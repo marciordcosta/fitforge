@@ -214,7 +214,7 @@
                 <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
               {/if}
             </h2>
-            <button class="icon-btn" onclick={() => (menuAberto = treino.id)} aria-label="Mais opções">⋮</button>
+            <button class="menu-btn" onclick={() => (menuAberto = treino.id)} aria-label="Mais opções">⋮</button>
           </div>
           <p class="preview">{preview(treino)}</p>
           <Button onclick={() => navigate(`/treino/log/${treino.id}`)}>Iniciar Rotina</Button>
@@ -289,6 +289,17 @@
     background: var(--surface-card);
     color: var(--surface-fg);
     font-size: var(--font-size-lg);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .menu-btn {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    color: var(--surface-muted);
+    font-size: var(--font-size-base);
     line-height: 1;
     cursor: pointer;
   }
