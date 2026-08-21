@@ -13,6 +13,7 @@ dist-ssr
 dev-dist
 *.local
 .env
+HANDOFF-TEMP.md
 
 # Editor directories and files
 .vscode/*

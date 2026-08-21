@@ -48,6 +48,10 @@ create table treinos (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id),
   nome_treino text not null,
+  -- Dia da semana sugerido (0=domingo..6=sábado, mesma convenção do
+  -- Date.getDay()), opcional. Usado só pra ordenar a lista por proximidade;
+  -- rotinas sem dia mantêm a ordenação manual.
+  dia_semana int check (dia_semana is null or (dia_semana >= 0 and dia_semana <= 6)),
   ordem int not null default 0
 );
 
@@ -56,10 +60,23 @@ create table treino_exercicios (
   user_id uuid not null references auth.users(id),
   treino_id uuid not null references treinos(id) on delete cascade,
   exercicio_id uuid not null references exercicios(id) on delete restrict,
-  series_planejadas int not null default 0,
   descanso_seg int,
-  prep_seg int,
+  observacao text,
   ordem int not null default 0
+);
+
+-- Cada linha é uma série planejada individual (peso-alvo + faixa de reps
+-- própria), em vez de uma contagem única para o exercício inteiro — permite
+-- que cada série tenha seu próprio alvo (ex: aquecimento leve, depois séries
+-- de trabalho mais pesadas).
+create table treino_exercicio_series (
+  id uuid primary key default gen_random_uuid(),
+  treino_exercicio_id uuid not null references treino_exercicios(id) on delete cascade,
+  serie int not null,
+  peso_alvo numeric,
+  rep_min int,
+  rep_max int,
+  unique (treino_exercicio_id, serie)
 );
 
 create table treino_registros (
@@ -89,10 +106,15 @@ select
   t.user_id,
   te.treino_id,
   em.musculo_id,
-  sum(te.series_planejadas * em.peso_contribuicao) as series_equivalentes
+  sum(qtd.n_series * em.peso_contribuicao) as series_equivalentes
 from treino_exercicios te
 join exercicio_musculos em on em.exercicio_id = te.exercicio_id
 join treinos t on t.id = te.treino_id
+join (
+  select treino_exercicio_id, count(*) as n_series
+  from treino_exercicio_series
+  group by treino_exercicio_id
+) qtd on qtd.treino_exercicio_id = te.id
 group by t.user_id, te.treino_id, em.musculo_id;
 
 create view v_musculo_volume_realizado as
@@ -111,6 +133,7 @@ alter table exercicios enable row level security;
 alter table exercicio_musculos enable row level security;
 alter table treinos enable row level security;
 alter table treino_exercicios enable row level security;
+alter table treino_exercicio_series enable row level security;
 alter table treino_registros enable row level security;
 
 create policy "musculos_owner" on musculos for all
@@ -131,6 +154,10 @@ create policy "treinos_owner" on treinos for all
 
 create policy "treino_exercicios_owner" on treino_exercicios for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy "treino_exercicio_series_owner" on treino_exercicio_series for all
+  using (treino_exercicio_id in (select id from treino_exercicios where user_id = auth.uid()))
+  with check (treino_exercicio_id in (select id from treino_exercicios where user_id = auth.uid()));
 
 create policy "treino_registros_owner" on treino_registros for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());
@@ -306,6 +333,27 @@ create policy "alimentos_owner" on alimentos for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 create policy "diario_alimentos_owner" on diario_alimentos for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ============================================================
+-- CONFIGURAÇÕES DO USUÁRIO
+-- ============================================================
+
+-- Preferências de UI que não pertencem a um domínio específico.
+-- historico_fonte controla a coluna "Anterior" na tela de log de treino:
+-- 'ultimo_exercicio' = última vez que esse exercício foi feito (em qualquer
+-- rotina); 'ultima_rotina' = último registro desse exercício especificamente
+-- dentro da rotina atual.
+create table usuario_config (
+  user_id uuid primary key references auth.users(id),
+  historico_fonte text not null default 'ultimo_exercicio'
+    check (historico_fonte in ('ultimo_exercicio', 'ultima_rotina')),
+  updated_at timestamptz not null default now()
+);
+
+alter table usuario_config enable row level security;
+
+create policy "usuario_config_owner" on usuario_config for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 notify pgrst, 'reload schema';

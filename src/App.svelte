@@ -1,10 +1,13 @@
 <script lang="ts">
   import { router, navigate } from "./lib/router.svelte";
   import { auth, logout } from "./lib/auth.svelte";
+  import { treinoLogSessao } from "./lib/treinoLogSessao.svelte";
   import BottomNav from "./components/BottomNav.svelte";
+  import TreinoMinimizado from "./components/TreinoMinimizado.svelte";
   import Login from "./routes/login/Login.svelte";
   import Home from "./routes/Home.svelte";
   import Placeholder from "./routes/Placeholder.svelte";
+  import Treino from "./routes/treino/Treino.svelte";
 
   const sectionTitles: Record<string, string> = {
     "/treino": "Treino",
@@ -43,12 +46,19 @@
 {:else if auth.user && auth.isAllowed}
   {#if router.path === "/"}
     <Home />
+  {:else if router.path.startsWith("/treino")}
+    <Treino />
   {:else if sectionTitles[router.path]}
     <Placeholder titulo={sectionTitles[router.path]} />
   {:else}
     <Home />
   {/if}
-  <BottomNav />
+  {#if !router.path.startsWith("/treino/log/")}
+    {#if treinoLogSessao.atual}
+      <TreinoMinimizado />
+    {/if}
+    <BottomNav />
+  {/if}
 {/if}
 
 <style>
