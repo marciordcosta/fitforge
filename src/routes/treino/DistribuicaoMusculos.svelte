@@ -67,7 +67,12 @@
   const gradeSemanal = $derived.by(() => {
     const colunas = ORDEM_DIAS.map((dia) => {
       const treino = treinos.find((t) => t.dia_semana === dia) ?? null;
-      return { dia, treinoNome: treino?.nome_treino ?? null, mapa: treino ? contarSeriesPorMusculo(treino) : new Map<string, number>() };
+      return {
+        dia,
+        treinoId: treino?.id ?? null,
+        treinoNome: treino?.nome_treino ?? null,
+        mapa: treino ? contarSeriesPorMusculo(treino) : new Map<string, number>(),
+      };
     });
 
     const totais = new Map<string, number>();
@@ -434,8 +439,15 @@
             <tr>
               <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
               {#each linha.valores as valor, i (i)}
+                {@const treinoId = gradeSemanal.colunas[i].treinoId}
                 <td class="grade-valor">
-                  {#if valor > 0}
+                  {#if valor > 0 && treinoId}
+                    <button
+                      class="grade-valor-caixa grade-valor-link"
+                      style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
+                      onclick={() => { mostrarGradeSemanal = false; navigate(`/treino/rotina/${treinoId}`); }}
+                    >{valor}</button>
+                  {:else if valor > 0}
                     <span
                       class="grade-valor-caixa"
                       style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
@@ -726,6 +738,11 @@
     border-radius: var(--radius-sm);
     font-weight: 600;
     font-size: var(--font-size-sm);
+  }
+  .grade-valor-link {
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
   }
   .grade-tabela tbody tr:not(:last-child) td {
     border-bottom: 1px solid var(--surface-border);
