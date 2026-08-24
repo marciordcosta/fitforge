@@ -3,7 +3,7 @@
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { parseISODate } from "../../lib/dates";
-  import { getDiasComTreino } from "../../lib/treinoApi";
+  import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
   import { navigate } from "../../lib/router.svelte";
   import {
     getPesoDoDia,
@@ -34,6 +34,7 @@
   let fotoUrl = $state<string | null>(null);
   let nomeRotina = $state<string | null>(null);
   let treinoIdRotina = $state<string | null>(null);
+  let treinoEfetuado = $state(false);
   let mostrarOpcoesFoto = $state(false);
   let inputCamera = $state<HTMLInputElement | undefined>();
   let inputGaleria = $state<HTMLInputElement | undefined>();
@@ -50,13 +51,28 @@
   async function carregar() {
     carregando = true;
     try {
-      const [p, f, treinos] = await Promise.all([getPesoDoDia(data), getFotoDoDia(data), getDiasComTreino(data, data)]);
+      const [p, f, treinosNoDia, todosTreinos] = await Promise.all([
+        getPesoDoDia(data),
+        getFotoDoDia(data),
+        getDiasComTreino(data, data),
+        listTreinos(),
+      ]);
       peso = p;
       pesoOriginal = p;
       foto = f;
       fotoUrl = f ? await getUrlAssinadaFoto(f.path) : null;
-      nomeRotina = treinos[0]?.treinoNome ?? null;
-      treinoIdRotina = treinos[0]?.treinoId ?? null;
+
+      if (treinosNoDia[0]) {
+        nomeRotina = treinosNoDia[0].treinoNome;
+        treinoIdRotina = treinosNoDia[0].treinoId;
+        treinoEfetuado = true;
+      } else {
+        const diaSemana = parseISODate(data).getDay();
+        const agendado = todosTreinos.find((t) => t.dia_semana === diaSemana);
+        nomeRotina = agendado?.nome_treino ?? null;
+        treinoIdRotina = agendado?.id ?? null;
+        treinoEfetuado = false;
+      }
     } finally {
       carregando = false;
     }
@@ -136,11 +152,14 @@
 
 <Sheet {onFechar}>
   <div class="titulo-dia">
-    <strong>{diaSemanaLabel}</strong>
-    <span class="titulo-data-complemento">{dataComplementoLabel}</span>
+    <strong>{diaSemanaLabel}</strong><span class="titulo-data-complemento">, {dataComplementoLabel}</span>
   </div>
   {#if nomeRotina && treinoIdRotina}
-    <button class="link-rotina" onclick={() => navigate(`/treino/rotina/${treinoIdRotina}/ver`)}>
+    <button
+      class="link-rotina"
+      onclick={() =>
+        navigate(treinoEfetuado ? `/treino/historico/${treinoIdRotina}/${data}` : `/treino/rotina/${treinoIdRotina}/ver`)}
+    >
       Dia de "{nomeRotina}"
     </button>
   {/if}
@@ -213,14 +232,11 @@
     margin: 0 0 var(--space-3);
   }
   .titulo-dia strong {
-    display: block;
     font-size: var(--font-size-base);
     font-weight: 700;
   }
   .titulo-data-complemento {
-    display: block;
-    margin-top: 2px;
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     font-weight: 400;
     color: var(--surface-muted);
   }
