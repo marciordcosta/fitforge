@@ -685,9 +685,9 @@
     border-bottom: 1px solid var(--surface-border);
   }
   .pizza-wrap {
-    width: 260px;
-    height: 260px;
-    max-width: 100%;
+    width: 100%;
+    max-width: 420px;
+    aspect-ratio: 1;
     overflow: hidden;
     margin: var(--space-2) auto 0;
   }
