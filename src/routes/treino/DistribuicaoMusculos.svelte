@@ -52,6 +52,16 @@
     });
   });
 
+  const totaisSemanais = $derived.by(() => {
+    let exercicios = 0;
+    let series = 0;
+    for (const t of treinos) {
+      exercicios += t.exercicios.length;
+      series += t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
+    }
+    return { exercicios, series };
+  });
+
   const ORDEM_DIAS = [1, 2, 3, 4, 5, 6, 0];
 
   let mostrarGradeSemanal = $state(false);
@@ -223,7 +233,11 @@
 
   // ---------------- Modal: exercícios/rotinas que trabalham um músculo ----------------
 
-  let modalAberto = $state<{ titulo: string; opcoes: { label: string; subtitulo?: string; valor?: string; onSelect: () => void }[] } | null>(null);
+  let modalAberto = $state<{
+    titulo: string;
+    opcoes: { label: string; subtitulo?: string; valor?: string; onSelect: () => void }[];
+    musculoParaGrade?: Musculo;
+  } | null>(null);
 
   /** Um item por (rotina, exercício) — o mesmo exercício pode aparecer em rotinas diferentes. */
   function exerciciosDoMusculo(
@@ -251,6 +265,17 @@
         valor: `${e.series} ${e.series === 1 ? "série" : "séries"}`,
         onSelect: () => navigate(`/treino/rotina/${e.treinoId}`),
       })),
+      musculoParaGrade: musculo,
+    };
+  }
+
+  function abrirMenuCardRotina(treino: TreinoComExercicios, lista: { musculo: Musculo; valor: number }[]): void {
+    modalAberto = {
+      titulo: treino.nome_treino,
+      opcoes: [
+        { label: "Editar Rotina", onSelect: () => navigate(`/treino/rotina/${treino.id}`) },
+        { label: "Visualizar Gráfico", onSelect: () => abrirDetalheRotina(treino.nome_treino, lista, [treino]) },
+      ],
     };
   }
 
@@ -339,6 +364,9 @@
                 </div>
               {/each}
             </div>
+            <p class="rotina-totais">
+              {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
+            </p>
           {/if}
         </div>
 
@@ -348,8 +376,8 @@
             class:clicavel={lista.length > 0}
             role="button"
             tabindex={0}
-            onclick={() => lista.length && abrirDetalheRotina(treino.nome_treino, lista, [treino])}
-            onkeydown={(e) => lista.length && e.key === "Enter" && abrirDetalheRotina(treino.nome_treino, lista, [treino])}
+            onclick={() => lista.length && abrirMenuCardRotina(treino, lista)}
+            onkeydown={(e) => lista.length && e.key === "Enter" && abrirMenuCardRotina(treino, lista)}
           >
             <div class="rotina-cabecalho">
               <h2 class="rotina-nome">{treino.nome_treino}</h2>
@@ -415,12 +443,31 @@
   {/if}
 </div>
 
+{#snippet linkDistribuicao()}
+  {#if modalAberto?.musculoParaGrade}
+    <button class="link-distribuicao" onclick={() => abrirGradeSemanal([modalAberto!.musculoParaGrade!.id])}>Distribuição</button>
+  {/if}
+{/snippet}
+
+{#snippet voltarGradeSemanal()}
+  <button class="grade-voltar" onclick={() => (mostrarGradeSemanal = false)} aria-label="Voltar">←</button>
+{/snippet}
+
 {#if modalAberto}
-  <ActionSheet titulo={modalAberto.titulo} opcoes={modalAberto.opcoes} onFechar={() => (modalAberto = null)} />
+  <ActionSheet
+    titulo={modalAberto.titulo}
+    opcoes={modalAberto.opcoes}
+    onFechar={() => (modalAberto = null)}
+    acaoTitulo={modalAberto.musculoParaGrade ? linkDistribuicao : undefined}
+  />
 {/if}
 
 {#if mostrarGradeSemanal}
-  <Sheet titulo="Distribuição na Semana" onFechar={() => (mostrarGradeSemanal = false)}>
+  <Sheet
+    titulo="Distribuição na Semana"
+    onFechar={() => (mostrarGradeSemanal = false)}
+    acaoTitulo={modalAberto ? voltarGradeSemanal : undefined}
+  >
     <div class="grade-scroll">
       <table class="grade-tabela">
         <thead>
@@ -684,6 +731,24 @@
     border-top: 1px solid var(--surface-border);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .link-distribuicao {
+    border: none;
+    background: none;
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .grade-voltar {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: var(--surface-fg);
+    font-size: var(--font-size-lg);
+    line-height: 1;
+    cursor: pointer;
   }
 
   .grade-scroll {

@@ -11,10 +11,15 @@
     onSelect: () => void;
   }
 
-  let { titulo, opcoes, onFechar }: { titulo?: string; opcoes: AcaoSheet[]; onFechar: () => void } = $props();
+  let {
+    titulo,
+    opcoes,
+    onFechar,
+    acaoTitulo,
+  }: { titulo?: string; opcoes: AcaoSheet[]; onFechar: () => void; acaoTitulo?: Snippet } = $props();
 </script>
 
-<Sheet {titulo} {onFechar}>
+<Sheet {titulo} {onFechar} {acaoTitulo}>
   {#each opcoes as opcao, i (i)}
     <button
       class="sheet-opcao"

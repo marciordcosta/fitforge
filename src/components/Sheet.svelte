@@ -4,10 +4,12 @@
   let {
     titulo,
     onFechar,
+    acaoTitulo,
     children,
   }: {
     titulo?: string;
     onFechar: () => void;
+    acaoTitulo?: Snippet;
     children: Snippet;
   } = $props();
 
@@ -51,7 +53,14 @@
       <span class="sheet-handle"></span>
     </div>
     <div class="sheet-conteudo">
-      {#if titulo}<h3>{titulo}</h3>{/if}
+      {#if titulo}
+        <div class="sheet-header">
+          <h3>{titulo}</h3>
+          {#if acaoTitulo}
+            <div class="sheet-header-acao">{@render acaoTitulo()}</div>
+          {/if}
+        </div>
+      {/if}
       {@render children()}
     </div>
   </div>
@@ -101,5 +110,15 @@
     margin: 0 0 var(--space-3);
     font-size: var(--font-size-base);
     text-align: center;
+  }
+  .sheet-header {
+    position: relative;
+  }
+  .sheet-header-acao {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
   }
 </style>
