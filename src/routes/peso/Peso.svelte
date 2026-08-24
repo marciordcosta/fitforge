@@ -2,8 +2,12 @@
   import { Chart } from "chart.js/auto";
   import { toISODate, hojeISO } from "../../lib/dates";
   import { getPesosDoPeriodo, type PesoRegistro } from "../../lib/pesoApi";
+  import { getDiasComTreino } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+
+  const COR_PESO = "#5eead4";
+  const COR_TREINO = "#f87171";
 
   interface Periodo {
     valor: string;
@@ -38,11 +42,13 @@
 
   let mesBase = $state(new Date());
   let pesos = $state<PesoRegistro[]>([]);
+  let diasComTreino = $state<Set<string>>(new Set());
   let loading = $state(true);
   let diaSelecionado = $state<string | null>(null);
 
   let periodo = $state<Periodo>(PERIODOS[2]);
   let pesosGrafico = $state<PesoRegistro[]>([]);
+  let diasComTreinoGrafico = $state<Set<string>>(new Set());
   let loadingGrafico = $state(true);
   let mostrarFiltro = $state(false);
 
@@ -52,7 +58,14 @@
 
   async function carregar() {
     loading = true;
-    pesos = await getPesosDoPeriodo(toISODate(mesInicio), toISODate(mesFim));
+    const dataInicio = toISODate(mesInicio);
+    const dataFim = toISODate(mesFim);
+    const [listaPesos, listaTreinos] = await Promise.all([
+      getPesosDoPeriodo(dataInicio, dataFim),
+      getDiasComTreino(dataInicio, dataFim),
+    ]);
+    pesos = listaPesos;
+    diasComTreino = new Set(listaTreinos.map((t) => t.data));
     loading = false;
   }
 
@@ -62,7 +75,13 @@
     loadingGrafico = true;
     const hoje = new Date();
     const dataInicio = periodo.dias == null ? "1900-01-01" : toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - periodo.dias));
-    pesosGrafico = await getPesosDoPeriodo(dataInicio, hojeISO());
+    const dataFim = hojeISO();
+    const [listaPesos, listaTreinos] = await Promise.all([
+      getPesosDoPeriodo(dataInicio, dataFim),
+      getDiasComTreino(dataInicio, dataFim),
+    ]);
+    pesosGrafico = listaPesos;
+    diasComTreinoGrafico = new Set(listaTreinos.map((t) => t.data));
     loadingGrafico = false;
   }
 
@@ -88,11 +107,11 @@
   const celulas = $derived.by(() => {
     const totalDias = mesFim.getDate();
     const primeiroDiaSemana = (mesInicio.getDay() + 6) % 7; // 0=Seg..6=Dom
-    const lista: ({ dia: number; iso: string; peso: number | null } | null)[] = [];
+    const lista: ({ dia: number; iso: string; peso: number | null; temTreino: boolean } | null)[] = [];
     for (let i = 0; i < primeiroDiaSemana; i++) lista.push(null);
     for (let dia = 1; dia <= totalDias; dia++) {
       const iso = toISODate(new Date(mesBase.getFullYear(), mesBase.getMonth(), dia));
-      lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null });
+      lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null, temTreino: diasComTreino.has(iso) });
     }
     return lista;
   });
@@ -117,8 +136,10 @@
         datasets: [
           {
             data: pesosGrafico.map((p) => p.peso),
-            borderColor: "#5eead4",
-            backgroundColor: "#5eead4",
+            borderColor: COR_PESO,
+            backgroundColor: COR_PESO,
+            pointBackgroundColor: pesosGrafico.map((p) => (diasComTreinoGrafico.has(p.data) ? COR_TREINO : COR_PESO)),
+            pointBorderColor: pesosGrafico.map((p) => (diasComTreinoGrafico.has(p.data) ? COR_TREINO : COR_PESO)),
             tension: 0.3,
             pointRadius: 3,
           },
@@ -211,6 +232,9 @@
           <div class="celula vazia"></div>
         {:else}
           <button class="celula" class:com-peso={cel.peso != null} onclick={() => abrirDia(cel.iso)}>
+            {#if cel.temTreino}
+              <span class="marcador-treino" aria-hidden="true"></span>
+            {/if}
             <span class="dia-numero" class:muted={cel.peso == null}>{cel.dia}</span>
             {#if cel.peso != null}
               <span class="peso-valor">{cel.peso}</span>
@@ -315,6 +339,7 @@
     gap: 2px;
   }
   .celula {
+    position: relative;
     aspect-ratio: 1;
     display: flex;
     flex-direction: column;
@@ -329,6 +354,15 @@
     box-sizing: border-box;
     overflow: hidden;
     cursor: pointer;
+  }
+  .marcador-treino {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #f87171;
   }
   .celula.vazia {
     visibility: hidden;

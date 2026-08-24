@@ -1,7 +1,9 @@
 <script lang="ts">
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import { parseISODate } from "../../lib/dates";
+  import { getDiasComTreino } from "../../lib/treinoApi";
   import {
     getPesoDoDia,
     getFotoDoDia,
@@ -29,7 +31,10 @@
   let carregando = $state(true);
   let foto = $state<FotoRegistro | null>(null);
   let fotoUrl = $state<string | null>(null);
-  let inputArquivo = $state<HTMLInputElement | undefined>();
+  let nomeRotina = $state<string | null>(null);
+  let mostrarOpcoesFoto = $state(false);
+  let inputCamera = $state<HTMLInputElement | undefined>();
+  let inputGaleria = $state<HTMLInputElement | undefined>();
 
   const dataLabel = $derived.by(() => {
     const texto = parseISODate(data).toLocaleDateString("pt-BR", {
@@ -44,11 +49,12 @@
   async function carregar() {
     carregando = true;
     try {
-      const [p, f] = await Promise.all([getPesoDoDia(data), getFotoDoDia(data)]);
+      const [p, f, treinos] = await Promise.all([getPesoDoDia(data), getFotoDoDia(data), getDiasComTreino(data, data)]);
       peso = p;
       pesoOriginal = p;
       foto = f;
       fotoUrl = f ? await getUrlAssinadaFoto(f.path) : null;
+      nomeRotina = treinos[0]?.treinoNome ?? null;
     } finally {
       carregando = false;
     }
@@ -57,7 +63,8 @@
   void carregar();
 
   async function selecionarFoto(e: Event) {
-    const arquivo = (e.target as HTMLInputElement).files?.[0];
+    const input = e.target as HTMLInputElement;
+    const arquivo = input.files?.[0];
     if (!arquivo) return;
     salvando = true;
     try {
@@ -67,7 +74,7 @@
       alert("Erro ao salvar foto: " + (err as Error).message);
     } finally {
       salvando = false;
-      if (inputArquivo) inputArquivo.value = "";
+      input.value = "";
     }
   }
 
@@ -118,7 +125,13 @@
   </svg>
 {/snippet}
 
-<Sheet titulo={dataLabel} {onFechar}>
+{#snippet nomeRotinaAcao()}
+  {#if nomeRotina}
+    <span class="nome-rotina">{nomeRotina}</span>
+  {/if}
+{/snippet}
+
+<Sheet titulo={dataLabel} {onFechar} acaoTitulo={nomeRotina ? nomeRotinaAcao : undefined}>
   <div class="campo">
     <label for="peso-input">Peso (kg)</label>
     <input id="peso-input" type="number" inputmode="decimal" step="0.1" placeholder="-" bind:value={peso} />
@@ -134,18 +147,12 @@
         <button class="foto-remover" onclick={removerFoto} disabled={salvando} aria-label="Remover foto">✕</button>
       </div>
     {:else}
-      <button class="foto-btn" onclick={() => inputArquivo?.click()} disabled={salvando} aria-label="Adicionar foto">
+      <button class="foto-btn" onclick={() => (mostrarOpcoesFoto = true)} disabled={salvando} aria-label="Adicionar foto">
         {@render iconCamera()}
       </button>
     {/if}
-    <input
-      bind:this={inputArquivo}
-      type="file"
-      accept="image/*"
-      capture="environment"
-      class="foto-input"
-      onchange={selecionarFoto}
-    />
+    <input bind:this={inputCamera} type="file" accept="image/*" capture="environment" class="foto-input" onchange={selecionarFoto} />
+    <input bind:this={inputGaleria} type="file" accept="image/*" class="foto-input" onchange={selecionarFoto} />
   </div>
 
   <div class="acoes">
@@ -155,6 +162,17 @@
     {/if}
   </div>
 </Sheet>
+
+{#if mostrarOpcoesFoto}
+  <ActionSheet
+    titulo="Adicionar foto"
+    onFechar={() => (mostrarOpcoesFoto = false)}
+    opcoes={[
+      { label: "Câmera", onSelect: () => inputCamera?.click() },
+      { label: "Galeria", onSelect: () => inputGaleria?.click() },
+    ]}
+  />
+{/if}
 
 <style>
   .campo {
@@ -176,6 +194,14 @@
     background: var(--surface-bg);
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+  }
+  .nome-rotina {
+    font-size: 11px;
+    color: var(--surface-muted);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .foto-secao {
     margin-bottom: var(--space-5);
