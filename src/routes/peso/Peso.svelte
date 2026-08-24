@@ -59,6 +59,16 @@
   let mostrarEscolhaMeta = $state(false);
   let metaEtapa = $state<"ganho" | "perda" | "manutencao" | null>(null);
 
+  const CHAVE_META_VISIVEL = "fitforge_peso_meta_visivel";
+  let metaVisivel = $state(typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_META_VISIVEL) !== "0" : true);
+
+  function alternarMetaVisivel() {
+    metaVisivel = !metaVisivel;
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(CHAVE_META_VISIVEL, metaVisivel ? "1" : "0");
+    }
+  }
+
   async function carregarMeta() {
     meta = await getMeta();
   }
@@ -154,7 +164,7 @@
 
   /** Linha reta de meta: do peso inicial do período visível até o peso-alvo calculado (percentual semanal composto, ou flat na manutenção). */
   const metaLinha = $derived.by(() => {
-    if (!meta || pesosGrafico.length < 2) return null;
+    if (!meta || !metaVisivel || pesosGrafico.length < 2) return null;
     const pesoInicial = pesosGrafico[0].peso;
     let pesoAlvo: number;
     if (meta.tipo === "manutencao") {
@@ -179,7 +189,7 @@
 
   /** Diferença % de cada peso real em relação ao peso esperado pela meta naquele mesmo dia (mesma fórmula da metaLinha, avaliada dia a dia). */
   const diffMetaPorPonto = $derived.by(() => {
-    if (!meta || !pesosGrafico.length) return null;
+    if (!meta || !metaVisivel || !pesosGrafico.length) return null;
     if (meta.tipo === "manutencao") {
       if (meta.pesoManutencao == null) return null;
       const alvo = meta.pesoManutencao;
@@ -336,6 +346,19 @@
     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
   </svg>
 {/snippet}
+{#snippet iconToggleMetaGrafico()}
+  <button
+    class="toggle-meta-grafico"
+    style={`color: ${metaVisivel ? COR_TREINO : "#fff"};`}
+    onclick={alternarMetaVisivel}
+    aria-label={metaVisivel ? "Ocultar meta no gráfico" : "Mostrar meta no gráfico"}
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 3v18h18" />
+      <path d="M18.7 8L14 12.7l-3-3L7 14" />
+    </svg>
+  </button>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -414,6 +437,7 @@
   <ActionSheet
     titulo="Meta"
     onFechar={() => (mostrarEscolhaMeta = false)}
+    acaoTitulo={iconToggleMetaGrafico}
     opcoes={[
       {
         label: "Ganho",
@@ -482,6 +506,20 @@
   .icon-btn svg {
     width: 22px;
     height: 22px;
+  }
+  .toggle-meta-grafico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+  .toggle-meta-grafico svg {
+    width: 20px;
+    height: 20px;
   }
   .chart-wrap {
     height: 220px;
