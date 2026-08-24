@@ -160,7 +160,7 @@
       onclick={() =>
         navigate(treinoEfetuado ? `/treino/historico/${treinoIdRotina}/${data}` : `/treino/rotina/${treinoIdRotina}/ver`)}
     >
-      Dia de "{nomeRotina}"
+      Dia de <span class="link-rotina-nome">"{nomeRotina}"</span>
     </button>
   {/if}
 
@@ -228,8 +228,8 @@
     font-size: var(--font-size-base);
   }
   .titulo-dia {
-    text-align: center;
-    margin: 0 0 var(--space-3);
+    text-align: left;
+    margin: 0 0 2px;
   }
   .titulo-dia strong {
     font-size: var(--font-size-base);
@@ -247,12 +247,15 @@
     padding: 0;
     border: none;
     background: none;
-    text-align: center;
-    color: var(--color-primary);
+    text-align: left;
+    color: #fff;
     font-size: var(--font-size-sm);
     font-family: inherit;
-    font-weight: 600;
     cursor: pointer;
+  }
+  .link-rotina-nome {
+    color: var(--color-primary);
+    font-weight: 600;
   }
   .foto-secao {
     margin-bottom: var(--space-5);
