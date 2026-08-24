@@ -381,7 +381,7 @@
               <th class="grade-col-musculo"></th>
               {#each gradeSemanal.colunas as col (col.dia)}
                 <th>
-                  <div class="grade-dia">{DIAS_SEMANA_ABREV[col.dia]}</div>
+                  <div class="grade-dia" class:com-treino={col.treinoNome != null}>{DIAS_SEMANA_ABREV[col.dia]}</div>
                   <div class="grade-rotina-nome">{col.treinoNome ?? "—"}</div>
                 </th>
               {/each}
@@ -399,7 +399,7 @@
                         style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
                       >{valor}</span>
                     {:else}
-                      <span class="grade-valor-vazio">—</span>
+                      <span class="grade-valor-vazio">💤</span>
                     {/if}
                   </td>
                 {/each}
@@ -442,7 +442,7 @@
                         style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
                       >{valor}</span>
                     {:else}
-                      <span class="grade-valor-vazio">—</span>
+                      <span class="grade-valor-vazio">💤</span>
                     {/if}
                   </td>
                 {/each}
@@ -690,6 +690,9 @@
     font-weight: 600;
     color: var(--surface-fg);
   }
+  .grade-dia.com-treino {
+    color: var(--color-primary);
+  }
   .grade-rotina-nome {
     font-size: 11px;
     font-weight: 400;
@@ -722,8 +725,10 @@
     font-size: var(--font-size-sm);
   }
   .grade-valor-vazio {
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
+    display: inline-block;
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0.5;
   }
   .grade-tabela tbody tr:not(:last-child) td {
     border-bottom: 1px solid var(--surface-border);
