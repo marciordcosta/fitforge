@@ -789,6 +789,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: var(--space-4);
     padding: var(--space-3) var(--space-4);
   }
   .voltar {
