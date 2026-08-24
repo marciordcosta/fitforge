@@ -796,6 +796,10 @@
     text-align: center;
     white-space: nowrap;
   }
+  .grade-tabela th:not(:first-child),
+  .grade-tabela td:not(:first-child) {
+    border-left: 1px solid var(--surface-border);
+  }
   .grade-dia {
     font-size: var(--font-size-sm);
     font-weight: 600;
