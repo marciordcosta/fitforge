@@ -137,6 +137,7 @@
     pointer-events: none;
   }
   .roda-lista {
+    position: relative;
     height: 100%;
     overflow-y: auto;
     scroll-snap-type: y mandatory;
