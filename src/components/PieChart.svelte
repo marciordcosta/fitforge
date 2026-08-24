@@ -41,8 +41,13 @@
         nomeDestacado = null;
       }
     }
-    window.addEventListener("click", aoClicarFora);
-    return () => window.removeEventListener("click", aoClicarFora);
+    // Registra só depois do clique atual (o que selecionou a fatia) terminar de se propagar,
+    // senão esse mesmo clique já cai aqui e desfaz a seleção antes de renderizar o painel.
+    const id = setTimeout(() => window.addEventListener("click", aoClicarFora));
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener("click", aoClicarFora);
+    };
   });
 
   const CX = 50;
