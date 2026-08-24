@@ -482,7 +482,7 @@
   <ActionSheet
     titulo={modalAberto.titulo}
     opcoes={modalAberto.opcoes}
-    onFechar={() => (modalAberto = null)}
+    onFechar={() => { if (!mostrarGradeSemanal) modalAberto = null; }}
     acaoTitulo={modalAberto.musculoParaGrade ? linkDistribuicao : undefined}
   />
 {/if}

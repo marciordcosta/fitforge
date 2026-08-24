@@ -29,6 +29,7 @@
 
   let nomeDestacado = $state<string | null>(null);
   let svgEl = $state<SVGSVGElement | undefined>();
+  let painelEl = $state<HTMLDivElement | undefined>();
 
   function aoClicarFatia(f: { nome: string; detalhe?: DetalheExercicio[] | null }): void {
     nomeDestacado = nomeDestacado === f.nome ? null : f.nome;
@@ -138,6 +139,12 @@
     if (!f?.detalhe?.length) return null;
     return { nome: f.nome, detalhe: f.detalhe };
   });
+
+  $effect(() => {
+    if (detalheSelecionado && painelEl) {
+      painelEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  });
 </script>
 
 <svg bind:this={svgEl} viewBox="0 0 100 100" class="pizza" role="img" aria-label="Distribuição muscular">
@@ -181,7 +188,7 @@
 </svg>
 
 {#if detalheSelecionado}
-  <div class="detalhe-painel">
+  <div class="detalhe-painel" bind:this={painelEl}>
     <div class="detalhe-cabecalho">
       <strong>{detalheSelecionado.nome}</strong>
       <button class="detalhe-fechar" onclick={() => (nomeDestacado = null)} aria-label="Fechar detalhe">✕</button>
