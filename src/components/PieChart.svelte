@@ -212,11 +212,13 @@
   }
   .fatia-nome {
     font-size: 4.2px;
-    font-weight: 600;
+    font-weight: 400;
+    fill: var(--surface-muted);
   }
   .fatia-pct {
     font-size: 4.2px;
-    font-weight: 700;
+    font-weight: 400;
+    fill: var(--surface-muted);
     opacity: 0.75;
   }
   .fatia-linha {
