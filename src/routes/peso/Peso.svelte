@@ -207,7 +207,7 @@
       ctx.font = "9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = COR_META;
+      ctx.fillStyle = COR_TREINO;
       pontos.forEach((ponto, i) => {
         const diff = diffs[i];
         if (diff == null) return;
