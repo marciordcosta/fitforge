@@ -19,7 +19,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => navigate("/treino")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
     <h1>
       {treino?.nome_treino ?? ""}
       {#if treino?.dia_semana != null}

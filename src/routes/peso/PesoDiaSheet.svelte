@@ -4,6 +4,7 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { parseISODate } from "../../lib/dates";
   import { getDiasComTreino } from "../../lib/treinoApi";
+  import { navigate } from "../../lib/router.svelte";
   import {
     getPesoDoDia,
     getFotoDoDia,
@@ -32,19 +33,19 @@
   let foto = $state<FotoRegistro | null>(null);
   let fotoUrl = $state<string | null>(null);
   let nomeRotina = $state<string | null>(null);
+  let treinoIdRotina = $state<string | null>(null);
   let mostrarOpcoesFoto = $state(false);
   let inputCamera = $state<HTMLInputElement | undefined>();
   let inputGaleria = $state<HTMLInputElement | undefined>();
 
-  const dataLabel = $derived.by(() => {
-    const texto = parseISODate(data).toLocaleDateString("pt-BR", {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
+  const diaSemanaLabel = $derived.by(() => {
+    const texto = parseISODate(data).toLocaleDateString("pt-BR", { weekday: "long" });
     return texto.charAt(0).toUpperCase() + texto.slice(1);
   });
+
+  const dataComplementoLabel = $derived.by(() =>
+    parseISODate(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }),
+  );
 
   async function carregar() {
     carregando = true;
@@ -55,6 +56,7 @@
       foto = f;
       fotoUrl = f ? await getUrlAssinadaFoto(f.path) : null;
       nomeRotina = treinos[0]?.treinoNome ?? null;
+      treinoIdRotina = treinos[0]?.treinoId ?? null;
     } finally {
       carregando = false;
     }
@@ -132,13 +134,17 @@
   </svg>
 {/snippet}
 
-{#snippet nomeRotinaAcao()}
-  {#if nomeRotina}
-    <span class="nome-rotina">{nomeRotina}</span>
+<Sheet {onFechar}>
+  <div class="titulo-dia">
+    <strong>{diaSemanaLabel}</strong>
+    <span class="titulo-data-complemento">{dataComplementoLabel}</span>
+  </div>
+  {#if nomeRotina && treinoIdRotina}
+    <button class="link-rotina" onclick={() => navigate(`/treino/rotina/${treinoIdRotina}/ver`)}>
+      Dia de "{nomeRotina}"
+    </button>
   {/if}
-{/snippet}
 
-<Sheet titulo={dataLabel} {onFechar} acaoTitulo={nomeRotina ? nomeRotinaAcao : undefined}>
   <div class="campo">
     <label for="peso-input">Peso (kg)</label>
     <input id="peso-input" type="number" inputmode="decimal" step="0.1" placeholder="-" bind:value={peso} />
@@ -202,13 +208,35 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
   }
-  .nome-rotina {
-    font-size: 11px;
+  .titulo-dia {
+    text-align: center;
+    margin: 0 0 var(--space-3);
+  }
+  .titulo-dia strong {
+    display: block;
+    font-size: var(--font-size-base);
+    font-weight: 700;
+  }
+  .titulo-data-complemento {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--font-size-sm);
+    font-weight: 400;
     color: var(--surface-muted);
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  }
+  .link-rotina {
+    display: block;
+    width: 100%;
+    margin: 0 0 var(--space-4);
+    padding: 0;
+    border: none;
+    background: none;
+    text-align: center;
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
   }
   .foto-secao {
     margin-bottom: var(--space-5);
