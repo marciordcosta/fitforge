@@ -205,13 +205,18 @@
       const { ctx } = c;
       ctx.save();
       ctx.font = "9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-      ctx.fillStyle = COR_META;
       ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       pontos.forEach((ponto, i) => {
         const diff = diffs[i];
         if (diff == null) return;
         const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
-        ctx.fillText(texto, ponto.x, ponto.y - 8);
+        const y = ponto.y - 11;
+        const largura = ctx.measureText(texto).width;
+        ctx.fillStyle = "#111318";
+        ctx.fillRect(ponto.x - largura / 2 - 3, y - 6, largura + 6, 12);
+        ctx.fillStyle = COR_META;
+        ctx.fillText(texto, ponto.x, y);
       });
       ctx.restore();
     },
