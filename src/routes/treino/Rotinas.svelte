@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, router } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -13,8 +13,13 @@
 
   let treinos = $state<TreinoComExercicios[]>([]);
   let loading = $state(true);
-  let menuAberto = $state<string | null>(null);
   let excluindoId = $state<string | null>(null);
+
+  /** Deriva do path pra que o botao "voltar" do navegador feche o menu, ou reabra ao voltar de "Editar Rotina". */
+  const menuAberto = $derived.by(() => {
+    const m = router.path.match(/^\/treino\/menu\/([^/]+)$/);
+    return m ? m[1] : null;
+  });
 
   /** Rotinas com dia informado sobem pro topo, ordenadas pelo dia mais próximo; sem dia, mantém a ordenação manual. */
   function ordenarPorDia(lista: TreinoComExercicios[]): TreinoComExercicios[] {
@@ -111,7 +116,7 @@
               <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
             {/if}
           </h2>
-          <button class="menu-btn" onclick={(e) => { e.stopPropagation(); menuAberto = treino.id; }} aria-label="Mais opções">⋮</button>
+          <button class="menu-btn" onclick={(e) => { e.stopPropagation(); navigate(`/treino/menu/${treino.id}`); }} aria-label="Mais opções">⋮</button>
         </div>
         <p class="preview">{preview(treino)}</p>
         <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
@@ -124,7 +129,7 @@
   {@const treinoId = menuAberto}
   <ActionSheet
     titulo={treinos.find((t) => t.id === treinoId)?.nome_treino}
-    onFechar={() => (menuAberto = null)}
+    onFechar={() => window.history.back()}
     opcoes={[
       { label: "Editar Rotina", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treinoId}`) },
       { label: "Duplicar Rotina", icon: iconDuplicar, onSelect: () => duplicar(treinoId) },

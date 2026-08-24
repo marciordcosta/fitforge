@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, router } from "../../lib/router.svelte";
   import { toISODate, parseISODate } from "../../lib/dates";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
@@ -269,15 +269,25 @@
     };
   }
 
-  function abrirMenuCardRotina(treino: TreinoComExercicios, lista: { musculo: Musculo; valor: number }[]): void {
-    modalAberto = {
-      titulo: treino.nome_treino,
-      opcoes: [
-        { label: "Editar Rotina", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treino.id}`) },
-        { label: "Visualizar Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(treino.nome_treino, lista) },
-      ],
-    };
+  function abrirMenuCardRotina(treino: TreinoComExercicios): void {
+    navigate(`/treino/distribuicao/rotina/${treino.id}`);
   }
+
+  /** Deriva do path pra que "voltar" do navegador feche o menu, ou reabra ao voltar de "Editar Rotina". */
+  const rotinaMenuUrl = $derived.by(() => {
+    const m = router.path.match(/^\/treino\/distribuicao\/rotina\/([^/]+)$/);
+    if (!m) return null;
+    return treinos.find((t) => t.id === m[1]) ?? null;
+  });
+
+  const rotinaMenuOpcoes = $derived.by((): AcaoSheet[] => {
+    if (!rotinaMenuUrl) return [];
+    const lista = distribuicaoPorTreino.find((d) => d.treino.id === rotinaMenuUrl!.id)?.lista ?? [];
+    return [
+      { label: "Editar Rotina", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${rotinaMenuUrl!.id}`) },
+      { label: "Visualizar Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(rotinaMenuUrl!.nome_treino, lista) },
+    ];
+  });
 
   function abrirMenuSemanal(): void {
     modalAberto = {
@@ -367,7 +377,7 @@
                 {/each}
               </div>
             {/if}
-            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirMenuCardRotina(treino, lista)}>
+            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirMenuCardRotina(treino)}>
               {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
                 (acc, ex) => acc + ex.series.length,
                 0,
@@ -452,6 +462,10 @@
     onFechar={() => (modalAberto = null)}
     acaoTitulo={modalAberto.musculoParaGrade ? linkDistribuicao : undefined}
   />
+{/if}
+
+{#if rotinaMenuUrl}
+  <ActionSheet titulo={rotinaMenuUrl.nome_treino} opcoes={rotinaMenuOpcoes} onFechar={() => window.history.back()} />
 {/if}
 
 {#if mostrarGradeSemanal}
