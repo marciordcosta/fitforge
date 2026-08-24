@@ -29,7 +29,6 @@
 
   let nomeDestacado = $state<string | null>(null);
   let svgEl = $state<SVGSVGElement | undefined>();
-  let painelEl = $state<HTMLDivElement | undefined>();
 
   function aoClicarFatia(f: { nome: string; detalhe?: DetalheExercicio[] | null }): void {
     nomeDestacado = nomeDestacado === f.nome ? null : f.nome;
@@ -139,12 +138,6 @@
     if (!f?.detalhe?.length) return null;
     return { nome: f.nome, detalhe: f.detalhe };
   });
-
-  $effect(() => {
-    if (detalheSelecionado && painelEl) {
-      painelEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  });
 </script>
 
 <svg bind:this={svgEl} viewBox="0 0 100 100" class="pizza" role="img" aria-label="Distribuição muscular">
@@ -188,19 +181,13 @@
 </svg>
 
 {#if detalheSelecionado}
-  <div class="detalhe-painel" bind:this={painelEl}>
-    <div class="detalhe-cabecalho">
-      <strong>{detalheSelecionado.nome}</strong>
-      <button class="detalhe-fechar" onclick={() => (nomeDestacado = null)} aria-label="Fechar detalhe">✕</button>
-    </div>
-    <div class="detalhe-lista">
-      {#each detalheSelecionado.detalhe as d (d.exercicio)}
-        <div class="detalhe-item">
-          <span class="detalhe-nome">{d.exercicio}</span>
-          <span class="detalhe-series">{d.series} {d.series === 1 ? "série" : "séries"}</span>
-        </div>
-      {/each}
-    </div>
+  <div class="detalhe-painel">
+    {#each detalheSelecionado.detalhe as d (d.exercicio)}
+      <div class="detalhe-item">
+        <span class="detalhe-nome">{d.exercicio}</span>
+        <span class="detalhe-series">{d.series} {d.series === 1 ? "série" : "séries"}</span>
+      </div>
+    {/each}
   </div>
 {/if}
 
@@ -237,31 +224,9 @@
     -webkit-tap-highlight-color: transparent;
   }
   .detalhe-painel {
-    margin-top: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-lg);
-    background: var(--surface-bg);
-    border: 1px solid var(--surface-border);
-  }
-  .detalhe-cabecalho {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    color: var(--surface-fg);
-  }
-  .detalhe-fechar {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: none;
-    color: var(--surface-muted);
-    font-size: var(--font-size-base);
-    line-height: 1;
-    cursor: pointer;
-  }
-  .detalhe-lista {
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--surface-border);
     display: flex;
     flex-direction: column;
   }
@@ -269,16 +234,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--surface-border);
-  }
-  .detalhe-item:last-child {
-    border-bottom: none;
+    gap: var(--space-2);
+    padding: 2px 0;
   }
   .detalhe-nome {
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
   }
   .detalhe-series {
     flex-shrink: 0;

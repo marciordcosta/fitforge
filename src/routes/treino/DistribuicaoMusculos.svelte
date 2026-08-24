@@ -482,7 +482,7 @@
   <ActionSheet
     titulo={modalAberto.titulo}
     opcoes={modalAberto.opcoes}
-    onFechar={() => { if (!mostrarGradeSemanal) modalAberto = null; }}
+    onFechar={() => (modalAberto = null)}
     acaoTitulo={modalAberto.musculoParaGrade ? linkDistribuicao : undefined}
   />
 {/if}
@@ -490,7 +490,7 @@
 {#if mostrarGradeSemanal}
   <Sheet
     titulo="Distribuição na Semana"
-    onFechar={() => (mostrarGradeSemanal = false)}
+    onFechar={() => { mostrarGradeSemanal = false; modalAberto = null; }}
     acaoTitulo={modalAberto ? voltarGradeSemanal : undefined}
     acaoTituloLado="esquerda"
   >
@@ -845,7 +845,7 @@
   }
   .pizza-wrap {
     width: 100%;
-    max-width: 420px;
+    max-width: 320px;
     aspect-ratio: 1;
     overflow: hidden;
     margin: var(--space-2) auto 0;
