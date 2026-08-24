@@ -139,6 +139,13 @@
     return "var(--color-neutral)";
   }
 
+  /** Nomes com 2+ palavras abreviam cada uma (ex: "Deltoide Anterior" -> "Delt. Ant."), pra caber na coluna estreita da grade. */
+  function abreviarMusculo(nome: string): string {
+    const partes = nome.split(" ");
+    if (partes.length < 2) return nome;
+    return partes.map((p) => (p.length > 4 ? `${p.slice(0, 4)}.` : p)).join(" ");
+  }
+
   const SEMANAS_MES = [
     { label: "Semana 1", subtitulo: "01–07", diaIni: 1, diaFim: 7 },
     { label: "Semana 2", subtitulo: "08–14", diaIni: 8, diaFim: 14 },
@@ -390,7 +397,7 @@
           <tbody>
             {#each gradeSemanal.linhas as linha (linha.musculo.id)}
               <tr>
-                <td class="grade-col-musculo">{linha.musculo.nome}</td>
+                <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
                 {#each linha.valores as valor, i (i)}
                   <td class="grade-valor">
                     {#if valor > 0}
@@ -398,8 +405,6 @@
                         class="grade-valor-caixa"
                         style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
                       >{valor}</span>
-                    {:else}
-                      <span class="grade-valor-vazio">—</span>
                     {/if}
                   </td>
                 {/each}
@@ -433,7 +438,7 @@
           <tbody>
             {#each gradeRealizado.linhas as linha (linha.musculo.id)}
               <tr>
-                <td class="grade-col-musculo">{linha.musculo.nome}</td>
+                <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
                 {#each linha.valores as valor, i (i)}
                   <td class="grade-valor">
                     {#if valor > 0}
@@ -441,8 +446,6 @@
                         class="grade-valor-caixa"
                         style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
                       >{valor}</span>
-                    {:else}
-                      <span class="grade-valor-vazio">—</span>
                     {/if}
                   </td>
                 {/each}
@@ -723,10 +726,6 @@
     border-radius: var(--radius-sm);
     font-weight: 600;
     font-size: var(--font-size-sm);
-  }
-  .grade-valor-vazio {
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
   }
   .grade-tabela tbody tr:not(:last-child) td {
     border-bottom: 1px solid var(--surface-border);
