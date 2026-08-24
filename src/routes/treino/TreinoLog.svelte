@@ -274,11 +274,20 @@
     return serieItem.concluida ? "concluida" : "";
   }
 
-  function classeTextoReps(serieItem: SetSessao): string {
-    if (!serieItem.concluida || serieItem.repeticoes == null) return "";
-    if (serieItem.repMin != null && serieItem.repeticoes < serieItem.repMin) return "abaixo-faixa";
-    if (serieItem.repMax != null && serieItem.repeticoes > serieItem.repMax) return "acima-faixa";
-    return "";
+  /** Antes de concluir mostra a meta; depois, some se ficou dentro da faixa, ou avisa se ficou fora. */
+  function textoMeta(serieItem: SetSessao): string | null {
+    if (serieItem.repMin == null && serieItem.repMax == null) return null;
+    if (!serieItem.concluida) {
+      return `Meta: ${
+        serieItem.repMin != null && serieItem.repMax != null
+          ? `${serieItem.repMin} a ${serieItem.repMax}`
+          : (serieItem.repMin ?? serieItem.repMax)
+      }`;
+    }
+    if (serieItem.repeticoes == null) return null;
+    if (serieItem.repMin != null && serieItem.repeticoes < serieItem.repMin) return "abaixo da meta";
+    if (serieItem.repMax != null && serieItem.repeticoes > serieItem.repMax) return "acima da meta";
+    return null;
   }
 
   function descansoLabel(ex: ExercicioSessao): string {
@@ -609,12 +618,8 @@
                     ? `${serieItem.anteriorPeso}kg x ${serieItem.anteriorReps}`
                     : "—"}
                 </span>
-                {#if serieItem.repMin != null || serieItem.repMax != null}
-                  <span class="anterior-meta {classeTextoReps(serieItem)}">
-                    Meta: {serieItem.repMin != null && serieItem.repMax != null
-                      ? `${serieItem.repMin} a ${serieItem.repMax}`
-                      : (serieItem.repMin ?? serieItem.repMax)}
-                  </span>
+                {#if textoMeta(serieItem)}
+                  <span class="anterior-meta">{textoMeta(serieItem)}</span>
                 {/if}
               </span>
               <input
@@ -683,13 +688,12 @@
 {/snippet}
 {#snippet iconMedalha()}
   <svg viewBox="0 0 24 24" fill="none">
-    <path d="M9 14.5 6 21 9.5 19.5 11 22 12.8 15.5Z" fill="#f59e0b" />
-    <path d="M15 14.5 18 21 14.5 19.5 13 22 11.2 15.5Z" fill="#f59e0b" />
-    <circle cx="12" cy="9.5" r="7.5" fill="#fbbf24" stroke="#d97706" stroke-width="1.2" />
-    <path
-      d="M12 5.6l1.15 2.33 2.57.37-1.86 1.81.44 2.56-2.3-1.21-2.3 1.21.44-2.56-1.86-1.81 2.57-.37z"
-      fill="#fffbeb"
-    />
+    <path d="M7 6H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4" stroke="#d97706" stroke-width="1.4" stroke-linecap="round" />
+    <path d="M17 6h3a1 1 0 0 1 1 1v1a4 4 0 0 1-4 4" stroke="#d97706" stroke-width="1.4" stroke-linecap="round" />
+    <path d="M7 4h10v6a5 5 0 0 1-10 0V4Z" fill="#fbbf24" stroke="#d97706" stroke-width="1.2" />
+    <path d="M12 15v3" stroke="#d97706" stroke-width="1.4" stroke-linecap="round" />
+    <path d="M9.3 18h5.4l.6 2.5H8.7Z" fill="#fbbf24" stroke="#d97706" stroke-width="1.2" />
+    <path d="M8 21h8" stroke="#d97706" stroke-width="1.4" stroke-linecap="round" />
   </svg>
 {/snippet}
 
@@ -1048,19 +1052,8 @@
     color: var(--surface-muted);
   }
   .anterior-meta {
-    display: inline-block;
     font-size: 11px;
     color: var(--surface-muted);
-    border-radius: 4px;
-    padding: 0 3px;
-  }
-  .anterior-meta.abaixo-faixa {
-    background: var(--color-danger);
-    color: #fff;
-  }
-  .anterior-meta.acima-faixa {
-    background: #60a5fa;
-    color: #fff;
   }
   .linha input {
     box-sizing: border-box;
