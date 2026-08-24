@@ -348,7 +348,6 @@
         <div class="rotina-card">
           <div class="rotina-cabecalho">
             <h2 class="rotina-nome">Distribuição Semanal</h2>
-            <button class="icon-btn" onclick={() => abrirMenuSemanal()} aria-label="Mais opções">⋮</button>
           </div>
           {#if !distribuicaoSemanal.length}
             <p class="muted">Nenhum volume planejado ainda.</p>
@@ -364,21 +363,14 @@
                 </div>
               {/each}
             </div>
-            <p class="rotina-totais">
+            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirMenuSemanal()}>
               {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
-            </p>
+            </button>
           {/if}
         </div>
 
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
-          <div
-            class="rotina-card"
-            class:clicavel={lista.length > 0}
-            role="button"
-            tabindex={0}
-            onclick={() => lista.length && abrirMenuCardRotina(treino, lista)}
-            onkeydown={(e) => lista.length && e.key === "Enter" && abrirMenuCardRotina(treino, lista)}
-          >
+          <div class="rotina-card">
             <div class="rotina-cabecalho">
               <h2 class="rotina-nome">{treino.nome_treino}</h2>
               {#if treino.dia_semana != null}
@@ -400,12 +392,12 @@
                 {/each}
               </div>
             {/if}
-            <p class="rotina-totais">
+            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirMenuCardRotina(treino, lista)}>
               {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
                 (acc, ex) => acc + ex.series.length,
                 0,
               )} séries
-            </p>
+            </button>
           </div>
         {/each}
       </div>
@@ -646,9 +638,6 @@
     padding: var(--space-4);
     box-shadow: var(--shadow-card);
   }
-  .rotina-card.clicavel {
-    cursor: pointer;
-  }
   .rotina-cabecalho {
     display: flex;
     align-items: center;
@@ -757,6 +746,17 @@
     border-top: 1px solid var(--surface-border);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .rotina-totais-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--surface-border);
+    padding-top: var(--space-3);
+    font-family: inherit;
+    cursor: pointer;
   }
   .link-distribuicao {
     display: flex;

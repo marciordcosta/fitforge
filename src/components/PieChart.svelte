@@ -135,7 +135,7 @@
 
   const detalheSelecionado = $derived.by(() => {
     const f = fatias.find((x) => x.nome === nomeDestacado);
-    if (!f?.detalhe?.length) return null;
+    if (!f || f.detalhe == null) return null;
     return { nome: f.nome, detalhe: f.detalhe };
   });
 </script>
@@ -182,12 +182,16 @@
 
 {#if detalheSelecionado}
   <div class="detalhe-painel">
-    {#each detalheSelecionado.detalhe as d (d.exercicio)}
-      <div class="detalhe-item">
-        <span class="detalhe-nome">{d.exercicio}</span>
-        <span class="detalhe-series">{d.series} {d.series === 1 ? "série" : "séries"}</span>
-      </div>
-    {/each}
+    {#if detalheSelecionado.detalhe.length}
+      {#each detalheSelecionado.detalhe as d (d.exercicio)}
+        <div class="detalhe-item">
+          <span class="detalhe-nome">{d.exercicio}</span>
+          <span class="detalhe-series">{d.series} {d.series === 1 ? "série" : "séries"}</span>
+        </div>
+      {/each}
+    {:else}
+      <p class="detalhe-vazio">Nenhum exercício encontrado.</p>
+    {/if}
   </div>
 {/if}
 
@@ -243,6 +247,11 @@
   }
   .detalhe-series {
     flex-shrink: 0;
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+  }
+  .detalhe-vazio {
+    margin: 0;
     color: var(--surface-muted);
     font-size: var(--font-size-sm);
   }
