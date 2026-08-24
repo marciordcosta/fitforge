@@ -619,7 +619,13 @@
                     : "—"}
                 </span>
                 {#if textoMeta(serieItem)}
-                  <span class="anterior-meta">{textoMeta(serieItem)}</span>
+                  {#if !serieItem.concluida}
+                    <button class="anterior-meta anterior-meta-link" onclick={() => navigate(`/treino/rotina/${treinoId}`)}>
+                      {textoMeta(serieItem)}
+                    </button>
+                  {:else}
+                    <span class="anterior-meta">{textoMeta(serieItem)}</span>
+                  {/if}
                 {/if}
               </span>
               <input
@@ -1052,8 +1058,18 @@
     color: var(--surface-muted);
   }
   .anterior-meta {
+    display: block;
     font-size: 11px;
     color: var(--surface-muted);
+  }
+  .anterior-meta-link {
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
+    text-decoration: underline;
+    font-family: inherit;
+    cursor: pointer;
   }
   .linha input {
     box-sizing: border-box;
