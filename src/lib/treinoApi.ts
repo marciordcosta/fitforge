@@ -504,6 +504,14 @@ export async function updateDescansoTreinoExercicio(
   if (error) throw error;
 }
 
+export async function updateObservacaoTreinoExercicio(treinoExercicioId: string, observacao: string | null): Promise<void> {
+  const { error } = await supabase
+    .from("treino_exercicios")
+    .update({ observacao })
+    .eq("id", treinoExercicioId);
+  if (error) throw error;
+}
+
 // ---------------- Log de treino (registros) ----------------
 
 export interface SetRegistro {

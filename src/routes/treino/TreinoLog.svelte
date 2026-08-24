@@ -11,6 +11,7 @@
     salvarRegistrosDoDia,
     salvarExerciciosRotina,
     updateDescansoTreinoExercicio,
+    updateObservacaoTreinoExercicio,
     listExercicios,
     type TreinoComExercicios,
     type Exercicio,
@@ -263,6 +264,17 @@
     }
   }
 
+  /** Exercícios adicionados nessa sessão ainda não existem na rotina salva (id sintético), não há o que persistir ainda. */
+  async function salvarObservacao(exIdx: number) {
+    const ex = sessao[exIdx];
+    if (ex.treino_exercicio_id.startsWith("novo-")) return;
+    try {
+      await updateObservacaoTreinoExercicio(ex.treino_exercicio_id, ex.observacao);
+    } catch (e) {
+      alert("Erro ao salvar observação: " + (e as Error).message);
+    }
+  }
+
   // ---------------- Substituir / reordenar exercícios da sessão ----------------
 
   let menuExercicioAberto = $state<number | null>(null);
@@ -511,16 +523,13 @@
             ⋮
           </button>
         </div>
-        {#if ex.sets[0]?.repMin != null || ex.sets[0]?.repMax != null}
-          <p class="faixa-rep">
-            {ex.sets[0].repMin != null && ex.sets[0].repMax != null
-              ? `${ex.sets[0].repMin} a ${ex.sets[0].repMax}`
-              : (ex.sets[0].repMin ?? ex.sets[0].repMax)}
-          </p>
-        {/if}
-        {#if ex.observacao}
-          <p class="observacao">{ex.observacao}</p>
-        {/if}
+        <input
+          class="observacao-input"
+          type="text"
+          placeholder="Adicionar notas do exercício aqui"
+          bind:value={ex.observacao}
+          onchange={() => salvarObservacao(exIdx)}
+        />
         <button class="descanso" onclick={() => (descansoEditandoIdx = exIdx)}>
           ⏱ {descansoLabel(ex)}
         </button>
@@ -548,9 +557,18 @@
                 </button>
               {/if}
               <span class="anterior">
-                {serieItem.anteriorPeso != null && serieItem.anteriorReps != null
-                  ? `${serieItem.anteriorPeso}kg x ${serieItem.anteriorReps}`
-                  : "—"}
+                <span class="anterior-valor">
+                  {serieItem.anteriorPeso != null && serieItem.anteriorReps != null
+                    ? `${serieItem.anteriorPeso}kg x ${serieItem.anteriorReps}`
+                    : "—"}
+                </span>
+                {#if serieItem.repMin != null || serieItem.repMax != null}
+                  <span class="anterior-meta">
+                    Meta: {serieItem.repMin != null && serieItem.repMax != null
+                      ? `${serieItem.repMin} a ${serieItem.repMax}`
+                      : (serieItem.repMin ?? serieItem.repMax)}
+                  </span>
+                {/if}
               </span>
               <input
                 type="number"
@@ -847,11 +865,6 @@
     padding: var(--space-3) 0;
     margin-bottom: var(--space-5);
   }
-  .faixa-rep {
-    font-size: var(--font-size-sm);
-    color: var(--surface-fg);
-    margin: 0 0 var(--space-1);
-  }
   .exercicio-card h2 {
     font-size: var(--font-size-base);
     color: var(--color-primary);
@@ -901,10 +914,20 @@
     cursor: pointer;
     font-family: inherit;
   }
-  .observacao {
-    font-size: var(--font-size-sm);
+  .observacao-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0 0 var(--space-2);
     color: var(--surface-muted);
-    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+  }
+  .observacao-input::placeholder {
+    color: var(--surface-muted);
   }
   .tabela {
     display: flex;
@@ -926,7 +949,18 @@
     padding: var(--space-1) 0;
   }
   .linha.concluida {
+    position: relative;
+  }
+  .linha.concluida::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--space-2);
+    right: var(--space-2);
     background: #1e4a2f;
+    border-radius: var(--radius-md);
+    z-index: -1;
   }
   .linha.concluida input,
   .linha.concluida .serie-num {
@@ -965,8 +999,15 @@
     height: 40px;
   }
   .anterior {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .anterior-meta {
+    font-size: 11px;
+    color: var(--color-primary);
   }
   .linha input {
     box-sizing: border-box;
