@@ -1,8 +1,24 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
-  import { toISODate } from "../../lib/dates";
+  import { toISODate, hojeISO } from "../../lib/dates";
   import { getPesosDoPeriodo, type PesoRegistro } from "../../lib/pesoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
+
+  interface Periodo {
+    valor: string;
+    label: string;
+    dias: number | null;
+  }
+
+  const PERIODOS: Periodo[] = [
+    { valor: "7d", label: "1 semana", dias: 7 },
+    { valor: "1m", label: "1 mês", dias: 30 },
+    { valor: "3m", label: "3 meses", dias: 90 },
+    { valor: "6m", label: "6 meses", dias: 182 },
+    { valor: "1a", label: "1 ano", dias: 365 },
+    { valor: "tudo", label: "Tudo", dias: null },
+  ];
 
   const MESES = [
     "Janeiro",
@@ -25,6 +41,11 @@
   let loading = $state(true);
   let diaSelecionado = $state<string | null>(null);
 
+  let periodo = $state<Periodo>(PERIODOS[2]);
+  let pesosGrafico = $state<PesoRegistro[]>([]);
+  let loadingGrafico = $state(true);
+  let mostrarFiltro = $state(false);
+
   const mesLabel = $derived(`${MESES[mesBase.getMonth()]} ${mesBase.getFullYear()}`);
   const mesInicio = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth(), 1));
   const mesFim = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth() + 1, 0));
@@ -37,9 +58,24 @@
 
   void carregar();
 
+  async function carregarGrafico() {
+    loadingGrafico = true;
+    const hoje = new Date();
+    const dataInicio = periodo.dias == null ? "1900-01-01" : toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - periodo.dias));
+    pesosGrafico = await getPesosDoPeriodo(dataInicio, hojeISO());
+    loadingGrafico = false;
+  }
+
+  void carregarGrafico();
+
   function trocarMes(delta: number) {
     mesBase = new Date(mesBase.getFullYear(), mesBase.getMonth() + delta, 1);
     void carregar();
+  }
+
+  function selecionarPeriodo(p: Periodo) {
+    periodo = p;
+    void carregarGrafico();
   }
 
   const pesosPorData = $derived.by(() => {
@@ -73,14 +109,14 @@
     if (!canvas) return;
     chart?.destroy();
     chart = null;
-    if (!pesos.length) return;
+    if (!pesosGrafico.length) return;
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pesos.map((p) => formatDataCurta(p.data)),
+        labels: pesosGrafico.map((p) => formatDataCurta(p.data)),
         datasets: [
           {
-            data: pesos.map((p) => p.peso),
+            data: pesosGrafico.map((p) => p.peso),
             borderColor: "#5eead4",
             backgroundColor: "#5eead4",
             tension: 0.3,
@@ -93,35 +129,63 @@
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          x: { grid: { display: false }, ticks: { color: "#9aa0ab" } },
-          y: { ticks: { color: "#9aa0ab" } },
+          x: { display: false },
+          y: { ticks: { color: "#9aa0ab" }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
         },
       },
     });
   }
 
   $effect(() => {
-    if (!loading) desenharGrafico();
+    if (!loadingGrafico) desenharGrafico();
   });
 
   function abrirDia(iso: string) {
     diaSelecionado = iso;
   }
 
+  function abrirAdicionar() {
+    diaSelecionado = hojeISO();
+  }
+
   function aoSalvar() {
     void carregar();
+    void carregarGrafico();
   }
 </script>
+
+{#snippet iconFiltro()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+{/snippet}
+{#snippet iconAdicionar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
     <h1>Peso</h1>
+    <div class="header-acoes">
+      <button class="icon-btn" onclick={() => (mostrarFiltro = true)} aria-label="Filtro de período">
+        {@render iconFiltro()}
+      </button>
+      <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar peso">
+        {@render iconAdicionar()}
+      </button>
+    </div>
   </div>
 
-  {#if loading}
+  {#if loadingGrafico}
     <p class="muted">Carregando…</p>
-  {:else if !pesos.length}
-    <p class="muted">Nenhum registro ainda. Toque em um dia no calendário pra começar.</p>
+  {:else if !pesosGrafico.length}
+    <p class="muted">Nenhum registro nesse período.</p>
   {:else}
     <div class="chart-wrap">
       <canvas bind:this={canvas}></canvas>
@@ -162,6 +226,14 @@
   <PesoDiaSheet data={diaSelecionado} onFechar={() => (diaSelecionado = null)} onSalvo={aoSalvar} />
 {/if}
 
+{#if mostrarFiltro}
+  <ActionSheet
+    titulo="Período do gráfico"
+    onFechar={() => (mostrarFiltro = false)}
+    opcoes={PERIODOS.map((p) => ({ label: p.label, onSelect: () => selecionarPeriodo(p) }))}
+  />
+{/if}
+
 <style>
   .container {
     max-width: 480px;
@@ -171,11 +243,34 @@
     padding-right: var(--space-4);
   }
   .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: var(--space-4);
   }
   .header h1 {
     font-size: var(--font-size-lg);
     margin: 0;
+  }
+  .header-acoes {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: var(--surface-fg);
+    cursor: pointer;
+  }
+  .icon-btn svg {
+    width: 22px;
+    height: 22px;
   }
   .chart-wrap {
     height: 220px;
