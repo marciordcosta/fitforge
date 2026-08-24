@@ -1,13 +1,15 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
-  import { toISODate, hojeISO } from "../../lib/dates";
-  import { getPesosDoPeriodo, type PesoRegistro } from "../../lib/pesoApi";
+  import { toISODate, parseISODate, hojeISO } from "../../lib/dates";
+  import { getPesosDoPeriodo, getMeta, type PesoRegistro, type PesoMeta } from "../../lib/pesoApi";
   import { getDiasComTreino } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
+  import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
   const COR_PESO = "#5eead4";
   const COR_TREINO = "#f87171";
+  const COR_META = "rgba(248, 113, 113, 0.5)";
 
   interface Periodo {
     valor: string;
@@ -51,6 +53,16 @@
   let diasComTreinoGrafico = $state<Set<string>>(new Set());
   let loadingGrafico = $state(true);
   let mostrarFiltro = $state(false);
+
+  let meta = $state<PesoMeta | null>(null);
+  let mostrarEscolhaMeta = $state(false);
+  let metaEtapa = $state<"ganho" | "perda" | "manutencao" | null>(null);
+
+  async function carregarMeta() {
+    meta = await getMeta();
+  }
+
+  void carregarMeta();
 
   const mesLabel = $derived(`${MESES[mesBase.getMonth()]} ${mesBase.getFullYear()}`);
   const mesInicio = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth(), 1));
@@ -121,6 +133,31 @@
     return `${d}/${m}`;
   }
 
+  /** Linha reta de meta: do peso inicial do período visível até o peso-alvo calculado (percentual semanal composto, ou flat na manutenção). */
+  const metaLinha = $derived.by(() => {
+    if (!meta || pesosGrafico.length < 2) return null;
+    const pesoInicial = pesosGrafico[0].peso;
+    let pesoAlvo: number;
+    if (meta.tipo === "manutencao") {
+      if (meta.pesoManutencao == null) return null;
+      pesoAlvo = meta.pesoManutencao;
+    } else {
+      if (meta.percentual == null) return null;
+      let dias = periodo.dias;
+      if (dias == null) {
+        const primeira = parseISODate(pesosGrafico[0].data);
+        const ultima = parseISODate(pesosGrafico[pesosGrafico.length - 1].data);
+        dias = Math.max(1, Math.round((ultima.getTime() - primeira.getTime()) / 86400000));
+      }
+      const semanas = dias / 7;
+      pesoAlvo = pesoInicial * Math.pow(1 + meta.percentual / 100, semanas);
+    }
+    const linha = new Array<number | null>(pesosGrafico.length).fill(null);
+    linha[0] = meta.tipo === "manutencao" ? pesoAlvo : pesoInicial;
+    linha[linha.length - 1] = pesoAlvo;
+    return linha;
+  });
+
   let canvas = $state<HTMLCanvasElement | undefined>();
   let chart: Chart | null = null;
 
@@ -143,6 +180,19 @@
             tension: 0.3,
             pointRadius: 3,
           },
+          ...(metaLinha
+            ? [
+                {
+                  data: metaLinha,
+                  borderColor: COR_META,
+                  backgroundColor: COR_META,
+                  borderDash: [6, 4],
+                  pointRadius: 0,
+                  spanGaps: true,
+                  tension: 0,
+                },
+              ]
+            : []),
         ],
       },
       options: {
@@ -173,6 +223,10 @@
     void carregar();
     void carregarGrafico();
   }
+
+  function aoSalvarMeta() {
+    void carregarMeta();
+  }
 </script>
 
 {#snippet iconFiltro()}
@@ -189,6 +243,30 @@
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 {/snippet}
+{#snippet iconMeta()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+    <line x1="4" y1="22" x2="4" y2="2" />
+  </svg>
+{/snippet}
+{#snippet iconGanho()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="3 17 9 11 13 15 21 7" />
+    <polyline points="14 7 21 7 21 14" />
+  </svg>
+{/snippet}
+{#snippet iconPerda()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="3 7 9 13 13 9 21 17" />
+    <polyline points="21 10 21 17 14 17" />
+  </svg>
+{/snippet}
+{#snippet iconManutencao()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="5" y1="9" x2="19" y2="9" />
+    <line x1="5" y1="15" x2="19" y2="15" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -196,6 +274,9 @@
     <div class="header-acoes">
       <button class="icon-btn" onclick={() => (mostrarFiltro = true)} aria-label="Filtro de período">
         {@render iconFiltro()}
+      </button>
+      <button class="icon-btn" onclick={() => (mostrarEscolhaMeta = true)} aria-label="Meta">
+        {@render iconMeta()}
       </button>
       <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar peso">
         {@render iconAdicionar()}
@@ -256,6 +337,22 @@
     onFechar={() => (mostrarFiltro = false)}
     opcoes={PERIODOS.map((p) => ({ label: p.label, onSelect: () => selecionarPeriodo(p) }))}
   />
+{/if}
+
+{#if mostrarEscolhaMeta}
+  <ActionSheet
+    titulo="Meta"
+    onFechar={() => (mostrarEscolhaMeta = false)}
+    opcoes={[
+      { label: "Ganho", icon: iconGanho, onSelect: () => (metaEtapa = "ganho") },
+      { label: "Perda", icon: iconPerda, onSelect: () => (metaEtapa = "perda") },
+      { label: "Manutenção", icon: iconManutencao, onSelect: () => (metaEtapa = "manutencao") },
+    ]}
+  />
+{/if}
+
+{#if metaEtapa !== null}
+  <PesoMetaFormSheet tipo={metaEtapa} onFechar={() => (metaEtapa = null)} onSalvo={aoSalvarMeta} />
 {/if}
 
 <style>

@@ -101,3 +101,55 @@ export async function excluirFotoDoDia(foto: FotoRegistro): Promise<void> {
   const { error } = await supabase.from("fotos").delete().eq("id", foto.id);
   if (error) throw error;
 }
+
+export async function getUltimoPeso(): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("pesos")
+    .select("peso")
+    .eq("user_id", uid())
+    .order("data", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.peso ?? null;
+}
+
+/** Meta única por usuário. Para "percentual", o sinal indica a direção: positivo = ganho, negativo = perda — sempre semanal. */
+export interface PesoMeta {
+  tipo: "percentual" | "manutencao";
+  percentual: number | null;
+  pesoManutencao: number | null;
+}
+
+export async function getMeta(): Promise<PesoMeta | null> {
+  const { data, error } = await supabase
+    .from("peso_metas")
+    .select("tipo, percentual, peso_manutencao")
+    .eq("user_id", uid())
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { tipo: data.tipo, percentual: data.percentual, pesoManutencao: data.peso_manutencao };
+}
+
+export async function salvarMetaPercentual(percentual: number): Promise<void> {
+  const { error } = await supabase.from("peso_metas").upsert({
+    user_id: uid(),
+    tipo: "percentual",
+    percentual,
+    peso_manutencao: null,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+export async function salvarMetaManutencao(peso: number): Promise<void> {
+  const { error } = await supabase.from("peso_metas").upsert({
+    user_id: uid(),
+    tipo: "manutencao",
+    percentual: null,
+    peso_manutencao: peso,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
