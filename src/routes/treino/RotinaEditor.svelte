@@ -553,14 +553,13 @@
     cursor: pointer;
   }
   .menu-btn {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
+    border: none;
+    background: none;
     color: var(--surface-muted);
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-base);
     line-height: 1;
     cursor: pointer;
   }
