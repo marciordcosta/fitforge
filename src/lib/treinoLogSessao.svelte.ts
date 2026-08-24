@@ -2,10 +2,13 @@ import type { RecordesExercicio } from "./treinoApi";
 
 /**
  * Estado da sessão de treino ao vivo, guardado fora do componente para
- * sobreviver a navegações (ex: ir ver/editar um exercício e voltar) — o
+ * sobreviver a navegações (ex: ir ver/editar um exercício e voltar) e
+ * também a recarregamentos de página (persistido no localStorage) — o
  * cronômetro e as séries continuam de onde pararam. Só é limpo quando o
  * usuário conclui ou descarta o treino explicitamente.
  */
+
+const CHAVE_STORAGE = "fitforge_treino_ativo";
 
 export interface SetSessao {
   serie: number;
@@ -45,7 +48,29 @@ export interface SessaoTreinoAtiva {
   houveAlteracaoEstrutura: boolean;
 }
 
-let atual = $state<SessaoTreinoAtiva | null>(null);
+function carregarDoStorage(): SessaoTreinoAtiva | null {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const bruto = localStorage.getItem(CHAVE_STORAGE);
+    return bruto ? (JSON.parse(bruto) as SessaoTreinoAtiva) : null;
+  } catch {
+    return null;
+  }
+}
+
+let atual = $state<SessaoTreinoAtiva | null>(carregarDoStorage());
+
+if (typeof localStorage !== "undefined") {
+  $effect.root(() => {
+    $effect(() => {
+      if (atual) {
+        localStorage.setItem(CHAVE_STORAGE, JSON.stringify(atual));
+      } else {
+        localStorage.removeItem(CHAVE_STORAGE);
+      }
+    });
+  });
+}
 
 export const treinoLogSessao = {
   get atual(): SessaoTreinoAtiva | null {
