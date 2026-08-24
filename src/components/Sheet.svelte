@@ -5,11 +5,13 @@
     titulo,
     onFechar,
     acaoTitulo,
+    acaoTituloLado = "direita",
     children,
   }: {
     titulo?: string;
     onFechar: () => void;
     acaoTitulo?: Snippet;
+    acaoTituloLado?: "esquerda" | "direita";
     children: Snippet;
   } = $props();
 
@@ -57,7 +59,7 @@
         <div class="sheet-header">
           <h3>{titulo}</h3>
           {#if acaoTitulo}
-            <div class="sheet-header-acao">{@render acaoTitulo()}</div>
+            <div class="sheet-header-acao" class:esquerda={acaoTituloLado === "esquerda"}>{@render acaoTitulo()}</div>
           {/if}
         </div>
       {/if}
@@ -120,5 +122,9 @@
     right: 0;
     display: flex;
     align-items: center;
+  }
+  .sheet-header-acao.esquerda {
+    right: auto;
+    left: 0;
   }
 </style>

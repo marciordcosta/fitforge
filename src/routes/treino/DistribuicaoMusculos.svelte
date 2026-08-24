@@ -1,7 +1,7 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
   import { toISODate, parseISODate } from "../../lib/dates";
-  import ActionSheet from "../../components/ActionSheet.svelte";
+  import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import PieChart from "../../components/PieChart.svelte";
   import {
@@ -225,8 +225,8 @@
     modalAberto = {
       titulo: "Realizado",
       opcoes: [
-        { label: "Mês", onSelect: () => (mostrarGradeRealizado = true) },
-        { label: "Gráfico", onSelect: () => abrirDetalheRotina(mesLabel, listaRealizado, null) },
+        { label: "Mês", icon: iconGrade, onSelect: () => (mostrarGradeRealizado = true) },
+        { label: "Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(mesLabel, listaRealizado, null) },
       ],
     };
   }
@@ -235,7 +235,7 @@
 
   let modalAberto = $state<{
     titulo: string;
-    opcoes: { label: string; subtitulo?: string; valor?: string; onSelect: () => void }[];
+    opcoes: AcaoSheet[];
     musculoParaGrade?: Musculo;
   } | null>(null);
 
@@ -273,8 +273,8 @@
     modalAberto = {
       titulo: treino.nome_treino,
       opcoes: [
-        { label: "Editar Rotina", onSelect: () => navigate(`/treino/rotina/${treino.id}`) },
-        { label: "Visualizar Gráfico", onSelect: () => abrirDetalheRotina(treino.nome_treino, lista, [treino]) },
+        { label: "Editar Rotina", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treino.id}`) },
+        { label: "Visualizar Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(treino.nome_treino, lista, [treino]) },
       ],
     };
   }
@@ -283,8 +283,8 @@
     modalAberto = {
       titulo: "Distribuição Semanal",
       opcoes: [
-        { label: "Semana", onSelect: () => abrirGradeSemanal(null) },
-        { label: "Gráfico", onSelect: () => abrirDetalheRotina("Distribuição Semanal", distribuicaoSemanal, treinos) },
+        { label: "Semana", icon: iconGrade, onSelect: () => abrirGradeSemanal(null) },
+        { label: "Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina("Distribuição Semanal", distribuicaoSemanal, treinos) },
       ],
     };
   }
@@ -443,9 +443,34 @@
   {/if}
 </div>
 
+{#snippet iconEditar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+{/snippet}
+{#snippet iconGrafico()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+    <path d="M22 12A10 10 0 0 0 12 2v10z" />
+  </svg>
+{/snippet}
+{#snippet iconGrade()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+{/snippet}
+
 {#snippet linkDistribuicao()}
   {#if modalAberto?.musculoParaGrade}
-    <button class="link-distribuicao" onclick={() => abrirGradeSemanal([modalAberto!.musculoParaGrade!.id])}>Distribuição</button>
+    <button
+      class="link-distribuicao"
+      onclick={() => abrirGradeSemanal([modalAberto!.musculoParaGrade!.id])}
+      aria-label="Ver distribuição na semana"
+    >{@render iconGrade()}</button>
   {/if}
 {/snippet}
 
@@ -467,6 +492,7 @@
     titulo="Distribuição na Semana"
     onFechar={() => (mostrarGradeSemanal = false)}
     acaoTitulo={modalAberto ? voltarGradeSemanal : undefined}
+    acaoTituloLado="esquerda"
   >
     <div class="grade-scroll">
       <table class="grade-tabela">
@@ -733,22 +759,27 @@
     color: var(--surface-muted);
   }
   .link-distribuicao {
-    border: none;
-    background: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .grade-voltar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 28px;
     height: 28px;
     border: none;
     background: none;
-    color: var(--surface-fg);
-    font-size: var(--font-size-lg);
-    line-height: 1;
+    color: var(--color-primary);
     cursor: pointer;
+  }
+  .link-distribuicao svg {
+    width: 20px;
+    height: 20px;
+  }
+  .grade-voltar {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+    padding: var(--space-1);
   }
 
   .grade-scroll {
