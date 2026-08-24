@@ -5,6 +5,7 @@
   import { getDiasComTreino } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
+  import PesoGraficoTelaCheia from "./PesoGraficoTelaCheia.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
 
@@ -54,6 +55,7 @@
   let diasComTreinoGrafico = $state<Set<string>>(new Set());
   let loadingGrafico = $state(true);
   let mostrarFiltro = $state(false);
+  let mostrarGraficoCheio = $state(false);
 
   let meta = $state<PesoMeta | null>(null);
   let mostrarEscolhaMeta = $state(false);
@@ -381,9 +383,9 @@
   {:else if !pesosGrafico.length}
     <p class="muted">Nenhum registro nesse período.</p>
   {:else}
-    <div class="chart-wrap">
+    <button class="chart-wrap" onclick={() => (mostrarGraficoCheio = true)} aria-label="Ver gráfico em tela cheia">
       <canvas bind:this={canvas}></canvas>
-    </div>
+    </button>
   {/if}
 
   <div class="mes-nav">
@@ -469,6 +471,16 @@
   <PesoMetaFormSheet tipo={metaEtapa} onFechar={() => (metaEtapa = null)} onSalvo={aoSalvarMeta} />
 {/if}
 
+{#if mostrarGraficoCheio}
+  <PesoGraficoTelaCheia
+    {pesosGrafico}
+    {diasComTreinoGrafico}
+    {metaLinha}
+    {diffMetaPorPonto}
+    onFechar={() => (mostrarGraficoCheio = false)}
+  />
+{/if}
+
 <style>
   .container {
     max-width: 480px;
@@ -522,8 +534,14 @@
     height: 20px;
   }
   .chart-wrap {
+    display: block;
+    width: 100%;
     height: 220px;
     margin-bottom: var(--space-4);
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
   }
   .mes-nav {
     display: flex;
