@@ -14,15 +14,9 @@
 </script>
 
 <script lang="ts">
-  interface DetalheExercicio {
-    exercicio: string;
-    series: number;
-  }
-
   interface Fatia {
     nome: string;
     valor: number;
-    detalhe?: DetalheExercicio[] | null;
   }
 
   let { dados }: { dados: Fatia[] } = $props();
@@ -30,7 +24,7 @@
   let nomeDestacado = $state<string | null>(null);
   let svgEl = $state<SVGSVGElement | undefined>();
 
-  function aoClicarFatia(f: { nome: string; detalhe?: DetalheExercicio[] | null }): void {
+  function aoClicarFatia(f: { nome: string }): void {
     nomeDestacado = nomeDestacado === f.nome ? null : f.nome;
   }
 
@@ -42,7 +36,7 @@
       }
     }
     // Registra só depois do clique atual (o que selecionou a fatia) terminar de se propagar,
-    // senão esse mesmo clique já cai aqui e desfaz a seleção antes de renderizar o painel.
+    // senão esse mesmo clique já cai aqui e desfaz a seleção antes de renderizar o destaque.
     const id = setTimeout(() => window.addEventListener("click", aoClicarFora));
     return () => {
       clearTimeout(id);
@@ -125,18 +119,11 @@
         dyInicial,
         path,
         cor,
-        detalhe: d.detalhe,
         linha: `M ${pBorda.x} ${pBorda.y} L ${pCotovelo.x} ${pCotovelo.y} L ${colX} ${pCotovelo.y}`,
         label: { x: labelX, y: pCotovelo.y },
         ancora: ladoDireito ? "start" : "end",
       };
     });
-  });
-
-  const detalheSelecionado = $derived.by(() => {
-    const f = fatias.find((x) => x.nome === nomeDestacado);
-    if (!f || f.detalhe == null) return null;
-    return { nome: f.nome, detalhe: f.detalhe };
   });
 </script>
 
@@ -146,7 +133,7 @@
       d={f.path}
       fill={f.cor}
       opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
-      class:fatia-clicavel={!!f.detalhe?.length}
+      class="fatia-clicavel"
       role="button"
       tabindex={0}
       onclick={() => aoClicarFatia(f)}
@@ -164,9 +151,8 @@
       x={f.label.x}
       y={f.label.y}
       text-anchor={f.ancora}
-      class="fatia-texto"
+      class="fatia-texto fatia-clicavel"
       style={`opacity: ${nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1};`}
-      class:fatia-clicavel={!!f.detalhe?.length}
       role="button"
       tabindex={0}
       onclick={() => aoClicarFatia(f)}
@@ -184,21 +170,6 @@
     </text>
   {/each}
 </svg>
-
-{#if detalheSelecionado}
-  <div class="detalhe-painel">
-    {#if detalheSelecionado.detalhe.length}
-      {#each detalheSelecionado.detalhe as d (d.exercicio)}
-        <div class="detalhe-item">
-          <span class="detalhe-nome">{d.exercicio}</span>
-          <span class="detalhe-series">{d.series} {d.series === 1 ? "série" : "séries"}</span>
-        </div>
-      {/each}
-    {:else}
-      <p class="detalhe-vazio">Nenhum exercício encontrado.</p>
-    {/if}
-  </div>
-{/if}
 
 <style>
   .pizza {
@@ -239,35 +210,5 @@
   }
   .fatia-clicavel {
     cursor: pointer;
-    outline: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .detalhe-painel {
-    margin-top: var(--space-2);
-    padding-top: var(--space-2);
-    border-top: 1px solid var(--surface-border);
-    display: flex;
-    flex-direction: column;
-  }
-  .detalhe-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    padding: 2px 0;
-  }
-  .detalhe-nome {
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
-  }
-  .detalhe-series {
-    flex-shrink: 0;
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
-  }
-  .detalhe-vazio {
-    margin: 0;
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
   }
 </style>

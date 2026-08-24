@@ -226,7 +226,7 @@
       titulo: "Realizado",
       opcoes: [
         { label: "Mês", icon: iconGrade, onSelect: () => (mostrarGradeRealizado = true) },
-        { label: "Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(mesLabel, listaRealizado, null) },
+        { label: "Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(mesLabel, listaRealizado) },
       ],
     };
   }
@@ -274,7 +274,7 @@
       titulo: treino.nome_treino,
       opcoes: [
         { label: "Editar Rotina", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treino.id}`) },
-        { label: "Visualizar Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(treino.nome_treino, lista, [treino]) },
+        { label: "Visualizar Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(treino.nome_treino, lista) },
       ],
     };
   }
@@ -284,7 +284,7 @@
       titulo: "Distribuição Semanal",
       opcoes: [
         { label: "Semana", icon: iconGrade, onSelect: () => abrirGradeSemanal(null) },
-        { label: "Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina("Distribuição Semanal", distribuicaoSemanal, treinos) },
+        { label: "Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina("Distribuição Semanal", distribuicaoSemanal) },
       ],
     };
   }
@@ -294,37 +294,12 @@
   interface ItemDetalheRotina {
     musculo: Musculo;
     valor: number;
-    detalhe: { exercicio: string; series: number }[] | null;
   }
 
   let modalDetalheRotina = $state<{ titulo: string; itens: ItemDetalheRotina[] } | null>(null);
 
-  /** Quantas séries cada exercício contribui pra esse músculo, dentro do escopo de rotinas informado. */
-  function detalhePorMusculo(lista: TreinoComExercicios[], musculoId: string): { exercicio: string; series: number }[] {
-    const mapa = new Map<string, number>();
-    for (const t of lista) {
-      for (const ex of t.exercicios) {
-        if (!ex.exercicio) continue;
-        if (ex.exercicio.musculos.some((m) => m.musculo_id === musculoId)) {
-          mapa.set(ex.exercicio.nome, (mapa.get(ex.exercicio.nome) ?? 0) + ex.series.length);
-        }
-      }
-    }
-    return Array.from(mapa, ([exercicio, series]) => ({ exercicio, series }));
-  }
-
-  function abrirDetalheRotina(
-    titulo: string,
-    itens: { musculo: Musculo; valor: number }[],
-    escopo: TreinoComExercicios[] | null,
-  ): void {
-    modalDetalheRotina = {
-      titulo,
-      itens: itens.map((item) => ({
-        ...item,
-        detalhe: escopo ? detalhePorMusculo(escopo, item.musculo.id) : null,
-      })),
-    };
+  function abrirDetalheRotina(titulo: string, itens: { musculo: Musculo; valor: number }[]): void {
+    modalDetalheRotina = { titulo, itens };
   }
 </script>
 
@@ -568,9 +543,7 @@
 {#if modalDetalheRotina}
   <Sheet titulo={modalDetalheRotina.titulo} onFechar={() => (modalDetalheRotina = null)}>
     <div class="pizza-wrap">
-      <PieChart
-        dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor, detalhe: i.detalhe }))}
-      />
+      <PieChart dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))} />
     </div>
   </Sheet>
 {/if}
