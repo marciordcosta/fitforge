@@ -5,6 +5,7 @@
   export interface AcaoSheet {
     label: string;
     subtitulo?: string;
+    valor?: string;
     destructive?: boolean;
     icon?: Snippet;
     onSelect: () => void;
@@ -32,6 +33,9 @@
           <span class="sheet-opcao-subtitulo">{opcao.subtitulo}</span>
         {/if}
       </span>
+      {#if opcao.valor}
+        <span class="sheet-opcao-valor">{opcao.valor}</span>
+      {/if}
     </button>
   {/each}
 </Sheet>
@@ -59,12 +63,19 @@
   }
   .sheet-opcao-texto {
     display: flex;
+    flex: 1;
+    min-width: 0;
     flex-direction: column;
     gap: 2px;
   }
   .sheet-opcao-subtitulo {
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .sheet-opcao-valor {
+    flex-shrink: 0;
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
   }
   .sheet-icon {
     display: flex;

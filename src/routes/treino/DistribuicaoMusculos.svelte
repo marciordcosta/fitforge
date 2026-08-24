@@ -218,19 +218,19 @@
 
   // ---------------- Modal: exercícios/rotinas que trabalham um músculo ----------------
 
-  let modalAberto = $state<{ titulo: string; opcoes: { label: string; subtitulo?: string; onSelect: () => void }[] } | null>(null);
+  let modalAberto = $state<{ titulo: string; opcoes: { label: string; subtitulo?: string; valor?: string; onSelect: () => void }[] } | null>(null);
 
   /** Um item por (rotina, exercício) — o mesmo exercício pode aparecer em rotinas diferentes. */
   function exerciciosDoMusculo(
     lista: TreinoComExercicios[],
     musculoId: string,
-  ): { exercicioNome: string; treinoId: string; treinoNome: string }[] {
-    const resultado: { exercicioNome: string; treinoId: string; treinoNome: string }[] = [];
+  ): { exercicioNome: string; treinoId: string; treinoNome: string; series: number }[] {
+    const resultado: { exercicioNome: string; treinoId: string; treinoNome: string; series: number }[] = [];
     for (const t of lista) {
       for (const ex of t.exercicios) {
         if (!ex.exercicio) continue;
         if (ex.exercicio.musculos.some((m) => m.musculo_id === musculoId)) {
-          resultado.push({ exercicioNome: ex.exercicio.nome, treinoId: t.id, treinoNome: t.nome_treino });
+          resultado.push({ exercicioNome: ex.exercicio.nome, treinoId: t.id, treinoNome: t.nome_treino, series: ex.series.length });
         }
       }
     }
@@ -243,6 +243,7 @@
       opcoes: exerciciosDoMusculo(lista, musculo.id).map((e) => ({
         label: e.exercicioNome,
         subtitulo: e.treinoNome,
+        valor: `${e.series} ${e.series === 1 ? "série" : "séries"}`,
         onSelect: () => navigate(`/treino/rotina/${e.treinoId}`),
       })),
     };
