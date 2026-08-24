@@ -1009,19 +1009,7 @@
     padding: var(--space-1) 0;
   }
   .linha.concluida {
-    position: relative;
-    z-index: 0;
-  }
-  .linha.concluida::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: var(--space-2);
-    right: var(--space-2);
     background: #1e4a2f;
-    border-radius: var(--radius-md);
-    z-index: -1;
   }
   .linha.concluida input,
   .linha.concluida .serie-num {
