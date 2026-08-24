@@ -18,6 +18,7 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DescansoPicker from "../../components/DescansoPicker.svelte";
+  import Sheet from "../../components/Sheet.svelte";
   import { treinoLogSessao, type SetSessao, type ExercicioSessao } from "../../lib/treinoLogSessao.svelte";
 
   let { treinoId }: { treinoId: string } = $props();
@@ -43,17 +44,6 @@
     if (total < 60) return `${total}s`;
     return formatMMSS(total);
   });
-
-  const volumeTotal = $derived(
-    sessao.reduce(
-      (acc, ex) =>
-        acc +
-        ex.sets
-          .filter((s) => s.concluida && s.peso != null && s.repeticoes != null)
-          .reduce((a, s) => a + (s.peso ?? 0) * (s.repeticoes ?? 0), 0),
-      0,
-    ),
-  );
 
   const seriesTotal = $derived(sessao.reduce((acc, ex) => acc + ex.sets.filter((s) => s.concluida).length, 0));
 
@@ -487,32 +477,27 @@
   }
 </script>
 
-<div class="container">
-  <div class="header">
+<div class="header-fixo">
+  <div class="header-fixo-inner">
     <button class="voltar" onclick={() => navigate("/treino")}>▾ {nomeTreino}</button>
-    <button class="concluir" disabled={salvando} onclick={concluirTreino}>Concluir</button>
+    <div class="stat-inline">
+      <span class="stat-label">Duração</span>
+      <span class="stat-valor destaque">{duracaoLabel}</span>
+    </div>
+    <div class="stat-inline">
+      <span class="stat-label">Séries</span>
+      <span class="stat-valor">{seriesTotal}</span>
+    </div>
+    <button class="concluir-icon" disabled={salvando} onclick={concluirTreino} aria-label="Concluir treino">✓</button>
   </div>
+</div>
 
+<div class="container">
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else if naoEncontrada}
     <p class="muted">Rotina não encontrada.</p>
   {:else}
-    <div class="stats">
-      <div>
-        <span class="label">Duração</span>
-        <span class="valor destaque">{duracaoLabel}</span>
-      </div>
-      <div>
-        <span class="label">Volume</span>
-        <span class="valor">{volumeTotal.toFixed(0)} kg</span>
-      </div>
-      <div>
-        <span class="label">Séries</span>
-        <span class="valor">{seriesTotal}</span>
-      </div>
-    </div>
-
     {#each sessao as ex, exIdx (ex.exercicio_id)}
       <div class="exercicio-card">
         <div class="exercicio-header">
@@ -653,21 +638,17 @@
 {/if}
 
 {#if substituindoExIdx !== null}
-  <div class="sheet-overlay" role="presentation" onclick={() => (substituindoExIdx = null)}>
-    <div class="sheet sheet-lista" role="presentation" onclick={(e) => e.stopPropagation()}>
-      <div class="sheet-handle"></div>
-      <h3>Substituir por</h3>
-      <input class="sheet-busca" type="text" placeholder="Procurar exercício" bind:value={buscaSubstituir} />
-      <ul class="sheet-itens">
-        {#each opcoesSubstituir as ex (ex.id)}
-          <li><button onclick={() => substituirExercicio(ex)}>{ex.nome}</button></li>
-        {/each}
-        {#if !opcoesSubstituir.length}
-          <li class="sheet-vazio">Nenhum exercício encontrado.</li>
-        {/if}
-      </ul>
-    </div>
-  </div>
+  <Sheet titulo="Substituir por" onFechar={() => (substituindoExIdx = null)}>
+    <input class="sheet-busca" type="text" placeholder="Procurar exercício" bind:value={buscaSubstituir} />
+    <ul class="sheet-itens">
+      {#each opcoesSubstituir as ex (ex.id)}
+        <li><button onclick={() => substituirExercicio(ex)}>{ex.nome}</button></li>
+      {/each}
+      {#if !opcoesSubstituir.length}
+        <li class="sheet-vazio">Nenhum exercício encontrado.</li>
+      {/if}
+    </ul>
+  </Sheet>
 {/if}
 
 {#if mostrarPicker}
@@ -713,21 +694,17 @@
 {/if}
 
 {#if reordenando}
-  <div class="sheet-overlay" role="presentation" onclick={() => (reordenando = false)}>
-    <div class="sheet sheet-lista" role="presentation" onclick={(e) => e.stopPropagation()}>
-      <div class="sheet-handle"></div>
-      <h3>Reordenar Exercícios</h3>
-      {#each sessao as ex, idx (ex.exercicio_id)}
-        <div class="reorder-item">
-          <span>{ex.nome}</span>
-          <div class="acoes">
-            <button onclick={() => moverExercicio(idx, -1)} disabled={idx === 0} aria-label="Mover para cima">▲</button>
-            <button onclick={() => moverExercicio(idx, 1)} disabled={idx === sessao.length - 1} aria-label="Mover para baixo">▼</button>
-          </div>
+  <Sheet titulo="Reordenar Exercícios" onFechar={() => (reordenando = false)}>
+    {#each sessao as ex, idx (ex.exercicio_id)}
+      <div class="reorder-item">
+        <span>{ex.nome}</span>
+        <div class="acoes">
+          <button onclick={() => moverExercicio(idx, -1)} disabled={idx === 0} aria-label="Mover para cima">▲</button>
+          <button onclick={() => moverExercicio(idx, 1)} disabled={idx === sessao.length - 1} aria-label="Mover para baixo">▼</button>
         </div>
-      {/each}
-    </div>
-  </div>
+      </div>
+    {/each}
+  </Sheet>
 {/if}
 
 {#if mostrarConfirmDescartar}
@@ -752,45 +729,41 @@
 {#if recordeAberto !== null}
   {@const ex = sessao[recordeAberto.exIdx]}
   {@const s = ex.sets[recordeAberto.setIdx]}
-  <div class="sheet-overlay" role="presentation" onclick={() => (recordeAberto = null)}>
-    <div class="sheet" role="presentation" onclick={(e) => e.stopPropagation()}>
-      <div class="sheet-handle"></div>
-      <h3>Novo recorde</h3>
-      <p class="sub">{ex.nome}</p>
-      <div class="recordes-lista">
-        {#if s.prPeso}
-          <div class="recorde-item">
-            <span class="recorde-medalha">{@render iconMedalha()}</span>
-            <span class="recorde-label">Maior Peso</span>
-            <span class="recorde-valor">
-              {s.peso} kg
-              {#if formatDelta(s.prPesoDelta)}<span class="recorde-delta">{formatDelta(s.prPesoDelta)}</span>{/if}
-            </span>
-          </div>
-        {/if}
-        {#if s.prVolume}
-          <div class="recorde-item">
-            <span class="recorde-medalha">{@render iconMedalha()}</span>
-            <span class="recorde-label">Melhor Volume de Série</span>
-            <span class="recorde-valor">
-              {(s.peso ?? 0) * (s.repeticoes ?? 0)} kg
-              {#if formatDelta(s.prVolumeDelta)}<span class="recorde-delta">{formatDelta(s.prVolumeDelta)}</span>{/if}
-            </span>
-          </div>
-        {/if}
-        {#if s.pr1rm}
-          <div class="recorde-item">
-            <span class="recorde-medalha">{@render iconMedalha()}</span>
-            <span class="recorde-label">Melhor 1RM</span>
-            <span class="recorde-valor">
-              {(s.peso != null && s.repeticoes != null ? calcular1RM(s.peso, s.repeticoes) : 0).toFixed(2)} kg
-              {#if formatDelta(s.pr1rmDelta)}<span class="recorde-delta">{formatDelta(s.pr1rmDelta)}</span>{/if}
-            </span>
-          </div>
-        {/if}
-      </div>
+  <Sheet titulo="Novo recorde" onFechar={() => (recordeAberto = null)}>
+    <p class="sub">{ex.nome}</p>
+    <div class="recordes-lista">
+      {#if s.prPeso}
+        <div class="recorde-item">
+          <span class="recorde-medalha">{@render iconMedalha()}</span>
+          <span class="recorde-label">Maior Peso</span>
+          <span class="recorde-valor">
+            {s.peso} kg
+            {#if formatDelta(s.prPesoDelta)}<span class="recorde-delta">{formatDelta(s.prPesoDelta)}</span>{/if}
+          </span>
+        </div>
+      {/if}
+      {#if s.prVolume}
+        <div class="recorde-item">
+          <span class="recorde-medalha">{@render iconMedalha()}</span>
+          <span class="recorde-label">Melhor Volume de Série</span>
+          <span class="recorde-valor">
+            {(s.peso ?? 0) * (s.repeticoes ?? 0)} kg
+            {#if formatDelta(s.prVolumeDelta)}<span class="recorde-delta">{formatDelta(s.prVolumeDelta)}</span>{/if}
+          </span>
+        </div>
+      {/if}
+      {#if s.pr1rm}
+        <div class="recorde-item">
+          <span class="recorde-medalha">{@render iconMedalha()}</span>
+          <span class="recorde-label">Melhor 1RM</span>
+          <span class="recorde-valor">
+            {(s.peso != null && s.repeticoes != null ? calcular1RM(s.peso, s.repeticoes) : 0).toFixed(2)} kg
+            {#if formatDelta(s.pr1rmDelta)}<span class="recorde-delta">{formatDelta(s.pr1rmDelta)}</span>{/if}
+          </span>
+        </div>
+      {/if}
     </div>
-  </div>
+  </Sheet>
 {/if}
 
 <style>
@@ -800,11 +773,20 @@
     padding: var(--space-4);
     padding-bottom: var(--space-6);
   }
-  .header {
+  .header-fixo {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--surface-bg);
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .header-fixo-inner {
+    max-width: 520px;
+    margin: 0 auto;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--space-4);
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
   }
   .voltar {
     flex: 1;
@@ -820,39 +802,38 @@
     font-weight: 600;
     cursor: pointer;
   }
-  .concluir {
+  .stat-inline {
     flex-shrink: 0;
-    margin-left: var(--space-2);
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    border: none;
-    border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-4);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .stats {
-    display: flex;
-    justify-content: space-between;
-    background: var(--surface-card);
-    border-radius: var(--radius-lg);
-    padding: var(--space-3);
-    margin-bottom: var(--space-4);
-  }
-  .stats > div {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 2px;
   }
-  .stats .label {
-    font-size: var(--font-size-sm);
+  .stat-label {
+    font-size: 11px;
     color: var(--surface-muted);
   }
-  .stats .valor {
+  .stat-valor {
     font-size: var(--font-size-base);
     font-weight: 600;
   }
-  .stats .destaque {
+  .concluir-icon {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .concluir-icon:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .stat-valor.destaque {
     color: var(--color-primary);
   }
   .exercicio-card {
@@ -1197,41 +1178,6 @@
     font-size: var(--font-size-base);
     font-weight: 600;
     cursor: pointer;
-  }
-  .sheet-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    z-index: 100;
-  }
-  .sheet {
-    width: 100%;
-    max-width: 520px;
-    background: var(--surface-card);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    padding: var(--space-3) var(--space-4);
-    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
-    box-shadow: var(--shadow-float);
-  }
-  .sheet-handle {
-    width: 40px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--surface-border);
-    margin: 0 auto var(--space-4);
-  }
-  .sheet h3 {
-    margin: 0 0 var(--space-3);
-    font-size: var(--font-size-base);
-    text-align: center;
-  }
-  .sheet-lista {
-    max-height: 70vh;
-    display: flex;
-    flex-direction: column;
   }
   .sheet-busca {
     box-sizing: border-box;

@@ -24,10 +24,32 @@
   const CX = 50;
   const CY = 50;
   const R = 32;
+  const COL_DIREITA = 78;
+  const COL_ESQUERDA = 22;
+  const MAX_CHARS_LINHA = 9;
+  const ALTURA_LINHA = 5.4;
 
   function ponto(r: number, anguloGraus: number): { x: number; y: number } {
     const rad = ((anguloGraus - 90) * Math.PI) / 180;
     return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
+  }
+
+  /** Quebra o nome em linhas curtas pra nunca ultrapassar a largura reservada pro rótulo. */
+  function quebrarLinhas(texto: string): string[] {
+    const palavras = texto.split(" ");
+    const linhas: string[] = [];
+    let atual = "";
+    for (const p of palavras) {
+      const tentativa = atual ? `${atual} ${p}` : p;
+      if (tentativa.length > MAX_CHARS_LINHA && atual) {
+        linhas.push(atual);
+        atual = p;
+      } else {
+        atual = tentativa;
+      }
+    }
+    if (atual) linhas.push(atual);
+    return linhas;
   }
 
   const total = $derived(dados.reduce((s, d) => s + d.valor, 0));
@@ -55,18 +77,27 @@
 
       const meio = (inicio + fim) / 2;
       const cor = PALETA[i % PALETA.length];
+      const pct = Math.round((d.valor / total) * 100);
 
       const pBorda = ponto(R, meio);
-      const pCotovelo = ponto(R + 7, meio);
+      const pCotovelo = ponto(R + 6, meio);
       const ladoDireito = pCotovelo.x >= CX;
-      const pLabel = { x: pCotovelo.x + (ladoDireito ? 3 : -3), y: pCotovelo.y };
+      const colX = ladoDireito ? COL_DIREITA : COL_ESQUERDA;
+      const labelX = colX + (ladoDireito ? 2 : -2);
+
+      const linhasNome = quebrarLinhas(d.nome);
+      const totalLinhas = linhasNome.length + 1;
+      const dyInicial = -((totalLinhas - 1) / 2) * ALTURA_LINHA;
+
       return {
         nome: d.nome,
-        valor: d.valor,
+        pct,
+        linhasNome,
+        dyInicial,
         path,
         cor,
-        linha: `M ${pBorda.x} ${pBorda.y} L ${pCotovelo.x} ${pCotovelo.y} L ${pLabel.x} ${pLabel.y}`,
-        label: pLabel,
+        linha: `M ${pBorda.x} ${pBorda.y} L ${pCotovelo.x} ${pCotovelo.y} L ${colX} ${pCotovelo.y}`,
+        label: { x: labelX, y: pCotovelo.y },
         ancora: ladoDireito ? "start" : "end",
       };
     });
@@ -79,9 +110,11 @@
   {/each}
   {#each fatias as f (f.nome)}
     <path d={f.linha} class="fatia-linha" style={`stroke: ${f.cor};`} fill="none" />
-    <text x={f.label.x} y={f.label.y} text-anchor={f.ancora} dominant-baseline="middle" class="fatia-texto">
-      <tspan class="fatia-nome">{f.nome}</tspan>
-      <tspan class="fatia-valor"> {f.valor}</tspan>
+    <text x={f.label.x} y={f.label.y} text-anchor={f.ancora} class="fatia-texto">
+      {#each f.linhasNome as linha, i (i)}
+        <tspan x={f.label.x} dy={i === 0 ? `${f.dyInicial}` : `${ALTURA_LINHA}`} class="fatia-nome">{linha}</tspan>
+      {/each}
+      <tspan x={f.label.x} dy={`${ALTURA_LINHA}`} class="fatia-pct">{f.pct}%</tspan>
     </text>
   {/each}
 </svg>
@@ -97,12 +130,13 @@
     fill: #fff;
   }
   .fatia-nome {
-    font-size: 4.5px;
+    font-size: 4.2px;
     font-weight: 600;
   }
-  .fatia-valor {
-    font-size: 4.5px;
+  .fatia-pct {
+    font-size: 4.2px;
     font-weight: 700;
+    opacity: 0.75;
   }
   .fatia-linha {
     stroke-width: 0.6;

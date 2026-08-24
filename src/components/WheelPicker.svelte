@@ -1,5 +1,6 @@
 <script lang="ts" generics="T">
   import { untrack } from "svelte";
+  import Sheet from "./Sheet.svelte";
 
   interface Opcao<T> {
     valor: T;
@@ -59,63 +60,29 @@
   }
 </script>
 
-<div class="sheet-overlay" role="presentation" onclick={onFechar}>
-  <div class="sheet" role="presentation" onclick={(e) => e.stopPropagation()}>
-    <div class="sheet-handle"></div>
-    <h3>{titulo}</h3>
-    {#if subtitulo}<p class="sub">{subtitulo}</p>{/if}
-    <div class="roda-wrap" style={`height: ${ALTURA_ITEM * ITENS_VISIVEIS}px;`}>
-      <div class="roda-marcador" style={`height: ${ALTURA_ITEM}px;`}></div>
-      <div class="roda-lista" bind:this={listaEl} onscroll={aoRolar} use:posicionarInicial style={`padding: ${PADDING_VERTICAL}px 0;`}>
-        {#each opcoes as opcao, i (i)}
-          <button
-            class="roda-item"
-            class:ativo={i === indiceSelecionado}
-            style={`height: ${ALTURA_ITEM}px; opacity: ${opacidade(i)};`}
-            onclick={() => selecionarIndice(i)}
-          >
-            {opcao.label}
-          </button>
-        {/each}
-      </div>
+<Sheet {titulo} {onFechar}>
+  {#if subtitulo}<p class="sub">{subtitulo}</p>{/if}
+  <div class="roda-wrap" style={`height: ${ALTURA_ITEM * ITENS_VISIVEIS}px;`}>
+    <div class="roda-marcador" style={`height: ${ALTURA_ITEM}px;`}></div>
+    <div class="roda-lista" bind:this={listaEl} onscroll={aoRolar} use:posicionarInicial style={`padding: ${PADDING_VERTICAL}px 0;`}>
+      {#each opcoes as opcao, i (i)}
+        <button
+          class="roda-item"
+          class:ativo={i === indiceSelecionado}
+          style={`height: ${ALTURA_ITEM}px; opacity: ${opacidade(i)};`}
+          onclick={() => selecionarIndice(i)}
+        >
+          {opcao.label}
+        </button>
+      {/each}
     </div>
-    <button class="feito" onclick={confirmar}>Feito</button>
   </div>
-</div>
+  <button class="feito" onclick={confirmar}>Feito</button>
+</Sheet>
 
 <style>
-  .sheet-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    z-index: 100;
-  }
-  .sheet {
-    width: 100%;
-    max-width: 520px;
-    background: var(--surface-card);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    padding: var(--space-3) var(--space-4);
-    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
-    box-shadow: var(--shadow-float);
-  }
-  .sheet-handle {
-    width: 40px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--surface-border);
-    margin: 0 auto var(--space-4);
-  }
-  h3 {
-    margin: 0;
-    font-size: var(--font-size-base);
-    text-align: center;
-  }
   .sub {
-    margin: var(--space-1) 0 0;
+    margin: 0 0 var(--space-1);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
     text-align: center;

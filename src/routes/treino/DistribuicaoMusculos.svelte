@@ -2,6 +2,7 @@
   import { navigate } from "../../lib/router.svelte";
   import { toISODate, parseISODate } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import Sheet from "../../components/Sheet.svelte";
   import PieChart from "../../components/PieChart.svelte";
   import {
     listMusculos,
@@ -377,97 +378,85 @@
 {/if}
 
 {#if mostrarGradeSemanal}
-  <div class="grade-overlay" role="presentation" onclick={() => (mostrarGradeSemanal = false)}>
-    <div class="grade-sheet" role="presentation" onclick={(e) => e.stopPropagation()}>
-      <div class="sheet-handle"></div>
-      <h3>Distribuição na Semana</h3>
-      <div class="grade-scroll">
-        <table class="grade-tabela">
-          <thead>
+  <Sheet titulo="Distribuição na Semana" onFechar={() => (mostrarGradeSemanal = false)}>
+    <div class="grade-scroll">
+      <table class="grade-tabela">
+        <thead>
+          <tr>
+            <th class="grade-col-musculo"></th>
+            {#each gradeSemanal.colunas as col (col.dia)}
+              <th>
+                <div class="grade-dia" class:com-treino={col.treinoNome != null}>{DIAS_SEMANA_ABREV[col.dia]}</div>
+                <div class="grade-rotina-nome">{col.treinoNome ?? "💤"}</div>
+              </th>
+            {/each}
+          </tr>
+        </thead>
+        <tbody>
+          {#each gradeSemanal.linhas as linha (linha.musculo.id)}
             <tr>
-              <th class="grade-col-musculo"></th>
-              {#each gradeSemanal.colunas as col (col.dia)}
-                <th>
-                  <div class="grade-dia" class:com-treino={col.treinoNome != null}>{DIAS_SEMANA_ABREV[col.dia]}</div>
-                  <div class="grade-rotina-nome">{col.treinoNome ?? "💤"}</div>
-                </th>
+              <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
+              {#each linha.valores as valor, i (i)}
+                <td class="grade-valor">
+                  {#if valor > 0}
+                    <span
+                      class="grade-valor-caixa"
+                      style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
+                    >{valor}</span>
+                  {/if}
+                </td>
               {/each}
             </tr>
-          </thead>
-          <tbody>
-            {#each gradeSemanal.linhas as linha (linha.musculo.id)}
-              <tr>
-                <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
-                {#each linha.valores as valor, i (i)}
-                  <td class="grade-valor">
-                    {#if valor > 0}
-                      <span
-                        class="grade-valor-caixa"
-                        style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
-                      >{valor}</span>
-                    {/if}
-                  </td>
-                {/each}
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+          {/each}
+        </tbody>
+      </table>
     </div>
-  </div>
+  </Sheet>
 {/if}
 
 {#if mostrarGradeRealizado}
-  <div class="grade-overlay" role="presentation" onclick={() => (mostrarGradeRealizado = false)}>
-    <div class="grade-sheet" role="presentation" onclick={(e) => e.stopPropagation()}>
-      <div class="sheet-handle"></div>
-      <h3>Realizado em {mesLabel}</h3>
-      <div class="grade-scroll">
-        <table class="grade-tabela">
-          <thead>
+  <Sheet titulo={`Realizado em ${mesLabel}`} onFechar={() => (mostrarGradeRealizado = false)}>
+    <div class="grade-scroll">
+      <table class="grade-tabela">
+        <thead>
+          <tr>
+            <th class="grade-col-musculo"></th>
+            {#each gradeRealizado.colunas as col (col.label)}
+              <th>
+                <div class="grade-dia">{col.label}</div>
+                <div class="grade-rotina-nome">{col.subtitulo}</div>
+              </th>
+            {/each}
+          </tr>
+        </thead>
+        <tbody>
+          {#each gradeRealizado.linhas as linha (linha.musculo.id)}
             <tr>
-              <th class="grade-col-musculo"></th>
-              {#each gradeRealizado.colunas as col (col.label)}
-                <th>
-                  <div class="grade-dia">{col.label}</div>
-                  <div class="grade-rotina-nome">{col.subtitulo}</div>
-                </th>
+              <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
+              {#each linha.valores as valor, i (i)}
+                <td class="grade-valor">
+                  {#if valor > 0}
+                    <span
+                      class="grade-valor-caixa"
+                      style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
+                    >{valor}</span>
+                  {/if}
+                </td>
               {/each}
             </tr>
-          </thead>
-          <tbody>
-            {#each gradeRealizado.linhas as linha (linha.musculo.id)}
-              <tr>
-                <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
-                {#each linha.valores as valor, i (i)}
-                  <td class="grade-valor">
-                    {#if valor > 0}
-                      <span
-                        class="grade-valor-caixa"
-                        style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
-                      >{valor}</span>
-                    {/if}
-                  </td>
-                {/each}
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+          {/each}
+        </tbody>
+      </table>
     </div>
-  </div>
+  </Sheet>
 {/if}
 
 {#if modalDetalheRotina}
-  <div class="grade-overlay" role="presentation" onclick={() => (modalDetalheRotina = null)}>
-    <div class="grade-sheet pizza-sheet" role="presentation" onclick={(e) => e.stopPropagation()}>
-      <div class="sheet-handle"></div>
-      <h3>{modalDetalheRotina.titulo}</h3>
-      <div class="pizza-wrap">
-        <PieChart dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))} />
-      </div>
+  <Sheet titulo={modalDetalheRotina.titulo} onFechar={() => (modalDetalheRotina = null)}>
+    <div class="pizza-wrap">
+      <PieChart dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))} />
     </div>
-  </div>
+  </Sheet>
 {/if}
 
 <style>
@@ -639,43 +628,8 @@
     color: var(--surface-muted);
   }
 
-  .grade-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    z-index: 100;
-  }
-  .grade-sheet {
-    width: 100%;
-    max-width: 520px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    background: var(--surface-card);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    padding: var(--space-3) var(--space-4);
-    padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
-    box-shadow: var(--shadow-float);
-  }
-  .sheet-handle {
-    width: 40px;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--surface-border);
-    margin: 0 auto var(--space-4);
-    flex-shrink: 0;
-  }
-  .grade-sheet h3 {
-    margin: 0 0 var(--space-3);
-    font-size: var(--font-size-base);
-    text-align: center;
-    flex-shrink: 0;
-  }
   .grade-scroll {
-    overflow: auto;
+    overflow-x: auto;
     padding-bottom: var(--space-3);
   }
   .grade-tabela {
@@ -730,12 +684,11 @@
   .grade-tabela tbody tr:not(:last-child) td {
     border-bottom: 1px solid var(--surface-border);
   }
-  .pizza-sheet {
-    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
-  }
   .pizza-wrap {
     width: 260px;
     height: 260px;
-    margin: 0 auto;
+    max-width: 100%;
+    overflow: hidden;
+    margin: var(--space-2) auto 0;
   }
 </style>
