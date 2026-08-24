@@ -275,18 +275,20 @@
   }
 
   /** Antes de concluir mostra a meta; depois, some se ficou dentro da faixa, ou avisa se ficou fora. */
+  function faixaMeta(serieItem: SetSessao): string {
+    return serieItem.repMin != null && serieItem.repMax != null
+      ? `${serieItem.repMin} a ${serieItem.repMax}`
+      : String(serieItem.repMin ?? serieItem.repMax);
+  }
+
   function textoMeta(serieItem: SetSessao): string | null {
     if (serieItem.repMin == null && serieItem.repMax == null) return null;
     if (!serieItem.concluida) {
-      return `Meta: ${
-        serieItem.repMin != null && serieItem.repMax != null
-          ? `${serieItem.repMin} a ${serieItem.repMax}`
-          : (serieItem.repMin ?? serieItem.repMax)
-      }`;
+      return `Meta: ${faixaMeta(serieItem)}`;
     }
     if (serieItem.repeticoes == null) return null;
-    if (serieItem.repMin != null && serieItem.repeticoes < serieItem.repMin) return "abaixo da meta";
-    if (serieItem.repMax != null && serieItem.repeticoes > serieItem.repMax) return "acima da meta";
+    if (serieItem.repMin != null && serieItem.repeticoes < serieItem.repMin) return `Abaixo da meta (${faixaMeta(serieItem)})`;
+    if (serieItem.repMax != null && serieItem.repeticoes > serieItem.repMax) return `Acima da meta (${faixaMeta(serieItem)})`;
     return null;
   }
 
