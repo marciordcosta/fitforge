@@ -177,6 +177,46 @@
     return linha;
   });
 
+  /** Diferença % de cada peso real em relação ao peso esperado pela meta naquele mesmo dia (mesma fórmula da metaLinha, avaliada dia a dia). */
+  const diffMetaPorPonto = $derived.by(() => {
+    if (!meta || !pesosGrafico.length) return null;
+    if (meta.tipo === "manutencao") {
+      if (meta.pesoManutencao == null) return null;
+      const alvo = meta.pesoManutencao;
+      return pesosGrafico.map((p) => ((p.peso - alvo) / alvo) * 100);
+    }
+    if (meta.percentual == null) return null;
+    const percentual = meta.percentual;
+    const pesoInicial = pesosGrafico[0].peso;
+    const dataInicial = parseISODate(pesosGrafico[0].data);
+    return pesosGrafico.map((p) => {
+      const diasDecorridos = Math.round((parseISODate(p.data).getTime() - dataInicial.getTime()) / 86400000);
+      const alvo = pesoInicial * Math.pow(1 + percentual / 100, diasDecorridos / 7);
+      return ((p.peso - alvo) / alvo) * 100;
+    });
+  });
+
+  const pluginRotulosMeta = {
+    id: "rotulosMeta",
+    afterDatasetsDraw(c: Chart) {
+      const diffs = diffMetaPorPonto;
+      if (!diffs) return;
+      const pontos = c.getDatasetMeta(0).data;
+      const { ctx } = c;
+      ctx.save();
+      ctx.font = "9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+      ctx.fillStyle = COR_META;
+      ctx.textAlign = "center";
+      pontos.forEach((ponto, i) => {
+        const diff = diffs[i];
+        if (diff == null) return;
+        const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
+        ctx.fillText(texto, ponto.x, ponto.y - 8);
+      });
+      ctx.restore();
+    },
+  };
+
   let canvas = $state<HTMLCanvasElement | undefined>();
   let chart: Chart | null = null;
 
@@ -217,12 +257,14 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { top: 14 } },
         plugins: { legend: { display: false } },
         scales: {
           x: { display: false },
           y: { ticks: { color: "#9aa0ab" }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
         },
       },
+      plugins: [pluginRotulosMeta],
     });
   }
 
