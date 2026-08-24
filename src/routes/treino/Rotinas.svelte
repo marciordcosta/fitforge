@@ -83,6 +83,7 @@
   <div class="quick-actions">
     <button class="quick-btn" onclick={() => navigate("/treino/exercicios")}>Exercícios</button>
     <button class="quick-btn" onclick={() => navigate("/treino/distribuicao")}>Distribuição</button>
+    <button class="quick-btn" onclick={() => navigate("/treino/historico")}>Histórico</button>
   </div>
 
   <div class="rotinas-header">

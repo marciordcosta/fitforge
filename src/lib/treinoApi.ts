@@ -563,6 +563,77 @@ export async function salvarRegistrosDoDia(
   if (insError) throw insError;
 }
 
+export interface DiaComTreino {
+  data: string;
+  treinoId: string;
+  treinoNome: string;
+}
+
+/** Dias do período que têm ao menos um registro, com a rotina feita naquele dia (uma por dia; se houver mais de uma, pega a primeira). */
+export async function getDiasComTreino(dataInicio: string, dataFim: string): Promise<DiaComTreino[]> {
+  const { data, error } = await supabase
+    .from("treino_registros")
+    .select("data, treino_id, treinos(nome_treino)")
+    .gte("data", dataInicio)
+    .lte("data", dataFim);
+  if (error) throw error;
+
+  const porDia = new Map<string, DiaComTreino>();
+  for (const r of data ?? []) {
+    if (porDia.has(r.data)) continue;
+    porDia.set(r.data, {
+      data: r.data,
+      treinoId: r.treino_id,
+      treinoNome: (r.treinos as unknown as { nome_treino: string } | null)?.nome_treino ?? "",
+    });
+  }
+  return Array.from(porDia.values());
+}
+
+export interface ExercicioRegistroDia {
+  exercicioId: string;
+  exercicioNome: string;
+  sets: SetRegistro[];
+}
+
+export interface HistoricoDia {
+  treinoNome: string;
+  exercicios: ExercicioRegistroDia[];
+}
+
+/** Registro completo de uma sessão específica (rotina + data), agrupado por exercício e com nomes já resolvidos. */
+export async function getHistoricoDia(treinoId: string, data: string): Promise<HistoricoDia> {
+  const [{ data: rows, error }, treino] = await Promise.all([
+    supabase
+      .from("treino_registros")
+      .select("exercicio_id, serie, peso, repeticoes, exercicios(nome)")
+      .eq("treino_id", treinoId)
+      .eq("data", data)
+      .order("serie", { ascending: true }),
+    getTreino(treinoId),
+  ]);
+  if (error) throw error;
+
+  const porExercicio = new Map<string, ExercicioRegistroDia>();
+  for (const r of rows ?? []) {
+    let grupo = porExercicio.get(r.exercicio_id);
+    if (!grupo) {
+      grupo = {
+        exercicioId: r.exercicio_id,
+        exercicioNome: (r.exercicios as unknown as { nome: string } | null)?.nome ?? "",
+        sets: [],
+      };
+      porExercicio.set(r.exercicio_id, grupo);
+    }
+    grupo.sets.push({ serie: r.serie, peso: r.peso, repeticoes: r.repeticoes });
+  }
+
+  return {
+    treinoNome: treino?.nome_treino ?? "",
+    exercicios: Array.from(porExercicio.values()),
+  };
+}
+
 /** Último registro de um exercício, filtrado por rotina se `treinoId` for informado. */
 export async function getUltimoRegistro(
   exercicioId: string,

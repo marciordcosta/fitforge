@@ -8,6 +8,8 @@
   import ExercicioDetalhe from "./ExercicioDetalhe.svelte";
   import ExercicioForm from "./ExercicioForm.svelte";
   import DistribuicaoMusculos from "./DistribuicaoMusculos.svelte";
+  import HistoricoCalendario from "./HistoricoCalendario.svelte";
+  import HistoricoDia from "./HistoricoDia.svelte";
 
   const segmentos = $derived(
     router.path.replace(/^\/treino\/?/, "").split("/").filter(Boolean),
@@ -32,6 +34,10 @@
   <Exercicios />
 {:else if segmentos[0] === "distribuicao"}
   <DistribuicaoMusculos />
+{:else if segmentos[0] === "historico" && segmentos[1] && segmentos[2]}
+  <HistoricoDia treinoId={segmentos[1]} data={segmentos[2]} />
+{:else if segmentos[0] === "historico"}
+  <HistoricoCalendario />
 {:else}
   <Rotinas />
 {/if}
