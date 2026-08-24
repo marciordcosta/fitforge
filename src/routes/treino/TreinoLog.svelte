@@ -488,7 +488,7 @@
       <span class="stat-label">Séries</span>
       <span class="stat-valor">{seriesTotal}</span>
     </div>
-    <button class="concluir-icon" disabled={salvando} onclick={concluirTreino} aria-label="Concluir treino">✓</button>
+    <button class="concluir" disabled={salvando} onclick={concluirTreino}>Concluir</button>
   </div>
 </div>
 
@@ -785,11 +785,11 @@
     margin: 0 auto;
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    justify-content: space-between;
     padding: var(--space-3) var(--space-4);
   }
   .voltar {
-    flex: 1;
+    flex-shrink: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -817,19 +817,17 @@
     font-size: var(--font-size-base);
     font-weight: 600;
   }
-  .concluir-icon {
+  .concluir {
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: none;
     background: var(--color-primary);
     color: var(--color-primary-fg);
-    font-size: var(--font-size-lg);
-    font-weight: 700;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-4);
+    font-weight: 600;
     cursor: pointer;
   }
-  .concluir-icon:disabled {
+  .concluir:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
