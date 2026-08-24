@@ -407,11 +407,10 @@
           <div class="celula vazia"></div>
         {:else}
           <button class="celula" class:com-peso={cel.peso != null} onclick={() => abrirDia(cel.iso)}>
-            {#if cel.temTreino}
-              <span class="marcador-treino" aria-hidden="true"></span>
-            {/if}
             {#if cel.iso === hojeISO()}
-              <span class="marcador-hoje" aria-hidden="true"></span>
+              <span class="marcador-hoje" class:com-treino={cel.temTreino} aria-hidden="true"></span>
+            {:else if cel.temTreino}
+              <span class="marcador-treino" aria-hidden="true"></span>
             {/if}
             <span class="dia-numero" class:muted={cel.peso == null}>{cel.dia}</span>
             {#if cel.peso != null}
@@ -612,24 +611,26 @@
   }
   .marcador-hoje {
     position: absolute;
-    bottom: 4px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 4px;
+    right: 4px;
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--color-primary);
     animation: pulso-hoje 1.6s ease-in-out infinite;
   }
+  .marcador-hoje.com-treino {
+    background: #f87171;
+  }
   @keyframes pulso-hoje {
     0%,
     100% {
       opacity: 1;
-      transform: translateX(-50%) scale(1);
+      transform: scale(1);
     }
     50% {
       opacity: 0.45;
-      transform: translateX(-50%) scale(1.6);
+      transform: scale(1.6);
     }
   }
   .celula.vazia {
