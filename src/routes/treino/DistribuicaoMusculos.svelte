@@ -382,7 +382,7 @@
               {#each gradeSemanal.colunas as col (col.dia)}
                 <th>
                   <div class="grade-dia">{DIAS_SEMANA_ABREV[col.dia]}</div>
-                  <div class="grade-rotina-nome">{col.treinoNome ?? "Descanso"}</div>
+                  <div class="grade-rotina-nome">{col.treinoNome ?? "—"}</div>
                 </th>
               {/each}
             </tr>
@@ -681,7 +681,7 @@
   }
   .grade-tabela th,
   .grade-tabela td {
-    padding: var(--space-2);
+    padding: var(--space-1);
     text-align: center;
     white-space: nowrap;
   }
@@ -706,6 +706,9 @@
     left: 0;
     background: var(--surface-card);
     padding-left: 0;
+    max-width: 68px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .grade-valor-caixa {
     display: inline-flex;
