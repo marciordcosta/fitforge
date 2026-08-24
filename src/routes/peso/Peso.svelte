@@ -6,6 +6,7 @@
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import WheelPicker from "../../components/WheelPicker.svelte";
 
   const COR_PESO = "#5eead4";
   const COR_TREINO = "#f87171";
@@ -48,7 +49,7 @@
   let loading = $state(true);
   let diaSelecionado = $state<string | null>(null);
 
-  let periodo = $state<Periodo>(PERIODOS[2]);
+  let periodo = $state<Periodo>(PERIODOS[0]);
   let pesosGrafico = $state<PesoRegistro[]>([]);
   let diasComTreinoGrafico = $state<Set<string>>(new Set());
   let loadingGrafico = $state(true);
@@ -332,10 +333,12 @@
 {/if}
 
 {#if mostrarFiltro}
-  <ActionSheet
+  <WheelPicker
     titulo="Período do gráfico"
+    opcoes={PERIODOS.map((p) => ({ valor: p, label: p.label }))}
+    valorAtual={periodo}
+    onSelecionar={(p) => selecionarPeriodo(p)}
     onFechar={() => (mostrarFiltro = false)}
-    opcoes={PERIODOS.map((p) => ({ label: p.label, onSelect: () => selecionarPeriodo(p) }))}
   />
 {/if}
 
