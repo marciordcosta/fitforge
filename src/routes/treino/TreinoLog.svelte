@@ -610,7 +610,7 @@
                     : "—"}
                 </span>
                 {#if serieItem.repMin != null || serieItem.repMax != null}
-                  <span class="anterior-meta">
+                  <span class="anterior-meta {classeTextoReps(serieItem)}">
                     Meta: {serieItem.repMin != null && serieItem.repMax != null
                       ? `${serieItem.repMin} a ${serieItem.repMax}`
                       : (serieItem.repMin ?? serieItem.repMax)}
@@ -624,7 +624,6 @@
                 bind:value={serieItem.peso}
               />
               <input
-                class={classeTextoReps(serieItem)}
                 type="number"
                 inputmode="decimal"
                 placeholder={serieItem.anteriorReps != null ? String(serieItem.anteriorReps) : "-"}
@@ -1010,19 +1009,13 @@
   }
   .linha.concluida {
     background: #1e4a2f;
+    margin: 0 calc(var(--space-4) * -1);
+    padding: var(--space-1) var(--space-4);
   }
   .linha.concluida input,
   .linha.concluida .serie-num {
     background: transparent;
     border-color: transparent;
-  }
-  .linha input.abaixo-faixa {
-    color: var(--color-danger);
-    font-weight: 700;
-  }
-  .linha input.acima-faixa {
-    color: #60a5fa;
-    font-weight: 700;
   }
   .serie-num {
     width: 36px;
@@ -1055,8 +1048,19 @@
     color: var(--surface-muted);
   }
   .anterior-meta {
+    display: inline-block;
     font-size: 11px;
     color: var(--surface-muted);
+    border-radius: 4px;
+    padding: 0 3px;
+  }
+  .anterior-meta.abaixo-faixa {
+    background: var(--color-danger);
+    color: #fff;
+  }
+  .anterior-meta.acima-faixa {
+    background: #60a5fa;
+    color: #fff;
   }
   .linha input {
     box-sizing: border-box;
