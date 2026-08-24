@@ -701,7 +701,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .grade-col-musculo {
+  .grade-tabela .grade-col-musculo {
     text-align: left;
     font-size: var(--font-size-sm);
     color: var(--surface-fg);
