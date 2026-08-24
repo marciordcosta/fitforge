@@ -8,10 +8,10 @@
   import Home from "./routes/Home.svelte";
   import Placeholder from "./routes/Placeholder.svelte";
   import Treino from "./routes/treino/Treino.svelte";
+  import Peso from "./routes/peso/Peso.svelte";
 
   const sectionTitles: Record<string, string> = {
     "/treino": "Treino",
-    "/peso": "Peso",
     "/fotos": "Fotos",
     "/dieta": "Dieta",
   };
@@ -48,6 +48,8 @@
     <Home />
   {:else if router.path.startsWith("/treino")}
     <Treino />
+  {:else if router.path === "/peso"}
+    <Peso />
   {:else if sectionTitles[router.path]}
     <Placeholder titulo={sectionTitles[router.path]} />
   {:else}
