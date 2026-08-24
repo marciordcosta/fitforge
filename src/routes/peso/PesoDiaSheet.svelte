@@ -124,6 +124,13 @@
     <circle cx="12" cy="13" r="4" />
   </svg>
 {/snippet}
+{#snippet iconGaleria()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="8.5" cy="9.5" r="1.5" />
+    <path d="M21 15l-5-5-9 9" />
+  </svg>
+{/snippet}
 
 {#snippet nomeRotinaAcao()}
   {#if nomeRotina}
@@ -168,8 +175,8 @@
     titulo="Adicionar foto"
     onFechar={() => (mostrarOpcoesFoto = false)}
     opcoes={[
-      { label: "Câmera", onSelect: () => inputCamera?.click() },
-      { label: "Galeria", onSelect: () => inputGaleria?.click() },
+      { label: "Câmera", icon: iconCamera, onSelect: () => inputCamera?.click() },
+      { label: "Galeria", icon: iconGaleria, onSelect: () => inputGaleria?.click() },
     ]}
   />
 {/if}
