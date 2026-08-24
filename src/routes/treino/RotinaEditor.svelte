@@ -4,6 +4,7 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DescansoPicker from "../../components/DescansoPicker.svelte";
+  import WheelPicker from "../../components/WheelPicker.svelte";
   import {
     getTreino,
     createTreino,
@@ -12,6 +13,7 @@
     listExercicios,
     getUltimoRegistro,
     DIAS_SEMANA_ABREV,
+    DIAS_SEMANA_COMPLETO,
     type Exercicio,
     type SetRegistro,
   } from "../../lib/treinoApi";
@@ -27,6 +29,12 @@
   let salvando = $state(false);
   let mostrarPicker = $state(false);
   let buscaPicker = $state("");
+  let mostrarDiaPicker = $state(false);
+
+  const opcoesDia = [
+    { valor: null, label: "Sem dia fixo" },
+    ...DIAS_SEMANA_COMPLETO.map((label, idx) => ({ valor: idx, label })),
+  ];
 
   const anteriorCache = new Map<string, SetRegistro[]>();
 
@@ -286,12 +294,9 @@
   {:else}
     <div class="nome-linha">
       <input class="nome-input" type="text" placeholder="Nome da rotina (ex: Upper A)" bind:value={nomeTreino} />
-      <select class="dia-select" bind:value={diaSemana}>
-        <option value={null}>—</option>
-        {#each DIAS_SEMANA_ABREV as label, idx (label)}
-          <option value={idx}>{label}</option>
-        {/each}
-      </select>
+      <button class="dia-select" onclick={() => (mostrarDiaPicker = true)}>
+        {diaSemana != null ? DIAS_SEMANA_ABREV[diaSemana] : "—"}
+      </button>
     </div>
 
     {#each linhas as linha, idx (linha.exercicio_id)}
@@ -374,6 +379,16 @@
       window.history.back();
     }}
     onCancelar={() => (mostrarConfirmCancelar = false)}
+  />
+{/if}
+
+{#if mostrarDiaPicker}
+  <WheelPicker
+    titulo="Dia da Semana"
+    opcoes={opcoesDia}
+    valorAtual={diaSemana}
+    onSelecionar={(v) => (diaSemana = v)}
+    onFechar={() => (mostrarDiaPicker = false)}
   />
 {/if}
 
