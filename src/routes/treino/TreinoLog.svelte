@@ -479,7 +479,10 @@
 
 <div class="header-fixo">
   <div class="header-fixo-inner">
-    <button class="voltar" onclick={() => navigate("/treino")}>▾ {nomeTreino}</button>
+    <div class="stat-inline stat-treino">
+      <span class="stat-label">Treino</span>
+      <button class="voltar" onclick={() => navigate("/treino")}>▾ {nomeTreino}</button>
+    </div>
     <div class="stat-inline">
       <span class="stat-label">Duração</span>
       <span class="stat-valor destaque">{duracaoLabel}</span>
@@ -808,6 +811,11 @@
     flex-direction: column;
     align-items: center;
     gap: 2px;
+  }
+  .stat-treino {
+    flex: 1;
+    min-width: 0;
+    align-items: flex-start;
   }
   .stat-label {
     font-size: 11px;
