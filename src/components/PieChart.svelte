@@ -173,9 +173,14 @@
       onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
     >
       {#each f.linhasNome as linha, i (i)}
-        <tspan x={f.label.x} dy={i === 0 ? `${f.dyInicial}` : `${ALTURA_LINHA}`} class="fatia-nome">{linha}</tspan>
+        <tspan
+          x={f.label.x}
+          dy={i === 0 ? `${f.dyInicial}` : `${ALTURA_LINHA}`}
+          class="fatia-nome"
+          class:destaque={f.nome === nomeDestacado}
+        >{linha}</tspan>
       {/each}
-      <tspan x={f.label.x} dy={`${ALTURA_LINHA}`} class="fatia-pct">{f.pct}%</tspan>
+      <tspan x={f.label.x} dy={`${ALTURA_LINHA}`} class="fatia-pct" class:destaque={f.nome === nomeDestacado}>{f.pct}%</tspan>
     </text>
   {/each}
 </svg>
@@ -215,11 +220,19 @@
     font-weight: 400;
     fill: var(--surface-muted);
   }
+  .fatia-nome.destaque {
+    font-weight: 600;
+    fill: #fff;
+  }
   .fatia-pct {
     font-size: 4.2px;
     font-weight: 400;
     fill: var(--surface-muted);
     opacity: 0.75;
+  }
+  .fatia-pct.destaque {
+    font-weight: 700;
+    fill: #fff;
   }
   .fatia-linha {
     stroke-width: 0.6;
