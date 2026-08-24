@@ -1044,13 +1044,9 @@
     font-family: inherit;
     cursor: pointer;
   }
-  .serie-num.medalha {
-    width: 40px;
-    height: 40px;
-  }
   .serie-num.medalha svg {
-    width: 40px;
-    height: 40px;
+    width: 26px;
+    height: 26px;
   }
   .anterior {
     display: flex;
