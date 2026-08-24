@@ -56,10 +56,14 @@
     text-align: left;
     padding: var(--space-4) var(--space-1);
     border: none;
+    border-bottom: 1px solid var(--surface-border);
     background: none;
     color: var(--surface-fg);
     font-size: var(--font-size-base);
     cursor: pointer;
+  }
+  .sheet-opcao:last-child {
+    border-bottom: none;
   }
   .sheet-opcao.destructive {
     color: var(--color-danger);
