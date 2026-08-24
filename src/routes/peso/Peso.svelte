@@ -2,7 +2,7 @@
   import { Chart } from "chart.js/auto";
   import { toISODate, parseISODate, hojeISO } from "../../lib/dates";
   import { getPesosDoPeriodo, getMeta, excluirMeta, type PesoRegistro, type PesoMeta } from "../../lib/pesoApi";
-  import { getDiasComTreino } from "../../lib/treinoApi";
+  import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
   import PesoGraficoTelaCheia from "./PesoGraficoTelaCheia.svelte";
@@ -56,6 +56,15 @@
   let loadingGrafico = $state(true);
   let mostrarFiltro = $state(false);
   let mostrarGraficoCheio = $state(false);
+  let hojeTemRotinaAgendada = $state(false);
+
+  async function carregarRotinaHoje() {
+    const treinos = await listTreinos();
+    const diaSemanaHoje = new Date().getDay();
+    hojeTemRotinaAgendada = treinos.some((t) => t.dia_semana === diaSemanaHoje);
+  }
+
+  void carregarRotinaHoje();
 
   let meta = $state<PesoMeta | null>(null);
   let mostrarEscolhaMeta = $state(false);
@@ -407,12 +416,15 @@
           <div class="celula vazia"></div>
         {:else}
           <button class="celula" class:com-peso={cel.peso != null} onclick={() => abrirDia(cel.iso)}>
-            {#if cel.iso === hojeISO()}
-              <span class="marcador-hoje" class:com-treino={cel.temTreino} aria-hidden="true"></span>
-            {:else if cel.temTreino}
+            {#if cel.temTreino}
               <span class="marcador-treino" aria-hidden="true"></span>
             {/if}
-            <span class="dia-numero" class:muted={cel.peso == null}>{cel.dia}</span>
+            <span class="dia-numero-wrap">
+              <span class="dia-numero" class:muted={cel.peso == null}>{cel.dia}</span>
+              {#if cel.iso === hojeISO()}
+                <span class="marcador-hoje" class:com-treino={hojeTemRotinaAgendada} aria-hidden="true"></span>
+              {/if}
+            </span>
             {#if cel.peso != null}
               <span class="peso-valor">{cel.peso}</span>
             {/if}
@@ -609,10 +621,14 @@
     border-radius: 50%;
     background: #f87171;
   }
+  .dia-numero-wrap {
+    position: relative;
+    display: inline-flex;
+  }
   .marcador-hoje {
     position: absolute;
-    top: 4px;
-    right: 4px;
+    top: -2px;
+    right: -7px;
     width: 6px;
     height: 6px;
     border-radius: 50%;
