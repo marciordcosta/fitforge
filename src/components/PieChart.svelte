@@ -28,10 +28,22 @@
   let { dados }: { dados: Fatia[] } = $props();
 
   let nomeDestacado = $state<string | null>(null);
+  let svgEl = $state<SVGSVGElement | undefined>();
 
   function aoClicarFatia(f: { nome: string; detalhe?: DetalheExercicio[] | null }): void {
     nomeDestacado = nomeDestacado === f.nome ? null : f.nome;
   }
+
+  $effect(() => {
+    if (!nomeDestacado) return;
+    function aoClicarFora(e: MouseEvent) {
+      if (svgEl && !svgEl.contains(e.target as Node)) {
+        nomeDestacado = null;
+      }
+    }
+    window.addEventListener("click", aoClicarFora);
+    return () => window.removeEventListener("click", aoClicarFora);
+  });
 
   const CX = 50;
   const CY = 50;
@@ -123,7 +135,7 @@
   });
 </script>
 
-<svg viewBox="0 0 100 100" class="pizza" role="img" aria-label="Distribuição muscular">
+<svg bind:this={svgEl} viewBox="0 0 100 100" class="pizza" role="img" aria-label="Distribuição muscular">
   {#each fatias as f (f.nome)}
     <path
       d={f.path}
