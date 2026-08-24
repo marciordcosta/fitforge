@@ -48,7 +48,7 @@
     <Home />
   {:else if router.path.startsWith("/treino")}
     <Treino />
-  {:else if router.path === "/peso"}
+  {:else if router.path.startsWith("/peso")}
     <Peso />
   {:else if sectionTitles[router.path]}
     <Placeholder titulo={sectionTitles[router.path]} />

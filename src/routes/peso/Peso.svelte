@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
+  import { navigate, router } from "../../lib/router.svelte";
   import { toISODate, parseISODate, hojeISO } from "../../lib/dates";
   import { getPesosDoPeriodo, getMeta, excluirMeta, type PesoRegistro, type PesoMeta } from "../../lib/pesoApi";
   import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
@@ -48,7 +49,12 @@
   let pesos = $state<PesoRegistro[]>([]);
   let diasComTreino = $state<Set<string>>(new Set());
   let loading = $state(true);
-  let diaSelecionado = $state<string | null>(null);
+
+  /** Deriva do path (não de estado local) pra que o botão "voltar" do navegador feche o modal, ou reabra ao voltar de uma tela navegada a partir dele (ex: link "Dia de X"). */
+  const diaSelecionado = $derived.by(() => {
+    const m = router.path.match(/^\/peso\/dia\/(\d{4}-\d{2}-\d{2})$/);
+    return m ? m[1] : null;
+  });
 
   let periodo = $state<Periodo>(PERIODOS[0]);
   let pesosGrafico = $state<PesoRegistro[]>([]);
@@ -295,11 +301,11 @@
   });
 
   function abrirDia(iso: string) {
-    diaSelecionado = iso;
+    navigate(`/peso/dia/${iso}`);
   }
 
   function abrirAdicionar() {
-    diaSelecionado = hojeISO();
+    navigate(`/peso/dia/${hojeISO()}`);
   }
 
   function aoSalvar() {
@@ -436,7 +442,7 @@
 </div>
 
 {#if diaSelecionado !== null}
-  <PesoDiaSheet data={diaSelecionado} onFechar={() => (diaSelecionado = null)} onSalvo={aoSalvar} />
+  <PesoDiaSheet data={diaSelecionado} onFechar={() => window.history.back()} onSalvo={aoSalvar} />
 {/if}
 
 {#if mostrarFiltro}
