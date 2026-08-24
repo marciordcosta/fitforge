@@ -36,6 +36,7 @@ export interface ExercicioSessao {
   observacao: string | null;
   sets: SetSessao[];
   descansoAte: number | null;
+  descansoInicioEm: number | null;
   descansoNotificado: boolean;
   recordes: RecordesExercicio;
 }

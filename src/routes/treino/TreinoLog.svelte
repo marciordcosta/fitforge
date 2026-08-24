@@ -108,6 +108,7 @@
           observacao: te.observacao,
           sets,
           descansoAte: null,
+          descansoInicioEm: null,
           descansoNotificado: false,
           recordes,
         };
@@ -123,11 +124,25 @@
     treinoLogSessao.iniciar({ treinoId, nomeTreino, inicio, sessao, houveAlteracaoEstrutura });
   });
 
+  function notificar(titulo: string, corpo: string): void {
+    if (typeof Notification === "undefined") return;
+    if (Notification.permission === "granted") {
+      new Notification(titulo, { body: corpo, tag: "fitforge-descanso", icon: "/icons/icon-192.png" });
+    } else if (Notification.permission !== "denied") {
+      void Notification.requestPermission().then((permissao) => {
+        if (permissao === "granted") {
+          new Notification(titulo, { body: corpo, tag: "fitforge-descanso", icon: "/icons/icon-192.png" });
+        }
+      });
+    }
+  }
+
   function checarDescansosConcluidos(): void {
     for (const ex of sessao) {
       if (ex.descansoAte && !ex.descansoNotificado && Date.now() >= ex.descansoAte) {
         ex.descansoNotificado = true;
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        notificar("Descanso terminado!", `Hora da próxima série — ${ex.nome}`);
       }
     }
   }
@@ -137,6 +152,34 @@
     checarDescansosConcluidos();
   }, 1000);
   $effect(() => () => clearInterval(timerId));
+
+  const exercicioDescansando = $derived.by(() => sessao.find((ex) => ex.descansoAte && ex.descansoAte > agora) ?? null);
+
+  const restanteDescansoSeg = $derived.by(() => {
+    if (!exercicioDescansando?.descansoAte) return 0;
+    return Math.max(Math.ceil((exercicioDescansando.descansoAte - agora) / 1000), 0);
+  });
+
+  const progressoDescanso = $derived.by(() => {
+    const ex = exercicioDescansando;
+    if (!ex?.descansoAte || !ex.descansoInicioEm) return 0;
+    const total = ex.descansoAte - ex.descansoInicioEm;
+    if (total <= 0) return 1;
+    return Math.min(Math.max((agora - ex.descansoInicioEm) / total, 0), 1);
+  });
+
+  function ajustarDescanso(deltaSeg: number): void {
+    const ex = exercicioDescansando;
+    if (!ex?.descansoAte) return;
+    ex.descansoAte = Math.max(ex.descansoAte + deltaSeg * 1000, Date.now());
+  }
+
+  function pularDescanso(): void {
+    const ex = exercicioDescansando;
+    if (!ex) return;
+    ex.descansoAte = null;
+    ex.descansoInicioEm = null;
+  }
 
   function adicionarSerie(exIdx: number) {
     const ex = sessao[exIdx];
@@ -195,12 +238,15 @@
       serieItem.prVolume = false;
       serieItem.prVolumeDelta = null;
       ex.descansoAte = null;
+      ex.descansoInicioEm = null;
       return;
     }
 
     if (ex.descanso_seg) {
-      ex.descansoAte = Date.now() + ex.descanso_seg * 1000;
+      ex.descansoInicioEm = Date.now();
+      ex.descansoAte = ex.descansoInicioEm + ex.descanso_seg * 1000;
       ex.descansoNotificado = false;
+      notificar("Descanso iniciado", `${ex.nome} — ${formatMinSeg(ex.descanso_seg)}`);
     }
 
     if (serieItem.peso != null && serieItem.repeticoes != null) {
@@ -401,6 +447,7 @@
       observacao: null,
       sets,
       descansoAte: null,
+      descansoInicioEm: null,
       descansoNotificado: false,
       recordes,
     };
@@ -603,6 +650,18 @@
     <button class="descartar" onclick={() => (mostrarConfirmDescartar = true)} disabled={salvando}>Descartar Treino</button>
   {/if}
 </div>
+
+{#if exercicioDescansando}
+  <div class="descanso-bar">
+    <div class="descanso-progresso" style={`width: ${progressoDescanso * 100}%`}></div>
+    <div class="descanso-bar-conteudo">
+      <button class="descanso-ajuste" onclick={() => ajustarDescanso(-15)}>-15</button>
+      <span class="descanso-tempo">{formatMMSS(restanteDescansoSeg)}</span>
+      <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
+      <button class="descanso-pular" onclick={pularDescanso}>Pular</button>
+    </div>
+  </div>
+{/if}
 
 {#snippet iconReordenar()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -920,6 +979,7 @@
     box-sizing: border-box;
     background: none;
     border: none;
+    outline: none;
     padding: 0;
     margin: 0 0 var(--space-2);
     color: var(--surface-muted);
@@ -950,6 +1010,7 @@
   }
   .linha.concluida {
     position: relative;
+    z-index: 0;
   }
   .linha.concluida::before {
     content: "";
@@ -1007,7 +1068,7 @@
   }
   .anterior-meta {
     font-size: 11px;
-    color: var(--color-primary);
+    color: var(--surface-muted);
   }
   .linha input {
     box-sizing: border-box;
@@ -1223,6 +1284,61 @@
     border: 1px solid var(--surface-border);
     background: none;
     color: var(--color-danger);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .descanso-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    background: var(--surface-card);
+    border-top: 1px solid var(--surface-border);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .descanso-progresso {
+    height: 3px;
+    background: var(--color-primary);
+    transition: width 1s linear;
+  }
+  .descanso-bar-conteudo {
+    max-width: 520px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+  .descanso-ajuste {
+    flex-shrink: 0;
+    width: 48px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .descanso-tempo {
+    flex: 1;
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--surface-fg);
+    font-variant-numeric: tabular-nums;
+  }
+  .descanso-pular {
+    flex-shrink: 0;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
     font-size: var(--font-size-base);
     font-weight: 600;
     cursor: pointer;
