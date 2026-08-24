@@ -814,8 +814,8 @@
     gap: 2px;
   }
   .stat-treino {
-    flex: 1;
     min-width: 0;
+    max-width: 40%;
     align-items: flex-start;
   }
   .stat-label {
