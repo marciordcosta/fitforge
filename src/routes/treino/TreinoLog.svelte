@@ -255,17 +255,14 @@
       if (serieItem.peso > ex.recordes.maiorPeso) {
         serieItem.prPeso = true;
         serieItem.prPesoDelta = serieItem.peso - ex.recordes.maiorPeso;
-        ex.recordes.maiorPeso = serieItem.peso;
       }
       if (rm > ex.recordes.melhor1rm) {
         serieItem.pr1rm = true;
         serieItem.pr1rmDelta = rm - ex.recordes.melhor1rm;
-        ex.recordes.melhor1rm = rm;
       }
       if (volume > ex.recordes.melhorVolumeSerie) {
         serieItem.prVolume = true;
         serieItem.prVolumeDelta = volume - ex.recordes.melhorVolumeSerie;
-        ex.recordes.melhorVolumeSerie = volume;
       }
     }
   }

@@ -14,8 +14,6 @@
 </script>
 
 <script lang="ts">
-  import Sheet from "./Sheet.svelte";
-
   interface DetalheExercicio {
     exercicio: string;
     series: number;
@@ -29,13 +27,10 @@
 
   let { dados }: { dados: Fatia[] } = $props();
 
-  let fatiaSelecionada = $state<{ nome: string; detalhe: DetalheExercicio[] } | null>(null);
   let nomeDestacado = $state<string | null>(null);
 
   function aoClicarFatia(f: { nome: string; detalhe?: DetalheExercicio[] | null }): void {
-    nomeDestacado = f.nome;
-    if (!f.detalhe?.length) return;
-    fatiaSelecionada = { nome: f.nome, detalhe: f.detalhe };
+    nomeDestacado = nomeDestacado === f.nome ? null : f.nome;
   }
 
   const CX = 50;
@@ -120,6 +115,12 @@
       };
     });
   });
+
+  const detalheSelecionado = $derived.by(() => {
+    const f = fatias.find((x) => x.nome === nomeDestacado);
+    if (!f?.detalhe?.length) return null;
+    return { nome: f.nome, detalhe: f.detalhe };
+  });
 </script>
 
 <svg viewBox="0 0 100 100" class="pizza" role="img" aria-label="Distribuição muscular">
@@ -162,17 +163,21 @@
   {/each}
 </svg>
 
-{#if fatiaSelecionada}
-  <Sheet titulo={fatiaSelecionada.nome} onFechar={() => (fatiaSelecionada = null)}>
+{#if detalheSelecionado}
+  <div class="detalhe-painel">
+    <div class="detalhe-cabecalho">
+      <strong>{detalheSelecionado.nome}</strong>
+      <button class="detalhe-fechar" onclick={() => (nomeDestacado = null)} aria-label="Fechar detalhe">✕</button>
+    </div>
     <div class="detalhe-lista">
-      {#each fatiaSelecionada.detalhe as d (d.exercicio)}
+      {#each detalheSelecionado.detalhe as d (d.exercicio)}
         <div class="detalhe-item">
           <span class="detalhe-nome">{d.exercicio}</span>
           <span class="detalhe-series">{d.series} {d.series === 1 ? "série" : "séries"}</span>
         </div>
       {/each}
     </div>
-  </Sheet>
+  </div>
 {/if}
 
 <style>
@@ -181,6 +186,11 @@
     height: 100%;
     display: block;
     overflow: visible;
+  }
+  .pizza path,
+  .pizza text {
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
   }
   .fatia-texto {
     fill: #fff;
@@ -198,6 +208,33 @@
     stroke-width: 0.6;
   }
   .fatia-clicavel {
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .detalhe-painel {
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--surface-bg);
+    border: 1px solid var(--surface-border);
+  }
+  .detalhe-cabecalho {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    color: var(--surface-fg);
+  }
+  .detalhe-fechar {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    color: var(--surface-muted);
+    font-size: var(--font-size-base);
+    line-height: 1;
     cursor: pointer;
   }
   .detalhe-lista {
