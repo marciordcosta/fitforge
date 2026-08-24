@@ -153,3 +153,8 @@ export async function salvarMetaManutencao(peso: number): Promise<void> {
   });
   if (error) throw error;
 }
+
+export async function excluirMeta(): Promise<void> {
+  const { error } = await supabase.from("peso_metas").delete().eq("user_id", uid());
+  if (error) throw error;
+}

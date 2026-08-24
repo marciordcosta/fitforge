@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
   import { toISODate, parseISODate, hojeISO } from "../../lib/dates";
-  import { getPesosDoPeriodo, getMeta, type PesoRegistro, type PesoMeta } from "../../lib/pesoApi";
+  import { getPesosDoPeriodo, getMeta, excluirMeta, type PesoRegistro, type PesoMeta } from "../../lib/pesoApi";
   import { getDiasComTreino } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
@@ -64,6 +64,24 @@
   }
 
   void carregarMeta();
+
+  const metaAtiva = $derived.by((): "ganho" | "perda" | "manutencao" | null => {
+    if (!meta) return null;
+    if (meta.tipo === "manutencao") return "manutencao";
+    if (meta.percentual == null) return null;
+    return meta.percentual > 0 ? "ganho" : "perda";
+  });
+
+  function valorMeta(tipo: "ganho" | "perda" | "manutencao"): string | undefined {
+    if (metaAtiva !== tipo || !meta) return undefined;
+    if (tipo === "manutencao") return meta.pesoManutencao != null ? `${meta.pesoManutencao}kg` : undefined;
+    return meta.percentual != null ? `${Math.abs(meta.percentual)}%` : undefined;
+  }
+
+  async function limparMeta() {
+    await excluirMeta();
+    await carregarMeta();
+  }
 
   const mesLabel = $derived(`${MESES[mesBase.getMonth()]} ${mesBase.getFullYear()}`);
   const mesInicio = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth(), 1));
@@ -268,6 +286,13 @@
     <line x1="5" y1="15" x2="19" y2="15" />
   </svg>
 {/snippet}
+{#snippet iconLimparMeta()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18" />
+    <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -347,9 +372,28 @@
     titulo="Meta"
     onFechar={() => (mostrarEscolhaMeta = false)}
     opcoes={[
-      { label: "Ganho", icon: iconGanho, onSelect: () => (metaEtapa = "ganho") },
-      { label: "Perda", icon: iconPerda, onSelect: () => (metaEtapa = "perda") },
-      { label: "Manutenção", icon: iconManutencao, onSelect: () => (metaEtapa = "manutencao") },
+      {
+        label: "Ganho",
+        icon: iconGanho,
+        valor: valorMeta("ganho"),
+        disabled: metaAtiva != null && metaAtiva !== "ganho",
+        onSelect: () => (metaEtapa = "ganho"),
+      },
+      {
+        label: "Perda",
+        icon: iconPerda,
+        valor: valorMeta("perda"),
+        disabled: metaAtiva != null && metaAtiva !== "perda",
+        onSelect: () => (metaEtapa = "perda"),
+      },
+      {
+        label: "Manutenção",
+        icon: iconManutencao,
+        valor: valorMeta("manutencao"),
+        disabled: metaAtiva != null && metaAtiva !== "manutencao",
+        onSelect: () => (metaEtapa = "manutencao"),
+      },
+      { label: "Limpar Metas", icon: iconLimparMeta, destructive: true, onSelect: () => limparMeta() },
     ]}
   />
 {/if}

@@ -7,6 +7,7 @@
     subtitulo?: string;
     valor?: string;
     destructive?: boolean;
+    disabled?: boolean;
     icon?: Snippet;
     onSelect: () => void;
   }
@@ -24,6 +25,7 @@
     <button
       class="sheet-opcao"
       class:destructive={opcao.destructive}
+      disabled={opcao.disabled}
       onclick={() => {
         opcao.onSelect();
         onFechar();
@@ -65,6 +67,10 @@
   }
   .sheet-opcao.destructive {
     color: var(--color-danger);
+  }
+  .sheet-opcao:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
   .sheet-opcao-texto {
     display: flex;
