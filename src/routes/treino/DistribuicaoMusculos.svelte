@@ -336,6 +336,12 @@
                 {/each}
               </div>
             {/if}
+            <p class="rotina-totais">
+              {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
+                (acc, ex) => acc + ex.series.length,
+                0,
+              )} séries
+            </p>
           </div>
         {/each}
       </div>
@@ -625,6 +631,13 @@
     font-size: var(--font-size-sm);
   }
   .muted {
+    color: var(--surface-muted);
+  }
+  .rotina-totais {
+    margin: var(--space-3) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--surface-border);
+    font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
 
