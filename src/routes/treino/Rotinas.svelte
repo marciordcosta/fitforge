@@ -7,7 +7,6 @@
     listTreinos,
     deleteTreino,
     duplicateTreino,
-    atualizarOrdemTreinos,
     DIAS_SEMANA_COMPLETO,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
@@ -56,105 +55,6 @@
     await carregar();
   }
 
-  // ---------------- Arrastar para reordenar (pressionar e segurar) ----------------
-
-  let arrastandoId = $state<string | null>(null);
-  let pressTimer: number | null = null;
-  let idPressionado: string | null = null;
-  let pointerDownPos: { x: number; y: number } | null = null;
-  let moveu = false;
-  let pointerTypeAtual = "touch";
-  const cardRefs: Record<string, HTMLElement | null> = {};
-
-  function cancelarPress() {
-    if (pressTimer != null) {
-      clearTimeout(pressTimer);
-      pressTimer = null;
-    }
-  }
-
-  function onCardPointerDown(e: PointerEvent, id: string) {
-    if ((e.target as HTMLElement).closest("button")) return;
-    cancelarPress();
-    idPressionado = id;
-    moveu = false;
-    pointerDownPos = { x: e.clientX, y: e.clientY };
-    pointerTypeAtual = e.pointerType;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    pressTimer = window.setTimeout(() => {
-      pressTimer = null;
-      if (moveu) return;
-      arrastandoId = id;
-      if (navigator.vibrate) navigator.vibrate(15);
-    }, 400);
-  }
-
-  function onCardPointerCancel() {
-    cancelarPress();
-    arrastandoId = null;
-    idPressionado = null;
-    pointerDownPos = null;
-    moveu = false;
-  }
-
-  /** Detecta se o dedo já se moveu o suficiente pra ser um scroll, não um toque parado. */
-  function onCardPointerMoveLocal(e: PointerEvent) {
-    if (!pointerDownPos || moveu) return;
-    const dx = e.clientX - pointerDownPos.x;
-    const dy = e.clientY - pointerDownPos.y;
-    if (Math.hypot(dx, dy) > 8) {
-      moveu = true;
-      cancelarPress();
-      // No mouse não há conflito com rolagem por toque: já pode arrastar direto.
-      if (pointerTypeAtual === "mouse" && idPressionado) {
-        arrastandoId = idPressionado;
-      }
-    }
-  }
-
-  function onCardPointerMove(e: PointerEvent) {
-    if (arrastandoId === null) return;
-    const y = e.clientY;
-    const idx = treinos.findIndex((t) => t.id === arrastandoId);
-    if (idx === -1) return;
-    for (let i = 0; i < treinos.length; i++) {
-      if (i === idx) continue;
-      const el = cardRefs[treinos[i].id];
-      if (!el) continue;
-      const rect = el.getBoundingClientRect();
-      const meio = rect.top + rect.height / 2;
-      if ((i < idx && y < meio) || (i > idx && y > meio)) {
-        const novos = treinos.slice();
-        const [item] = novos.splice(idx, 1);
-        novos.splice(i, 0, item);
-        treinos = novos;
-        break;
-      }
-    }
-  }
-
-  async function onCardPointerUpLocal() {
-    cancelarPress();
-    if (arrastandoId !== null) {
-      arrastandoId = null;
-      await atualizarOrdemTreinos(treinos.map((t) => t.id));
-    } else if (idPressionado && !moveu) {
-      navigate(`/treino/rotina/${idPressionado}/ver`);
-    }
-    idPressionado = null;
-    pointerDownPos = null;
-    moveu = false;
-  }
-
-  $effect(() => {
-    if (arrastandoId === null) return;
-    window.addEventListener("pointermove", onCardPointerMove);
-    window.addEventListener("pointerup", onCardPointerUpLocal);
-    return () => {
-      window.removeEventListener("pointermove", onCardPointerMove);
-      window.removeEventListener("pointerup", onCardPointerUpLocal);
-    };
-  });
 </script>
 
 {#snippet iconEditar()}
@@ -197,28 +97,23 @@
   {:else}
     {#each treinos as treino (treino.id)}
       <div
-        class="card-wrap"
-        class:arrastando={arrastandoId === treino.id}
-        bind:this={cardRefs[treino.id]}
-        onpointerdown={(e) => onCardPointerDown(e, treino.id)}
-        onpointermove={onCardPointerMoveLocal}
-        onpointerup={onCardPointerUpLocal}
-        onpointercancel={onCardPointerCancel}
-        role="presentation"
+        class="rotina-item"
+        role="button"
+        tabindex="0"
+        onclick={() => navigate(`/treino/rotina/${treino.id}/ver`)}
+        onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
       >
-        <div class="rotina-item">
-          <div class="card-header">
-            <h2>
-              {treino.nome_treino}
-              {#if treino.dia_semana != null}
-                <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
-              {/if}
-            </h2>
-            <button class="menu-btn" onclick={() => (menuAberto = treino.id)} aria-label="Mais opções">⋮</button>
-          </div>
-          <p class="preview">{preview(treino)}</p>
-          <Button onclick={() => navigate(`/treino/log/${treino.id}`)}>Iniciar Rotina</Button>
+        <div class="card-header">
+          <h2>
+            {treino.nome_treino}
+            {#if treino.dia_semana != null}
+              <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
+            {/if}
+          </h2>
+          <button class="menu-btn" onclick={(e) => { e.stopPropagation(); menuAberto = treino.id; }} aria-label="Mais opções">⋮</button>
         </div>
+        <p class="preview">{preview(treino)}</p>
+        <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
       </div>
     {/each}
   {/if}
@@ -303,20 +198,8 @@
     line-height: 1;
     cursor: pointer;
   }
-  .card-wrap {
-    touch-action: none;
-    user-select: none;
-    -webkit-user-drag: none;
-    transition: transform 0.15s ease, opacity 0.15s ease;
-  }
-  .card-wrap.arrastando {
-    transform: scale(1.02);
-    opacity: 0.85;
-    box-shadow: var(--shadow-float);
-    position: relative;
-    z-index: 10;
-  }
   .rotina-item {
+    cursor: pointer;
     background: var(--surface-card);
     padding: var(--space-4);
     border-radius: var(--radius-lg);
