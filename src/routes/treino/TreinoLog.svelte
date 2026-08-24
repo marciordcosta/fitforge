@@ -1069,7 +1069,7 @@
     border: none;
     padding: 0;
     text-align: left;
-    text-decoration: underline;
+    text-decoration: none;
     font-family: inherit;
     cursor: pointer;
   }

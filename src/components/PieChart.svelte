@@ -30,8 +30,10 @@
   let { dados }: { dados: Fatia[] } = $props();
 
   let fatiaSelecionada = $state<{ nome: string; detalhe: DetalheExercicio[] } | null>(null);
+  let nomeDestacado = $state<string | null>(null);
 
   function aoClicarFatia(f: { nome: string; detalhe?: DetalheExercicio[] | null }): void {
+    nomeDestacado = f.nome;
     if (!f.detalhe?.length) return;
     fatiaSelecionada = { nome: f.nome, detalhe: f.detalhe };
   }
@@ -125,6 +127,7 @@
     <path
       d={f.path}
       fill={f.cor}
+      opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
       class:fatia-clicavel={!!f.detalhe?.length}
       role="button"
       tabindex={0}
@@ -133,12 +136,18 @@
     />
   {/each}
   {#each fatias as f (f.nome)}
-    <path d={f.linha} class="fatia-linha" style={`stroke: ${f.cor};`} fill="none" />
+    <path
+      d={f.linha}
+      class="fatia-linha"
+      style={`stroke: ${f.cor}; opacity: ${nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1};`}
+      fill="none"
+    />
     <text
       x={f.label.x}
       y={f.label.y}
       text-anchor={f.ancora}
       class="fatia-texto"
+      style={`opacity: ${nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1};`}
       class:fatia-clicavel={!!f.detalhe?.length}
       role="button"
       tabindex={0}
