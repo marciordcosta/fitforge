@@ -780,7 +780,7 @@
     position: sticky;
     top: 0;
     z-index: 20;
-    background: var(--surface-bg);
+    background: var(--surface-card);
     border-bottom: 1px solid var(--surface-border);
   }
   .header-fixo-inner {
