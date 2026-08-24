@@ -14,12 +14,27 @@
 </script>
 
 <script lang="ts">
+  import Sheet from "./Sheet.svelte";
+
+  interface DetalheExercicio {
+    exercicio: string;
+    series: number;
+  }
+
   interface Fatia {
     nome: string;
     valor: number;
+    detalhe?: DetalheExercicio[] | null;
   }
 
   let { dados }: { dados: Fatia[] } = $props();
+
+  let fatiaSelecionada = $state<{ nome: string; detalhe: DetalheExercicio[] } | null>(null);
+
+  function aoClicarFatia(f: { nome: string; detalhe?: DetalheExercicio[] | null }): void {
+    if (!f.detalhe?.length) return;
+    fatiaSelecionada = { nome: f.nome, detalhe: f.detalhe };
+  }
 
   const CX = 50;
   const CY = 50;
@@ -96,6 +111,7 @@
         dyInicial,
         path,
         cor,
+        detalhe: d.detalhe,
         linha: `M ${pBorda.x} ${pBorda.y} L ${pCotovelo.x} ${pCotovelo.y} L ${colX} ${pCotovelo.y}`,
         label: { x: labelX, y: pCotovelo.y },
         ancora: ladoDireito ? "start" : "end",
@@ -106,11 +122,29 @@
 
 <svg viewBox="0 0 100 100" class="pizza" role="img" aria-label="Distribuição muscular">
   {#each fatias as f (f.nome)}
-    <path d={f.path} fill={f.cor} />
+    <path
+      d={f.path}
+      fill={f.cor}
+      class:fatia-clicavel={!!f.detalhe?.length}
+      role="button"
+      tabindex={0}
+      onclick={() => aoClicarFatia(f)}
+      onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
+    />
   {/each}
   {#each fatias as f (f.nome)}
     <path d={f.linha} class="fatia-linha" style={`stroke: ${f.cor};`} fill="none" />
-    <text x={f.label.x} y={f.label.y} text-anchor={f.ancora} class="fatia-texto">
+    <text
+      x={f.label.x}
+      y={f.label.y}
+      text-anchor={f.ancora}
+      class="fatia-texto"
+      class:fatia-clicavel={!!f.detalhe?.length}
+      role="button"
+      tabindex={0}
+      onclick={() => aoClicarFatia(f)}
+      onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
+    >
       {#each f.linhasNome as linha, i (i)}
         <tspan x={f.label.x} dy={i === 0 ? `${f.dyInicial}` : `${ALTURA_LINHA}`} class="fatia-nome">{linha}</tspan>
       {/each}
@@ -118,6 +152,19 @@
     </text>
   {/each}
 </svg>
+
+{#if fatiaSelecionada}
+  <Sheet titulo={fatiaSelecionada.nome} onFechar={() => (fatiaSelecionada = null)}>
+    <div class="detalhe-lista">
+      {#each fatiaSelecionada.detalhe as d (d.exercicio)}
+        <div class="detalhe-item">
+          <span class="detalhe-nome">{d.exercicio}</span>
+          <span class="detalhe-series">{d.series} {d.series === 1 ? "série" : "séries"}</span>
+        </div>
+      {/each}
+    </div>
+  </Sheet>
+{/if}
 
 <style>
   .pizza {
@@ -140,5 +187,32 @@
   }
   .fatia-linha {
     stroke-width: 0.6;
+  }
+  .fatia-clicavel {
+    cursor: pointer;
+  }
+  .detalhe-lista {
+    display: flex;
+    flex-direction: column;
+  }
+  .detalhe-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .detalhe-item:last-child {
+    border-bottom: none;
+  }
+  .detalhe-nome {
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+  }
+  .detalhe-series {
+    flex-shrink: 0;
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
   }
 </style>
