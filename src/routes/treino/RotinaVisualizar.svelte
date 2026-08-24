@@ -20,7 +20,12 @@
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => navigate("/treino")} aria-label="Voltar">←</button>
-    <h1>{treino?.nome_treino ?? ""}</h1>
+    <h1>
+      {treino?.nome_treino ?? ""}
+      {#if treino?.dia_semana != null}
+        <span class="dia-inline">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
+      {/if}
+    </h1>
     <span class="header-spacer"></span>
   </div>
 
@@ -29,10 +34,6 @@
   {:else if !treino}
     <p class="muted">Rotina não encontrada.</p>
   {:else}
-    {#if treino.dia_semana != null}
-      <p class="dia">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</p>
-    {/if}
-
     <div class="acoes">
       <button class="btn-iniciar" onclick={() => navigate(`/treino/log/${treino!.id}`)}>Iniciar Rotina</button>
       <button class="btn-editar" onclick={() => navigate(`/treino/rotina/${treino!.id}`)}>Editar Rotina</button>
@@ -113,11 +114,11 @@
     padding: var(--space-1);
     flex-shrink: 0;
   }
-  .dia {
-    text-align: center;
-    color: var(--surface-muted);
+  .dia-inline {
     font-size: var(--font-size-sm);
-    margin: 0 0 var(--space-3);
+    font-weight: 400;
+    color: var(--surface-muted);
+    margin-left: var(--space-1);
   }
   .acoes {
     display: flex;
