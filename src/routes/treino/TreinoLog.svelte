@@ -895,7 +895,7 @@
     background: none;
     border: none;
     color: var(--surface-fg);
-    font-size: var(--font-size-base);
+    font-size: 17px;
     font-weight: 600;
     cursor: pointer;
   }
@@ -912,11 +912,11 @@
     align-items: flex-start;
   }
   .stat-label {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--surface-muted);
   }
   .stat-valor {
-    font-size: var(--font-size-base);
+    font-size: 17px;
     font-weight: 600;
   }
   .concluir {
@@ -941,7 +941,7 @@
     margin-bottom: var(--space-5);
   }
   .exercicio-card h2 {
-    font-size: var(--font-size-base);
+    font-size: 17px;
     color: var(--color-primary);
     margin: 0;
   }
@@ -1090,7 +1090,7 @@
     height: 36px;
     border-radius: 6px;
     border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
+    background: var(--surface-card);
     color: var(--surface-muted);
     cursor: pointer;
   }
