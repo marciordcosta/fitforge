@@ -2,11 +2,13 @@
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import {
     listRefeicoesModelo,
     criarRefeicaoModelo,
     atualizarRefeicaoModelo,
     excluirRefeicaoModelo,
+    reordenarRefeicoesModelo,
     type RefeicaoModelo,
   } from "../../lib/dietaApi";
 
@@ -19,6 +21,14 @@
   let salvando = $state(false);
   let paraExcluir = $state<RefeicaoModelo | null>(null);
   let excluindo = $state(false);
+  let itemMenu = $state<RefeicaoModelo | null>(null);
+
+  let itemRefs: (HTMLLIElement | null)[] = [];
+  let arrastandoIndex = $state<number | null>(null);
+  let arrastarOffsetY = $state(0);
+  let alturaLinha = 0;
+  let startY = 0;
+  let ordemMudou = false;
 
   async function carregar() {
     loading = true;
@@ -77,6 +87,53 @@
       excluindo = false;
     }
   }
+
+  function aoPointerDownHandle(e: PointerEvent, index: number) {
+    e.preventDefault();
+    const el = itemRefs[index];
+    if (!el) return;
+    alturaLinha = el.getBoundingClientRect().height;
+    startY = e.clientY;
+    arrastandoIndex = index;
+    arrastarOffsetY = 0;
+    ordemMudou = false;
+    window.addEventListener("pointermove", aoPointerMove);
+    window.addEventListener("pointerup", aoPointerUp);
+  }
+
+  function aoPointerMove(e: PointerEvent) {
+    if (arrastandoIndex === null || !alturaLinha) return;
+    const delta = e.clientY - startY;
+    arrastarOffsetY = delta;
+    const passos = Math.round(delta / alturaLinha);
+    if (passos !== 0) {
+      const novoIndex = Math.min(modelos.length - 1, Math.max(0, arrastandoIndex + passos));
+      if (novoIndex !== arrastandoIndex) {
+        const copia = modelos.slice();
+        const [item] = copia.splice(arrastandoIndex, 1);
+        copia.splice(novoIndex, 0, item);
+        modelos = copia;
+        arrastandoIndex = novoIndex;
+        startY = e.clientY;
+        arrastarOffsetY = 0;
+        ordemMudou = true;
+      }
+    }
+  }
+
+  async function aoPointerUp() {
+    window.removeEventListener("pointermove", aoPointerMove);
+    window.removeEventListener("pointerup", aoPointerUp);
+    arrastandoIndex = null;
+    arrastarOffsetY = 0;
+    if (!ordemMudou) return;
+    try {
+      await reordenarRefeicoesModelo(modelos.map((m) => m.id));
+    } catch (err) {
+      alert("Erro ao salvar a nova ordem: " + (err as Error).message);
+      await carregar();
+    }
+  }
 </script>
 
 {#snippet iconEditar()}
@@ -90,6 +147,16 @@
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 {/snippet}
+{#snippet iconArrastar()}
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <circle cx="9" cy="6" r="1.6" />
+    <circle cx="15" cy="6" r="1.6" />
+    <circle cx="9" cy="12" r="1.6" />
+    <circle cx="15" cy="12" r="1.6" />
+    <circle cx="9" cy="18" r="1.6" />
+    <circle cx="15" cy="18" r="1.6" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -99,7 +166,7 @@
   </div>
 
   <p class="dica">
-    Esses nomes aparecem como sugestão ao criar uma refeição no dia. Editar ou excluir aqui não afeta as refeições já lançadas em dias passados.
+    Essas refeições são criadas automaticamente em todo dia que você abrir. Editar ou excluir aqui não afeta as refeições já lançadas em dias passados.
   </p>
 
   {#if loading}
@@ -110,16 +177,35 @@
     <p class="muted">Nenhuma refeição cadastrada ainda.</p>
   {:else}
     <ul class="lista">
-      {#each modelos as m (m.id)}
-        <li class="linha">
-          <span class="nome">{m.nome}</span>
-          <button class="icone-btn" onclick={() => abrirEdicao(m)} aria-label="Editar">{@render iconEditar()}</button>
-          <button class="icone-btn destrutivo" onclick={() => (paraExcluir = m)} aria-label="Excluir">{@render iconExcluir()}</button>
+      {#each modelos as m, i (m.id)}
+        <li
+          class="linha"
+          class:arrastando={arrastandoIndex === i}
+          bind:this={itemRefs[i]}
+          style={arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
+        >
+          <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
+            {@render iconArrastar()}
+          </button>
+          <button class="nome-btn" onclick={() => (itemMenu = m)}>
+            <span class="nome">{m.nome}</span>
+          </button>
         </li>
       {/each}
     </ul>
   {/if}
 </div>
+
+{#if itemMenu}
+  <ActionSheet
+    titulo={itemMenu.nome}
+    onFechar={() => (itemMenu = null)}
+    opcoes={[
+      { label: "Editar", icon: iconEditar, onSelect: () => abrirEdicao(itemMenu!) },
+      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => (paraExcluir = itemMenu) },
+    ]}
+  />
+{/if}
 
 {#if mostrarForm}
   <Sheet titulo={editando ? "Editar Refeição" : "Nova Refeição"} onFechar={() => (mostrarForm = false)}>
@@ -179,37 +265,49 @@
   .linha {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) 0;
+    gap: var(--space-1);
     border-bottom: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    position: relative;
   }
-  .nome {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--font-size-base);
-    color: var(--surface-fg);
+  .linha.arrastando {
+    z-index: 10;
+    background: var(--surface-card);
   }
-  .icone-btn {
+  .handle {
     flex-shrink: 0;
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: none;
     background: none;
     color: var(--surface-muted);
-    cursor: pointer;
+    cursor: grab;
+    touch-action: none;
   }
-  .icone-btn svg {
+  .handle svg {
     width: 18px;
     height: 18px;
   }
-  .icone-btn.destrutivo {
-    color: var(--color-danger);
+  .nome-btn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    text-align: left;
+    border: none;
+    background: none;
+    padding: var(--space-3) 0;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .nome {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
   }
   .muted {
     color: var(--surface-muted);

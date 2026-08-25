@@ -6,7 +6,7 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import {
-    getRefeicoesDoDia,
+    garantirRefeicoesPadraoDoDia,
     getDiarioDoDia,
     getMetasDiarias,
     type RefeicaoDia,
@@ -38,7 +38,7 @@
     loading = true;
     erro = null;
     try {
-      [refeicoes, itens, metas] = await Promise.all([getRefeicoesDoDia(dataAtual), getDiarioDoDia(dataAtual), getMetasDiarias()]);
+      [refeicoes, itens, metas] = await Promise.all([garantirRefeicoesPadraoDoDia(dataAtual), getDiarioDoDia(dataAtual), getMetasDiarias()]);
     } catch (err) {
       erro = (err as Error).message;
     } finally {

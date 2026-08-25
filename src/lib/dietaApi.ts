@@ -234,19 +234,25 @@ export interface RefeicaoModelo {
   nome: string;
 }
 
+/** Lista o catálogo já na ordem escolhida pelo usuário (arrastar na tela de Gerenciar Refeições). */
 export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
   const { data, error } = await supabase
     .from("dieta_refeicoes_modelo")
     .select("id, nome")
+    .order("ordem", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data ?? [];
 }
 
 export async function criarRefeicaoModelo(nome: string): Promise<string> {
+  const { count, error: erroCount } = await supabase
+    .from("dieta_refeicoes_modelo")
+    .select("id", { count: "exact", head: true });
+  if (erroCount) throw erroCount;
   const { data, error } = await supabase
     .from("dieta_refeicoes_modelo")
-    .insert({ user_id: uid(), nome })
+    .insert({ user_id: uid(), nome, ordem: count ?? 0 })
     .select("id")
     .single();
   if (error) throw error;
@@ -256,6 +262,15 @@ export async function criarRefeicaoModelo(nome: string): Promise<string> {
 export async function atualizarRefeicaoModelo(id: string, nome: string): Promise<void> {
   const { error } = await supabase.from("dieta_refeicoes_modelo").update({ nome }).eq("id", id);
   if (error) throw error;
+}
+
+/** Salva a nova ordem (arrastar-e-soltar) — ids já na ordem final desejada. */
+export async function reordenarRefeicoesModelo(ids: string[]): Promise<void> {
+  const resultados = await Promise.all(
+    ids.map((id, i) => supabase.from("dieta_refeicoes_modelo").update({ ordem: i }).eq("id", id)),
+  );
+  const comErro = resultados.find((r) => r.error);
+  if (comErro?.error) throw comErro.error;
 }
 
 export async function excluirRefeicaoModelo(id: string): Promise<void> {
@@ -279,6 +294,16 @@ export async function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
     .order("created_at", { ascending: true });
   if (error) throw error;
   return linhas ?? [];
+}
+
+/** Se o dia ainda não tem nenhuma refeição, cria uma pra cada item do catálogo (as refeições "padrão" de todo dia) e retorna a lista já pronta. */
+export async function garantirRefeicoesPadraoDoDia(data: string): Promise<RefeicaoDia[]> {
+  const existentes = await getRefeicoesDoDia(data);
+  if (existentes.length) return existentes;
+  const catalogo = await listRefeicoesModelo();
+  if (!catalogo.length) return existentes;
+  await Promise.all(catalogo.map((m) => criarRefeicaoDia(data, m.nome)));
+  return getRefeicoesDoDia(data);
 }
 
 export async function getRefeicaoDia(id: string): Promise<RefeicaoDia | null> {
