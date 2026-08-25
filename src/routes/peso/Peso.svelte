@@ -279,8 +279,7 @@
   /**
    * Com mais de 7 dias no período, rotular todo dia fica poluído (nos dois modos, já que ambos tem
    * um ponto por dia agora). Nesse caso, só anota o dia mais recente de cada semana presente nos
-   * dados. Com até 7 dias, anota todo ponto normalmente. A comparação com a meta usa sempre a média
-   * móvel do dia (mediaMovelGrafico), nunca o peso bruto — mesmo no modo diário.
+   * dados. Com até 7 dias, anota todo ponto normalmente.
    */
   const pontosComRotulo = $derived.by((): boolean[] | null => {
     if (!pontosGrafico.length) return null;
@@ -292,13 +291,17 @@
     return pontosGrafico.map((p) => ultimaDataPorSemana.get(chaveSemana(parseISODate(p.data))) === p.data);
   });
 
-  /** Diferença % de cada dia rotulado em relação ao peso esperado pela meta naquela mesma data. */
+  /**
+   * Diferença % de cada dia rotulado em relação ao peso esperado pela meta naquela mesma data.
+   * Compara sempre o valor efetivamente plotado (bruto no modo diário, média no modo média), pra
+   * o sinal do rótulo bater com a posição visual do ponto em relação à linha da meta.
+   */
   const diffMetaPorPonto = $derived.by(() => {
     const alvos = metaAlvoPorPonto;
     const rotulo = pontosComRotulo;
-    const movel = mediaMovelGrafico;
-    if (!alvos || !rotulo || !movel.length) return null;
-    return movel.map((p, i) => {
+    const pontos = pontosGrafico;
+    if (!alvos || !rotulo || !pontos.length) return null;
+    return pontos.map((p, i) => {
       const alvo = alvos[i];
       if (!rotulo[i] || alvo == null) return null;
       return ((p.peso - alvo) / alvo) * 100;
