@@ -10,20 +10,23 @@
     getReceita,
     garantirRefeicoesPadraoDoDia,
     getRefeicoesDoDia,
-    getRefeicaoDia,
     getMetasDiarias,
     adicionarReceitaAoDiario,
     atualizarReceita,
     atualizarItemReceita,
     removerItemReceita,
+    adicionarItemReceita,
     excluirReceita,
     type Receita,
     type ReceitaItem,
     type RefeicaoDia,
     type MetasDiarias,
   } from "../../lib/dietaApi";
+  import { receitaRascunho, limparRascunho } from "../../lib/receitaRascunho.svelte";
 
   let { receitaId }: { receitaId: string } = $props();
+
+  const PREFIXO_NOVO = "novo-";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -37,7 +40,6 @@
   let erro = $state<string | null>(null);
   let mostrarEscolhaRefeicao = $state(false);
   let mostrarCriarRefeicao = $state(false);
-  let salvando = $state(false);
   let itemEditando = $state<ReceitaItem | null>(null);
   let itemParaRemover = $state<ReceitaItem | null>(null);
   let confirmandoExclusao = $state(false);
@@ -67,8 +69,27 @@
       metas = metasRes;
       refeicao = refeicoesHoje[0] ?? null;
       nomeEditavel = receitaRes?.nome ?? "";
-      itensLocais = receitaRes?.itens ?? [];
       idsParaRemover = [];
+
+      const itensSalvos = receitaRes?.itens ?? [];
+      const itensPendentes = receitaRascunho.contexto === receitaId ? receitaRascunho.itens : [];
+      const itensNovos: ReceitaItem[] = itensPendentes.map((it) => {
+        const fator = it.quantidade / it.alimento.porcaoPadraoQtd;
+        return {
+          id: `${PREFIXO_NOVO}${crypto.randomUUID()}`,
+          alimentoId: it.alimento.id,
+          nome: it.alimento.nome,
+          quantidade: it.quantidade,
+          unidade: it.alimento.porcaoPadraoUnidade,
+          porcaoPadraoQtd: it.alimento.porcaoPadraoQtd,
+          calorias: round1(it.alimento.caloriasPorPorcao * fator),
+          proteinaG: round1(it.alimento.proteinaG * fator),
+          gorduraG: round1(it.alimento.gorduraG * fator),
+          carboidratoG: round1(it.alimento.carboidratoG * fator),
+        };
+      });
+      itensLocais = [...itensSalvos, ...itensNovos];
+      if (itensNovos.length) limparRascunho();
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -91,7 +112,11 @@
         await removerItemReceita(id);
       }
       for (const item of itensLocais) {
-        await atualizarItemReceita(item.id, item.quantidade);
+        if (item.id.startsWith(PREFIXO_NOVO)) {
+          await adicionarItemReceita(receita.id, item.alimentoId, item.quantidade);
+        } else {
+          await atualizarItemReceita(item.id, item.quantidade);
+        }
       }
       nomeEditando = false;
       await carregar();
@@ -110,7 +135,7 @@
   function aoCriarRefeicao(id: string) {
     mostrarCriarRefeicao = false;
     mostrarEscolhaRefeicao = false;
-    void getRefeicaoDia(id).then((r) => (refeicao = r));
+    void adicionarNaRefeicao(id);
   }
 
   const totalCalorias = $derived(itensLocais.reduce((acc, i) => acc + i.calorias, 0));
@@ -135,15 +160,13 @@
     return meta > 0 ? Math.min(100, (valor / meta) * 100) : 0;
   }
 
-  async function adicionar() {
-    if (!receita || !refeicao) return;
-    salvando = true;
+  async function adicionarNaRefeicao(refeicaoIdAlvo: string) {
+    if (!receita) return;
     try {
-      await adicionarReceitaAoDiario(receita.id, hojeISO(), refeicao.id);
-      navigate(`/dieta/refeicao/${refeicao.id}`);
+      await adicionarReceitaAoDiario(receita.id, hojeISO(), refeicaoIdAlvo);
+      navigate(`/dieta/refeicao/${refeicaoIdAlvo}`);
     } catch (err) {
       alert("Erro ao adicionar refeição: " + (err as Error).message);
-      salvando = false;
     }
   }
 
@@ -170,7 +193,9 @@
 
   function removerItem() {
     if (!itemParaRemover) return;
-    idsParaRemover = [...idsParaRemover, itemParaRemover.id];
+    if (!itemParaRemover.id.startsWith(PREFIXO_NOVO)) {
+      idsParaRemover = [...idsParaRemover, itemParaRemover.id];
+    }
     itensLocais = itensLocais.filter((it) => it.id !== itemParaRemover!.id);
     itemParaRemover = null;
   }
@@ -294,9 +319,8 @@
       {/each}
     {/if}
 
-    <div class="acao-adicionar">
-      <Button onclick={adicionar} disabled={salvando || !refeicao}>Adicionar à Refeição</Button>
-    </div>
+    <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/receita/${receitaId}`)}>+ Adicionar Alimento</button>
+
     <div class="acao-excluir">
       <Button variant="danger" onclick={() => (confirmandoExclusao = true)} disabled={excluindo}>Excluir Refeição</Button>
     </div>
@@ -317,7 +341,7 @@
     titulo="Selecione a refeição"
     onFechar={() => (mostrarEscolhaRefeicao = false)}
     opcoes={[
-      ...opcoesRefeicao.map((r) => ({ label: r.nome, onSelect: () => (refeicao = r) })),
+      ...opcoesRefeicao.map((r) => ({ label: r.nome, onSelect: () => adicionarNaRefeicao(r.id) })),
       { label: "+ Nova Refeição", onSelect: () => (mostrarCriarRefeicao = true) },
     ]}
   />
@@ -555,10 +579,19 @@
     height: 18px;
   }
   .acao-adicionar {
-    margin-top: var(--space-4);
+    width: 100%;
+    padding: var(--space-3);
+    margin-top: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--surface-border);
+    background: none;
+    color: var(--color-primary);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    cursor: pointer;
   }
   .acao-excluir {
-    margin-top: var(--space-3);
+    margin-top: var(--space-4);
   }
   .muted {
     color: var(--surface-muted);

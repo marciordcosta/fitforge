@@ -20,7 +20,7 @@
     type MetasDiarias,
     type RefeicaoDia,
   } from "../../lib/dietaApi";
-  import { adicionarAoRascunho } from "../../lib/receitaRascunho.svelte";
+  import { adicionarAoRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
 
   let {
     alimentoId,
@@ -28,12 +28,14 @@
     refeicaoIdInicial,
     itemDiarioId,
     modoReceita,
+    receitaIdExistente,
   }: {
     alimentoId?: string;
     data?: string;
     refeicaoIdInicial?: string | null;
     itemDiarioId?: string;
     modoReceita?: boolean;
+    receitaIdExistente?: string;
   } = $props();
 
   const editandoItem = untrack(() => itemDiarioId != null);
@@ -145,7 +147,7 @@
   }
 
   function sufixoRota(): string {
-    if (modoReceita) return "/receita";
+    if (modoReceita) return `/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`;
     return refeicao ? `/${dataResolvida}/${refeicao.id}` : dataResolvida ? `/${dataResolvida}` : "";
   }
 
@@ -166,7 +168,7 @@
     processandoAlimento = true;
     try {
       await excluirAlimento(alimento.id);
-      navigate(modoReceita ? "/dieta/alimentos/receita" : "/dieta/alimentos");
+      navigate(modoReceita ? `/dieta/alimentos/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}` : "/dieta/alimentos");
     } catch (err) {
       alert("Erro ao excluir alimento: " + (err as Error).message);
       processandoAlimento = false;
@@ -176,8 +178,9 @@
   async function salvar() {
     if (!alimento) return;
     if (modoReceita) {
+      definirContexto(receitaIdExistente ?? "nova");
       adicionarAoRascunho(alimento, quantidade);
-      navigate("/dieta/receitas/nova");
+      navigate(receitaIdExistente ? `/dieta/receitas/ver/${receitaIdExistente}` : "/dieta/receitas/nova");
       return;
     }
     if (!refeicao) return;

@@ -13,12 +13,16 @@
     type Alimento,
     type ReceitaResumo,
   } from "../../lib/dietaApi";
-  import { adicionarAoRascunho } from "../../lib/receitaRascunho.svelte";
+  import { adicionarAoRascunho, definirContexto, limparRascunho } from "../../lib/receitaRascunho.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
   /** Quando presente, cada alimento ganha um "+" pra adicionar direto a essa refeição, sem passar pelo detalhamento. Sem isso, é só o catálogo normal. */
-  let { refeicaoId, modoReceita }: { refeicaoId?: string; modoReceita?: boolean } = $props();
+  let {
+    refeicaoId,
+    modoReceita,
+    receitaIdExistente,
+  }: { refeicaoId?: string; modoReceita?: boolean; receitaIdExistente?: string } = $props();
 
   const modoAdicionar = untrack(() => refeicaoId != null);
   const refeicaoIdFixo = untrack(() => refeicaoId);
@@ -100,7 +104,7 @@
 
   function abrirDetalhamento(a: Alimento) {
     if (modoReceita) {
-      navigate(`/dieta/alimento/${a.id}/receita`);
+      navigate(`/dieta/alimento/${a.id}/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`);
     } else if (modoAdicionar) {
       navigate(`/dieta/alimento/${a.id}/${refeicaoData}/${refeicaoIdFixo}`);
     } else {
@@ -122,13 +126,14 @@
   }
 
   function adicionarNaReceita(a: Alimento) {
+    definirContexto(receitaIdExistente ?? "nova");
     adicionarAoRascunho(a);
     mostrarMensagem(`${a.nome} adicionado`);
   }
 
   function abrirScanner() {
     const destino = modoReceita
-      ? "/dieta/scanear/receita"
+      ? `/dieta/scanear/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`
       : modoAdicionar
         ? `/dieta/scanear/${refeicaoData}/${refeicaoIdFixo}`
         : `/dieta/scanear/${hojeISO()}`;
@@ -259,7 +264,9 @@
     onFechar={() => (mostrarEscolhaCriar = false)}
     opcoes={[
       { label: "Alimento", icon: iconAlimento, onSelect: () => (mostrarCriarAlimento = true) },
-      ...(modoReceita ? [] : [{ label: "Refeição", icon: iconReceita, onSelect: () => navigate("/dieta/receitas/nova") }]),
+      ...(modoReceita
+        ? []
+        : [{ label: "Refeição", icon: iconReceita, onSelect: () => { limparRascunho(); navigate("/dieta/receitas/nova"); } }]),
       { label: "Escanear Alimento", icon: iconScanner, onSelect: abrirScanner },
     ]}
   />

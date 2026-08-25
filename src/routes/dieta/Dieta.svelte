@@ -19,7 +19,7 @@
 {:else if segmentos[0] === "item" && segmentos[1]}
   <DietaItemForm itemDiarioId={segmentos[1]} />
 {:else if segmentos[0] === "alimento" && segmentos[1] && segmentos[2] === "receita"}
-  <DietaItemForm alimentoId={segmentos[1]} modoReceita={true} />
+  <DietaItemForm alimentoId={segmentos[1]} modoReceita={true} receitaIdExistente={segmentos[3]} />
 {:else if segmentos[0] === "alimento" && segmentos[1]}
   <DietaItemForm
     alimentoId={segmentos[1]}
@@ -29,7 +29,7 @@
 {:else if segmentos[0] === "alimentos" && segmentos[1] === "refeicao" && segmentos[2]}
   <DietaAlimentos refeicaoId={segmentos[2]} />
 {:else if segmentos[0] === "alimentos" && segmentos[1] === "receita"}
-  <DietaAlimentos modoReceita={true} />
+  <DietaAlimentos modoReceita={true} receitaIdExistente={segmentos[2]} />
 {:else if segmentos[0] === "alimentos"}
   <DietaAlimentos />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "nova"}
@@ -42,7 +42,7 @@
   <DietaRefeicoesGerenciar />
 {:else if segmentos[0] === "scanear" && segmentos[1] === "receita"}
   {#await import("./DietaScanear.svelte") then { default: DietaScanear }}
-    <DietaScanear modoReceita={true} />
+    <DietaScanear modoReceita={true} receitaIdExistente={segmentos[2]} />
   {/await}
 {:else if segmentos[0] === "scanear"}
   {#await import("./DietaScanear.svelte") then { default: DietaScanear }}

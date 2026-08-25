@@ -7,7 +7,12 @@
   import { buscarProdutoPorCodigoBarras } from "../../lib/openFoodFacts";
   import Button from "../../components/Button.svelte";
 
-  let { data, refeicaoId, modoReceita }: { data?: string; refeicaoId?: string; modoReceita?: boolean } = $props();
+  let {
+    data,
+    refeicaoId,
+    modoReceita,
+    receitaIdExistente,
+  }: { data?: string; refeicaoId?: string; modoReceita?: boolean; receitaIdExistente?: string } = $props();
 
   const dataResolvida = untrack(() => data) ?? hojeISO();
 
@@ -59,7 +64,7 @@
       }
 
       const destino = modoReceita
-        ? `/dieta/alimento/${alimentoId}/receita`
+        ? `/dieta/alimento/${alimentoId}/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`
         : refeicaoId
           ? `/dieta/alimento/${alimentoId}/${dataResolvida}/${refeicaoId}`
           : `/dieta/alimento/${alimentoId}/${dataResolvida}`;
@@ -77,7 +82,7 @@
 
   function irParaCadastroManual() {
     if (modoReceita) {
-      navigate("/dieta/alimentos/receita");
+      navigate(`/dieta/alimentos/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`);
       return;
     }
     navigate(refeicaoId ? `/dieta/alimentos/refeicao/${refeicaoId}` : "/dieta/alimentos");

@@ -597,6 +597,18 @@ export async function removerItemReceita(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function adicionarItemReceita(receitaId: string, alimentoId: string, quantidade: number): Promise<void> {
+  const { count, error: erroCount } = await supabase
+    .from("dieta_receita_itens")
+    .select("id", { count: "exact", head: true })
+    .eq("receita_id", receitaId);
+  if (erroCount) throw erroCount;
+  const { error } = await supabase
+    .from("dieta_receita_itens")
+    .insert({ receita_id: receitaId, alimento_id: alimentoId, quantidade, ordem: count ?? 0 });
+  if (error) throw error;
+}
+
 export async function criarReceita(nome: string, itens: { alimentoId: string; quantidade: number }[]): Promise<string> {
   const { data: existente, error: erroExistente } = await supabase
     .from("dieta_receitas")

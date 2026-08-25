@@ -4,6 +4,7 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DietaCopiarParaSheet from "./DietaCopiarParaSheet.svelte";
   import DietaCopiarDeSheet from "./DietaCopiarDeSheet.svelte";
+  import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import {
     getRefeicaoDia,
     getItensDaRefeicao,
@@ -11,9 +12,12 @@
     removerRefeicaoDia,
     salvarRefeicaoComoReceita,
     getMetasDiarias,
+    getAlimento,
+    atualizarItemDiario,
     type RefeicaoDia,
     type ItemDiario,
     type MetasDiarias,
+    type Alimento,
   } from "../../lib/dietaApi";
 
   let { refeicaoId }: { refeicaoId: string } = $props();
@@ -37,6 +41,8 @@
   let processando = $state(false);
   let mostrarCopiarPara = $state(false);
   let mostrarCopiarDe = $state(false);
+  let itemEditando = $state<ItemDiario | null>(null);
+  let alimentoEditando = $state<Alimento | null>(null);
 
   async function carregar() {
     loading = true;
@@ -78,6 +84,31 @@
 
   function pctMeta(valor: number, meta: number): number {
     return meta > 0 ? Math.min(100, (valor / meta) * 100) : 0;
+  }
+
+  async function abrirItem(item: ItemDiario) {
+    try {
+      alimentoEditando = await getAlimento(item.alimentoId);
+      itemEditando = item;
+    } catch (err) {
+      alert("Erro ao carregar alimento: " + (err as Error).message);
+    }
+  }
+
+  async function aoSalvarQuantidadeItem(qtd: number, unidade: "porcao" | "grama") {
+    if (!itemEditando || !alimentoEditando) return;
+    const quantidade = unidade === "porcao" ? qtd * alimentoEditando.porcaoPadraoQtd : qtd;
+    processando = true;
+    try {
+      await atualizarItemDiario(itemEditando.id, alimentoEditando, quantidade, refeicaoId);
+      itemEditando = null;
+      alimentoEditando = null;
+      await carregar();
+    } catch (err) {
+      alert("Erro ao atualizar item: " + (err as Error).message);
+    } finally {
+      processando = false;
+    }
   }
 
   async function remover() {
@@ -237,7 +268,7 @@
       <p class="muted">Nenhum alimento adicionado ainda.</p>
     {:else}
       {#each itens as item (item.id)}
-        <button class="item-card" onclick={() => navigate(`/dieta/item/${item.id}`)}>
+        <button class="item-card" onclick={() => abrirItem(item)}>
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
             <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal</p>
@@ -294,6 +325,17 @@
     dataAtual={refeicao.data}
     onFechar={() => (mostrarCopiarDe = false)}
     onCopiado={aoCopiarDe}
+  />
+{/if}
+
+{#if itemEditando && alimentoEditando}
+  <DietaQuantidadeDialog
+    quantidadeInicial={itemEditando.quantidade}
+    unidadeInicial="grama"
+    porcaoPadraoQtd={alimentoEditando.porcaoPadraoQtd}
+    porcaoPadraoUnidade={itemEditando.unidade}
+    onSalvar={aoSalvarQuantidadeItem}
+    onFechar={() => { itemEditando = null; alimentoEditando = null; }}
   />
 {/if}
 
