@@ -57,35 +57,33 @@
   });
 
   let periodo = $state<Periodo>(PERIODOS[1]);
-  let pesosGrafico = $state<PesoRegistro[]>([]);
+  /** Inclui 6 dias de "aquecimento" antes do período pedido, só pra a média móvel do primeiro dia visível já ter janela cheia. */
+  let pesosGraficoBruto = $state<PesoRegistro[]>([]);
+  let dataInicioGrafico = $state("");
   let diasComTreinoGrafico = $state<Set<string>>(new Set());
   let loadingGrafico = $state(true);
   let mostrarFiltro = $state(false);
   let mostrarGraficoCheio = $state(false);
   let hojeTemRotinaAgendada = $state(false);
 
-  /** "diário" = um ponto por dia (bruto); "média" = um ponto por semana (média), padrão. Semana ancorada em terça-feira: quem pesa em jejum de manhã, ao pesar na terça está refletindo o dia de segunda encerrado. */
+  /** "diário" = peso bruto de cada dia; "média" = média móvel dos últimos 7 dias em cada dia (padrão de mercado — MacroFactor, Trendweight etc.), padrão do app. */
   let modoGrafico = $state<"diario" | "media">("media");
 
-  function calcularMediasSemanais(lista: PesoRegistro[]): PesoRegistro[] {
-    const grupos = new Map<string, number[]>();
-    for (const p of lista) {
-      const chave = chaveSemana(parseISODate(p.data));
-      const valores = grupos.get(chave);
-      if (valores) valores.push(p.peso);
-      else grupos.set(chave, [p.peso]);
-    }
-    return Array.from(grupos.entries())
-      .map(([data, valores]) => ({ data, peso: valores.reduce((a, b) => a + b, 0) / valores.length }))
-      .sort((a, b) => a.data.localeCompare(b.data));
+  /** Um ponto por dia com peso registrado; a média móvel usa os até 7 dias anteriores (calendário, não semana fechada). */
+  function calcularMediaMovel(lista: PesoRegistro[]): PesoRegistro[] {
+    const ordenada = [...lista].sort((a, b) => a.data.localeCompare(b.data));
+    return ordenada.map((p) => {
+      const d = parseISODate(p.data);
+      const limite = toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 6));
+      const janela = ordenada.filter((q) => q.data >= limite && q.data <= p.data);
+      const media = janela.reduce((acc, q) => acc + q.peso, 0) / janela.length;
+      return { data: p.data, peso: media };
+    });
   }
 
   function selecionarModoGrafico(m: "diario" | "media") {
     modoGrafico = m;
-    if (m === "media" && periodo.dias != null && periodo.dias < 30) {
-      periodo = PERIODOS[1];
-      void carregarGrafico();
-    } else if (m === "diario" && periodo.valor !== PERIODOS[0].valor) {
+    if (m === "diario" && periodo.valor !== PERIODOS[0].valor) {
       periodo = PERIODOS[0];
       void carregarGrafico();
     }
@@ -164,12 +162,16 @@
     loadingGrafico = true;
     const hoje = new Date();
     const dataInicio = periodo.dias == null ? "1900-01-01" : toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - periodo.dias));
+    // Busca 6 dias a mais antes do início pedido, só pra a média móvel do primeiro dia visível já ter janela cheia.
+    const dataInicioBusca =
+      periodo.dias == null ? dataInicio : toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - periodo.dias - 6));
     const dataFim = hojeISO();
     const [listaPesos, listaTreinos] = await Promise.all([
-      getPesosDoPeriodo(dataInicio, dataFim),
+      getPesosDoPeriodo(dataInicioBusca, dataFim),
       getDiasComTreino(dataInicio, dataFim),
     ]);
-    pesosGrafico = listaPesos;
+    pesosGraficoBruto = listaPesos;
+    dataInicioGrafico = dataInicio;
     diasComTreinoGrafico = new Set(listaTreinos.map((t) => t.data));
     loadingGrafico = false;
   }
@@ -210,23 +212,25 @@
     return `${d}/${m}`;
   }
 
-  /** No modo média, cada ponto guarda a data de início da semana (terça); pra exibição, mostra a data de fechamento (segunda seguinte) — o último dia que entrou naquela média. */
   function dataExibicao(p: PesoRegistro): string {
-    if (modoGrafico !== "media") return p.data;
-    const d = parseISODate(p.data);
-    return toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6));
+    return p.data;
   }
 
-  /** Médias semanais do período do gráfico — sempre calculadas a partir dos dados diários brutos, usadas tanto pro modo "média" quanto como base da meta (mesmo no modo "diário"). */
-  const mediasSemanaisGrafico = $derived.by(() => calcularMediasSemanais(pesosGrafico));
+  /** Um dia com peso registrado dentro do período pedido (sem o "aquecimento" usado só pra a média móvel ter janela cheia). */
+  const pesosGrafico = $derived.by(() => pesosGraficoBruto.filter((p) => p.data >= dataInicioGrafico));
 
-  /** Pontos efetivamente plotados no gráfico principal, conforme o modo escolhido. */
-  const pontosGrafico = $derived.by(() => (modoGrafico === "media" ? mediasSemanaisGrafico : pesosGrafico));
+  /** Média móvel dos últimos 7 dias em cada dia do período, calculada com o "aquecimento" pra o primeiro ponto já ter janela cheia quando possível. */
+  const mediaMovelGrafico = $derived.by(() =>
+    calcularMediaMovel(pesosGraficoBruto).filter((p) => p.data >= dataInicioGrafico),
+  );
 
-  /** A meta é sempre semanal: o ponto de partida é a média da primeira semana, nunca o peso bruto de um dia só. */
-  const pesoInicialMedia = $derived.by(() => mediasSemanaisGrafico[0]?.peso ?? null);
+  /** Pontos efetivamente plotados no gráfico principal, conforme o modo escolhido — mesmas datas nos dois modos, só muda se o peso é bruto ou suavizado. */
+  const pontosGrafico = $derived.by(() => (modoGrafico === "media" ? mediaMovelGrafico : pesosGrafico));
 
-  /** Linha reta de meta: da média da semana inicial até o peso-alvo calculado (percentual semanal composto, ou flat na manutenção). */
+  /** A meta é sempre semanal e parte da média móvel do primeiro dia visível, nunca do peso bruto de um dia só. */
+  const pesoInicialMedia = $derived.by(() => mediaMovelGrafico[0]?.peso ?? null);
+
+  /** Linha reta de meta: da média móvel do primeiro dia até o peso-alvo calculado (percentual semanal composto, ou flat na manutenção). */
   const metaLinha = $derived.by(() => {
     if (!meta || !metaVisivel || pontosGrafico.length < 2 || pesoInicialMedia == null) return null;
     let pesoAlvo: number;
@@ -250,54 +254,49 @@
     return linha;
   });
 
-  /** Peso esperado pela meta em cada ponto plotado (mesma data), sempre projetado a partir da média da semana inicial. */
+  /** Peso esperado pela meta em cada dia plotado, sempre projetado a partir da média móvel do primeiro dia visível. */
   const metaAlvoPorPonto = $derived.by(() => {
-    if (!meta || !metaVisivel || !pontosGrafico.length || pesoInicialMedia == null) return null;
+    if (!meta || !metaVisivel || !mediaMovelGrafico.length || pesoInicialMedia == null) return null;
     if (meta.tipo === "manutencao") {
       if (meta.pesoManutencao == null) return null;
       const alvo = meta.pesoManutencao;
-      return pontosGrafico.map(() => alvo);
+      return mediaMovelGrafico.map(() => alvo);
     }
     if (meta.percentual == null) return null;
     const percentual = meta.percentual;
-    const dataInicial = parseISODate(mediasSemanaisGrafico[0].data);
-    return pontosGrafico.map((p) => {
+    const dataInicial = parseISODate(mediaMovelGrafico[0].data);
+    return mediaMovelGrafico.map((p) => {
       const diasDecorridos = Math.round((parseISODate(p.data).getTime() - dataInicial.getTime()) / 86400000);
       return pesoInicialMedia * Math.pow(1 + percentual / 100, diasDecorridos / 7);
     });
   });
 
   /**
-   * No modo diário com período maior que 1 semana, rotular todo dia fica poluído. Nesse caso, só
-   * anota o último dia de cada semana presente nos dados, usando a média daquela semana como valor
-   * — não o peso bruto do dia. Com período de 1 semana (ou no modo média), anota todo ponto normalmente.
+   * Com mais de 7 dias no período, rotular todo dia fica poluído (nos dois modos, já que ambos tem
+   * um ponto por dia agora). Nesse caso, só anota o dia mais recente de cada semana presente nos
+   * dados. Com até 7 dias, anota todo ponto normalmente. A comparação com a meta usa sempre a média
+   * móvel do dia (mediaMovelGrafico), nunca o peso bruto — mesmo no modo diário.
    */
-  const infoPorPonto = $derived.by(() => {
+  const pontosComRotulo = $derived.by((): boolean[] | null => {
     if (!pontosGrafico.length) return null;
-    if (modoGrafico !== "diario" || pontosGrafico.length <= 7) {
-      return pontosGrafico.map((p) => ({ mostrar: true, valor: p.peso }));
-    }
-    const mediasPorSemana = new Map(mediasSemanaisGrafico.map((m) => [m.data, m.peso]));
+    if (pontosGrafico.length <= 7) return pontosGrafico.map(() => true);
     const ultimaDataPorSemana = new Map<string, string>();
     for (const p of pontosGrafico) {
       ultimaDataPorSemana.set(chaveSemana(parseISODate(p.data)), p.data);
     }
-    return pontosGrafico.map((p) => {
-      const chave = chaveSemana(parseISODate(p.data));
-      if (ultimaDataPorSemana.get(chave) !== p.data) return { mostrar: false, valor: null };
-      return { mostrar: true, valor: mediasPorSemana.get(chave) ?? p.peso };
-    });
+    return pontosGrafico.map((p) => ultimaDataPorSemana.get(chaveSemana(parseISODate(p.data))) === p.data);
   });
 
-  /** Diferença % de cada ponto rotulado em relação ao peso esperado pela meta naquela mesma data. */
+  /** Diferença % de cada dia rotulado em relação ao peso esperado pela meta naquela mesma data. */
   const diffMetaPorPonto = $derived.by(() => {
     const alvos = metaAlvoPorPonto;
-    const info = infoPorPonto;
-    if (!alvos || !info) return null;
-    return info.map((item, i) => {
+    const rotulo = pontosComRotulo;
+    const movel = mediaMovelGrafico;
+    if (!alvos || !rotulo || !movel.length) return null;
+    return movel.map((p, i) => {
       const alvo = alvos[i];
-      if (!item.mostrar || item.valor == null || alvo == null) return null;
-      return ((item.valor - alvo) / alvo) * 100;
+      if (!rotulo[i] || alvo == null) return null;
+      return ((p.peso - alvo) / alvo) * 100;
     });
   });
 
@@ -306,7 +305,7 @@
     afterDatasetsDraw(c: Chart) {
       const diffs = diffMetaPorPonto;
       const alvos = metaAlvoPorPonto;
-      const info = infoPorPonto;
+      const rotulo = pontosComRotulo;
       const pontos = c.getDatasetMeta(0).data;
       const escalaY = c.scales.y;
       const { ctx } = c;
@@ -315,7 +314,7 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       pontos.forEach((ponto, i) => {
-        if (info && !info[i]?.mostrar) return;
+        if (rotulo && !rotulo[i]) return;
         const diff = diffs?.[i];
         const yDiff = ponto.y - 11;
         if (diff != null) {
@@ -584,11 +583,7 @@
 {#if mostrarFiltro}
   <WheelPicker
     titulo="Período do gráfico"
-    subtitulo={modoGrafico === "media" ? "No modo Média, o mínimo é 1 mês" : undefined}
-    opcoes={(modoGrafico === "media" ? PERIODOS.filter((p) => p.dias == null || p.dias >= 30) : PERIODOS).map((p) => ({
-      valor: p,
-      label: p.label,
-    }))}
+    opcoes={PERIODOS.map((p) => ({ valor: p, label: p.label }))}
     valorAtual={periodo}
     onSelecionar={(p) => selecionarPeriodo(p)}
     onFechar={() => (mostrarFiltro = false)}

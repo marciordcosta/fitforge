@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
-  import { toISODate, parseISODate } from "../../lib/dates";
   import type { PesoRegistro } from "../../lib/pesoApi";
 
   let {
@@ -30,12 +29,6 @@
     return `${d}/${m}`;
   }
 
-  /** No modo média, cada ponto guarda a data de início da semana (terça); pra exibição, mostra a data de fechamento (segunda seguinte). */
-  function dataExibicao(p: PesoRegistro): string {
-    if (modo !== "media") return p.data;
-    const d = parseISODate(p.data);
-    return toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6));
-  }
 
   const pluginRotulosMeta = {
     id: "rotulosMetaTelaCheia",
@@ -49,7 +42,7 @@
       ctx.textBaseline = "middle";
       pontos.forEach((ponto, i) => {
         const diff = diffMetaPorPonto?.[i];
-        // Suprimido pelo modo diário com período maior que 1 semana (ver infoPorPonto em Peso.svelte) — não anota esse ponto.
+        // Suprimido por período maior que 1 semana (ver pontosComRotulo em Peso.svelte) — não anota esse ponto.
         if (diffMetaPorPonto != null && diff == null) return;
         const yDiff = ponto.y - 14;
         if (diff != null) {
@@ -79,7 +72,7 @@
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pontosGrafico.map((p) => formatDataCurta(dataExibicao(p))),
+        labels: pontosGrafico.map((p) => formatDataCurta(p.data)),
         datasets: [
           {
             data: pontosGrafico.map((p) => p.peso),
