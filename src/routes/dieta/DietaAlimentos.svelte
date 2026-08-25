@@ -15,37 +15,38 @@
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
-  /** Quando presente, a tela entra em modo seleção múltipla pra adicionar vários alimentos de uma vez a essa refeição. Sem isso, clicar num alimento abre o detalhamento normal. */
+  /** Quando presente, cada alimento ganha um "+" pra adicionar direto a essa refeição, sem passar pelo detalhamento. Sem isso, é só o catálogo normal. */
   let { refeicaoId }: { refeicaoId?: string } = $props();
 
-  const modoSelecao = untrack(() => refeicaoId != null);
+  const modoAdicionar = untrack(() => refeicaoId != null);
   const refeicaoIdFixo = untrack(() => refeicaoId);
 
   let alimentos = $state<Alimento[]>([]);
-  let alimentosPorId = new Map<string, Alimento>();
   let resultadosReceitas = $state<ReceitaResumo[]>([]);
   let loading = $state(true);
   let busca = $state("");
   let mostrarEscolhaCriar = $state(false);
   let mostrarCriarAlimento = $state(false);
-  let selecionados = $state<Set<string>>(new Set());
   let refeicaoData = $state("");
-  let adicionandoReceita = $state<string | null>(null);
-  let confirmando = $state(false);
+  let refeicaoNome = $state("");
+  let adicionandoId = $state<string | null>(null);
+  let mensagem = $state<string | null>(null);
   let erro = $state<string | null>(null);
 
   let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
+  let timeoutMensagem: ReturnType<typeof setTimeout> | undefined;
 
-  function registrar(lista: Alimento[]) {
-    for (const a of lista) alimentosPorId.set(a.id, a);
-    return lista;
+  function mostrarMensagem(texto: string) {
+    mensagem = texto;
+    clearTimeout(timeoutMensagem);
+    timeoutMensagem = setTimeout(() => (mensagem = null), 2000);
   }
 
   async function carregarInicial() {
     loading = true;
     erro = null;
     try {
-      alimentos = registrar(await listAlimentos());
+      alimentos = await listAlimentos();
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -55,8 +56,11 @@
 
   void carregarInicial();
 
-  if (modoSelecao) {
-    void getRefeicaoDia(refeicaoIdFixo!).then((r) => (refeicaoData = r?.data ?? ""));
+  if (modoAdicionar) {
+    void getRefeicaoDia(refeicaoIdFixo!).then((r) => {
+      refeicaoData = r?.data ?? "";
+      refeicaoNome = r?.nome ?? "";
+    });
   }
 
   function aoDigitar() {
@@ -68,12 +72,12 @@
         if (busca.trim()) {
           const [alRes, recRes] = await Promise.all([
             buscarAlimentos(busca),
-            modoSelecao ? buscarReceitas(busca) : Promise.resolve([]),
+            modoAdicionar ? buscarReceitas(busca) : Promise.resolve([]),
           ]);
-          alimentos = registrar(alRes);
+          alimentos = alRes;
           resultadosReceitas = recRes;
         } else {
-          alimentos = registrar(await listAlimentos());
+          alimentos = await listAlimentos();
           resultadosReceitas = [];
         }
       } catch (err) {
@@ -89,43 +93,34 @@
     return (partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "");
   }
 
-  function alternarSelecao(id: string) {
-    const novo = new Set(selecionados);
-    if (novo.has(id)) novo.delete(id);
-    else novo.add(id);
-    selecionados = novo;
-  }
-
-  function aoClicarItem(a: Alimento) {
-    if (modoSelecao) alternarSelecao(a.id);
+  function abrirDetalhamento(a: Alimento) {
+    if (modoAdicionar) navigate(`/dieta/alimento/${a.id}/${refeicaoData}/${refeicaoIdFixo}`);
     else navigate(`/dieta/alimento/${a.id}/${hojeISO()}`);
   }
 
-  async function selecionarReceita(receita: ReceitaResumo) {
-    if (!refeicaoId) return;
-    adicionandoReceita = receita.id;
+  async function adicionarRapido(a: Alimento) {
+    if (!refeicaoIdFixo) return;
+    adicionandoId = a.id;
     try {
-      await adicionarReceitaAoDiario(receita.id, refeicaoData, refeicaoId);
-      window.history.back();
+      await adicionarItemDiario({ alimento: a, data: refeicaoData, refeicaoId: refeicaoIdFixo, quantidade: a.porcaoPadraoQtd });
+      mostrarMensagem(`Adicionado ao ${refeicaoNome}`);
     } catch (err) {
-      alert("Erro ao adicionar refeição: " + (err as Error).message);
-      adicionandoReceita = null;
+      alert("Erro ao adicionar alimento: " + (err as Error).message);
+    } finally {
+      adicionandoId = null;
     }
   }
 
-  async function confirmarSelecao() {
-    if (!refeicaoId || !selecionados.size) return;
-    confirmando = true;
+  async function selecionarReceita(receita: ReceitaResumo) {
+    if (!refeicaoIdFixo) return;
+    adicionandoId = receita.id;
     try {
-      for (const id of selecionados) {
-        const alimento = alimentosPorId.get(id);
-        if (!alimento) continue;
-        await adicionarItemDiario({ alimento, data: refeicaoData, refeicaoId, quantidade: alimento.porcaoPadraoQtd });
-      }
-      window.history.back();
+      await adicionarReceitaAoDiario(receita.id, refeicaoData, refeicaoIdFixo);
+      mostrarMensagem(`Adicionado ao ${refeicaoNome}`);
     } catch (err) {
-      alert("Erro ao adicionar alimentos: " + (err as Error).message);
-      confirmando = false;
+      alert("Erro ao adicionar refeição: " + (err as Error).message);
+    } finally {
+      adicionandoId = null;
     }
   }
 </script>
@@ -145,13 +140,14 @@
     <rect x="13" y="13" width="8" height="8" rx="1.5" />
   </svg>
 {/snippet}
-{#snippet iconCheck()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M20 6 9 17l-5-5" />
+{#snippet iconMais()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 {/snippet}
 
-<div class="container has-bottom-nav" class:com-rodape={modoSelecao}>
+<div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
     <h1>Alimentos</h1>
@@ -165,18 +161,20 @@
   {:else if erro}
     <p class="erro">Erro ao buscar alimentos: {erro}</p>
   {:else}
-    {#if modoSelecao && resultadosReceitas.length}
+    {#if modoAdicionar && resultadosReceitas.length}
       <p class="secao-titulo">Refeições</p>
       <ul class="lista">
         {#each resultadosReceitas as receita (receita.id)}
-          <li>
-            <button class="item" onclick={() => selecionarReceita(receita)} disabled={adicionandoReceita != null}>
+          <li class="linha">
+            <button class="info-btn" onclick={() => selecionarReceita(receita)}>
               <span class="avatar">{iniciais(receita.nome)}</span>
               <span class="info">
                 <span class="nome">{receita.nome}</span>
                 <span class="sub">Refeição salva</span>
               </span>
-              <span class="chevron">{adicionandoReceita === receita.id ? "…" : "›"}</span>
+            </button>
+            <button class="add-btn" onclick={() => selecionarReceita(receita)} disabled={adicionandoId === receita.id} aria-label="Adicionar">
+              {#if adicionandoId === receita.id}…{:else}{@render iconMais()}{/if}
             </button>
           </li>
         {/each}
@@ -189,21 +187,21 @@
     {:else}
       <ul class="lista">
         {#each alimentos as a (a.id)}
-          <li>
-            <button class="item" class:selecionado={modoSelecao && selecionados.has(a.id)} onclick={() => aoClicarItem(a)}>
-              {#if modoSelecao}
-                <span class="check" class:marcado={selecionados.has(a.id)}>
-                  {#if selecionados.has(a.id)}{@render iconCheck()}{/if}
-                </span>
-              {:else}
-                <span class="avatar">{iniciais(a.nome)}</span>
-              {/if}
+          <li class="linha">
+            <button class="info-btn" onclick={() => abrirDetalhamento(a)}>
+              <span class="avatar">{iniciais(a.nome)}</span>
               <span class="info">
                 <span class="nome">{a.nome}{#if a.marca} <span class="marca">· {a.marca}</span>{/if}</span>
                 <span class="sub">{a.caloriasPorPorcao.toFixed(0)} kcal / {a.porcaoPadraoQtd}{a.porcaoPadraoUnidade}</span>
               </span>
-              {#if !modoSelecao}<span class="chevron">›</span>{/if}
             </button>
+            {#if modoAdicionar}
+              <button class="add-btn" onclick={() => adicionarRapido(a)} disabled={adicionandoId === a.id} aria-label="Adicionar">
+                {#if adicionandoId === a.id}…{:else}{@render iconMais()}{/if}
+              </button>
+            {:else}
+              <span class="chevron">›</span>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -211,12 +209,8 @@
   {/if}
 </div>
 
-{#if modoSelecao}
-  <div class="rodape">
-    <button class="rodape-btn" onclick={confirmarSelecao} disabled={confirmando || !selecionados.size}>
-      Adicionar{selecionados.size ? ` (${selecionados.size})` : ""}
-    </button>
-  </div>
+{#if mensagem}
+  <div class="toast">{mensagem}</div>
 {/if}
 
 {#if mostrarEscolhaCriar}
@@ -241,9 +235,6 @@
     padding-top: var(--space-4);
     padding-left: var(--space-4);
     padding-right: var(--space-4);
-  }
-  .container.com-rodape {
-    padding-bottom: calc(var(--space-4) + 64px);
   }
   .header {
     display: flex;
@@ -289,35 +280,51 @@
     margin: 0;
     padding: 0;
   }
-  .item {
-    width: 100%;
+  .linha {
     display: flex;
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--surface-border);
-    border-left: none;
-    border-right: none;
-    border-top: none;
+  }
+  .info-btn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    border: none;
     background: none;
     cursor: pointer;
     text-align: left;
     font-family: inherit;
-  }
-  .item.selecionado {
-    background: #1e4a2f;
-    margin: 0 calc(var(--space-4) * -1);
-    padding: var(--space-3) var(--space-4);
-    border-bottom-color: transparent;
-  }
-  .item:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+    padding: 0;
   }
   .chevron {
     color: var(--surface-muted);
     font-size: var(--font-size-lg);
     flex-shrink: 0;
+  }
+  .add-btn {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .add-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .add-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
   .avatar {
     width: 40px;
@@ -332,25 +339,6 @@
     font-weight: 600;
     flex-shrink: 0;
     text-transform: uppercase;
-  }
-  .check {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid var(--surface-border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    color: var(--color-primary-fg);
-  }
-  .check.marcado {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-  }
-  .check svg {
-    width: 14px;
-    height: 14px;
   }
   .info {
     flex: 1;
@@ -380,32 +368,19 @@
   .erro {
     color: var(--color-danger);
   }
-  .rodape {
+  .toast {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    bottom: calc(var(--bottom-nav-height, 0px) + var(--space-4));
+    transform: translateX(-50%);
     background: var(--surface-card);
-    border-top: 1px solid var(--surface-border);
-    z-index: 60;
-  }
-  .rodape-btn {
-    width: 100%;
-    max-width: 480px;
-    margin: 0 auto;
-    display: block;
-    padding: var(--space-3);
+    color: var(--surface-fg);
+    border: 1px solid var(--surface-border);
+    padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-md);
-    border: none;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    font-weight: 600;
-    font-size: var(--font-size-base);
-    cursor: pointer;
-  }
-  .rodape-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    box-shadow: var(--shadow-float);
+    font-size: var(--font-size-sm);
+    z-index: 80;
+    white-space: nowrap;
   }
 </style>
