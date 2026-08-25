@@ -469,7 +469,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <h1>Peso</h1>
+    <h1>Peso <span class="modo-label">{modoGrafico === "media" ? "Média" : "Diário"}</span></h1>
     <div class="header-acoes">
       <button class="icon-btn" onclick={() => (mostrarFiltro = true)} aria-label="Filtro de período">
         {@render iconFiltro()}
@@ -498,7 +498,6 @@
   {:else}
     <button class="chart-wrap" onclick={() => (mostrarGraficoCheio = true)} aria-label="Ver gráfico em tela cheia">
       <canvas bind:this={canvas}></canvas>
-      <span class="modo-label">{modoGrafico === "media" ? "Média" : "Diário"}</span>
     </button>
   {/if}
 
@@ -679,10 +678,8 @@
     cursor: pointer;
   }
   .modo-label {
-    position: absolute;
-    top: 0;
-    right: var(--space-1);
-    font-size: 11px;
+    font-size: 12px;
+    font-weight: 400;
     color: var(--surface-muted);
   }
   .mes-nav {
