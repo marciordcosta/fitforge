@@ -15,6 +15,7 @@
     adicionarReceitaAoDiario,
     atualizarItemReceita,
     removerItemReceita,
+    excluirReceita,
     type Receita,
     type ReceitaItem,
     type RefeicaoDia,
@@ -39,6 +40,8 @@
   let itemEditando = $state<ReceitaItem | null>(null);
   let itemParaRemover = $state<ReceitaItem | null>(null);
   let processandoItem = $state(false);
+  let confirmandoExclusao = $state(false);
+  let excluindo = $state(false);
 
   async function carregar() {
     loading = true;
@@ -132,6 +135,18 @@
       alert("Erro ao remover item: " + (err as Error).message);
     } finally {
       processandoItem = false;
+    }
+  }
+
+  async function excluir() {
+    if (!receita) return;
+    excluindo = true;
+    try {
+      await excluirReceita(receita.id);
+      navigate("/dieta/receitas");
+    } catch (err) {
+      alert("Erro ao excluir refeição: " + (err as Error).message);
+      excluindo = false;
     }
   }
 </script>
@@ -236,8 +251,20 @@
     <div class="acao-adicionar">
       <Button onclick={adicionar} disabled={salvando || !refeicao}>Adicionar à Refeição</Button>
     </div>
+    <div class="acao-excluir">
+      <Button variant="danger" onclick={() => (confirmandoExclusao = true)} disabled={excluindo}>Excluir Refeição</Button>
+    </div>
   {/if}
 </div>
+
+{#if confirmandoExclusao}
+  <ConfirmDialog
+    titulo="Tem certeza de que quer excluir esta refeição salva?"
+    textoConfirmar="Excluir Refeição"
+    onConfirmar={excluir}
+    onCancelar={() => (confirmandoExclusao = false)}
+  />
+{/if}
 
 {#if mostrarEscolhaRefeicao}
   <ActionSheet
@@ -461,6 +488,9 @@
   }
   .acao-adicionar {
     margin-top: var(--space-4);
+  }
+  .acao-excluir {
+    margin-top: var(--space-3);
   }
   .muted {
     color: var(--surface-muted);

@@ -12,8 +12,8 @@ export interface ItemRascunho {
  */
 export const receitaRascunho = $state({ nome: "", itens: [] as ItemRascunho[] });
 
-export function adicionarAoRascunho(alimento: Alimento) {
-  receitaRascunho.itens.push({ alimento, quantidade: alimento.porcaoPadraoQtd });
+export function adicionarAoRascunho(alimento: Alimento, quantidade: number = alimento.porcaoPadraoQtd) {
+  receitaRascunho.itens.push({ alimento, quantidade });
 }
 
 export function removerDoRascunho(index: number) {

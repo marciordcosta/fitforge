@@ -623,6 +623,11 @@ export async function criarReceita(nome: string, itens: { alimentoId: string; qu
   return receita.id;
 }
 
+export async function excluirReceita(id: string): Promise<void> {
+  const { error } = await supabase.from("dieta_receitas").delete().eq("id", id);
+  if (error) throw error;
+}
+
 /** Loga todos os itens da receita de uma vez no diário, na mesma refeição/data. */
 export async function adicionarReceitaAoDiario(receitaId: string, data: string, refeicaoId: string): Promise<void> {
   const receita = await getReceita(receitaId);
