@@ -30,14 +30,21 @@
   let itens = $state<ItemDiario[]>([]);
   let metas = $state<MetasDiarias | null>(null);
   let loading = $state(true);
+  let erro = $state<string | null>(null);
   let itemParaRemover = $state<ItemDiario | null>(null);
   let confirmandoExclusaoRefeicao = $state(false);
   let processando = $state(false);
 
   async function carregar() {
     loading = true;
-    [refeicao, itens, metas] = await Promise.all([getRefeicaoDia(refeicaoId), getItensDaRefeicao(refeicaoId), getMetasDiarias()]);
-    loading = false;
+    erro = null;
+    try {
+      [refeicao, itens, metas] = await Promise.all([getRefeicaoDia(refeicaoId), getItensDaRefeicao(refeicaoId), getMetasDiarias()]);
+    } catch (err) {
+      erro = (err as Error).message;
+    } finally {
+      loading = false;
+    }
   }
 
   void carregar();
@@ -146,8 +153,12 @@
     <span class="header-spacer"></span>
   </div>
 
-  {#if loading || !refeicao}
+  {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if erro}
+    <p class="erro">Erro ao carregar a refeição: {erro}</p>
+  {:else if !refeicao}
+    <p class="muted">Refeição não encontrada.</p>
   {:else}
     <div class="acoes">
       <button class="acao-btn" disabled={processando} onclick={salvarComoReceita}>
@@ -463,5 +474,8 @@
   }
   .muted {
     color: var(--surface-muted);
+  }
+  .erro {
+    color: var(--color-danger);
   }
 </style>

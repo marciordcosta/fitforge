@@ -32,6 +32,7 @@
   let refeicaoData = $state("");
   let adicionandoReceita = $state<string | null>(null);
   let confirmando = $state(false);
+  let erro = $state<string | null>(null);
 
   let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
 
@@ -42,8 +43,14 @@
 
   async function carregarInicial() {
     loading = true;
-    alimentos = registrar(await listAlimentos());
-    loading = false;
+    erro = null;
+    try {
+      alimentos = registrar(await listAlimentos());
+    } catch (err) {
+      erro = (err as Error).message;
+    } finally {
+      loading = false;
+    }
   }
 
   void carregarInicial();
@@ -56,18 +63,24 @@
     clearTimeout(timeoutBusca);
     timeoutBusca = setTimeout(async () => {
       loading = true;
-      if (busca.trim()) {
-        const [alRes, recRes] = await Promise.all([
-          buscarAlimentos(busca),
-          modoSelecao ? buscarReceitas(busca) : Promise.resolve([]),
-        ]);
-        alimentos = registrar(alRes);
-        resultadosReceitas = recRes;
-      } else {
-        alimentos = registrar(await listAlimentos());
-        resultadosReceitas = [];
+      erro = null;
+      try {
+        if (busca.trim()) {
+          const [alRes, recRes] = await Promise.all([
+            buscarAlimentos(busca),
+            modoSelecao ? buscarReceitas(busca) : Promise.resolve([]),
+          ]);
+          alimentos = registrar(alRes);
+          resultadosReceitas = recRes;
+        } else {
+          alimentos = registrar(await listAlimentos());
+          resultadosReceitas = [];
+        }
+      } catch (err) {
+        erro = (err as Error).message;
+      } finally {
+        loading = false;
       }
-      loading = false;
     }, 300);
   }
 
@@ -149,6 +162,8 @@
 
   {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if erro}
+    <p class="erro">Erro ao buscar alimentos: {erro}</p>
   {:else}
     {#if modoSelecao && resultadosReceitas.length}
       <p class="secao-titulo">Refeições</p>
@@ -361,6 +376,9 @@
   }
   .muted {
     color: var(--surface-muted);
+  }
+  .erro {
+    color: var(--color-danger);
   }
   .rodape {
     position: fixed;

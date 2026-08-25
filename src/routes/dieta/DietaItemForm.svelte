@@ -52,36 +52,40 @@
   let confirmandoExclusao = $state(false);
   let salvando = $state(false);
   let processandoAlimento = $state(false);
+  let erro = $state<string | null>(null);
 
   async function carregar() {
     loading = true;
-    if (editandoItem) {
-      const item = await getItemDiario(itemDiarioId!);
-      if (!item) {
-        loading = false;
-        return;
+    erro = null;
+    try {
+      if (editandoItem) {
+        const item = await getItemDiario(itemDiarioId!);
+        if (!item) return;
+        const [alimentoRes, refeicaoRes, metasRes] = await Promise.all([
+          getAlimento(item.alimentoId),
+          getRefeicaoDia(item.refeicaoId),
+          getMetasDiarias(),
+        ]);
+        alimento = alimentoRes;
+        refeicao = refeicaoRes;
+        metas = metasRes;
+        dataResolvida = refeicaoRes?.data ?? "";
+        porcoes = alimentoRes ? item.quantidade / alimentoRes.porcaoPadraoQtd : 1;
+      } else {
+        const [alimentoRes, metasRes, refeicaoRes] = await Promise.all([
+          getAlimento(alimentoId!),
+          getMetasDiarias(),
+          refeicaoIdInicial ? getRefeicaoDia(refeicaoIdInicial) : Promise.resolve(null),
+        ]);
+        alimento = alimentoRes;
+        metas = metasRes;
+        refeicao = refeicaoRes;
       }
-      const [alimentoRes, refeicaoRes, metasRes] = await Promise.all([
-        getAlimento(item.alimentoId),
-        getRefeicaoDia(item.refeicaoId),
-        getMetasDiarias(),
-      ]);
-      alimento = alimentoRes;
-      refeicao = refeicaoRes;
-      metas = metasRes;
-      dataResolvida = refeicaoRes?.data ?? "";
-      porcoes = alimentoRes ? item.quantidade / alimentoRes.porcaoPadraoQtd : 1;
-    } else {
-      const [alimentoRes, metasRes, refeicaoRes] = await Promise.all([
-        getAlimento(alimentoId!),
-        getMetasDiarias(),
-        refeicaoIdInicial ? getRefeicaoDia(refeicaoIdInicial) : Promise.resolve(null),
-      ]);
-      alimento = alimentoRes;
-      metas = metasRes;
-      refeicao = refeicaoRes;
+    } catch (err) {
+      erro = (err as Error).message;
+    } finally {
+      loading = false;
     }
-    loading = false;
   }
 
   void carregar();
@@ -204,8 +208,12 @@
     </div>
   </div>
 
-  {#if loading || !alimento}
+  {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if erro}
+    <p class="erro">Erro ao carregar: {erro}</p>
+  {:else if !alimento}
+    <p class="muted">Alimento não encontrado.</p>
   {:else}
     <h2 class="nome-alimento">{alimento.nome}</h2>
 
@@ -500,5 +508,8 @@
   }
   .muted {
     color: var(--surface-muted);
+  }
+  .erro {
+    color: var(--color-danger);
   }
 </style>

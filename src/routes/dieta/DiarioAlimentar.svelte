@@ -14,12 +14,19 @@
   let refeicoes = $state<RefeicaoDia[]>([]);
   let itens = $state<ItemDiario[]>([]);
   let loading = $state(true);
+  let erro = $state<string | null>(null);
   let mostrarCriarRefeicao = $state(false);
 
   async function carregar() {
     loading = true;
-    [refeicoes, itens] = await Promise.all([getRefeicoesDoDia(dataAtual), getDiarioDoDia(dataAtual)]);
-    loading = false;
+    erro = null;
+    try {
+      [refeicoes, itens] = await Promise.all([getRefeicoesDoDia(dataAtual), getDiarioDoDia(dataAtual)]);
+    } catch (err) {
+      erro = (err as Error).message;
+    } finally {
+      loading = false;
+    }
   }
 
   void carregar();
@@ -68,6 +75,8 @@
 
   {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if erro}
+    <p class="erro">Erro ao carregar o diário: {erro}</p>
   {:else if !refeicoes.length}
     <p class="muted">Nenhuma refeição ainda. Toque em + pra criar.</p>
   {:else}
@@ -192,5 +201,8 @@
   }
   .muted {
     color: var(--surface-muted);
+  }
+  .erro {
+    color: var(--color-danger);
   }
 </style>
