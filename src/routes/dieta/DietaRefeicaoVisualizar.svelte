@@ -153,8 +153,8 @@
   </svg>
 {/snippet}
 
-<div class="container has-bottom-nav">
-  <div class="header">
+<div class="header-fixo">
+  <div class="header-fixo-inner">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
     <h1>
       {refeicao?.nome ?? ""}
@@ -162,7 +162,9 @@
     </h1>
     <span class="header-spacer"></span>
   </div>
+</div>
 
+<div class="container has-bottom-nav">
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else if erro}
@@ -303,13 +305,22 @@
     padding-left: var(--space-4);
     padding-right: var(--space-4);
   }
-  .header {
+  .header-fixo {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .header-fixo-inner {
+    max-width: 480px;
+    margin: 0 auto;
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin-bottom: var(--space-3);
+    padding: var(--space-4);
   }
-  .header h1 {
+  .header-fixo-inner h1 {
     flex: 1;
     min-width: 0;
     font-size: var(--font-size-lg);
