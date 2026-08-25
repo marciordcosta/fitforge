@@ -3,7 +3,8 @@
   import { parseISODate, toISODate, hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import DietaAdicionarSheet from "./DietaAdicionarSheet.svelte";
-  import { REFEICOES, getDiarioDoDia, type ItemDiario, type Refeicao } from "../../lib/dietaApi";
+  import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
+  import { getRefeicoesDoDia, getDiarioDoDia, type RefeicaoDia, type ItemDiario } from "../../lib/dietaApi";
 
   const MESES_ABREV = [
     "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez",
@@ -11,13 +12,15 @@
   const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 
   let dataAtual = $state(hojeISO());
+  let refeicoes = $state<RefeicaoDia[]>([]);
   let itens = $state<ItemDiario[]>([]);
   let loading = $state(true);
-  let refeicaoParaAdicionar = $state<Refeicao | null>(null);
+  let refeicaoParaAdicionar = $state<RefeicaoDia | null>(null);
+  let mostrarCriarRefeicao = $state(false);
 
   async function carregar() {
     loading = true;
-    itens = await getDiarioDoDia(dataAtual);
+    [refeicoes, itens] = await Promise.all([getRefeicoesDoDia(dataAtual), getDiarioDoDia(dataAtual)]);
     loading = false;
   }
 
@@ -35,14 +38,15 @@
     return `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES_ABREV[d.getMonth()]}`;
   });
 
-  function itensDaRefeicao(refeicao: Refeicao): ItemDiario[] {
-    return itens.filter((i) => i.refeicao === refeicao);
-  }
-
-  function preview(refeicao: Refeicao): string {
-    const nomes = itensDaRefeicao(refeicao).map((i) => i.nome);
+  function preview(refeicaoId: string): string {
+    const nomes = itens.filter((i) => i.refeicaoId === refeicaoId).map((i) => i.nome);
     if (!nomes.length) return "Nenhum alimento ainda";
     return nomes.join(", ");
+  }
+
+  function aoCriarRefeicao(id: string) {
+    mostrarCriarRefeicao = false;
+    navigate(`/dieta/refeicao/${id}`);
   }
 </script>
 
@@ -61,27 +65,30 @@
     <button onclick={() => trocarDia(-1)} aria-label="Dia anterior">‹</button>
     <span>{dataLabel}</span>
     <button onclick={() => trocarDia(1)} aria-label="Próximo dia">›</button>
+    <button class="icon-btn" onclick={() => (mostrarCriarRefeicao = true)} aria-label="Nova refeição">+</button>
   </div>
 
   {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if !refeicoes.length}
+    <p class="muted">Nenhuma refeição ainda. Toque em + pra criar.</p>
   {:else}
-    {#each REFEICOES as refeicao (refeicao.valor)}
+    {#each refeicoes as refeicao (refeicao.id)}
       <div
         class="refeicao-item"
         role="button"
         tabindex="0"
-        onclick={() => navigate(`/dieta/refeicao/${refeicao.valor}/${dataAtual}`)}
-        onkeydown={(e) => e.key === "Enter" && navigate(`/dieta/refeicao/${refeicao.valor}/${dataAtual}`)}
+        onclick={() => navigate(`/dieta/refeicao/${refeicao.id}`)}
+        onkeydown={(e) => e.key === "Enter" && navigate(`/dieta/refeicao/${refeicao.id}`)}
       >
         <div class="card-header">
-          <h2>{refeicao.label}</h2>
+          <h2>{refeicao.nome}</h2>
         </div>
-        <p class="preview">{preview(refeicao.valor)}</p>
+        <p class="preview">{preview(refeicao.id)}</p>
         <Button
           onclick={(e) => {
             e.stopPropagation();
-            refeicaoParaAdicionar = refeicao.valor;
+            refeicaoParaAdicionar = refeicao;
           }}
         >
           Adicionar Alimento
@@ -93,10 +100,18 @@
 
 {#if refeicaoParaAdicionar !== null}
   <DietaAdicionarSheet
-    refeicao={refeicaoParaAdicionar}
+    refeicaoId={refeicaoParaAdicionar.id}
     data={dataAtual}
     onFechar={() => (refeicaoParaAdicionar = null)}
     onAdicionado={carregar}
+  />
+{/if}
+
+{#if mostrarCriarRefeicao}
+  <DietaRefeicaoDiaFormSheet
+    data={dataAtual}
+    onFechar={() => (mostrarCriarRefeicao = false)}
+    onCriada={aoCriarRefeicao}
   />
 {/if}
 
@@ -134,6 +149,7 @@
     justify-content: center;
     gap: var(--space-4);
     margin-bottom: var(--space-5);
+    position: relative;
   }
   .dia-nav span {
     font-weight: 600;
@@ -150,6 +166,11 @@
     color: var(--surface-fg);
     font-size: var(--font-size-lg);
     cursor: pointer;
+  }
+  .icon-btn {
+    position: absolute;
+    right: 0;
+    color: var(--color-primary);
   }
   .refeicao-item {
     cursor: pointer;

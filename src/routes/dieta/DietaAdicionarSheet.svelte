@@ -7,16 +7,15 @@
     adicionarReceitaAoDiario,
     type Alimento,
     type ReceitaResumo,
-    type Refeicao,
   } from "../../lib/dietaApi";
 
   let {
-    refeicao,
+    refeicaoId,
     data,
     onFechar,
     onAdicionado,
   }: {
-    refeicao: Refeicao;
+    refeicaoId: string;
     data: string;
     onFechar: () => void;
     onAdicionado?: () => void;
@@ -49,13 +48,13 @@
 
   function selecionarAlimento(alimento: Alimento) {
     onFechar();
-    navigate(`/dieta/alimento/${alimento.id}/${data}/${refeicao}`);
+    navigate(`/dieta/alimento/${alimento.id}/${data}/${refeicaoId}`);
   }
 
   async function selecionarReceita(receita: ReceitaResumo) {
     adicionandoReceita = receita.id;
     try {
-      await adicionarReceitaAoDiario(receita.id, data, refeicao);
+      await adicionarReceitaAoDiario(receita.id, data, refeicaoId);
       onAdicionado?.();
       onFechar();
     } catch (err) {

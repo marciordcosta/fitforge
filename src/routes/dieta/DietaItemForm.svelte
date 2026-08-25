@@ -4,24 +4,35 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
+  import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import {
     getAlimento,
+    getItemDiario,
+    getRefeicaoDia,
+    getRefeicoesDoDia,
     getMetasDiarias,
     adicionarItemDiario,
+    atualizarItemDiario,
     duplicarAlimento,
     excluirAlimento,
-    REFEICOES,
-    labelRefeicao,
     type Alimento,
     type MetasDiarias,
-    type Refeicao,
+    type RefeicaoDia,
   } from "../../lib/dietaApi";
 
   let {
     alimentoId,
     data,
-    refeicaoInicial,
-  }: { alimentoId: string; data: string; refeicaoInicial: Refeicao | null } = $props();
+    refeicaoIdInicial,
+    itemDiarioId,
+  }: {
+    alimentoId?: string;
+    data?: string;
+    refeicaoIdInicial?: string | null;
+    itemDiarioId?: string;
+  } = $props();
+
+  const editandoItem = untrack(() => itemDiarioId != null);
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -30,9 +41,12 @@
   let alimento = $state<Alimento | null>(null);
   let metas = $state<MetasDiarias | null>(null);
   let loading = $state(true);
-  let refeicao = $state<Refeicao | null>(untrack(() => refeicaoInicial));
+  let dataResolvida = $state(untrack(() => data ?? ""));
+  let refeicao = $state<RefeicaoDia | null>(null);
   let porcoes = $state(1);
+  let opcoesRefeicao = $state<RefeicaoDia[]>([]);
   let mostrarEscolhaRefeicao = $state(false);
+  let mostrarCriarRefeicao = $state(false);
   let mostrarMenuAlimento = $state(false);
   let mostrarEditar = $state(false);
   let confirmandoExclusao = $state(false);
@@ -41,38 +55,46 @@
 
   async function carregar() {
     loading = true;
-    [alimento, metas] = await Promise.all([getAlimento(alimentoId), getMetasDiarias()]);
+    if (editandoItem) {
+      const item = await getItemDiario(itemDiarioId!);
+      if (!item) {
+        loading = false;
+        return;
+      }
+      const [alimentoRes, refeicaoRes, metasRes] = await Promise.all([
+        getAlimento(item.alimentoId),
+        getRefeicaoDia(item.refeicaoId),
+        getMetasDiarias(),
+      ]);
+      alimento = alimentoRes;
+      refeicao = refeicaoRes;
+      metas = metasRes;
+      dataResolvida = refeicaoRes?.data ?? "";
+      porcoes = alimentoRes ? item.quantidade / alimentoRes.porcaoPadraoQtd : 1;
+    } else {
+      const [alimentoRes, metasRes, refeicaoRes] = await Promise.all([
+        getAlimento(alimentoId!),
+        getMetasDiarias(),
+        refeicaoIdInicial ? getRefeicaoDia(refeicaoIdInicial) : Promise.resolve(null),
+      ]);
+      alimento = alimentoRes;
+      metas = metasRes;
+      refeicao = refeicaoRes;
+    }
     loading = false;
   }
 
   void carregar();
 
-  function sufixoRota(): string {
-    return refeicao ? `/${data}/${refeicao}` : data ? `/${data}` : "";
+  async function abrirEscolhaRefeicao() {
+    opcoesRefeicao = await getRefeicoesDoDia(dataResolvida);
+    mostrarEscolhaRefeicao = true;
   }
 
-  async function duplicar() {
-    if (!alimento) return;
-    processandoAlimento = true;
-    try {
-      const novoId = await duplicarAlimento(alimento);
-      navigate(`/dieta/alimento/${novoId}${sufixoRota()}`);
-    } catch (err) {
-      alert("Erro ao duplicar alimento: " + (err as Error).message);
-      processandoAlimento = false;
-    }
-  }
-
-  async function excluir() {
-    if (!alimento) return;
-    processandoAlimento = true;
-    try {
-      await excluirAlimento(alimento.id);
-      navigate("/dieta/alimentos");
-    } catch (err) {
-      alert("Erro ao excluir alimento: " + (err as Error).message);
-      processandoAlimento = false;
-    }
+  function aoCriarRefeicao(id: string) {
+    mostrarCriarRefeicao = false;
+    mostrarEscolhaRefeicao = false;
+    void getRefeicaoDia(id).then((r) => (refeicao = r));
   }
 
   const quantidade = $derived(alimento ? porcoes * alimento.porcaoPadraoQtd : 0);
@@ -98,14 +120,46 @@
     return meta > 0 ? Math.min(100, (valor / meta) * 100) : 0;
   }
 
+  function sufixoRota(): string {
+    return refeicao ? `/${dataResolvida}/${refeicao.id}` : dataResolvida ? `/${dataResolvida}` : "";
+  }
+
+  async function duplicarAlimentoCadastro() {
+    if (!alimento) return;
+    processandoAlimento = true;
+    try {
+      const novoId = await duplicarAlimento(alimento);
+      navigate(`/dieta/alimento/${novoId}${sufixoRota()}`);
+    } catch (err) {
+      alert("Erro ao duplicar alimento: " + (err as Error).message);
+      processandoAlimento = false;
+    }
+  }
+
+  async function excluir() {
+    if (!alimento) return;
+    processandoAlimento = true;
+    try {
+      await excluirAlimento(alimento.id);
+      navigate("/dieta/alimentos");
+    } catch (err) {
+      alert("Erro ao excluir alimento: " + (err as Error).message);
+      processandoAlimento = false;
+    }
+  }
+
   async function salvar() {
     if (!alimento || !refeicao) return;
     salvando = true;
     try {
-      await adicionarItemDiario({ alimento, data, refeicao, quantidade });
+      if (editandoItem) {
+        await atualizarItemDiario(itemDiarioId!, alimento, quantidade);
+      } else {
+        await adicionarItemDiario({ alimento, data: dataResolvida, refeicaoId: refeicao.id, quantidade });
+      }
       window.history.back();
     } catch (err) {
-      alert("Erro ao adicionar alimento: " + (err as Error).message);
+      alert("Erro ao salvar alimento: " + (err as Error).message);
       salvando = false;
     }
   }
@@ -139,7 +193,7 @@
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
-    <h1>Adicionar Alimento</h1>
+    <h1>{editandoItem ? "Editar Alimento" : "Adicionar Alimento"}</h1>
     <div class="header-acoes">
       {#if alimento?.fonte === "manual"}
         <button class="icone-acao" onclick={() => (mostrarMenuAlimento = true)} disabled={processandoAlimento} aria-label="Mais opções">
@@ -155,9 +209,16 @@
   {:else}
     <h2 class="nome-alimento">{alimento.nome}</h2>
 
-    <div class="linha" role="button" tabindex="0" onclick={() => (mostrarEscolhaRefeicao = true)} onkeydown={(e) => e.key === "Enter" && (mostrarEscolhaRefeicao = true)}>
+    <div
+      class="linha"
+      class:desabilitada={editandoItem}
+      role="button"
+      tabindex="0"
+      onclick={() => !editandoItem && abrirEscolhaRefeicao()}
+      onkeydown={(e) => e.key === "Enter" && !editandoItem && abrirEscolhaRefeicao()}
+    >
       <span>Refeição</span>
-      <span class:placeholder={!refeicao}>{refeicao ? labelRefeicao(refeicao) : "Selecione uma refeição"}</span>
+      <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Selecione uma refeição"}</span>
     </div>
 
     <div class="linha">
@@ -205,7 +266,7 @@
       </div>
     {/if}
 
-    <p class="itens-titulo">Itens da refeição</p>
+    <p class="itens-titulo">Item</p>
     <div class="item-preview">
       <span class="item-nome">{alimento.nome}</span>
       <span class="item-sub">{quantidade.toFixed(0)}{alimento.porcaoPadraoUnidade} · {calorias.toFixed(0)} kcal</span>
@@ -217,7 +278,18 @@
   <ActionSheet
     titulo="Selecione a refeição"
     onFechar={() => (mostrarEscolhaRefeicao = false)}
-    opcoes={REFEICOES.map((r) => ({ label: r.label, onSelect: () => (refeicao = r.valor) }))}
+    opcoes={[
+      ...opcoesRefeicao.map((r) => ({ label: r.nome, onSelect: () => (refeicao = r) })),
+      { label: "+ Nova Refeição", onSelect: () => (mostrarCriarRefeicao = true) },
+    ]}
+  />
+{/if}
+
+{#if mostrarCriarRefeicao}
+  <DietaRefeicaoDiaFormSheet
+    data={dataResolvida}
+    onFechar={() => (mostrarCriarRefeicao = false)}
+    onCriada={aoCriarRefeicao}
   />
 {/if}
 
@@ -227,7 +299,7 @@
     onFechar={() => (mostrarMenuAlimento = false)}
     opcoes={[
       { label: "Editar", icon: iconEditar, onSelect: () => (mostrarEditar = true) },
-      { label: "Duplicar", icon: iconDuplicar, onSelect: () => duplicar() },
+      { label: "Duplicar", icon: iconDuplicar, onSelect: () => duplicarAlimentoCadastro() },
       { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => (confirmandoExclusao = true) },
     ]}
   />
@@ -317,6 +389,9 @@
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--surface-border);
     cursor: pointer;
+  }
+  .linha.desabilitada {
+    cursor: default;
   }
   .linha span:first-child {
     color: var(--surface-fg);

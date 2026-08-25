@@ -1,36 +1,76 @@
 <script lang="ts">
+  import { navigate } from "../../lib/router.svelte";
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DietaAdicionarSheet from "./DietaAdicionarSheet.svelte";
-  import { getDiarioDoDia, removerItemDiario, labelRefeicao, type ItemDiario, type Refeicao } from "../../lib/dietaApi";
+  import {
+    getRefeicaoDia,
+    getItensDaRefeicao,
+    removerItemDiario,
+    removerRefeicaoDia,
+    duplicarRefeicaoDia,
+    salvarRefeicaoComoReceita,
+    getMetasDiarias,
+    type RefeicaoDia,
+    type ItemDiario,
+    type MetasDiarias,
+  } from "../../lib/dietaApi";
 
-  let { refeicao, data }: { refeicao: Refeicao; data: string } = $props();
+  let { refeicaoId }: { refeicaoId: string } = $props();
+
+  const COR_CARBO = "#5eead4";
+  const COR_GORDURA = "#f9a8d4";
+  const COR_PROTEINA = "#fbbf24";
 
   const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
   const MESES_ABREV = [
     "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez",
   ];
 
-  const dataLabel = $derived.by(() => {
-    const d = parseISODate(data);
-    return `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES_ABREV[d.getMonth()]}`;
-  });
-
+  let refeicao = $state<RefeicaoDia | null>(null);
   let itens = $state<ItemDiario[]>([]);
+  let metas = $state<MetasDiarias | null>(null);
   let loading = $state(true);
   let mostrarAdicionar = $state(false);
   let itemParaRemover = $state<ItemDiario | null>(null);
+  let confirmandoExclusaoRefeicao = $state(false);
   let processando = $state(false);
 
   async function carregar() {
     loading = true;
-    itens = (await getDiarioDoDia(data)).filter((i) => i.refeicao === refeicao);
+    [refeicao, itens, metas] = await Promise.all([getRefeicaoDia(refeicaoId), getItensDaRefeicao(refeicaoId), getMetasDiarias()]);
     loading = false;
   }
 
   void carregar();
 
+  const dataLabel = $derived.by(() => {
+    if (!refeicao) return "";
+    const d = parseISODate(refeicao.data);
+    return `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES_ABREV[d.getMonth()]}`;
+  });
+
   const totalCalorias = $derived(itens.reduce((acc, i) => acc + i.calorias, 0));
+  const totalProteina = $derived(itens.reduce((acc, i) => acc + i.proteinaG, 0));
+  const totalGordura = $derived(itens.reduce((acc, i) => acc + i.gorduraG, 0));
+  const totalCarboidrato = $derived(itens.reduce((acc, i) => acc + i.carboidratoG, 0));
+
+  const caloriasCarbo = $derived(totalCarboidrato * 4);
+  const caloriasGordura = $derived(totalGordura * 9);
+  const caloriasProteina = $derived(totalProteina * 4);
+  const caloriasMacros = $derived(caloriasCarbo + caloriasGordura + caloriasProteina);
+
+  const pctCarbo = $derived(caloriasMacros > 0 ? (caloriasCarbo / caloriasMacros) * 100 : 0);
+  const pctGordura = $derived(caloriasMacros > 0 ? (caloriasGordura / caloriasMacros) * 100 : 0);
+  const pctProteina = $derived(caloriasMacros > 0 ? (caloriasProteina / caloriasMacros) * 100 : 0);
+
+  const donutStyle = $derived(
+    `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
+  );
+
+  function pctMeta(valor: number, meta: number): number {
+    return meta > 0 ? Math.min(100, (valor / meta) * 100) : 0;
+  }
 
   async function remover() {
     if (!itemParaRemover) return;
@@ -43,8 +83,55 @@
       processando = false;
     }
   }
+
+  async function salvarComoReceita() {
+    processando = true;
+    try {
+      await salvarRefeicaoComoReceita(refeicaoId);
+      alert("Refeição salva como modelo reutilizável — buscável ao adicionar alimento.");
+    } catch (err) {
+      alert("Erro ao salvar refeição: " + (err as Error).message);
+    } finally {
+      processando = false;
+    }
+  }
+
+  async function duplicar() {
+    processando = true;
+    try {
+      const novoId = await duplicarRefeicaoDia(refeicaoId);
+      navigate(`/dieta/refeicao/${novoId}`);
+    } catch (err) {
+      alert("Erro ao duplicar refeição: " + (err as Error).message);
+      processando = false;
+    }
+  }
+
+  async function removerRefeicao() {
+    processando = true;
+    try {
+      await removerRefeicaoDia(refeicaoId);
+      navigate("/dieta");
+    } catch (err) {
+      alert("Erro ao remover refeição: " + (err as Error).message);
+      processando = false;
+    }
+  }
 </script>
 
+{#snippet iconSalvar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+    <path d="M17 21v-8H7v8" />
+    <path d="M7 3v5h8" />
+  </svg>
+{/snippet}
+{#snippet iconDuplicar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+{/snippet}
 {#snippet iconExcluir()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
@@ -55,32 +142,92 @@
   <div class="header">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
     <h1>
-      {labelRefeicao(refeicao)}
+      {refeicao?.nome ?? ""}
       <span class="data-inline">{dataLabel}</span>
     </h1>
     <span class="header-spacer"></span>
   </div>
 
-  {#if loading}
+  {#if loading || !refeicao}
     <p class="muted">Carregando…</p>
   {:else}
+    <div class="acoes">
+      <button class="acao-btn" disabled={processando} onclick={salvarComoReceita}>
+        <span class="acao-label">Salvar Refeição</span>
+        {@render iconSalvar()}
+      </button>
+      <button class="acao-btn" disabled={processando} onclick={duplicar}>
+        <span class="acao-label">Duplicar</span>
+        {@render iconDuplicar()}
+      </button>
+      <button class="acao-btn acao-destrutiva" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>
+        <span class="acao-label">Remover</span>
+        {@render iconExcluir()}
+      </button>
+    </div>
+
     {#if itens.length}
-      <p class="total">{totalCalorias.toFixed(0)} kcal</p>
+      <div class="resumo">
+        <div class="donut" style={donutStyle}>
+          <div class="donut-centro">
+            <strong>{totalCalorias.toFixed(0)}</strong>
+            <span>Cal</span>
+          </div>
+        </div>
+        <div class="resumo-macros">
+          <p style={`color:${COR_CARBO}`}><strong>{pctCarbo.toFixed(0)}%</strong><br />{totalCarboidrato.toFixed(1)} g<br />Carb</p>
+          <p style={`color:${COR_GORDURA}`}><strong>{pctGordura.toFixed(0)}%</strong><br />{totalGordura.toFixed(1)} g<br />Gorduras</p>
+          <p style={`color:${COR_PROTEINA}`}><strong>{pctProteina.toFixed(0)}%</strong><br />{totalProteina.toFixed(1)} g<br />Proteínas</p>
+        </div>
+      </div>
+
+      {#if metas}
+        <p class="metas-titulo">Percentual das suas metas diárias</p>
+        <div class="metas-grid">
+          <div class="meta-col">
+            <span class="meta-label">Calorias</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalCalorias, metas.calorias)}%; background:var(--color-secondary);`}></div></div>
+            <span class="meta-valor">{pctMeta(totalCalorias, metas.calorias).toFixed(0)}% · {metas.calorias.toFixed(0)}</span>
+          </div>
+          <div class="meta-col">
+            <span class="meta-label">Carb</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalCarboidrato, metas.carboidratoG)}%; background:${COR_CARBO};`}></div></div>
+            <span class="meta-valor">{pctMeta(totalCarboidrato, metas.carboidratoG).toFixed(0)}% · {metas.carboidratoG.toFixed(0)}g</span>
+          </div>
+          <div class="meta-col">
+            <span class="meta-label">Gorduras</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalGordura, metas.gorduraG)}%; background:${COR_GORDURA};`}></div></div>
+            <span class="meta-valor">{pctMeta(totalGordura, metas.gorduraG).toFixed(0)}% · {metas.gorduraG.toFixed(0)}g</span>
+          </div>
+          <div class="meta-col">
+            <span class="meta-label">Proteínas</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalProteina, metas.proteinaG)}%; background:${COR_PROTEINA};`}></div></div>
+            <span class="meta-valor">{pctMeta(totalProteina, metas.proteinaG).toFixed(0)}% · {metas.proteinaG.toFixed(0)}g</span>
+          </div>
+        </div>
+      {/if}
     {/if}
 
     {#if !itens.length}
       <p class="muted">Nenhum alimento adicionado ainda.</p>
     {:else}
       {#each itens as item (item.id)}
-        <div class="item-card">
+        <button class="item-card" onclick={() => navigate(`/dieta/item/${item.id}`)}>
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
             <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal</p>
           </div>
-          <button class="item-remover" onclick={() => (itemParaRemover = item)} aria-label="Remover alimento">
+          <span
+            class="item-remover"
+            role="button"
+            tabindex="0"
+            onclick={(e) => { e.stopPropagation(); itemParaRemover = item; }}
+            onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); itemParaRemover = item; } }}
+            aria-label="Remover alimento"
+          >
             {@render iconExcluir()}
-          </button>
-        </div>
+          </span>
+        </button>
       {/each}
     {/if}
 
@@ -88,10 +235,10 @@
   {/if}
 </div>
 
-{#if mostrarAdicionar}
+{#if mostrarAdicionar && refeicao}
   <DietaAdicionarSheet
-    {refeicao}
-    {data}
+    refeicaoId={refeicao.id}
+    data={refeicao.data}
     onFechar={() => (mostrarAdicionar = false)}
     onAdicionado={carregar}
   />
@@ -103,6 +250,15 @@
     textoConfirmar="Remover"
     onConfirmar={remover}
     onCancelar={() => (itemParaRemover = null)}
+  />
+{/if}
+
+{#if confirmandoExclusaoRefeicao}
+  <ConfirmDialog
+    titulo="Tem certeza de que quer remover esta refeição? Todos os alimentos dela serão apagados."
+    textoConfirmar="Remover Refeição"
+    onConfirmar={removerRefeicao}
+    onCancelar={() => (confirmandoExclusaoRefeicao = false)}
   />
 {/if}
 
@@ -150,13 +306,116 @@
     color: var(--surface-muted);
     text-transform: capitalize;
   }
-  .total {
-    text-align: center;
-    color: var(--surface-muted);
+  .acoes {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+  }
+  .acao-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    cursor: pointer;
+  }
+  .acao-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .acao-label {
     font-size: var(--font-size-sm);
-    margin: 0 0 var(--space-4);
+    font-weight: 600;
+    text-align: center;
+  }
+  .acao-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  .acao-destrutiva {
+    color: var(--color-danger);
+  }
+  .resumo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    padding: var(--space-3) 0 var(--space-5);
+  }
+  .donut {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .donut-centro {
+    position: absolute;
+    inset: 14px;
+    border-radius: 50%;
+    background: var(--surface-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .donut-centro strong {
+    font-size: var(--font-size-lg);
+  }
+  .donut-centro span {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .resumo-macros {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .resumo-macros p {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .metas-titulo {
+    font-weight: 600;
+    margin: var(--space-2) 0 var(--space-3);
+  }
+  .metas-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+  }
+  .meta-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .meta-label {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .meta-barra {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface-border);
+    overflow: hidden;
+  }
+  .meta-barra-fill {
+    height: 100%;
+  }
+  .meta-valor {
+    font-size: 11px;
+    color: var(--surface-muted);
   }
   .item-card {
+    width: 100%;
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -165,6 +424,10 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-2);
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
   }
   .item-info {
     flex: 1;
@@ -173,6 +436,7 @@
   .item-nome {
     margin: 0;
     font-size: var(--font-size-base);
+    color: var(--surface-fg);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -186,8 +450,9 @@
     flex-shrink: 0;
     width: 28px;
     height: 28px;
-    border: none;
-    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--color-danger);
     cursor: pointer;
   }

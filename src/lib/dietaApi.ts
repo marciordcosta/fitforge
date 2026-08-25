@@ -7,18 +7,14 @@ function uid(): string {
   return id;
 }
 
-export type Refeicao = "cafe_da_manha" | "almoco" | "jantar" | "lanche";
-
-export const REFEICOES: { valor: Refeicao; label: string }[] = [
-  { valor: "cafe_da_manha", label: "Café da Manhã" },
-  { valor: "almoco", label: "Almoço" },
-  { valor: "jantar", label: "Jantar" },
-  { valor: "lanche", label: "Lanche" },
-];
-
-export function labelRefeicao(refeicao: Refeicao): string {
-  return REFEICOES.find((r) => r.valor === refeicao)?.label ?? refeicao;
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
 }
+
+/** Nomes sugeridos ao criar uma refeição nova — não é mais uma lista fixa, o usuário pode nomear como quiser. */
+export const SUGESTOES_REFEICAO = ["Café da Manhã", "Almoço", "Jantar", "Lanche"];
+
+// ---------------- Alimentos ----------------
 
 export type FonteAlimento = "manual" | "taco" | "openfoodfacts";
 
@@ -154,11 +150,89 @@ export async function excluirAlimento(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ---------------- Refeições do dia (dinâmicas, nomeadas pelo usuário) ----------------
+
+export interface RefeicaoDia {
+  id: string;
+  nome: string;
+  data: string;
+}
+
+export async function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
+  const { data: linhas, error } = await supabase
+    .from("dieta_refeicoes_dia")
+    .select("id, nome, data")
+    .eq("data", data)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return linhas ?? [];
+}
+
+export async function getRefeicaoDia(id: string): Promise<RefeicaoDia | null> {
+  const { data, error } = await supabase.from("dieta_refeicoes_dia").select("id, nome, data").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function criarRefeicaoDia(data: string, nome: string): Promise<string> {
+  const { data: linha, error } = await supabase
+    .from("dieta_refeicoes_dia")
+    .insert({ user_id: uid(), data, nome })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return linha.id;
+}
+
+export async function removerRefeicaoDia(id: string): Promise<void> {
+  const { error } = await supabase.from("dieta_refeicoes_dia").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/** Duplica a refeição (nome + todos os alimentos) como uma nova refeição no mesmo dia. */
+export async function duplicarRefeicaoDia(id: string): Promise<string> {
+  const refeicao = await getRefeicaoDia(id);
+  if (!refeicao) throw new Error("Refeição não encontrada.");
+  const itens = await getItensDaRefeicao(id);
+  const novoId = await criarRefeicaoDia(refeicao.data, `${refeicao.nome} (cópia)`);
+  if (itens.length) {
+    const linhas = itens.map((it) => ({
+      user_id: uid(),
+      alimento_id: it.alimentoId,
+      data: refeicao.data,
+      refeicao_id: novoId,
+      quantidade: it.quantidade,
+      unidade: it.unidade,
+      calorias: it.calorias,
+      proteina_g: it.proteinaG,
+      gordura_g: it.gorduraG,
+      carboidrato_g: it.carboidratoG,
+    }));
+    const { error } = await supabase.from("diario_alimentos").insert(linhas);
+    if (error) throw error;
+  }
+  return novoId;
+}
+
+/** Guarda a composição atual da refeição como uma Receita reutilizável e buscável (mesmo nome da refeição). */
+export async function salvarRefeicaoComoReceita(id: string): Promise<void> {
+  const refeicao = await getRefeicaoDia(id);
+  if (!refeicao) throw new Error("Refeição não encontrada.");
+  const itens = await getItensDaRefeicao(id);
+  if (!itens.length) throw new Error("Adicione ao menos um alimento antes de salvar.");
+  await criarReceita(
+    refeicao.nome,
+    itens.map((it) => ({ alimentoId: it.alimentoId, quantidade: it.quantidade })),
+  );
+}
+
+// ---------------- Diário (itens logados por refeição) ----------------
+
 export interface ItemDiario {
   id: string;
   alimentoId: string;
   nome: string;
-  refeicao: Refeicao;
+  refeicaoId: string;
   quantidade: number;
   unidade: string;
   calorias: number;
@@ -167,37 +241,55 @@ export interface ItemDiario {
   carboidratoG: number;
 }
 
-export async function getDiarioDoDia(data: string): Promise<ItemDiario[]> {
-  const { data: linhas, error } = await supabase
-    .from("diario_alimentos")
-    .select(
-      "id, alimento_id, refeicao, quantidade, unidade, calorias, proteina_g, gordura_g, carboidrato_g, created_at, alimento:alimentos(nome)",
-    )
-    .eq("data", data)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (linhas ?? []).map((l: Record<string, unknown>) => ({
+function mapItemDiario(l: Record<string, unknown>): ItemDiario {
+  return {
     id: l.id as string,
     alimentoId: l.alimento_id as string,
     nome: ((l.alimento as { nome: string } | null)?.nome) ?? "",
-    refeicao: l.refeicao as Refeicao,
+    refeicaoId: l.refeicao_id as string,
     quantidade: l.quantidade as number,
     unidade: l.unidade as string,
     calorias: l.calorias as number,
     proteinaG: l.proteina_g as number,
     gorduraG: l.gordura_g as number,
     carboidratoG: l.carboidrato_g as number,
-  }));
+  };
 }
 
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
+const ITEM_DIARIO_SELECT =
+  "id, alimento_id, refeicao_id, quantidade, unidade, calorias, proteina_g, gordura_g, carboidrato_g, created_at, alimento:alimentos(nome)";
+
+/** Todos os itens logados num dia, de todas as refeições — usado pra montar a prévia dos cards na tela principal. */
+export async function getDiarioDoDia(data: string): Promise<ItemDiario[]> {
+  const { data: linhas, error } = await supabase
+    .from("diario_alimentos")
+    .select(ITEM_DIARIO_SELECT)
+    .eq("data", data)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (linhas ?? []).map((l) => mapItemDiario(l as Record<string, unknown>));
+}
+
+export async function getItemDiario(id: string): Promise<ItemDiario | null> {
+  const { data, error } = await supabase.from("diario_alimentos").select(ITEM_DIARIO_SELECT).eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? mapItemDiario(data as Record<string, unknown>) : null;
+}
+
+export async function getItensDaRefeicao(refeicaoId: string): Promise<ItemDiario[]> {
+  const { data: linhas, error } = await supabase
+    .from("diario_alimentos")
+    .select(ITEM_DIARIO_SELECT)
+    .eq("refeicao_id", refeicaoId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (linhas ?? []).map((l) => mapItemDiario(l as Record<string, unknown>));
 }
 
 export async function adicionarItemDiario(input: {
   alimento: Alimento;
   data: string;
-  refeicao: Refeicao;
+  refeicaoId: string;
   quantidade: number;
 }): Promise<void> {
   const fator = input.quantidade / input.alimento.porcaoPadraoQtd;
@@ -205,7 +297,7 @@ export async function adicionarItemDiario(input: {
     user_id: uid(),
     alimento_id: input.alimento.id,
     data: input.data,
-    refeicao: input.refeicao,
+    refeicao_id: input.refeicaoId,
     quantidade: input.quantidade,
     unidade: input.alimento.porcaoPadraoUnidade,
     calorias: round1(input.alimento.caloriasPorPorcao * fator),
@@ -216,10 +308,28 @@ export async function adicionarItemDiario(input: {
   if (error) throw error;
 }
 
+export async function atualizarItemDiario(id: string, alimento: Alimento, quantidade: number): Promise<void> {
+  const fator = quantidade / alimento.porcaoPadraoQtd;
+  const { error } = await supabase
+    .from("diario_alimentos")
+    .update({
+      quantidade,
+      unidade: alimento.porcaoPadraoUnidade,
+      calorias: round1(alimento.caloriasPorPorcao * fator),
+      proteina_g: round1(alimento.proteinaG * fator),
+      gordura_g: round1(alimento.gorduraG * fator),
+      carboidrato_g: round1(alimento.carboidratoG * fator),
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function removerItemDiario(id: string): Promise<void> {
   const { error } = await supabase.from("diario_alimentos").delete().eq("id", id);
   if (error) throw error;
 }
+
+// ---------------- Metas diárias ----------------
 
 /** Metas diárias (calorias + macros em gramas). Macros vêm de g/kg × peso de referência do perfil. */
 export interface MetasDiarias {
@@ -346,14 +456,14 @@ export async function criarReceita(nome: string, itens: { alimentoId: string; qu
 }
 
 /** Loga todos os itens da receita de uma vez no diário, na mesma refeição/data. */
-export async function adicionarReceitaAoDiario(receitaId: string, data: string, refeicao: Refeicao): Promise<void> {
+export async function adicionarReceitaAoDiario(receitaId: string, data: string, refeicaoId: string): Promise<void> {
   const receita = await getReceita(receitaId);
   if (!receita) throw new Error("Refeição não encontrada.");
   const linhas = receita.itens.map((it) => ({
     user_id: uid(),
     alimento_id: it.alimentoId,
     data,
-    refeicao,
+    refeicao_id: refeicaoId,
     quantidade: it.quantidade,
     unidade: it.unidade,
     calorias: it.calorias,
