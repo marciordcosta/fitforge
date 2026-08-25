@@ -347,11 +347,11 @@
   .info-hoje {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
     gap: var(--space-2);
     flex: 1;
     min-width: 0;
-    padding: 0 var(--space-2);
+    padding-right: var(--space-2);
   }
   .chip-info {
     display: flex;
