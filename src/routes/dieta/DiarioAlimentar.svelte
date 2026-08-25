@@ -2,6 +2,7 @@
   import { navigate } from "../../lib/router.svelte";
   import { parseISODate, toISODate, hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
+  import Sheet from "../../components/Sheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import {
     getRefeicoesDoDia,
@@ -28,6 +29,8 @@
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let mostrarCriarRefeicao = $state(false);
+  let mostrarData = $state(false);
+  let modoRestante = $state(false);
 
   async function carregar() {
     loading = true;
@@ -43,17 +46,17 @@
 
   void carregar();
 
-  function trocarDia(delta: number) {
-    const d = parseISODate(dataAtual);
-    dataAtual = toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta));
-    void carregar();
-  }
-
   const dataLabel = $derived.by(() => {
     if (dataAtual === hojeISO()) return "Hoje";
     const d = parseISODate(dataAtual);
     return `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES_ABREV[d.getMonth()]}`;
   });
+
+  function selecionarData(iso: string) {
+    dataAtual = iso;
+    mostrarData = false;
+    void carregar();
+  }
 
   function preview(refeicaoId: string): string {
     const nomes = itens.filter((i) => i.refeicaoId === refeicaoId).map((i) => i.nome);
@@ -74,11 +77,33 @@
   function pctMeta(valor: number, meta: number): number {
     return meta > 0 ? Math.min(100, (valor / meta) * 100) : 0;
   }
+
+  function restante(valor: number, meta: number): number {
+    return Math.max(0, meta - valor);
+  }
 </script>
 
+{#snippet iconChevron()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+{/snippet}
+{#snippet iconToggle()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 3l4 4-4 4" />
+    <path d="M21 7H7a4 4 0 0 0-4 4v1" />
+    <path d="M7 21l-4-4 4-4" />
+    <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
+  </svg>
+{/snippet}
+
 <div class="container has-bottom-nav">
-  <div class="header">
-    <h1>Dieta</h1>
+  <div class="topo">
+    <button class="dia-btn" onclick={() => (mostrarData = true)}>
+      <span class="dia-texto">{dataLabel}</span>
+      {@render iconChevron()}
+    </button>
+    <button class="icon-btn" onclick={() => (mostrarCriarRefeicao = true)} aria-label="Nova refeição">+</button>
   </div>
 
   <div class="quick-actions">
@@ -87,51 +112,66 @@
     <button class="quick-btn" onclick={() => navigate("/dieta/historico")}>Histórico</button>
   </div>
 
-  <div class="dia-nav">
-    <button onclick={() => trocarDia(-1)} aria-label="Dia anterior">‹</button>
-    <span>{dataLabel}</span>
-    <button onclick={() => trocarDia(1)} aria-label="Próximo dia">›</button>
-    <button class="icon-btn" onclick={() => (mostrarCriarRefeicao = true)} aria-label="Nova refeição">+</button>
-  </div>
-
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else if erro}
     <p class="erro">Erro ao carregar o diário: {erro}</p>
   {:else}
     {#if metas}
-      <div class="detalhes-card">
-        <div class="detalhes-cabecalho">
-          <h2 class="detalhes-titulo">Detalhes</h2>
+      <div class="card-calorias">
+        <p class="card-titulo">Calorias</p>
+        <div class="calorias-linha">
+          <span class="calorias-valor"><strong>{totalCalorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
+          <span class="calorias-restantes"><strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes</span>
         </div>
-        <div class="detalhes-lista">
-          <div class="detalhes-item">
-            <span class="detalhes-nome">Calorias</span>
-            <div class="detalhes-barra-wrap">
-              <div class="detalhes-barra" style={`width:${pctMeta(totalCalorias, metas.calorias)}%; background:var(--color-secondary);`}></div>
+        <div class="barra-wrap-grande">
+          <div class="barra-grande" style={`width:${pctMeta(totalCalorias, metas.calorias)}%; background:var(--color-secondary);`}></div>
+        </div>
+      </div>
+
+      <div class="card-macros">
+        <button class="toggle-btn" onclick={() => (modoRestante = !modoRestante)} aria-label="Alternar exibição">
+          {@render iconToggle()}
+        </button>
+        <div class="macros-grid">
+          <div class="macro-col">
+            <p class="macro-nome">Carb</p>
+            <p class="macro-valor">
+              {#if modoRestante}
+                <strong>{restante(totalCarboidrato, metas.carboidratoG).toFixed(0)} g</strong> restantes
+              {:else}
+                <strong>{totalCarboidrato.toFixed(0)} g</strong> <span class="macro-meta">/ {metas.carboidratoG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${pctMeta(totalCarboidrato, metas.carboidratoG)}%; background:${COR_CARBO};`}></div>
             </div>
-            <span class="detalhes-valor">{totalCalorias.toFixed(0)}/{metas.calorias.toFixed(0)}</span>
           </div>
-          <div class="detalhes-item">
-            <span class="detalhes-nome">Carboidratos</span>
-            <div class="detalhes-barra-wrap">
-              <div class="detalhes-barra" style={`width:${pctMeta(totalCarboidrato, metas.carboidratoG)}%; background:${COR_CARBO};`}></div>
+          <div class="macro-col">
+            <p class="macro-nome">Gorduras</p>
+            <p class="macro-valor">
+              {#if modoRestante}
+                <strong>{restante(totalGordura, metas.gorduraG).toFixed(0)} g</strong> restantes
+              {:else}
+                <strong>{totalGordura.toFixed(0)} g</strong> <span class="macro-meta">/ {metas.gorduraG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${pctMeta(totalGordura, metas.gorduraG)}%; background:${COR_GORDURA};`}></div>
             </div>
-            <span class="detalhes-valor">{totalCarboidrato.toFixed(0)}/{metas.carboidratoG.toFixed(0)}g</span>
           </div>
-          <div class="detalhes-item">
-            <span class="detalhes-nome">Gorduras</span>
-            <div class="detalhes-barra-wrap">
-              <div class="detalhes-barra" style={`width:${pctMeta(totalGordura, metas.gorduraG)}%; background:${COR_GORDURA};`}></div>
+          <div class="macro-col">
+            <p class="macro-nome">Proteínas</p>
+            <p class="macro-valor">
+              {#if modoRestante}
+                <strong>{restante(totalProteina, metas.proteinaG).toFixed(0)} g</strong> restantes
+              {:else}
+                <strong>{totalProteina.toFixed(0)} g</strong> <span class="macro-meta">/ {metas.proteinaG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${pctMeta(totalProteina, metas.proteinaG)}%; background:${COR_PROTEINA};`}></div>
             </div>
-            <span class="detalhes-valor">{totalGordura.toFixed(0)}/{metas.gorduraG.toFixed(0)}g</span>
-          </div>
-          <div class="detalhes-item">
-            <span class="detalhes-nome">Proteínas</span>
-            <div class="detalhes-barra-wrap">
-              <div class="detalhes-barra" style={`width:${pctMeta(totalProteina, metas.proteinaG)}%; background:${COR_PROTEINA};`}></div>
-            </div>
-            <span class="detalhes-valor">{totalProteina.toFixed(0)}/{metas.proteinaG.toFixed(0)}g</span>
           </div>
         </div>
       </div>
@@ -141,27 +181,27 @@
       <p class="muted">Nenhuma refeição ainda. Toque em + pra criar.</p>
     {:else}
       {#each refeicoes as refeicao (refeicao.id)}
-      <div
-        class="refeicao-item"
-        role="button"
-        tabindex="0"
-        onclick={() => navigate(`/dieta/refeicao/${refeicao.id}`)}
-        onkeydown={(e) => e.key === "Enter" && navigate(`/dieta/refeicao/${refeicao.id}`)}
-      >
-        <div class="card-header">
-          <h2>{refeicao.nome}</h2>
-        </div>
-        <p class="preview">{preview(refeicao.id)}</p>
-        <Button
-          onclick={(e) => {
-            e.stopPropagation();
-            navigate(`/dieta/alimentos/refeicao/${refeicao.id}`);
-          }}
+        <div
+          class="refeicao-item"
+          role="button"
+          tabindex="0"
+          onclick={() => navigate(`/dieta/refeicao/${refeicao.id}`)}
+          onkeydown={(e) => e.key === "Enter" && navigate(`/dieta/refeicao/${refeicao.id}`)}
         >
-          Adicionar Alimento
-        </Button>
-      </div>
-    {/each}
+          <div class="card-header">
+            <h2>{refeicao.nome}</h2>
+          </div>
+          <p class="preview">{preview(refeicao.id)}</p>
+          <Button
+            onclick={(e) => {
+              e.stopPropagation();
+              navigate(`/dieta/alimentos/refeicao/${refeicao.id}`);
+            }}
+          >
+            Adicionar Alimento
+          </Button>
+        </div>
+      {/each}
     {/if}
   {/if}
 </div>
@@ -174,6 +214,13 @@
   />
 {/if}
 
+{#if mostrarData}
+  <Sheet titulo="Selecionar dia" onFechar={() => (mostrarData = false)}>
+    <input class="data-input" type="date" value={dataAtual} onchange={(e) => selecionarData(e.currentTarget.value)} />
+    <button class="hoje-btn" onclick={() => selecionarData(hojeISO())}>Hoje</button>
+  </Sheet>
+{/if}
+
 <style>
   .container {
     max-width: 480px;
@@ -182,9 +229,41 @@
     padding-left: var(--space-4);
     padding-right: var(--space-4);
   }
-  .header h1 {
+  .topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+  }
+  .dia-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    background: none;
+    border: none;
+    color: var(--surface-fg);
     font-size: var(--font-size-lg);
-    margin: 0 0 var(--space-3);
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+  }
+  .dia-texto {
+    text-transform: capitalize;
+  }
+  .dia-btn svg {
+    width: 18px;
+    height: 18px;
+    color: var(--surface-muted);
+  }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--color-primary);
+    font-size: var(--font-size-lg);
+    cursor: pointer;
   }
   .quick-actions {
     display: flex;
@@ -202,80 +281,97 @@
     font-size: var(--font-size-sm);
     cursor: pointer;
   }
-  .dia-nav {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-4);
-    margin-bottom: var(--space-5);
+  .card-calorias,
+  .card-macros {
     position: relative;
-  }
-  .dia-nav span {
-    font-weight: 600;
-    min-width: 160px;
-    text-align: center;
-    text-transform: capitalize;
-  }
-  .dia-nav button {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
-    color: var(--surface-fg);
-    font-size: var(--font-size-lg);
-    cursor: pointer;
-  }
-  .icon-btn {
-    position: absolute;
-    right: 0;
-    color: var(--color-primary);
-  }
-  .detalhes-card {
     background: var(--surface-card);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
   }
-  .detalhes-cabecalho {
+  .card-titulo {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-base);
+    color: var(--surface-muted);
+  }
+  .calorias-linha {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
     margin-bottom: var(--space-3);
   }
-  .detalhes-titulo {
-    font-size: var(--font-size-base);
-    margin: 0;
+  .calorias-valor {
+    font-size: var(--font-size-lg);
   }
-  .detalhes-lista {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
+  .calorias-valor strong {
+    font-size: 22px;
   }
-  .detalhes-item {
-    display: grid;
-    grid-template-columns: 100px 1fr 70px;
-    align-items: center;
-    gap: var(--space-3);
-  }
-  .detalhes-nome {
+  .calorias-meta {
+    color: var(--surface-muted);
     font-size: var(--font-size-sm);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
-  .detalhes-barra-wrap {
+  .calorias-restantes {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .barra-wrap-grande {
     height: 10px;
     background: var(--surface-border);
     border-radius: 6px;
     overflow: hidden;
   }
-  .detalhes-barra {
+  .barra-grande {
     height: 100%;
     border-radius: 6px;
   }
-  .detalhes-valor {
-    text-align: right;
-    font-weight: 600;
-    font-size: var(--font-size-sm);
+  .toggle-btn {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .toggle-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .macros-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3);
+    padding-right: 32px;
+  }
+  .macro-nome {
+    margin: 0 0 var(--space-1);
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+  }
+  .macro-valor {
+    margin: 0 0 var(--space-2);
+    font-size: 13px;
+    color: var(--surface-fg);
+  }
+  .macro-meta {
+    color: var(--surface-muted);
+  }
+  .barra-wrap {
+    height: 8px;
+    background: var(--surface-border);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .barra {
+    height: 100%;
+    border-radius: 5px;
   }
   .refeicao-item {
     cursor: pointer;
@@ -311,5 +407,28 @@
   }
   .erro {
     color: var(--color-danger);
+  }
+  .data-input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    color-scheme: dark;
+  }
+  .hoje-btn {
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--color-primary);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    cursor: pointer;
   }
 </style>
