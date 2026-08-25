@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
   import { navigate, router } from "../../lib/router.svelte";
-  import { toISODate, parseISODate, hojeISO, chaveSemana } from "../../lib/dates";
+  import { toISODate, parseISODate, hojeISO } from "../../lib/dates";
   import { getPesosDoPeriodo, getMeta, excluirMeta, type PesoRegistro, type PesoMeta } from "../../lib/pesoApi";
   import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
@@ -277,18 +277,17 @@
   });
 
   /**
-   * Com mais de 7 dias no período, rotular todo dia fica poluído (nos dois modos, já que ambos tem
-   * um ponto por dia agora). Nesse caso, só anota o dia mais recente de cada semana presente nos
-   * dados. Com até 7 dias, anota todo ponto normalmente.
+   * Com mais de 7 dias no período, rotular todo ponto fica poluído (nos dois modos, já que ambos tem
+   * um ponto por dia agora). Nesse caso, rotula a cada 7 pontos, contando de trás pra frente a partir
+   * do mais recente — janela móvel, não semana de calendário fechada, pra sempre incluir o ponto mais
+   * recente e manter o espaçamento uniforme independente de onde os dados começam. Com até 7 dias,
+   * anota todo ponto normalmente.
    */
   const pontosComRotulo = $derived.by((): boolean[] | null => {
     if (!pontosGrafico.length) return null;
     if (periodo.valor === PERIODOS[0].valor || pontosGrafico.length <= 7) return pontosGrafico.map(() => true);
-    const ultimaDataPorSemana = new Map<string, string>();
-    for (const p of pontosGrafico) {
-      ultimaDataPorSemana.set(chaveSemana(parseISODate(p.data)), p.data);
-    }
-    return pontosGrafico.map((p) => ultimaDataPorSemana.get(chaveSemana(parseISODate(p.data))) === p.data);
+    const total = pontosGrafico.length;
+    return pontosGrafico.map((_, i) => (total - 1 - i) % 7 === 0);
   });
 
   /**
