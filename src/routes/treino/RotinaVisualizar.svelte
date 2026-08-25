@@ -222,8 +222,9 @@
     cursor: not-allowed;
   }
   .acao-label {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
   }
   .acao-btn svg {
     width: 20px;
