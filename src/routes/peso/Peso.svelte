@@ -374,7 +374,7 @@
         plugins: { legend: { display: false } },
         scales: {
           x: { display: false },
-          y: { ticks: { color: "#9aa0ab" }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
+          y: { ticks: { color: "#9aa0ab", font: { size: 10 } }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
         },
       },
       plugins: [pluginRotulosMeta, pluginDatasEixo],
