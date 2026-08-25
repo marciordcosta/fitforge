@@ -247,21 +247,30 @@
     return linha;
   });
 
-  /** Diferença % de cada ponto plotado em relação ao peso esperado pela meta naquela mesma data, sempre projetada a partir da media da semana inicial. */
-  const diffMetaPorPonto = $derived.by(() => {
+  /** Peso esperado pela meta em cada ponto plotado (mesma data), sempre projetado a partir da média da semana inicial. */
+  const metaAlvoPorPonto = $derived.by(() => {
     if (!meta || !metaVisivel || !pontosGrafico.length || pesoInicialMedia == null) return null;
     if (meta.tipo === "manutencao") {
       if (meta.pesoManutencao == null) return null;
       const alvo = meta.pesoManutencao;
-      return pontosGrafico.map((p) => ((p.peso - alvo) / alvo) * 100);
+      return pontosGrafico.map(() => alvo);
     }
     if (meta.percentual == null) return null;
     const percentual = meta.percentual;
     const dataInicial = parseISODate(mediasSemanaisGrafico[0].data);
     return pontosGrafico.map((p) => {
       const diasDecorridos = Math.round((parseISODate(p.data).getTime() - dataInicial.getTime()) / 86400000);
-      const alvo = pesoInicialMedia * Math.pow(1 + percentual / 100, diasDecorridos / 7);
-      return ((p.peso - alvo) / alvo) * 100;
+      return pesoInicialMedia * Math.pow(1 + percentual / 100, diasDecorridos / 7);
+    });
+  });
+
+  /** Diferença % de cada ponto plotado em relação ao peso esperado pela meta naquela mesma data. */
+  const diffMetaPorPonto = $derived.by(() => {
+    const alvos = metaAlvoPorPonto;
+    if (!alvos) return null;
+    return pontosGrafico.map((p, i) => {
+      const alvo = alvos[i];
+      return alvo == null ? null : ((p.peso - alvo) / alvo) * 100;
     });
   });
 
@@ -269,19 +278,27 @@
     id: "rotulosMeta",
     afterDatasetsDraw(c: Chart) {
       const diffs = diffMetaPorPonto;
-      if (!diffs) return;
+      const alvos = metaAlvoPorPonto;
       const pontos = c.getDatasetMeta(0).data;
+      const escalaY = c.scales.y;
       const { ctx } = c;
       ctx.save();
       ctx.font = "9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = COR_TREINO;
       pontos.forEach((ponto, i) => {
-        const diff = diffs[i];
-        if (diff == null) return;
-        const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
-        ctx.fillText(texto, ponto.x, ponto.y - 11);
+        const diff = diffs?.[i];
+        if (diff != null) {
+          ctx.fillStyle = COR_TREINO;
+          const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
+          ctx.fillText(texto, ponto.x, ponto.y - 11);
+        }
+        const alvo = alvos?.[i];
+        if (alvo != null && escalaY) {
+          ctx.fillStyle = COR_TREINO;
+          const yLinha = escalaY.getPixelForValue(alvo);
+          ctx.fillText(alvo.toFixed(1), ponto.x, yLinha - 9);
+        }
       });
       ctx.restore();
     },
@@ -292,6 +309,7 @@
     afterDatasetsDraw(c: Chart) {
       const pontosDados = pontosGrafico;
       const pontos = c.getDatasetMeta(0).data;
+      const y = c.chartArea.bottom + 11;
       const { ctx } = c;
       ctx.save();
       ctx.font = "9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -301,7 +319,7 @@
       pontos.forEach((ponto, i) => {
         const p = pontosDados[i];
         if (!p) return;
-        ctx.fillText(formatDataCurta(dataExibicao(p)), ponto.x, ponto.y + 14);
+        ctx.fillText(formatDataCurta(dataExibicao(p)), ponto.x, y);
       });
       ctx.restore();
     },
@@ -349,7 +367,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { top: 14, bottom: 14 } },
+        layout: { padding: { top: 14, bottom: 22 } },
         plugins: { legend: { display: false } },
         scales: {
           x: { display: false },
@@ -589,6 +607,7 @@
     modo={modoGrafico}
     {metaLinha}
     {diffMetaPorPonto}
+    {metaAlvoPorPonto}
     onFechar={() => (mostrarGraficoCheio = false)}
   />
 {/if}

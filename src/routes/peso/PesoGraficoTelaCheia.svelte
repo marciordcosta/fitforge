@@ -9,6 +9,7 @@
     modo,
     metaLinha,
     diffMetaPorPonto,
+    metaAlvoPorPonto,
     onFechar,
   }: {
     pontosGrafico: PesoRegistro[];
@@ -16,6 +17,7 @@
     modo: "diario" | "media";
     metaLinha: (number | null)[] | null;
     diffMetaPorPonto: (number | null)[] | null;
+    metaAlvoPorPonto: (number | null)[] | null;
     onFechar: () => void;
   } = $props();
 
@@ -38,19 +40,26 @@
   const pluginRotulosMeta = {
     id: "rotulosMetaTelaCheia",
     afterDatasetsDraw(c: Chart) {
-      if (!diffMetaPorPonto) return;
       const pontos = c.getDatasetMeta(0).data;
+      const escalaY = c.scales.y;
       const { ctx } = c;
       ctx.save();
       ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = COR_TREINO;
       pontos.forEach((ponto, i) => {
-        const diff = diffMetaPorPonto![i];
-        if (diff == null) return;
-        const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
-        ctx.fillText(texto, ponto.x, ponto.y - 14);
+        const diff = diffMetaPorPonto?.[i];
+        if (diff != null) {
+          ctx.fillStyle = COR_TREINO;
+          const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
+          ctx.fillText(texto, ponto.x, ponto.y - 14);
+        }
+        const alvo = metaAlvoPorPonto?.[i];
+        if (alvo != null && escalaY) {
+          ctx.fillStyle = COR_TREINO;
+          const yLinha = escalaY.getPixelForValue(alvo);
+          ctx.fillText(alvo.toFixed(1), ponto.x, yLinha - 12);
+        }
       });
       ctx.restore();
     },
