@@ -18,8 +18,6 @@
 
 {#if segmentos.length === 0}
   <Rotinas />
-{:else if segmentos[0] === "menu" && segmentos[1]}
-  <Rotinas />
 {:else if segmentos[0] === "rotina" && segmentos[1] === "nova"}
   <RotinaEditor treinoId={null} />
 {:else if segmentos[0] === "rotina" && segmentos[1] && segmentos[2] === "ver"}

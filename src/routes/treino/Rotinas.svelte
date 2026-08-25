@@ -1,25 +1,10 @@
 <script lang="ts">
-  import { navigate, router } from "../../lib/router.svelte";
+  import { navigate } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
-  import ActionSheet from "../../components/ActionSheet.svelte";
-  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
-  import {
-    listTreinos,
-    deleteTreino,
-    duplicateTreino,
-    DIAS_SEMANA_COMPLETO,
-    type TreinoComExercicios,
-  } from "../../lib/treinoApi";
+  import { listTreinos, DIAS_SEMANA_COMPLETO, type TreinoComExercicios } from "../../lib/treinoApi";
 
   let treinos = $state<TreinoComExercicios[]>([]);
   let loading = $state(true);
-  let excluindoId = $state<string | null>(null);
-
-  /** Deriva do path pra que o botao "voltar" do navegador feche o menu, ou reabra ao voltar de "Editar Rotina". */
-  const menuAberto = $derived.by(() => {
-    const m = router.path.match(/^\/treino\/menu\/([^/]+)$/);
-    return m ? m[1] : null;
-  });
 
   /** Rotinas com dia informado sobem pro topo, ordenadas pelo dia mais próximo; sem dia, mantém a ordenação manual. */
   function ordenarPorDia(lista: TreinoComExercicios[]): TreinoComExercicios[] {
@@ -48,37 +33,7 @@
     if (!nomes.length) return "Nenhum exercício ainda";
     return nomes.join(", ");
   }
-
-  async function excluir(id: string) {
-    excluindoId = null;
-    await deleteTreino(id);
-    await carregar();
-  }
-
-  async function duplicar(id: string) {
-    await duplicateTreino(id);
-    await carregar();
-  }
-
 </script>
-
-{#snippet iconEditar()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-  </svg>
-{/snippet}
-{#snippet iconDuplicar()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" />
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-  </svg>
-{/snippet}
-{#snippet iconExcluir()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 6L6 18M6 6l12 12" />
-  </svg>
-{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -116,7 +71,6 @@
               <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
             {/if}
           </h2>
-          <button class="menu-btn" onclick={(e) => { e.stopPropagation(); navigate(`/treino/menu/${treino.id}`); }} aria-label="Mais opções">⋮</button>
         </div>
         <p class="preview">{preview(treino)}</p>
         <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
@@ -124,29 +78,6 @@
     {/each}
   {/if}
 </div>
-
-{#if menuAberto !== null}
-  {@const treinoId = menuAberto}
-  <ActionSheet
-    titulo={treinos.find((t) => t.id === treinoId)?.nome_treino}
-    onFechar={() => window.history.back()}
-    opcoes={[
-      { label: "Editar Rotina", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treinoId}`) },
-      { label: "Duplicar Rotina", icon: iconDuplicar, onSelect: () => duplicar(treinoId) },
-      { label: "Excluir Rotina", icon: iconExcluir, destructive: true, onSelect: () => (excluindoId = treinoId) },
-    ]}
-  />
-{/if}
-
-{#if excluindoId !== null}
-  {@const idExcluir = excluindoId}
-  <ConfirmDialog
-    titulo="Tem certeza de que quer excluir esta rotina?"
-    textoConfirmar="Excluir Rotina"
-    onConfirmar={() => excluir(idExcluir)}
-    onCancelar={() => (excluindoId = null)}
-  />
-{/if}
 
 <style>
   .container {
@@ -190,17 +121,6 @@
     background: var(--surface-card);
     color: var(--surface-fg);
     font-size: var(--font-size-lg);
-    line-height: 1;
-    cursor: pointer;
-  }
-  .menu-btn {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: none;
-    color: var(--surface-muted);
-    font-size: var(--font-size-base);
     line-height: 1;
     cursor: pointer;
   }
