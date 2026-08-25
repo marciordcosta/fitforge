@@ -3,14 +3,16 @@
   import type { PesoRegistro } from "../../lib/pesoApi";
 
   let {
-    pesosGrafico,
+    pontosGrafico,
     diasComTreinoGrafico,
+    modo,
     metaLinha,
     diffMetaPorPonto,
     onFechar,
   }: {
-    pesosGrafico: PesoRegistro[];
+    pontosGrafico: PesoRegistro[];
     diasComTreinoGrafico: Set<string>;
+    modo: "diario" | "media";
     metaLinha: (number | null)[] | null;
     diffMetaPorPonto: (number | null)[] | null;
     onFechar: () => void;
@@ -52,17 +54,18 @@
   function desenhar() {
     if (!canvas) return;
     chart?.destroy();
+    const corPonto = (data: string) => (modo === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO);
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pesosGrafico.map((p) => formatDataCurta(p.data)),
+        labels: pontosGrafico.map((p) => formatDataCurta(p.data)),
         datasets: [
           {
-            data: pesosGrafico.map((p) => p.peso),
+            data: pontosGrafico.map((p) => p.peso),
             borderColor: COR_PESO,
             backgroundColor: COR_PESO,
-            pointBackgroundColor: pesosGrafico.map((p) => (diasComTreinoGrafico.has(p.data) ? COR_TREINO : COR_PESO)),
-            pointBorderColor: pesosGrafico.map((p) => (diasComTreinoGrafico.has(p.data) ? COR_TREINO : COR_PESO)),
+            pointBackgroundColor: pontosGrafico.map((p) => corPonto(p.data)),
+            pointBorderColor: pontosGrafico.map((p) => corPonto(p.data)),
             tension: 0.3,
             pointRadius: 4,
           },

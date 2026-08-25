@@ -56,7 +56,7 @@
     return m ? m[1] : null;
   });
 
-  let periodo = $state<Periodo>(PERIODOS[0]);
+  let periodo = $state<Periodo>(PERIODOS[1]);
   let pesosGrafico = $state<PesoRegistro[]>([]);
   let diasComTreinoGrafico = $state<Set<string>>(new Set());
   let loadingGrafico = $state(true);
@@ -64,8 +64,8 @@
   let mostrarGraficoCheio = $state(false);
   let hojeTemRotinaAgendada = $state(false);
 
-  /** "diário" = um ponto por dia (bruto); "média" = um ponto por semana (média). Semana ancorada em terça-feira: quem pesa em jejum de manhã, ao pesar na terça está refletindo o dia de segunda encerrado. */
-  let modoGrafico = $state<"diario" | "media">("diario");
+  /** "diário" = um ponto por dia (bruto); "média" = um ponto por semana (média), padrão. Semana ancorada em terça-feira: quem pesa em jejum de manhã, ao pesar na terça está refletindo o dia de segunda encerrado. */
+  let modoGrafico = $state<"diario" | "media">("media");
 
   function calcularMediasSemanais(lista: PesoRegistro[]): PesoRegistro[] {
     const grupos = new Map<string, number[]>();
@@ -86,6 +86,10 @@
       periodo = PERIODOS[1];
       void carregarGrafico();
     }
+  }
+
+  function alternarModoGrafico() {
+    selecionarModoGrafico(modoGrafico === "diario" ? "media" : "diario");
   }
 
   async function carregarRotinaHoje() {
@@ -396,6 +400,14 @@
     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
   </svg>
 {/snippet}
+{#snippet iconAlternarModo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 2l4 4-4 4" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <path d="M7 22l-4-4 4-4" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+  </svg>
+{/snippet}
 {#snippet iconToggleMetaGrafico()}
   <button
     class="toggle-meta-grafico"
@@ -420,6 +432,9 @@
       <button class="icon-btn" onclick={() => (mostrarEscolhaMeta = true)} aria-label="Meta">
         {@render iconMeta()}
       </button>
+      <button class="icon-btn" onclick={alternarModoGrafico} aria-label="Alternar modo do gráfico">
+        {@render iconAlternarModo()}
+      </button>
       <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar peso">
         {@render iconAdicionar()}
       </button>
@@ -433,11 +448,8 @@
   {:else}
     <button class="chart-wrap" onclick={() => (mostrarGraficoCheio = true)} aria-label="Ver gráfico em tela cheia">
       <canvas bind:this={canvas}></canvas>
+      <span class="modo-label">{modoGrafico === "media" ? "Média" : "Diário"}</span>
     </button>
-    <div class="modo-toggle">
-      <button class:active={modoGrafico === "diario"} onclick={() => selecionarModoGrafico("diario")}>Diário</button>
-      <button class:active={modoGrafico === "media"} onclick={() => selecionarModoGrafico("media")}>Média</button>
-    </div>
   {/if}
 
   <div class="mes-nav">
@@ -540,8 +552,9 @@
 
 {#if mostrarGraficoCheio}
   <PesoGraficoTelaCheia
-    {pesosGrafico}
+    {pontosGrafico}
     {diasComTreinoGrafico}
+    modo={modoGrafico}
     {metaLinha}
     {diffMetaPorPonto}
     onFechar={() => (mostrarGraficoCheio = false)}
@@ -601,34 +614,22 @@
     height: 20px;
   }
   .chart-wrap {
+    position: relative;
     display: block;
     width: 100%;
     height: 220px;
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--space-5);
     padding: 0;
     border: none;
     background: none;
     cursor: pointer;
   }
-  .modo-toggle {
-    display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-5);
-  }
-  .modo-toggle button {
-    flex: 1;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
+  .modo-label {
+    position: absolute;
+    top: 0;
+    right: var(--space-1);
+    font-size: 11px;
     color: var(--surface-muted);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-  }
-  .modo-toggle button.active {
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    border-color: var(--color-primary);
   }
   .mes-nav {
     display: flex;
