@@ -8,6 +8,8 @@
     valor?: string;
     destructive?: boolean;
     disabled?: boolean;
+    /** Não fecha o sheet após selecionar essa opção (ex: uma ação que deve reabrir o próprio menu em seguida). */
+    manterAberto?: boolean;
     icon?: Snippet;
     onSelect: () => void;
   }
@@ -28,7 +30,7 @@
       disabled={opcao.disabled}
       onclick={() => {
         opcao.onSelect();
-        onFechar();
+        if (!opcao.manterAberto) onFechar();
       }}
     >
       {#if opcao.icon}

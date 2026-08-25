@@ -207,6 +207,13 @@
     return `${d}/${m}`;
   }
 
+  /** No modo média, cada ponto guarda a data de início da semana (terça); pra exibição, mostra a data de fechamento (segunda seguinte) — o último dia que entrou naquela média. */
+  function dataExibicao(p: PesoRegistro): string {
+    if (modoGrafico !== "media") return p.data;
+    const d = parseISODate(p.data);
+    return toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6));
+  }
+
   /** Médias semanais do período do gráfico — sempre calculadas a partir dos dados diários brutos, usadas tanto pro modo "média" quanto como base da meta (mesmo no modo "diário"). */
   const mediasSemanaisGrafico = $derived.by(() => calcularMediasSemanais(pesosGrafico));
 
@@ -280,6 +287,26 @@
     },
   };
 
+  const pluginDatasEixo = {
+    id: "datasEixo",
+    afterDatasetsDraw(c: Chart) {
+      const pontosDados = pontosGrafico;
+      const pontos = c.getDatasetMeta(0).data;
+      const { ctx } = c;
+      ctx.save();
+      ctx.font = "9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#9aa0ab";
+      pontos.forEach((ponto, i) => {
+        const p = pontosDados[i];
+        if (!p) return;
+        ctx.fillText(formatDataCurta(dataExibicao(p)), ponto.x, ponto.y + 14);
+      });
+      ctx.restore();
+    },
+  };
+
   let canvas = $state<HTMLCanvasElement | undefined>();
   let chart: Chart | null = null;
 
@@ -322,14 +349,14 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { top: 14 } },
+        layout: { padding: { top: 14, bottom: 14 } },
         plugins: { legend: { display: false } },
         scales: {
           x: { display: false },
           y: { ticks: { color: "#9aa0ab" }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
         },
       },
-      plugins: [pluginRotulosMeta],
+      plugins: [pluginRotulosMeta, pluginDatasEixo],
     });
   }
 
@@ -432,7 +459,12 @@
       <button class="icon-btn" onclick={() => (mostrarEscolhaMeta = true)} aria-label="Meta">
         {@render iconMeta()}
       </button>
-      <button class="icon-btn" onclick={alternarModoGrafico} aria-label="Alternar modo do gráfico">
+      <button
+        class="icon-btn"
+        class:destaque={modoGrafico === "diario"}
+        onclick={alternarModoGrafico}
+        aria-label="Alternar modo do gráfico"
+      >
         {@render iconAlternarModo()}
       </button>
       <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar peso">
@@ -541,7 +573,7 @@
         disabled: metaAtiva != null && metaAtiva !== "manutencao",
         onSelect: () => (metaEtapa = "manutencao"),
       },
-      { label: "Limpar Metas", icon: iconLimparMeta, destructive: true, onSelect: () => limparMeta() },
+      { label: "Limpar Metas", icon: iconLimparMeta, destructive: true, manterAberto: true, onSelect: () => limparMeta() },
     ]}
   />
 {/if}
@@ -598,6 +630,9 @@
   .icon-btn svg {
     width: 22px;
     height: 22px;
+  }
+  .icon-btn.destaque {
+    color: var(--color-primary);
   }
   .toggle-meta-grafico {
     display: flex;

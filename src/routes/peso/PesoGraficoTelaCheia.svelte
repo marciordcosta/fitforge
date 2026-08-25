@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
+  import { toISODate, parseISODate } from "../../lib/dates";
   import type { PesoRegistro } from "../../lib/pesoApi";
 
   let {
@@ -25,6 +26,13 @@
   function formatDataCurta(iso: string): string {
     const [, m, d] = iso.split("-");
     return `${d}/${m}`;
+  }
+
+  /** No modo média, cada ponto guarda a data de início da semana (terça); pra exibição, mostra a data de fechamento (segunda seguinte). */
+  function dataExibicao(p: PesoRegistro): string {
+    if (modo !== "media") return p.data;
+    const d = parseISODate(p.data);
+    return toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6));
   }
 
   const pluginRotulosMeta = {
@@ -58,7 +66,7 @@
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pontosGrafico.map((p) => formatDataCurta(p.data)),
+        labels: pontosGrafico.map((p) => formatDataCurta(dataExibicao(p))),
         datasets: [
           {
             data: pontosGrafico.map((p) => p.peso),
