@@ -2,7 +2,6 @@
   import { navigate } from "../../lib/router.svelte";
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
-  import DietaAdicionarSheet from "./DietaAdicionarSheet.svelte";
   import {
     getRefeicaoDia,
     getItensDaRefeicao,
@@ -31,7 +30,6 @@
   let itens = $state<ItemDiario[]>([]);
   let metas = $state<MetasDiarias | null>(null);
   let loading = $state(true);
-  let mostrarAdicionar = $state(false);
   let itemParaRemover = $state<ItemDiario | null>(null);
   let confirmandoExclusaoRefeicao = $state(false);
   let processando = $state(false);
@@ -231,18 +229,9 @@
       {/each}
     {/if}
 
-    <button class="acao-adicionar" onclick={() => (mostrarAdicionar = true)}>+ Adicionar Alimento</button>
+    <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/refeicao/${refeicaoId}`)}>+ Adicionar Alimento</button>
   {/if}
 </div>
-
-{#if mostrarAdicionar && refeicao}
-  <DietaAdicionarSheet
-    refeicaoId={refeicao.id}
-    data={refeicao.data}
-    onFechar={() => (mostrarAdicionar = false)}
-    onAdicionado={carregar}
-  />
-{/if}
 
 {#if itemParaRemover !== null}
   <ConfirmDialog

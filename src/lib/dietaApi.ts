@@ -49,13 +49,23 @@ function mapAlimento(a: Record<string, unknown>): Alimento {
   };
 }
 
+/** Divide o termo em palavras e aplica um ilike por palavra (AND) — acha o nome com as palavras em qualquer ordem. */
+function porPalavras<T>(builder: T, coluna: string, termo: string): T {
+  const palavras = termo.trim().split(/\s+/).filter(Boolean);
+  return palavras.reduce(
+    (b, p) => (b as unknown as { ilike: (c: string, v: string) => T }).ilike(coluna, `%${p}%`),
+    builder,
+  );
+}
+
 export async function buscarAlimentos(query: string): Promise<Alimento[]> {
   const termo = query.trim();
   if (!termo) return [];
-  const { data, error } = await supabase
-    .from("alimentos")
-    .select(ALIMENTO_SELECT)
-    .ilike("nome", `%${termo}%`)
+  const { data, error } = await porPalavras(
+    supabase.from("alimentos").select(ALIMENTO_SELECT),
+    "nome",
+    termo,
+  )
     .order("nome", { ascending: true })
     .limit(30);
   if (error) throw error;
@@ -396,10 +406,7 @@ function mapReceitaItem(l: Record<string, unknown>): ReceitaItem {
 export async function buscarReceitas(query: string): Promise<ReceitaResumo[]> {
   const termo = query.trim();
   if (!termo) return [];
-  const { data, error } = await supabase
-    .from("dieta_receitas")
-    .select("id, nome")
-    .ilike("nome", `%${termo}%`)
+  const { data, error } = await porPalavras(supabase.from("dieta_receitas").select("id, nome"), "nome", termo)
     .order("nome", { ascending: true })
     .limit(20);
   if (error) throw error;

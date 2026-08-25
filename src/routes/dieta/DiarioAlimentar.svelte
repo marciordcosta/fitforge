@@ -2,7 +2,6 @@
   import { navigate } from "../../lib/router.svelte";
   import { parseISODate, toISODate, hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
-  import DietaAdicionarSheet from "./DietaAdicionarSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import { getRefeicoesDoDia, getDiarioDoDia, type RefeicaoDia, type ItemDiario } from "../../lib/dietaApi";
 
@@ -15,7 +14,6 @@
   let refeicoes = $state<RefeicaoDia[]>([]);
   let itens = $state<ItemDiario[]>([]);
   let loading = $state(true);
-  let refeicaoParaAdicionar = $state<RefeicaoDia | null>(null);
   let mostrarCriarRefeicao = $state(false);
 
   async function carregar() {
@@ -88,7 +86,7 @@
         <Button
           onclick={(e) => {
             e.stopPropagation();
-            refeicaoParaAdicionar = refeicao;
+            navigate(`/dieta/alimentos/refeicao/${refeicao.id}`);
           }}
         >
           Adicionar Alimento
@@ -97,15 +95,6 @@
     {/each}
   {/if}
 </div>
-
-{#if refeicaoParaAdicionar !== null}
-  <DietaAdicionarSheet
-    refeicaoId={refeicaoParaAdicionar.id}
-    data={dataAtual}
-    onFechar={() => (refeicaoParaAdicionar = null)}
-    onAdicionado={carregar}
-  />
-{/if}
 
 {#if mostrarCriarRefeicao}
   <DietaRefeicaoDiaFormSheet

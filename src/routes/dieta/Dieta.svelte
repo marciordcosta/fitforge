@@ -21,6 +21,8 @@
     data={segmentos[2] ?? hojeISO()}
     refeicaoIdInicial={segmentos[3] ?? null}
   />
+{:else if segmentos[0] === "alimentos" && segmentos[1] === "refeicao" && segmentos[2]}
+  <DietaAlimentos refeicaoId={segmentos[2]} />
 {:else if segmentos[0] === "alimentos"}
   <DietaAlimentos />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "nova"}
