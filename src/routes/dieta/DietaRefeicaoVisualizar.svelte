@@ -200,9 +200,9 @@
           </div>
         </div>
         <div class="resumo-macros">
-          <p><strong style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br />{totalCarboidrato.toFixed(1)} g<br />Carb</p>
-          <p><strong style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br />{totalGordura.toFixed(1)} g<br />Gorduras</p>
-          <p><strong style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br />{totalProteina.toFixed(1)} g<br />Proteínas</p>
+          <p><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br /><span class="valor-g">{totalCarboidrato.toFixed(1)} g</span><br />Carb</p>
+          <p><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br /><span class="valor-g">{totalGordura.toFixed(1)} g</span><br />Gorduras</p>
+          <p><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{totalProteina.toFixed(1)} g</span><br />Proteínas</p>
         </div>
       </div>
 
@@ -426,6 +426,12 @@
     font-size: var(--font-size-sm);
     text-align: center;
     line-height: 1.5;
+  }
+  .resumo-macros .pct {
+    font-size: var(--font-size-base);
+  }
+  .resumo-macros .valor-g {
+    font-size: 17px;
   }
   .metas-titulo {
     font-weight: 600;

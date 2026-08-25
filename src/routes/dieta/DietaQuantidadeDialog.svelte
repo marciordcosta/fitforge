@@ -1,6 +1,5 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
 
   let {
@@ -38,6 +37,10 @@
       onSalvar(quantidade, unidade);
     }
   }
+
+  const pesoEquivalente = $derived(
+    unidade === "porcao" ? `${porcaoPadraoQtd} ${porcaoPadraoUnidade}` : `1 ${porcaoPadraoUnidade}`,
+  );
 </script>
 
 {#snippet iconAlternar()}
@@ -49,61 +52,88 @@
   </svg>
 {/snippet}
 
-<Sheet titulo="Quanto?" {onFechar}>
-  <div class="campo">
-    <label for="qtd-input">Porção(ões) de</label>
-    <div class="qtd-linha">
-      <input id="qtd-input" class="qtd-input" type="number" inputmode="decimal" step="any" min="0" bind:value={quantidade} />
-      <span class="unidade-texto">{unidade === "porcao" ? `${porcaoPadraoQtd} ${porcaoPadraoUnidade}` : `1 ${porcaoPadraoUnidade}`}</span>
+<div class="overlay" role="presentation" onclick={onFechar}>
+  <div class="card" role="presentation" onclick={(e) => e.stopPropagation()}>
+    <p class="titulo">Quanto?</p>
+    <p class="rotulo">Porção(ões)</p>
+
+    <div class="caixa-wrap">
+      <input class="caixa-input" type="number" inputmode="decimal" step="any" min="0" bind:value={quantidade} />
+    </div>
+
+    <div class="peso-linha">
+      <span class="peso-texto">{pesoEquivalente}</span>
       <button class="icone-alternar" onclick={alternarUnidade} aria-label="Alternar unidade">
         {@render iconAlternar()}
       </button>
     </div>
-  </div>
 
-  <div class="acoes">
-    <div class="acao-item">
-      <Button variant="secondary" onclick={onFechar}>Cancelar</Button>
-    </div>
-    <div class="acao-item">
-      <Button onclick={salvar} disabled={quantidade <= 0}>Salvar</Button>
+    <div class="acoes">
+      <div class="acao-item">
+        <Button variant="secondary" onclick={onFechar}>Cancelar</Button>
+      </div>
+      <div class="acao-item">
+        <Button onclick={salvar} disabled={quantidade <= 0}>Salvar</Button>
+      </div>
     </div>
   </div>
-</Sheet>
+</div>
 
 <style>
-  .campo {
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    z-index: 200;
+  }
+  .card {
+    width: 100%;
+    max-width: 320px;
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    box-shadow: var(--shadow-float);
+  }
+  .titulo {
+    text-align: center;
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin: 0 0 var(--space-4);
+  }
+  .rotulo {
+    text-align: center;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+    margin: 0 0 var(--space-2);
+  }
+  .caixa-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-3);
+  }
+  .caixa-input {
+    width: 96px;
+    text-align: center;
+    padding: var(--space-3);
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+  }
+  .peso-linha {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: var(--space-2);
     margin-bottom: var(--space-5);
   }
-  .campo label {
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
-  }
-  .qtd-linha {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    box-sizing: border-box;
-    width: 100%;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
-  }
-  .qtd-input {
-    width: 50px;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    font-weight: 400;
-  }
-  .unidade-texto {
-    flex: 1;
+  .peso-texto {
     color: var(--surface-muted);
     font-size: var(--font-size-sm);
   }
@@ -117,8 +147,8 @@
     display: flex;
   }
   .icone-alternar svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
   }
   .acoes {
     display: flex;
