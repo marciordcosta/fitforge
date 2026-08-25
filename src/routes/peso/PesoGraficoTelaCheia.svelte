@@ -49,6 +49,8 @@
       ctx.textBaseline = "middle";
       pontos.forEach((ponto, i) => {
         const diff = diffMetaPorPonto?.[i];
+        // Suprimido pelo modo diário com período maior que 1 semana (ver infoPorPonto em Peso.svelte) — não anota esse ponto.
+        if (diffMetaPorPonto != null && diff == null) return;
         const yDiff = ponto.y - 14;
         if (diff != null) {
           ctx.fillStyle = "#fff";

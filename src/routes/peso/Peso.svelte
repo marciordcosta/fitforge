@@ -85,6 +85,9 @@
     if (m === "media" && periodo.dias != null && periodo.dias < 30) {
       periodo = PERIODOS[1];
       void carregarGrafico();
+    } else if (m === "diario" && periodo.valor !== PERIODOS[0].valor) {
+      periodo = PERIODOS[0];
+      void carregarGrafico();
     }
   }
 
@@ -264,13 +267,37 @@
     });
   });
 
-  /** Diferença % de cada ponto plotado em relação ao peso esperado pela meta naquela mesma data. */
+  /**
+   * No modo diário com período maior que 1 semana, rotular todo dia fica poluído. Nesse caso, só
+   * anota o último dia de cada semana presente nos dados, usando a média daquela semana como valor
+   * — não o peso bruto do dia. Com período de 1 semana (ou no modo média), anota todo ponto normalmente.
+   */
+  const infoPorPonto = $derived.by(() => {
+    if (!pontosGrafico.length) return null;
+    if (modoGrafico !== "diario" || pontosGrafico.length <= 7) {
+      return pontosGrafico.map((p) => ({ mostrar: true, valor: p.peso }));
+    }
+    const mediasPorSemana = new Map(mediasSemanaisGrafico.map((m) => [m.data, m.peso]));
+    const ultimaDataPorSemana = new Map<string, string>();
+    for (const p of pontosGrafico) {
+      ultimaDataPorSemana.set(chaveSemana(parseISODate(p.data)), p.data);
+    }
+    return pontosGrafico.map((p) => {
+      const chave = chaveSemana(parseISODate(p.data));
+      if (ultimaDataPorSemana.get(chave) !== p.data) return { mostrar: false, valor: null };
+      return { mostrar: true, valor: mediasPorSemana.get(chave) ?? p.peso };
+    });
+  });
+
+  /** Diferença % de cada ponto rotulado em relação ao peso esperado pela meta naquela mesma data. */
   const diffMetaPorPonto = $derived.by(() => {
     const alvos = metaAlvoPorPonto;
-    if (!alvos) return null;
-    return pontosGrafico.map((p, i) => {
+    const info = infoPorPonto;
+    if (!alvos || !info) return null;
+    return info.map((item, i) => {
       const alvo = alvos[i];
-      return alvo == null ? null : ((p.peso - alvo) / alvo) * 100;
+      if (!item.mostrar || item.valor == null || alvo == null) return null;
+      return ((item.valor - alvo) / alvo) * 100;
     });
   });
 
@@ -279,6 +306,7 @@
     afterDatasetsDraw(c: Chart) {
       const diffs = diffMetaPorPonto;
       const alvos = metaAlvoPorPonto;
+      const info = infoPorPonto;
       const pontos = c.getDatasetMeta(0).data;
       const escalaY = c.scales.y;
       const { ctx } = c;
@@ -287,6 +315,7 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       pontos.forEach((ponto, i) => {
+        if (info && !info[i]?.mostrar) return;
         const diff = diffs?.[i];
         const yDiff = ponto.y - 11;
         if (diff != null) {
