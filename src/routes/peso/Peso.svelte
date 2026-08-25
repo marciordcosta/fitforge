@@ -56,7 +56,7 @@
     return m ? m[1] : null;
   });
 
-  let periodo = $state<Periodo>(PERIODOS[1]);
+  let periodo = $state<Periodo>(PERIODOS[0]);
   /** Inclui 6 dias de "aquecimento" antes do período pedido, só pra a média móvel do primeiro dia visível já ter janela cheia. */
   let pesosGraficoBruto = $state<PesoRegistro[]>([]);
   let dataInicioGrafico = $state("");
@@ -188,6 +188,11 @@
     void carregarGrafico();
   }
 
+  function selecionarPeriodoPorValor(valor: string) {
+    const p = PERIODOS.find((item) => item.valor === valor);
+    if (p) selecionarPeriodo(p);
+  }
+
   const pesosPorData = $derived.by(() => {
     const mapa = new Map<string, number>();
     for (const p of pesos) mapa.set(p.data, p.peso);
@@ -279,7 +284,7 @@
    */
   const pontosComRotulo = $derived.by((): boolean[] | null => {
     if (!pontosGrafico.length) return null;
-    if (pontosGrafico.length <= 7) return pontosGrafico.map(() => true);
+    if (periodo.valor === PERIODOS[0].valor || pontosGrafico.length <= 7) return pontosGrafico.map(() => true);
     const ultimaDataPorSemana = new Map<string, string>();
     for (const p of pontosGrafico) {
       ultimaDataPorSemana.set(chaveSemana(parseISODate(p.data)), p.data);
@@ -585,9 +590,9 @@
 {#if mostrarFiltro}
   <WheelPicker
     titulo="Período do gráfico"
-    opcoes={PERIODOS.map((p) => ({ valor: p, label: p.label }))}
-    valorAtual={periodo}
-    onSelecionar={(p) => selecionarPeriodo(p)}
+    opcoes={PERIODOS.map((p) => ({ valor: p.valor, label: p.label }))}
+    valorAtual={periodo.valor}
+    onSelecionar={selecionarPeriodoPorValor}
     onFechar={() => (mostrarFiltro = false)}
   />
 {/if}
