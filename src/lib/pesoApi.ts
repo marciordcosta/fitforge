@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
+import { toISODate, parseISODate, hojeISO } from "./dates";
 
 export interface PesoRegistro {
   data: string;
@@ -157,4 +158,52 @@ export async function salvarMetaManutencao(peso: number): Promise<void> {
 export async function excluirMeta(): Promise<void> {
   const { error } = await supabase.from("peso_metas").delete().eq("user_id", uid());
   if (error) throw error;
+}
+
+export interface ProgressoMetaPeso {
+  pesoAtual: number;
+  pesoAlvo: number;
+  /** Quanto falta em gramas pra bater o alvo — positivo = falta ganhar, negativo = falta perder. */
+  faltamG: number;
+}
+
+/**
+ * Peso atual (média móvel dos últimos 7 dias, no registro mais recente) contra o alvo da meta ativa.
+ * Pra meta percentual, o alvo é projetado a partir da média móvel do primeiro peso já registrado
+ * (mesma lógica do gráfico em "Tudo"), pra dar um número estável, independente de filtro de tela.
+ * Retorna null se não há meta ativa ou nenhum peso registrado ainda.
+ */
+export async function getProgressoMetaHoje(): Promise<ProgressoMetaPeso | null> {
+  const meta = await getMeta();
+  if (!meta) return null;
+
+  const registros = await getPesosDoPeriodo("1900-01-01", hojeISO());
+  if (!registros.length) return null;
+  const ordenados = [...registros].sort((a, b) => a.data.localeCompare(b.data));
+
+  function mediaMovelEm(data: string): number {
+    const d = parseISODate(data);
+    const limite = toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 6));
+    const janela = ordenados.filter((p) => p.data >= limite && p.data <= data);
+    return janela.reduce((acc, p) => acc + p.peso, 0) / janela.length;
+  }
+
+  const dataMaisRecente = ordenados[ordenados.length - 1].data;
+  const pesoAtual = mediaMovelEm(dataMaisRecente);
+
+  let pesoAlvo: number;
+  if (meta.tipo === "manutencao") {
+    if (meta.pesoManutencao == null) return null;
+    pesoAlvo = meta.pesoManutencao;
+  } else {
+    if (meta.percentual == null) return null;
+    const dataInicial = ordenados[0].data;
+    const pesoInicial = mediaMovelEm(dataInicial);
+    const diasDecorridos = Math.round(
+      (parseISODate(dataMaisRecente).getTime() - parseISODate(dataInicial).getTime()) / 86400000,
+    );
+    pesoAlvo = pesoInicial * Math.pow(1 + meta.percentual / 100, diasDecorridos / 7);
+  }
+
+  return { pesoAtual, pesoAlvo, faltamG: Math.round((pesoAlvo - pesoAtual) * 1000) };
 }

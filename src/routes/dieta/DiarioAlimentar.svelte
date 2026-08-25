@@ -13,6 +13,8 @@
     type ItemDiario,
     type MetasDiarias,
   } from "../../lib/dietaApi";
+  import { listTreinos, type Treino } from "../../lib/treinoApi";
+  import { getProgressoMetaHoje, type ProgressoMetaPeso } from "../../lib/pesoApi";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -33,6 +35,21 @@
   let mostrarMenuMais = $state(false);
   let mostrarData = $state(false);
   let modoRestante = $state(false);
+  let rotinaHoje = $state<Treino | null>(null);
+  let progressoPeso = $state<ProgressoMetaPeso | null>(null);
+
+  async function carregarInfoTopo() {
+    try {
+      const [treinos, progresso] = await Promise.all([listTreinos(), getProgressoMetaHoje()]);
+      const diaSemanaHoje = new Date().getDay();
+      rotinaHoje = treinos.find((t) => t.dia_semana === diaSemanaHoje) ?? null;
+      progressoPeso = progresso;
+    } catch {
+      // informativo, não impede o uso do diário se falhar
+    }
+  }
+
+  void carregarInfoTopo();
 
   async function carregar() {
     loading = true;
@@ -128,6 +145,18 @@
     <path d="M17 8v8" />
   </svg>
 {/snippet}
+{#snippet iconRotina()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 7v10M2 9v6M18 7v10M22 9v6" />
+    <path d="M6 12h12" />
+  </svg>
+{/snippet}
+{#snippet iconPesoMeta()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+    <line x1="4" y1="22" x2="4" y2="2" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="topo">
@@ -135,6 +164,22 @@
       <span class="dia-texto">{dataLabel}</span>
       {@render iconChevron()}
     </button>
+    {#if dataAtual === hojeISO()}
+      <div class="info-hoje">
+        {#if rotinaHoje}
+          <button class="chip-info" onclick={() => navigate(`/treino/rotina/${rotinaHoje!.id}/ver`)}>
+            {@render iconRotina()}
+            <span class="chip-texto">{rotinaHoje.nome_treino}</span>
+          </button>
+        {/if}
+        {#if progressoPeso}
+          <button class="chip-info" onclick={() => navigate("/peso")}>
+            {@render iconPesoMeta()}
+            <span class="chip-texto">{progressoPeso.faltamG > 0 ? "+" : ""}{progressoPeso.faltamG}g</span>
+          </button>
+        {/if}
+      </div>
+    {/if}
     <button class="icon-btn" onclick={() => (mostrarMenuMais = true)} aria-label="Adicionar">+</button>
   </div>
 
@@ -279,6 +324,7 @@
     margin-bottom: var(--space-4);
   }
   .dia-btn {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: var(--space-1);
@@ -298,7 +344,42 @@
     height: 18px;
     color: var(--surface-muted);
   }
+  .info-hoje {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    flex: 1;
+    min-width: 0;
+    padding: 0 var(--space-2);
+  }
+  .chip-info {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 140px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .chip-info svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--color-primary);
+  }
+  .chip-texto {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .icon-btn {
+    flex-shrink: 0;
     width: 32px;
     height: 32px;
     border-radius: var(--radius-sm);
