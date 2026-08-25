@@ -217,29 +217,38 @@ export async function removerRefeicaoDia(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Duplica a refeição (nome + todos os alimentos) como uma nova refeição no mesmo dia. */
-export async function duplicarRefeicaoDia(id: string): Promise<string> {
-  const refeicao = await getRefeicaoDia(id);
-  if (!refeicao) throw new Error("Refeição não encontrada.");
-  const itens = await getItensDaRefeicao(id);
-  const novoId = await criarRefeicaoDia(refeicao.data, `${refeicao.nome} (cópia)`);
-  if (itens.length) {
-    const linhas = itens.map((it) => ({
-      user_id: uid(),
-      alimento_id: it.alimentoId,
-      data: refeicao.data,
-      refeicao_id: novoId,
-      quantidade: it.quantidade,
-      unidade: it.unidade,
-      calorias: it.calorias,
-      proteina_g: it.proteinaG,
-      gordura_g: it.gorduraG,
-      carboidrato_g: it.carboidratoG,
-    }));
-    const { error } = await supabase.from("diario_alimentos").insert(linhas);
-    if (error) throw error;
-  }
-  return novoId;
+/** Acha a refeição do usuário com esse nome nesse dia, ou cria uma nova — usada por "copiar para". */
+export async function encontrarOuCriarRefeicaoDia(data: string, nome: string): Promise<string> {
+  const { data: existente, error } = await supabase
+    .from("dieta_refeicoes_dia")
+    .select("id")
+    .eq("data", data)
+    .eq("nome", nome)
+    .maybeSingle();
+  if (error) throw error;
+  if (existente) return existente.id;
+  return criarRefeicaoDia(data, nome);
+}
+
+/** Copia todos os itens de uma refeição pra outra (já existente), preservando quantidade/unidade/macros congelados. */
+export async function copiarItensEntreRefeicoes(origemId: string, destinoId: string): Promise<void> {
+  const [itens, destino] = await Promise.all([getItensDaRefeicao(origemId), getRefeicaoDia(destinoId)]);
+  if (!itens.length) return;
+  if (!destino) throw new Error("Refeição de destino não encontrada.");
+  const linhas = itens.map((it) => ({
+    user_id: uid(),
+    alimento_id: it.alimentoId,
+    data: destino.data,
+    refeicao_id: destinoId,
+    quantidade: it.quantidade,
+    unidade: it.unidade,
+    calorias: it.calorias,
+    proteina_g: it.proteinaG,
+    gordura_g: it.gorduraG,
+    carboidrato_g: it.carboidratoG,
+  }));
+  const { error } = await supabase.from("diario_alimentos").insert(linhas);
+  if (error) throw error;
 }
 
 /** Guarda a composição atual da refeição como uma Receita reutilizável e buscável (mesmo nome da refeição). */

@@ -2,12 +2,13 @@
   import { navigate } from "../../lib/router.svelte";
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import DietaCopiarParaSheet from "./DietaCopiarParaSheet.svelte";
+  import DietaCopiarDeSheet from "./DietaCopiarDeSheet.svelte";
   import {
     getRefeicaoDia,
     getItensDaRefeicao,
     removerItemDiario,
     removerRefeicaoDia,
-    duplicarRefeicaoDia,
     salvarRefeicaoComoReceita,
     getMetasDiarias,
     type RefeicaoDia,
@@ -34,6 +35,8 @@
   let itemParaRemover = $state<ItemDiario | null>(null);
   let confirmandoExclusaoRefeicao = $state(false);
   let processando = $state(false);
+  let mostrarCopiarPara = $state(false);
+  let mostrarCopiarDe = $state(false);
 
   async function carregar() {
     loading = true;
@@ -101,15 +104,14 @@
     }
   }
 
-  async function duplicar() {
-    processando = true;
-    try {
-      const novoId = await duplicarRefeicaoDia(refeicaoId);
-      navigate(`/dieta/refeicao/${novoId}`);
-    } catch (err) {
-      alert("Erro ao duplicar refeição: " + (err as Error).message);
-      processando = false;
-    }
+  function aoCopiarPara(destinoId: string) {
+    mostrarCopiarPara = false;
+    navigate(`/dieta/refeicao/${destinoId}`);
+  }
+
+  async function aoCopiarDe() {
+    mostrarCopiarDe = false;
+    await carregar();
   }
 
   async function removerRefeicao() {
@@ -131,10 +133,18 @@
     <path d="M7 3v5h8" />
   </svg>
 {/snippet}
-{#snippet iconDuplicar()}
+{#snippet iconCopiarDe()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" />
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    <rect x="3" y="3" width="12" height="12" rx="2" />
+    <path d="M21 9v10a2 2 0 0 1-2 2H9" />
+    <path d="M17 13l4-4-4-4" />
+  </svg>
+{/snippet}
+{#snippet iconCopiarPara()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M3 15V5a2 2 0 0 1 2-2h10" />
+    <path d="M7 11L3 15l4 4" />
   </svg>
 {/snippet}
 {#snippet iconExcluir()}
@@ -165,9 +175,13 @@
         <span class="acao-label">Salvar Refeição</span>
         {@render iconSalvar()}
       </button>
-      <button class="acao-btn" disabled={processando} onclick={duplicar}>
-        <span class="acao-label">Duplicar</span>
-        {@render iconDuplicar()}
+      <button class="acao-btn" disabled={processando} onclick={() => (mostrarCopiarDe = true)}>
+        <span class="acao-label">Copiar de</span>
+        {@render iconCopiarDe()}
+      </button>
+      <button class="acao-btn" disabled={processando} onclick={() => (mostrarCopiarPara = true)}>
+        <span class="acao-label">Copiar para</span>
+        {@render iconCopiarPara()}
       </button>
       <button class="acao-btn acao-destrutiva" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>
         <span class="acao-label">Remover</span>
@@ -259,6 +273,25 @@
     textoConfirmar="Remover Refeição"
     onConfirmar={removerRefeicao}
     onCancelar={() => (confirmandoExclusaoRefeicao = false)}
+  />
+{/if}
+
+{#if mostrarCopiarPara && refeicao}
+  <DietaCopiarParaSheet
+    refeicaoOrigemId={refeicaoId}
+    nomeAtual={refeicao.nome}
+    dataAtual={refeicao.data}
+    onFechar={() => (mostrarCopiarPara = false)}
+    onCopiado={aoCopiarPara}
+  />
+{/if}
+
+{#if mostrarCopiarDe && refeicao}
+  <DietaCopiarDeSheet
+    refeicaoDestinoId={refeicaoId}
+    dataAtual={refeicao.data}
+    onFechar={() => (mostrarCopiarDe = false)}
+    onCopiado={aoCopiarDe}
   />
 {/if}
 
