@@ -3,6 +3,7 @@
   import { parseISODate, toISODate, hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import Sheet from "../../components/Sheet.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import {
     getRefeicoesDoDia,
@@ -29,6 +30,7 @@
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let mostrarCriarRefeicao = $state(false);
+  let mostrarMenuMais = $state(false);
   let mostrarData = $state(false);
   let modoRestante = $state(false);
 
@@ -96,6 +98,36 @@
     <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
   </svg>
 {/snippet}
+{#snippet iconRefeicaoAvulsa()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="18" height="17" rx="2" />
+    <path d="M3 9h18" />
+    <path d="M12 13v5" />
+    <path d="M9.5 15.5h5" />
+  </svg>
+{/snippet}
+{#snippet iconGerenciar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="4" y1="6" x2="20" y2="6" />
+    <line x1="4" y1="12" x2="20" y2="12" />
+    <line x1="4" y1="18" x2="20" y2="18" />
+    <circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    <circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none" />
+  </svg>
+{/snippet}
+{#snippet iconScanner()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 7V5a1 1 0 0 1 1-1h2" />
+    <path d="M17 4h2a1 1 0 0 1 1 1v2" />
+    <path d="M20 17v2a1 1 0 0 1-1 1h-2" />
+    <path d="M7 20H5a1 1 0 0 1-1-1v-2" />
+    <path d="M7 8v8" />
+    <path d="M10 8v8" />
+    <path d="M13.5 8v8" />
+    <path d="M17 8v8" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="topo">
@@ -103,7 +135,7 @@
       <span class="dia-texto">{dataLabel}</span>
       {@render iconChevron()}
     </button>
-    <button class="icon-btn" onclick={() => (mostrarCriarRefeicao = true)} aria-label="Nova refeição">+</button>
+    <button class="icon-btn" onclick={() => (mostrarMenuMais = true)} aria-label="Adicionar">+</button>
   </div>
 
   <div class="quick-actions">
@@ -205,6 +237,17 @@
     {/if}
   {/if}
 </div>
+
+{#if mostrarMenuMais}
+  <ActionSheet
+    onFechar={() => (mostrarMenuMais = false)}
+    opcoes={[
+      { label: "Refeição avulsa", subtitulo: "Apenas para hoje", icon: iconRefeicaoAvulsa, onSelect: () => (mostrarCriarRefeicao = true) },
+      { label: "Gerenciar refeições", subtitulo: "Cadastro e edição das refeições", icon: iconGerenciar, onSelect: () => navigate("/dieta/refeicoes/gerenciar") },
+      { label: "Escanear alimento", subtitulo: "Ler código de barras", icon: iconScanner, onSelect: () => navigate(`/dieta/scanear/${dataAtual}`) },
+    ]}
+  />
+{/if}
 
 {#if mostrarCriarRefeicao}
   <DietaRefeicaoDiaFormSheet

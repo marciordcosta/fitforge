@@ -111,6 +111,13 @@
     }
   }
 
+  function abrirScanner() {
+    const destino = modoAdicionar
+      ? `/dieta/scanear/${refeicaoData}/${refeicaoIdFixo}`
+      : `/dieta/scanear/${hojeISO()}`;
+    navigate(destino);
+  }
+
   async function selecionarReceita(receita: ReceitaResumo) {
     if (!refeicaoIdFixo) return;
     adicionandoId = receita.id;
@@ -144,6 +151,18 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" />
     <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+{/snippet}
+{#snippet iconScanner()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 7V5a1 1 0 0 1 1-1h2" />
+    <path d="M17 4h2a1 1 0 0 1 1 1v2" />
+    <path d="M20 17v2a1 1 0 0 1-1 1h-2" />
+    <path d="M7 20H5a1 1 0 0 1-1-1v-2" />
+    <path d="M7 8v8" />
+    <path d="M10 8v8" />
+    <path d="M13.5 8v8" />
+    <path d="M17 8v8" />
   </svg>
 {/snippet}
 
@@ -220,6 +239,7 @@
     opcoes={[
       { label: "Alimento", icon: iconAlimento, onSelect: () => (mostrarCriarAlimento = true) },
       { label: "Refeição", icon: iconReceita, onSelect: () => navigate("/dieta/receitas/nova") },
+      { label: "Escanear Alimento", icon: iconScanner, onSelect: abrirScanner },
     ]}
   />
 {/if}

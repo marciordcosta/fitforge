@@ -11,9 +11,6 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-/** Nomes sugeridos ao criar uma refeição nova — não é mais uma lista fixa, o usuário pode nomear como quiser. */
-export const SUGESTOES_REFEICAO = ["Café da Manhã", "Almoço", "Jantar", "Lanche"];
-
 // ---------------- Alimentos ----------------
 
 export type FonteAlimento = "manual" | "taco" | "openfoodfacts";
@@ -32,10 +29,11 @@ export interface Alimento {
   gorduraSaturadaG: number | null;
   gorduraInsaturadaG: number | null;
   fonte: FonteAlimento;
+  codigoBarras: string | null;
 }
 
 const ALIMENTO_SELECT =
-  "id, nome, marca, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g, gordura_insaturada_g, fonte";
+  "id, nome, marca, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g, gordura_insaturada_g, fonte, codigo_barras";
 
 function mapAlimento(a: Record<string, unknown>): Alimento {
   return {
@@ -52,6 +50,7 @@ function mapAlimento(a: Record<string, unknown>): Alimento {
     gorduraSaturadaG: a.gordura_saturada_g as number | null,
     gorduraInsaturadaG: a.gordura_insaturada_g as number | null,
     fonte: a.fonte as FonteAlimento,
+    codigoBarras: a.codigo_barras as string | null,
   };
 }
 
@@ -175,6 +174,92 @@ export async function duplicarAlimento(alimento: Alimento): Promise<string> {
 
 export async function excluirAlimento(id: string): Promise<void> {
   const { error } = await supabase.from("alimentos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/** Acha um alimento já cadastrado (por qualquer usuário) com esse código de barras — evita duplicar o mesmo produto ao reescanear. */
+export async function getAlimentoPorCodigoBarras(codigo: string): Promise<Alimento | null> {
+  const { data, error } = await supabase
+    .from("alimentos")
+    .select(ALIMENTO_SELECT)
+    .eq("codigo_barras", codigo)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapAlimento(data) : null;
+}
+
+export interface AlimentoOpenFoodFactsInput {
+  nome: string;
+  marca: string | null;
+  caloriasPorPorcao: number;
+  proteinaG: number;
+  gorduraG: number;
+  carboidratoG: number;
+  fibraG: number | null;
+  gorduraSaturadaG: number | null;
+  gorduraInsaturadaG: number | null;
+  codigoBarras: string;
+}
+
+/** Cria um alimento a partir de um produto escaneado (Open Food Facts) — valores sempre por 100g, como a API fornece. */
+export async function criarAlimentoOpenFoodFacts(input: AlimentoOpenFoodFactsInput): Promise<string> {
+  const { data, error } = await supabase
+    .from("alimentos")
+    .insert({
+      user_id: uid(),
+      nome: input.nome,
+      marca: input.marca,
+      porcao_padrao_qtd: 100,
+      porcao_padrao_unidade: "g",
+      calorias_por_porcao: input.caloriasPorPorcao,
+      proteina_g: input.proteinaG,
+      gordura_g: input.gorduraG,
+      carboidrato_g: input.carboidratoG,
+      fibra_g: input.fibraG,
+      gordura_saturada_g: input.gorduraSaturadaG,
+      gordura_insaturada_g: input.gorduraInsaturadaG,
+      codigo_barras: input.codigoBarras,
+      fonte: "openfoodfacts",
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+// ---------------- Catálogo de refeições (nomes reutilizáveis, gerenciáveis pelo usuário) ----------------
+
+export interface RefeicaoModelo {
+  id: string;
+  nome: string;
+}
+
+export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
+  const { data, error } = await supabase
+    .from("dieta_refeicoes_modelo")
+    .select("id, nome")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function criarRefeicaoModelo(nome: string): Promise<string> {
+  const { data, error } = await supabase
+    .from("dieta_refeicoes_modelo")
+    .insert({ user_id: uid(), nome })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function atualizarRefeicaoModelo(id: string, nome: string): Promise<void> {
+  const { error } = await supabase.from("dieta_refeicoes_modelo").update({ nome }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function excluirRefeicaoModelo(id: string): Promise<void> {
+  const { error } = await supabase.from("dieta_refeicoes_modelo").delete().eq("id", id);
   if (error) throw error;
 }
 

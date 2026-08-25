@@ -5,6 +5,7 @@
   import DietaAlimentos from "./DietaAlimentos.svelte";
   import DietaItemForm from "./DietaItemForm.svelte";
   import DietaReceitaForm from "./DietaReceitaForm.svelte";
+  import DietaRefeicoesGerenciar from "./DietaRefeicoesGerenciar.svelte";
   import Placeholder from "../Placeholder.svelte";
   import { hojeISO } from "../../lib/dates";
 
@@ -27,6 +28,12 @@
   <DietaAlimentos />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "nova"}
   <DietaReceitaForm />
+{:else if segmentos[0] === "refeicoes" && segmentos[1] === "gerenciar"}
+  <DietaRefeicoesGerenciar />
+{:else if segmentos[0] === "scanear"}
+  {#await import("./DietaScanear.svelte") then { default: DietaScanear }}
+    <DietaScanear data={segmentos[1]} refeicaoId={segmentos[2]} />
+  {/await}
 {:else if segmentos[0] === "distribuicao"}
   <Placeholder titulo="Distribuição" />
 {:else if segmentos[0] === "historico"}

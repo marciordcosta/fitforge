@@ -1,7 +1,7 @@
 <script lang="ts">
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
-  import { criarRefeicaoDia, SUGESTOES_REFEICAO } from "../../lib/dietaApi";
+  import { criarRefeicaoDia, listRefeicoesModelo, type RefeicaoModelo } from "../../lib/dietaApi";
 
   let {
     data,
@@ -15,6 +15,11 @@
 
   let nome = $state("");
   let salvando = $state(false);
+  let sugestoes = $state<RefeicaoModelo[]>([]);
+
+  void listRefeicoesModelo()
+    .then((r) => (sugestoes = r))
+    .catch(() => {});
 
   async function criar() {
     if (!nome.trim()) return;
@@ -32,11 +37,13 @@
 <Sheet titulo="Nova Refeição" {onFechar}>
   <input class="nome-input" type="text" placeholder="Nome da refeição" bind:value={nome} />
 
-  <div class="sugestoes">
-    {#each SUGESTOES_REFEICAO as s (s)}
-      <button class="sugestao" onclick={() => (nome = s)}>{s}</button>
-    {/each}
-  </div>
+  {#if sugestoes.length}
+    <div class="sugestoes">
+      {#each sugestoes as s (s.id)}
+        <button class="sugestao" onclick={() => (nome = s.nome)}>{s.nome}</button>
+      {/each}
+    </div>
+  {/if}
 
   <Button onclick={criar} disabled={salvando || !nome.trim()}>Criar Refeição</Button>
 </Sheet>
