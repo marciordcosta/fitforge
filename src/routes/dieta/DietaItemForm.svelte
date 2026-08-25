@@ -218,7 +218,10 @@
   {:else if !alimento}
     <p class="muted">Alimento não encontrado.</p>
   {:else}
-    <h2 class="nome-alimento">{alimento.nome}</h2>
+    <h2 class="nome-alimento">
+      {alimento.nome}
+      <span class="porcao-padrao">{alimento.porcaoPadraoQtd}{alimento.porcaoPadraoUnidade}</span>
+    </h2>
 
     <div
       class="linha"
@@ -409,6 +412,11 @@
   .nome-alimento {
     font-size: var(--font-size-lg);
     margin: 0 0 var(--space-4);
+  }
+  .porcao-padrao {
+    font-size: var(--font-size-sm);
+    font-weight: 400;
+    color: var(--surface-muted);
   }
   .linha {
     display: flex;
