@@ -54,6 +54,8 @@
   <Placeholder titulo="Histórico" />
 {:else if segmentos[0] === "meta"}
   <Placeholder titulo="Meta" />
+{:else if segmentos[0] === "parametrizacao"}
+  <Placeholder titulo="Parametrização" />
 {:else}
   <DiarioAlimentar />
 {/if}
