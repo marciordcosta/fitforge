@@ -26,6 +26,8 @@
   />
 {:else if segmentos[0] === "alimentos" && segmentos[1] === "refeicao" && segmentos[2]}
   <DietaAlimentos refeicaoId={segmentos[2]} />
+{:else if segmentos[0] === "alimentos" && segmentos[1] === "receita"}
+  <DietaAlimentos modoReceita={true} />
 {:else if segmentos[0] === "alimentos"}
   <DietaAlimentos />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "nova"}
@@ -36,6 +38,10 @@
   <DietaReceitas />
 {:else if segmentos[0] === "refeicoes" && segmentos[1] === "gerenciar"}
   <DietaRefeicoesGerenciar />
+{:else if segmentos[0] === "scanear" && segmentos[1] === "receita"}
+  {#await import("./DietaScanear.svelte") then { default: DietaScanear }}
+    <DietaScanear modoReceita={true} />
+  {/await}
 {:else if segmentos[0] === "scanear"}
   {#await import("./DietaScanear.svelte") then { default: DietaScanear }}
     <DietaScanear data={segmentos[1]} refeicaoId={segmentos[2]} />

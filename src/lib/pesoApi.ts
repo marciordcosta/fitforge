@@ -163,7 +163,7 @@ export async function excluirMeta(): Promise<void> {
 export interface ProgressoMetaPeso {
   pesoAtual: number;
   pesoAlvo: number;
-  /** Peso atual menos o alvo (mesmo sinal do % mostrado no gráfico) — positivo = acima da meta, negativo = abaixo. */
+  /** Alvo menos o peso atual — quanto falta pra bater a meta: positivo = falta ganhar, negativo = falta perder (peso já está acima do alvo). */
   faltamG: number;
 }
 
@@ -210,5 +210,5 @@ export async function getProgressoMetaHoje(): Promise<ProgressoMetaPeso | null> 
     pesoAlvo = pesoInicial * Math.pow(1 + meta.percentual / 100, diasDecorridos / 7);
   }
 
-  return { pesoAtual, pesoAlvo, faltamG: Math.round((pesoAtual - pesoAlvo) * 1000) };
+  return { pesoAtual, pesoAlvo, faltamG: Math.round((pesoAlvo - pesoAtual) * 1000) };
 }

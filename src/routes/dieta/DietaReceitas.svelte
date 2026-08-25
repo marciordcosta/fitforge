@@ -1,6 +1,7 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
   import { buscarReceitas, listReceitas, type ReceitaResumo } from "../../lib/dietaApi";
+  import { limparRascunho } from "../../lib/receitaRascunho.svelte";
 
   let receitas = $state<ReceitaResumo[]>([]);
   let loading = $state(true);
@@ -8,6 +9,11 @@
   let busca = $state("");
 
   let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
+
+  function criarNova() {
+    limparRascunho();
+    navigate("/dieta/receitas/nova");
+  }
 
   async function carregarInicial() {
     loading = true;
@@ -48,7 +54,7 @@
   <div class="header">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
     <h1>Refeições</h1>
-    <button class="criar" onclick={() => navigate("/dieta/receitas/nova")}>Criar</button>
+    <button class="criar" onclick={criarNova}>Criar</button>
   </div>
 
   <input class="search" type="text" placeholder="Procurar refeição" bind:value={busca} oninput={aoDigitar} />

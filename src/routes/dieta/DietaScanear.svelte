@@ -3,11 +3,12 @@
   import { navigate } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
-  import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts } from "../../lib/dietaApi";
+  import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts, getAlimento } from "../../lib/dietaApi";
   import { buscarProdutoPorCodigoBarras } from "../../lib/openFoodFacts";
+  import { adicionarAoRascunho } from "../../lib/receitaRascunho.svelte";
   import Button from "../../components/Button.svelte";
 
-  let { data, refeicaoId }: { data?: string; refeicaoId?: string } = $props();
+  let { data, refeicaoId, modoReceita }: { data?: string; refeicaoId?: string; modoReceita?: boolean } = $props();
 
   const dataResolvida = untrack(() => data) ?? hojeISO();
 
@@ -45,9 +46,9 @@
     fase = "buscando";
     try {
       let alimentoId: string;
-      const existente = await getAlimentoPorCodigoBarras(codigo);
-      if (existente) {
-        alimentoId = existente.id;
+      let alimento = await getAlimentoPorCodigoBarras(codigo);
+      if (alimento) {
+        alimentoId = alimento.id;
       } else {
         const produto = await buscarProdutoPorCodigoBarras(codigo);
         if (!produto) {
@@ -56,7 +57,15 @@
           return;
         }
         alimentoId = await criarAlimentoOpenFoodFacts({ ...produto, codigoBarras: codigo });
+        alimento = await getAlimento(alimentoId);
       }
+
+      if (modoReceita) {
+        if (alimento) adicionarAoRascunho(alimento);
+        navigate("/dieta/receitas/nova");
+        return;
+      }
+
       const destino = refeicaoId
         ? `/dieta/alimento/${alimentoId}/${dataResolvida}/${refeicaoId}`
         : `/dieta/alimento/${alimentoId}/${dataResolvida}`;
@@ -73,6 +82,10 @@
   }
 
   function irParaCadastroManual() {
+    if (modoReceita) {
+      navigate("/dieta/alimentos/receita");
+      return;
+    }
     navigate(refeicaoId ? `/dieta/alimentos/refeicao/${refeicaoId}` : "/dieta/alimentos");
   }
 </script>

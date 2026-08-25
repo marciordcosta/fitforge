@@ -157,6 +157,28 @@
     <line x1="4" y1="22" x2="4" y2="2" />
   </svg>
 {/snippet}
+{#snippet iconQuickAlimentos()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3v7a2 2 0 0 0 2 2v9" />
+    <path d="M7 3v4M11 3v4" />
+    <path d="M17 3c-1.5 0-3 1.5-3 4v3a2 2 0 0 0 2 2v9" />
+  </svg>
+{/snippet}
+{#snippet iconQuickRefeicoes()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="8" height="8" rx="1.5" />
+    <rect x="13" y="3" width="8" height="8" rx="1.5" />
+    <rect x="3" y="13" width="8" height="8" rx="1.5" />
+    <rect x="13" y="13" width="8" height="8" rx="1.5" />
+  </svg>
+{/snippet}
+{#snippet iconQuickMeta()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="8" />
+    <circle cx="12" cy="12" r="4" />
+    <circle cx="12" cy="12" r="0.5" fill="currentColor" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="topo">
@@ -175,7 +197,9 @@
         {#if progressoPeso}
           <button class="chip-info" onclick={() => navigate("/peso")}>
             {@render iconPesoMeta()}
-            <span class="chip-texto">{progressoPeso.faltamG > 0 ? "+" : ""}{progressoPeso.faltamG}g</span>
+            <span class="chip-texto" class:negativo={progressoPeso.faltamG < 0}>
+              {progressoPeso.faltamG > 0 ? "+" : ""}{progressoPeso.faltamG}g
+            </span>
           </button>
         {/if}
       </div>
@@ -184,9 +208,18 @@
   </div>
 
   <div class="quick-actions">
-    <button class="quick-btn" onclick={() => navigate("/dieta/alimentos")}>Alimentos</button>
-    <button class="quick-btn" onclick={() => navigate("/dieta/receitas")}>Refeições</button>
-    <button class="quick-btn" onclick={() => navigate("/dieta/meta")}>Meta</button>
+    <button class="quick-btn" onclick={() => navigate("/dieta/alimentos")}>
+      <span class="quick-btn-label">Alimentos</span>
+      {@render iconQuickAlimentos()}
+    </button>
+    <button class="quick-btn" onclick={() => navigate("/dieta/receitas")}>
+      <span class="quick-btn-label">Refeições</span>
+      {@render iconQuickRefeicoes()}
+    </button>
+    <button class="quick-btn" onclick={() => navigate("/dieta/meta")}>
+      <span class="quick-btn-label">Meta</span>
+      {@render iconQuickMeta()}
+    </button>
     <div class="quick-btn-vazio"></div>
   </div>
 
@@ -379,15 +412,21 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .chip-texto.negativo {
+    color: var(--color-danger);
+  }
   .icon-btn {
     flex-shrink: 0;
     width: 32px;
     height: 32px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
     color: var(--color-primary);
-    font-size: var(--font-size-lg);
+    font-size: 28px;
+    line-height: 1;
     cursor: pointer;
   }
   .quick-actions {
@@ -400,14 +439,25 @@
   }
   .quick-btn {
     flex: 1;
-    padding: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-1);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
     color: var(--surface-fg);
-    font-weight: 600;
-    font-size: var(--font-size-sm);
     cursor: pointer;
+  }
+  .quick-btn-label {
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+  .quick-btn svg {
+    width: 20px;
+    height: 20px;
   }
   .card-calorias,
   .card-macros {

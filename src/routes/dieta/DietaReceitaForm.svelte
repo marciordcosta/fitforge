@@ -1,63 +1,27 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
-  import { buscarAlimentos, criarReceita, type Alimento } from "../../lib/dietaApi";
+  import { criarReceita } from "../../lib/dietaApi";
+  import { receitaRascunho, removerDoRascunho, limparRascunho, type ItemRascunho } from "../../lib/receitaRascunho.svelte";
 
-  interface ItemReceita {
-    alimento: Alimento;
-    quantidade: number;
-  }
-
-  let nome = $state("");
-  let itens = $state<ItemReceita[]>([]);
-  let termo = $state("");
-  let resultados = $state<Alimento[]>([]);
-  let buscando = $state(false);
   let salvando = $state(false);
 
-  let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
-
-  function aoDigitar() {
-    clearTimeout(timeoutBusca);
-    if (termo.trim().length < 2) {
-      resultados = [];
-      return;
-    }
-    timeoutBusca = setTimeout(async () => {
-      buscando = true;
-      try {
-        resultados = await buscarAlimentos(termo);
-      } finally {
-        buscando = false;
-      }
-    }, 300);
-  }
-
-  function adicionarItem(alimento: Alimento) {
-    itens = [...itens, { alimento, quantidade: alimento.porcaoPadraoQtd }];
-    termo = "";
-    resultados = [];
-  }
-
-  function removerItem(i: number) {
-    itens = itens.filter((_, idx) => idx !== i);
-  }
-
-  function caloriasItem(item: ItemReceita): number {
+  function caloriasItem(item: ItemRascunho): number {
     return item.alimento.caloriasPorPorcao * (item.quantidade / item.alimento.porcaoPadraoQtd);
   }
 
-  const totalCalorias = $derived(itens.reduce((acc, i) => acc + caloriasItem(i), 0));
+  const totalCalorias = $derived(receitaRascunho.itens.reduce((acc, i) => acc + caloriasItem(i), 0));
 
-  const valido = $derived(nome.trim().length > 0 && itens.length > 0);
+  const valido = $derived(receitaRascunho.nome.trim().length > 0 && receitaRascunho.itens.length > 0);
 
   async function salvar() {
     if (!valido) return;
     salvando = true;
     try {
       await criarReceita(
-        nome.trim(),
-        itens.map((i) => ({ alimentoId: i.alimento.id, quantidade: i.quantidade })),
+        receitaRascunho.nome.trim(),
+        receitaRascunho.itens.map((i) => ({ alimentoId: i.alimento.id, quantidade: i.quantidade })),
       );
+      limparRascunho();
       navigate("/dieta/receitas");
     } catch (err) {
       alert("Erro ao criar refeição: " + (err as Error).message);
@@ -66,6 +30,26 @@
   }
 </script>
 
+{#snippet iconAlimento()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3v7a2 2 0 0 0 2 2v9" />
+    <path d="M7 3v4M11 3v4" />
+    <path d="M17 3c-1.5 0-3 1.5-3 4v3a2 2 0 0 0 2 2v9" />
+  </svg>
+{/snippet}
+{#snippet iconScanner()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 7V5a1 1 0 0 1 1-1h2" />
+    <path d="M17 4h2a1 1 0 0 1 1 1v2" />
+    <path d="M20 17v2a1 1 0 0 1-1 1h-2" />
+    <path d="M7 20H5a1 1 0 0 1-1-1v-2" />
+    <path d="M7 8v8" />
+    <path d="M10 8v8" />
+    <path d="M13.5 8v8" />
+    <path d="M17 8v8" />
+  </svg>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
@@ -73,28 +57,24 @@
     <button class="salvar" onclick={salvar} disabled={salvando || !valido} aria-label="Salvar">✓</button>
   </div>
 
-  <input class="nome-input" type="text" placeholder="Nome da refeição" bind:value={nome} />
+  <input class="nome-input" type="text" placeholder="Nome da refeição" bind:value={receitaRascunho.nome} />
 
-  <input class="busca-input" type="text" placeholder="Adicionar alimento…" bind:value={termo} oninput={aoDigitar} />
+  <div class="acoes-adicionar">
+    <button class="acao-btn" onclick={() => navigate("/dieta/alimentos/receita")}>
+      {@render iconAlimento()}
+      <span>Adicionar Alimento</span>
+    </button>
+    <button class="acao-btn" onclick={() => navigate("/dieta/scanear/receita")}>
+      {@render iconScanner()}
+      <span>Escanear</span>
+    </button>
+  </div>
 
-  {#if buscando}
-    <p class="muted">Buscando…</p>
-  {:else if resultados.length}
-    <div class="resultados">
-      {#each resultados as alimento (alimento.id)}
-        <button class="resultado-item" onclick={() => adicionarItem(alimento)}>
-          <span class="resultado-nome">{alimento.nome}</span>
-          <span class="resultado-cal">{alimento.caloriasPorPorcao.toFixed(0)} kcal / {alimento.porcaoPadraoQtd}{alimento.porcaoPadraoUnidade}</span>
-        </button>
-      {/each}
-    </div>
-  {/if}
-
-  <p class="itens-titulo">Itens ({itens.length})</p>
-  {#if !itens.length}
+  <p class="itens-titulo">Itens ({receitaRascunho.itens.length})</p>
+  {#if !receitaRascunho.itens.length}
     <p class="muted">Nenhum alimento adicionado ainda.</p>
   {:else}
-    {#each itens as item, i (item.alimento.id + i)}
+    {#each receitaRascunho.itens as item, i (item.alimento.id + i)}
       <div class="item-card">
         <div class="item-info">
           <p class="item-nome">{item.alimento.nome}</p>
@@ -109,7 +89,7 @@
           bind:value={item.quantidade}
         />
         <span class="qtd-unidade">{item.alimento.porcaoPadraoUnidade}</span>
-        <button class="item-remover" onclick={() => removerItem(i)} aria-label="Remover item">✕</button>
+        <button class="item-remover" onclick={() => removerDoRascunho(i)} aria-label="Remover item">✕</button>
       </div>
     {/each}
     <p class="total">Total: {totalCalorias.toFixed(0)} kcal</p>
@@ -154,8 +134,7 @@
     color: var(--surface-muted);
     cursor: not-allowed;
   }
-  .nome-input,
-  .busca-input {
+  .nome-input {
     box-sizing: border-box;
     width: 100%;
     padding: var(--space-3);
@@ -166,38 +145,31 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
   }
-  .resultados {
-    background: var(--surface-card);
-    border-radius: var(--radius-md);
+  .acoes-adicionar {
+    display: flex;
+    gap: var(--space-2);
     margin-bottom: var(--space-4);
-    overflow: hidden;
   }
-  .resultado-item {
+  .acao-btn {
+    flex: 1;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    width: 100%;
-    text-align: left;
+    justify-content: center;
+    gap: var(--space-2);
     padding: var(--space-3);
-    border: none;
-    border-bottom: 1px solid var(--surface-border);
-    background: none;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
     color: var(--surface-fg);
+    font-weight: 600;
+    font-size: var(--font-size-sm);
     cursor: pointer;
   }
-  .resultado-item:last-child {
-    border-bottom: none;
-  }
-  .resultado-nome {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .resultado-cal {
+  .acao-btn svg {
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
+    color: var(--color-primary);
   }
   .itens-titulo {
     font-weight: 600;
