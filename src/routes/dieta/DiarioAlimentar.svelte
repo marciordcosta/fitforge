@@ -138,7 +138,7 @@
             <p class="macro-nome">Carb</p>
             <p class="macro-valor">
               {#if modoRestante}
-                <strong>{restante(totalCarboidrato, metas.carboidratoG).toFixed(0)} g</strong> restantes
+                <strong>{restante(totalCarboidrato, metas.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
               {:else}
                 <strong>{totalCarboidrato.toFixed(0)} g</strong> <span class="macro-meta">/ {metas.carboidratoG.toFixed(0)}</span>
               {/if}
@@ -151,7 +151,7 @@
             <p class="macro-nome">Gorduras</p>
             <p class="macro-valor">
               {#if modoRestante}
-                <strong>{restante(totalGordura, metas.gorduraG).toFixed(0)} g</strong> restantes
+                <strong>{restante(totalGordura, metas.gorduraG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
               {:else}
                 <strong>{totalGordura.toFixed(0)} g</strong> <span class="macro-meta">/ {metas.gorduraG.toFixed(0)}</span>
               {/if}
@@ -164,7 +164,7 @@
             <p class="macro-nome">Proteínas</p>
             <p class="macro-valor">
               {#if modoRestante}
-                <strong>{restante(totalProteina, metas.proteinaG).toFixed(0)} g</strong> restantes
+                <strong>{restante(totalProteina, metas.proteinaG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
               {:else}
                 <strong>{totalProteina.toFixed(0)} g</strong> <span class="macro-meta">/ {metas.proteinaG.toFixed(0)}</span>
               {/if}
