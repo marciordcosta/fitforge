@@ -367,7 +367,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { top: 14, bottom: 22 } },
+        layout: { padding: { top: 14, bottom: 22, left: 10, right: 14 } },
         plugins: { legend: { display: false } },
         scales: {
           x: { display: false },
