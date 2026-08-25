@@ -288,16 +288,19 @@
       ctx.textBaseline = "middle";
       pontos.forEach((ponto, i) => {
         const diff = diffs?.[i];
+        const yDiff = ponto.y - 11;
         if (diff != null) {
-          ctx.fillStyle = COR_TREINO;
+          ctx.fillStyle = "#fff";
           const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
-          ctx.fillText(texto, ponto.x, ponto.y - 11);
+          ctx.fillText(texto, ponto.x, yDiff);
         }
         const alvo = alvos?.[i];
         if (alvo != null && escalaY) {
-          ctx.fillStyle = COR_TREINO;
-          const yLinha = escalaY.getPixelForValue(alvo);
-          ctx.fillText(alvo.toFixed(1), ponto.x, yLinha - 9);
+          const yLinha = escalaY.getPixelForValue(alvo) - 9;
+          // Perto demais do rótulo do peso real (ex: primeiro ponto, onde a meta parte do mesmo valor) — pula pra não sobrepor.
+          if (diff != null && Math.abs(yLinha - yDiff) < 12) return;
+          ctx.fillStyle = "#fff";
+          ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
         }
       });
       ctx.restore();

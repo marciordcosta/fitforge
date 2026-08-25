@@ -49,16 +49,18 @@
       ctx.textBaseline = "middle";
       pontos.forEach((ponto, i) => {
         const diff = diffMetaPorPonto?.[i];
+        const yDiff = ponto.y - 14;
         if (diff != null) {
           ctx.fillStyle = COR_TREINO;
           const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
-          ctx.fillText(texto, ponto.x, ponto.y - 14);
+          ctx.fillText(texto, ponto.x, yDiff);
         }
         const alvo = metaAlvoPorPonto?.[i];
         if (alvo != null && escalaY) {
+          const yLinha = escalaY.getPixelForValue(alvo) - 12;
+          if (diff != null && Math.abs(yLinha - yDiff) < 14) return;
           ctx.fillStyle = COR_TREINO;
-          const yLinha = escalaY.getPixelForValue(alvo);
-          ctx.fillText(alvo.toFixed(1), ponto.x, yLinha - 12);
+          ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
         }
       });
       ctx.restore();
