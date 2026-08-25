@@ -424,7 +424,7 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: var(--space-3);
-    margin-bottom: var(--space-5);
+    margin-bottom: var(--space-6);
   }
   .meta-col {
     display: flex;
