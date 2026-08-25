@@ -73,6 +73,12 @@ export async function listAlimentos(limite = 50): Promise<Alimento[]> {
   return (data ?? []).map(mapAlimento);
 }
 
+export async function getAlimento(id: string): Promise<Alimento | null> {
+  const { data, error } = await supabase.from("alimentos").select(ALIMENTO_SELECT).eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? mapAlimento(data) : null;
+}
+
 export async function criarAlimentoManual(input: {
   nome: string;
   marca: string | null;
@@ -163,4 +169,29 @@ export async function adicionarItemDiario(input: {
 export async function removerItemDiario(id: string): Promise<void> {
   const { error } = await supabase.from("diario_alimentos").delete().eq("id", id);
   if (error) throw error;
+}
+
+/** Metas diárias (calorias + macros em gramas). Macros vêm de g/kg × peso de referência do perfil. */
+export interface MetasDiarias {
+  calorias: number;
+  proteinaG: number;
+  gorduraG: number;
+  carboidratoG: number;
+}
+
+const METAS_PADRAO: MetasDiarias = { calorias: 2000, proteinaG: 165, gorduraG: 56, carboidratoG: 223 };
+
+export async function getMetasDiarias(): Promise<MetasDiarias> {
+  const { data, error } = await supabase
+    .from("dieta_perfil")
+    .select("peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return METAS_PADRAO;
+  return {
+    calorias: data.meta_calorias,
+    proteinaG: data.proteina_g_kg * data.peso_atual,
+    gorduraG: data.gordura_g_kg * data.peso_atual,
+    carboidratoG: data.carboidrato_g_kg * data.peso_atual,
+  };
 }

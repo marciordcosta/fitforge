@@ -44,10 +44,6 @@
     if (!nomes.length) return "Nenhum alimento ainda";
     return nomes.join(", ");
   }
-
-  function aoSalvarItem() {
-    void carregar();
-  }
 </script>
 
 <div class="container has-bottom-nav">
@@ -100,7 +96,6 @@
     refeicao={refeicaoParaAdicionar}
     data={dataAtual}
     onFechar={() => (refeicaoParaAdicionar = null)}
-    onSalvo={aoSalvarItem}
   />
 {/if}
 

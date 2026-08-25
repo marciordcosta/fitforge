@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
+  import { hojeISO } from "../../lib/dates";
   import { buscarAlimentos, listAlimentos, type Alimento } from "../../lib/dietaApi";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
 
@@ -50,13 +51,14 @@
     <ul class="lista">
       {#each alimentos as a (a.id)}
         <li>
-          <span class="item">
+          <button class="item" onclick={() => navigate(`/dieta/alimento/${a.id}/${hojeISO()}`)}>
             <span class="avatar">{iniciais(a.nome)}</span>
             <span class="info">
               <span class="nome">{a.nome}{#if a.marca} <span class="marca">· {a.marca}</span>{/if}</span>
               <span class="sub">{a.caloriasPorPorcao.toFixed(0)} kcal / {a.porcaoPadraoQtd}{a.porcaoPadraoUnidade}</span>
             </span>
-          </span>
+            <span class="chevron">›</span>
+          </button>
         </li>
       {/each}
     </ul>
@@ -119,6 +121,18 @@
     gap: var(--space-3);
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--surface-border);
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+  }
+  .chevron {
+    color: var(--surface-muted);
+    font-size: var(--font-size-lg);
+    flex-shrink: 0;
   }
   .avatar {
     width: 40px;
