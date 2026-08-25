@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
   import { navigate, router } from "../../lib/router.svelte";
-  import { toISODate, parseISODate, hojeISO } from "../../lib/dates";
+  import { toISODate, parseISODate, hojeISO, chaveSemana } from "../../lib/dates";
   import { getPesosDoPeriodo, getMeta, excluirMeta, type PesoRegistro, type PesoMeta } from "../../lib/pesoApi";
   import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
@@ -63,6 +63,30 @@
   let mostrarFiltro = $state(false);
   let mostrarGraficoCheio = $state(false);
   let hojeTemRotinaAgendada = $state(false);
+
+  /** "diário" = um ponto por dia (bruto); "média" = um ponto por semana (média). Semana ancorada em terça-feira: quem pesa em jejum de manhã, ao pesar na terça está refletindo o dia de segunda encerrado. */
+  let modoGrafico = $state<"diario" | "media">("diario");
+
+  function calcularMediasSemanais(lista: PesoRegistro[]): PesoRegistro[] {
+    const grupos = new Map<string, number[]>();
+    for (const p of lista) {
+      const chave = chaveSemana(parseISODate(p.data));
+      const valores = grupos.get(chave);
+      if (valores) valores.push(p.peso);
+      else grupos.set(chave, [p.peso]);
+    }
+    return Array.from(grupos.entries())
+      .map(([data, valores]) => ({ data, peso: valores.reduce((a, b) => a + b, 0) / valores.length }))
+      .sort((a, b) => a.data.localeCompare(b.data));
+  }
+
+  function selecionarModoGrafico(m: "diario" | "media") {
+    modoGrafico = m;
+    if (m === "media" && periodo.dias != null && periodo.dias < 30) {
+      periodo = PERIODOS[1];
+      void carregarGrafico();
+    }
+  }
 
   async function carregarRotinaHoje() {
     const treinos = await listTreinos();
@@ -179,10 +203,18 @@
     return `${d}/${m}`;
   }
 
-  /** Linha reta de meta: do peso inicial do período visível até o peso-alvo calculado (percentual semanal composto, ou flat na manutenção). */
+  /** Médias semanais do período do gráfico — sempre calculadas a partir dos dados diários brutos, usadas tanto pro modo "média" quanto como base da meta (mesmo no modo "diário"). */
+  const mediasSemanaisGrafico = $derived.by(() => calcularMediasSemanais(pesosGrafico));
+
+  /** Pontos efetivamente plotados no gráfico principal, conforme o modo escolhido. */
+  const pontosGrafico = $derived.by(() => (modoGrafico === "media" ? mediasSemanaisGrafico : pesosGrafico));
+
+  /** A meta é sempre semanal: o ponto de partida é a média da primeira semana, nunca o peso bruto de um dia só. */
+  const pesoInicialMedia = $derived.by(() => mediasSemanaisGrafico[0]?.peso ?? null);
+
+  /** Linha reta de meta: da média da semana inicial até o peso-alvo calculado (percentual semanal composto, ou flat na manutenção). */
   const metaLinha = $derived.by(() => {
-    if (!meta || !metaVisivel || pesosGrafico.length < 2) return null;
-    const pesoInicial = pesosGrafico[0].peso;
+    if (!meta || !metaVisivel || pontosGrafico.length < 2 || pesoInicialMedia == null) return null;
     let pesoAlvo: number;
     if (meta.tipo === "manutencao") {
       if (meta.pesoManutencao == null) return null;
@@ -196,29 +228,28 @@
         dias = Math.max(1, Math.round((ultima.getTime() - primeira.getTime()) / 86400000));
       }
       const semanas = dias / 7;
-      pesoAlvo = pesoInicial * Math.pow(1 + meta.percentual / 100, semanas);
+      pesoAlvo = pesoInicialMedia * Math.pow(1 + meta.percentual / 100, semanas);
     }
-    const linha = new Array<number | null>(pesosGrafico.length).fill(null);
-    linha[0] = meta.tipo === "manutencao" ? pesoAlvo : pesoInicial;
+    const linha = new Array<number | null>(pontosGrafico.length).fill(null);
+    linha[0] = meta.tipo === "manutencao" ? pesoAlvo : pesoInicialMedia;
     linha[linha.length - 1] = pesoAlvo;
     return linha;
   });
 
-  /** Diferença % de cada peso real em relação ao peso esperado pela meta naquele mesmo dia (mesma fórmula da metaLinha, avaliada dia a dia). */
+  /** Diferença % de cada ponto plotado em relação ao peso esperado pela meta naquela mesma data, sempre projetada a partir da media da semana inicial. */
   const diffMetaPorPonto = $derived.by(() => {
-    if (!meta || !metaVisivel || !pesosGrafico.length) return null;
+    if (!meta || !metaVisivel || !pontosGrafico.length || pesoInicialMedia == null) return null;
     if (meta.tipo === "manutencao") {
       if (meta.pesoManutencao == null) return null;
       const alvo = meta.pesoManutencao;
-      return pesosGrafico.map((p) => ((p.peso - alvo) / alvo) * 100);
+      return pontosGrafico.map((p) => ((p.peso - alvo) / alvo) * 100);
     }
     if (meta.percentual == null) return null;
     const percentual = meta.percentual;
-    const pesoInicial = pesosGrafico[0].peso;
-    const dataInicial = parseISODate(pesosGrafico[0].data);
-    return pesosGrafico.map((p) => {
+    const dataInicial = parseISODate(mediasSemanaisGrafico[0].data);
+    return pontosGrafico.map((p) => {
       const diasDecorridos = Math.round((parseISODate(p.data).getTime() - dataInicial.getTime()) / 86400000);
-      const alvo = pesoInicial * Math.pow(1 + percentual / 100, diasDecorridos / 7);
+      const alvo = pesoInicialMedia * Math.pow(1 + percentual / 100, diasDecorridos / 7);
       return ((p.peso - alvo) / alvo) * 100;
     });
   });
@@ -252,18 +283,20 @@
     if (!canvas) return;
     chart?.destroy();
     chart = null;
-    if (!pesosGrafico.length) return;
+    const pontos = pontosGrafico;
+    if (!pontos.length) return;
+    const corPonto = (data: string) => (modoGrafico === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO);
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pesosGrafico.map((p) => formatDataCurta(p.data)),
+        labels: pontos.map((p) => formatDataCurta(p.data)),
         datasets: [
           {
-            data: pesosGrafico.map((p) => p.peso),
+            data: pontos.map((p) => p.peso),
             borderColor: COR_PESO,
             backgroundColor: COR_PESO,
-            pointBackgroundColor: pesosGrafico.map((p) => (diasComTreinoGrafico.has(p.data) ? COR_TREINO : COR_PESO)),
-            pointBorderColor: pesosGrafico.map((p) => (diasComTreinoGrafico.has(p.data) ? COR_TREINO : COR_PESO)),
+            pointBackgroundColor: pontos.map((p) => corPonto(p.data)),
+            pointBorderColor: pontos.map((p) => corPonto(p.data)),
             tension: 0.3,
             pointRadius: 3,
           },
@@ -401,6 +434,10 @@
     <button class="chart-wrap" onclick={() => (mostrarGraficoCheio = true)} aria-label="Ver gráfico em tela cheia">
       <canvas bind:this={canvas}></canvas>
     </button>
+    <div class="modo-toggle">
+      <button class:active={modoGrafico === "diario"} onclick={() => selecionarModoGrafico("diario")}>Diário</button>
+      <button class:active={modoGrafico === "media"} onclick={() => selecionarModoGrafico("media")}>Média</button>
+    </div>
   {/if}
 
   <div class="mes-nav">
@@ -454,7 +491,11 @@
 {#if mostrarFiltro}
   <WheelPicker
     titulo="Período do gráfico"
-    opcoes={PERIODOS.map((p) => ({ valor: p, label: p.label }))}
+    subtitulo={modoGrafico === "media" ? "No modo Média, o mínimo é 1 mês" : undefined}
+    opcoes={(modoGrafico === "media" ? PERIODOS.filter((p) => p.dias == null || p.dias >= 30) : PERIODOS).map((p) => ({
+      valor: p,
+      label: p.label,
+    }))}
     valorAtual={periodo}
     onSelecionar={(p) => selecionarPeriodo(p)}
     onFechar={() => (mostrarFiltro = false)}
@@ -563,11 +604,31 @@
     display: block;
     width: 100%;
     height: 220px;
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-3);
     padding: 0;
     border: none;
     background: none;
     cursor: pointer;
+  }
+  .modo-toggle {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+  }
+  .modo-toggle button {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+  .modo-toggle button.active {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    border-color: var(--color-primary);
   }
   .mes-nav {
     display: flex;
