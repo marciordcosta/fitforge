@@ -267,9 +267,9 @@
         </div>
       </div>
       <div class="resumo-macros">
-        <p style={`color:${COR_CARBO}`}><strong>{pctCarbo.toFixed(0)}%</strong><br />{carboidratoG.toFixed(1)} g<br />Carb</p>
-        <p style={`color:${COR_GORDURA}`}><strong>{pctGordura.toFixed(0)}%</strong><br />{gorduraG.toFixed(1)} g<br />Gorduras</p>
-        <p style={`color:${COR_PROTEINA}`}><strong>{pctProteina.toFixed(0)}%</strong><br />{proteinaG.toFixed(1)} g<br />Proteínas</p>
+        <p><strong style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br />{carboidratoG.toFixed(1)} g<br />Carb</p>
+        <p><strong style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br />{gorduraG.toFixed(1)} g<br />Gorduras</p>
+        <p><strong style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br />{proteinaG.toFixed(1)} g<br />Proteínas</p>
       </div>
     </div>
 
