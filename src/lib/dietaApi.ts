@@ -512,10 +512,12 @@ export interface ReceitaResumo {
 }
 
 export interface ReceitaItem {
+  id: string;
   alimentoId: string;
   nome: string;
   quantidade: number;
   unidade: string;
+  porcaoPadraoQtd: number;
   calorias: number;
   proteinaG: number;
   gorduraG: number;
@@ -528,12 +530,15 @@ export interface Receita extends ReceitaResumo {
 
 function mapReceitaItem(l: Record<string, unknown>): ReceitaItem {
   const a = l.alimento as Record<string, unknown>;
-  const fator = (l.quantidade as number) / (a.porcao_padrao_qtd as number);
+  const porcaoPadraoQtd = a.porcao_padrao_qtd as number;
+  const fator = (l.quantidade as number) / porcaoPadraoQtd;
   return {
+    id: l.id as string,
     alimentoId: l.alimento_id as string,
     nome: a.nome as string,
     quantidade: l.quantidade as number,
     unidade: a.porcao_padrao_unidade as string,
+    porcaoPadraoQtd,
     calorias: round1((a.calorias_por_porcao as number) * fator),
     proteinaG: round1((a.proteina_g as number) * fator),
     gorduraG: round1((a.gordura_g as number) * fator),
@@ -567,7 +572,7 @@ export async function getReceita(id: string): Promise<Receita | null> {
     supabase
       .from("dieta_receita_itens")
       .select(
-        "alimento_id, quantidade, ordem, alimento:alimentos(nome, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g)",
+        "id, alimento_id, quantidade, ordem, alimento:alimentos(nome, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g)",
       )
       .eq("receita_id", id)
       .order("ordem", { ascending: true }),
@@ -580,6 +585,16 @@ export async function getReceita(id: string): Promise<Receita | null> {
     nome: receitaRes.data.nome,
     itens: (itensRes.data ?? []).map((l) => mapReceitaItem(l as Record<string, unknown>)),
   };
+}
+
+export async function atualizarItemReceita(id: string, quantidade: number): Promise<void> {
+  const { error } = await supabase.from("dieta_receita_itens").update({ quantidade }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function removerItemReceita(id: string): Promise<void> {
+  const { error } = await supabase.from("dieta_receita_itens").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export async function criarReceita(nome: string, itens: { alimentoId: string; quantidade: number }[]): Promise<string> {

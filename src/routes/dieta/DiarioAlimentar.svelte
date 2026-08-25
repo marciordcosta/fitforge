@@ -207,22 +207,6 @@
     <button class="icon-btn" onclick={() => (mostrarMenuMais = true)} aria-label="Adicionar">+</button>
   </div>
 
-  <div class="quick-actions">
-    <button class="quick-btn" onclick={() => navigate("/dieta/alimentos")}>
-      <span class="quick-btn-label">Alimentos</span>
-      {@render iconQuickAlimentos()}
-    </button>
-    <button class="quick-btn" onclick={() => navigate("/dieta/receitas")}>
-      <span class="quick-btn-label">Refeições</span>
-      {@render iconQuickRefeicoes()}
-    </button>
-    <button class="quick-btn" onclick={() => navigate("/dieta/meta")}>
-      <span class="quick-btn-label">Meta</span>
-      {@render iconQuickMeta()}
-    </button>
-    <div class="quick-btn-vazio"></div>
-  </div>
-
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else if erro}
@@ -287,6 +271,22 @@
         </div>
       </div>
     {/if}
+
+    <div class="quick-actions">
+      <button class="quick-btn" onclick={() => navigate("/dieta/alimentos")}>
+        <span class="quick-btn-label">Alimentos</span>
+        {@render iconQuickAlimentos()}
+      </button>
+      <button class="quick-btn" onclick={() => navigate("/dieta/receitas")}>
+        <span class="quick-btn-label">Refeições</span>
+        {@render iconQuickRefeicoes()}
+      </button>
+      <button class="quick-btn" onclick={() => navigate("/dieta/meta")}>
+        <span class="quick-btn-label">Meta</span>
+        {@render iconQuickMeta()}
+      </button>
+      <div class="quick-btn-vazio"></div>
+    </div>
 
     {#if !refeicoes.length}
       <p class="muted">Nenhuma refeição ainda. Toque em + pra criar.</p>

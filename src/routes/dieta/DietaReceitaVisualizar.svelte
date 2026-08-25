@@ -3,7 +3,9 @@
   import { hojeISO } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import Button from "../../components/Button.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
+  import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import {
     getReceita,
     garantirRefeicoesPadraoDoDia,
@@ -11,7 +13,10 @@
     getRefeicaoDia,
     getMetasDiarias,
     adicionarReceitaAoDiario,
+    atualizarItemReceita,
+    removerItemReceita,
     type Receita,
+    type ReceitaItem,
     type RefeicaoDia,
     type MetasDiarias,
   } from "../../lib/dietaApi";
@@ -31,6 +36,9 @@
   let mostrarEscolhaRefeicao = $state(false);
   let mostrarCriarRefeicao = $state(false);
   let salvando = $state(false);
+  let itemEditando = $state<ReceitaItem | null>(null);
+  let itemParaRemover = $state<ReceitaItem | null>(null);
+  let processandoItem = $state(false);
 
   async function carregar() {
     loading = true;
@@ -97,7 +105,42 @@
       salvando = false;
     }
   }
+
+  async function aoSalvarQuantidadeItem(qtd: number, unidade: "porcao" | "grama") {
+    if (!itemEditando) return;
+    const quantidade = unidade === "porcao" ? qtd * itemEditando.porcaoPadraoQtd : qtd;
+    processandoItem = true;
+    try {
+      await atualizarItemReceita(itemEditando.id, quantidade);
+      itemEditando = null;
+      await carregar();
+    } catch (err) {
+      alert("Erro ao atualizar item: " + (err as Error).message);
+    } finally {
+      processandoItem = false;
+    }
+  }
+
+  async function removerItem() {
+    if (!itemParaRemover) return;
+    processandoItem = true;
+    try {
+      await removerItemReceita(itemParaRemover.id);
+      itemParaRemover = null;
+      await carregar();
+    } catch (err) {
+      alert("Erro ao remover item: " + (err as Error).message);
+    } finally {
+      processandoItem = false;
+    }
+  }
 </script>
+
+{#snippet iconExcluir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -170,11 +213,23 @@
     {#if !receita.itens.length}
       <p class="muted">Nenhum alimento nessa refeição.</p>
     {:else}
-      {#each receita.itens as item (item.alimentoId)}
-        <div class="item-card">
-          <p class="item-nome">{item.nome}</p>
-          <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal</p>
-        </div>
+      {#each receita.itens as item (item.id)}
+        <button class="item-card" onclick={() => (itemEditando = item)}>
+          <div class="item-info">
+            <p class="item-nome">{item.nome}</p>
+            <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal</p>
+          </div>
+          <span
+            class="item-remover"
+            role="button"
+            tabindex="0"
+            onclick={(e) => { e.stopPropagation(); itemParaRemover = item; }}
+            onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); itemParaRemover = item; } }}
+            aria-label="Remover alimento"
+          >
+            {@render iconExcluir()}
+          </span>
+        </button>
       {/each}
     {/if}
 
@@ -200,6 +255,26 @@
     data={hojeISO()}
     onFechar={() => (mostrarCriarRefeicao = false)}
     onCriada={aoCriarRefeicao}
+  />
+{/if}
+
+{#if itemEditando}
+  <DietaQuantidadeDialog
+    quantidadeInicial={itemEditando.quantidade}
+    unidadeInicial="grama"
+    porcaoPadraoQtd={itemEditando.porcaoPadraoQtd}
+    porcaoPadraoUnidade={itemEditando.unidade}
+    onSalvar={aoSalvarQuantidadeItem}
+    onFechar={() => (itemEditando = null)}
+  />
+{/if}
+
+{#if itemParaRemover !== null}
+  <ConfirmDialog
+    titulo="Tem certeza de que quer remover este alimento?"
+    textoConfirmar="Remover"
+    onConfirmar={removerItem}
+    onCancelar={() => (itemParaRemover = null)}
   />
 {/if}
 
@@ -339,21 +414,50 @@
     margin: var(--space-2) 0 var(--space-3);
   }
   .item-card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
     background: var(--surface-card);
     padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-2);
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+  }
+  .item-info {
+    flex: 1;
+    min-width: 0;
   }
   .item-nome {
     margin: 0;
     font-size: var(--font-size-base);
     color: var(--surface-fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .item-qtd {
     margin: 2px 0 0;
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .item-remover {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-danger);
+    cursor: pointer;
+  }
+  .item-remover svg {
+    width: 18px;
+    height: 18px;
   }
   .acao-adicionar {
     margin-top: var(--space-4);
