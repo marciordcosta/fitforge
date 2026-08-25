@@ -14,10 +14,10 @@
 
   const items: NavItem[] = [
     { href: "/", label: "Início", icon: "home" },
-    { href: "/treino", label: "Treino", icon: "dumbbell" },
     { href: "/peso", label: "Peso", icon: "chart" },
-    { href: "/fotos", label: "Fotos", icon: "photo" },
     { href: "/dieta", label: "Dieta", icon: "meal" },
+    { href: "/treino", label: "Treino", icon: "dumbbell" },
+    { href: "/fotos", label: "Fotos", icon: "photo" },
   ];
 
   function isActive(href: string): boolean {

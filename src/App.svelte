@@ -9,11 +9,11 @@
   import Placeholder from "./routes/Placeholder.svelte";
   import Treino from "./routes/treino/Treino.svelte";
   import Peso from "./routes/peso/Peso.svelte";
+  import Dieta from "./routes/dieta/Dieta.svelte";
 
   const sectionTitles: Record<string, string> = {
     "/treino": "Treino",
     "/fotos": "Fotos",
-    "/dieta": "Dieta",
   };
 
   let blockedAlertShown = false;
@@ -50,6 +50,8 @@
     <Treino />
   {:else if router.path.startsWith("/peso")}
     <Peso />
+  {:else if router.path.startsWith("/dieta")}
+    <Dieta />
   {:else if sectionTitles[router.path]}
     <Placeholder titulo={sectionTitles[router.path]} />
   {:else}
