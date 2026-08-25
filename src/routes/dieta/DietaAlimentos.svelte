@@ -175,7 +175,7 @@
       <ul class="lista">
         {#each alimentos as a (a.id)}
           <li>
-            <button class="item" onclick={() => aoClicarItem(a)}>
+            <button class="item" class:selecionado={modoSelecao && selecionados.has(a.id)} onclick={() => aoClicarItem(a)}>
               {#if modoSelecao}
                 <span class="check" class:marcado={selecionados.has(a.id)}>
                   {#if selecionados.has(a.id)}{@render iconCheck()}{/if}
@@ -288,6 +288,12 @@
     cursor: pointer;
     text-align: left;
     font-family: inherit;
+  }
+  .item.selecionado {
+    background: #1e4a2f;
+    margin: 0 calc(var(--space-4) * -1);
+    padding: var(--space-3) var(--space-4);
+    border-bottom-color: transparent;
   }
   .item:disabled {
     opacity: 0.6;
