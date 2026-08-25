@@ -106,6 +106,9 @@
   const proteinaG = $derived(alimento ? alimento.proteinaG * porcoes : 0);
   const gorduraG = $derived(alimento ? alimento.gorduraG * porcoes : 0);
   const carboidratoG = $derived(alimento ? alimento.carboidratoG * porcoes : 0);
+  const fibraG = $derived(alimento?.fibraG != null ? alimento.fibraG * porcoes : null);
+  const gorduraSaturadaG = $derived(alimento?.gorduraSaturadaG != null ? alimento.gorduraSaturadaG * porcoes : null);
+  const gorduraInsaturadaG = $derived(alimento?.gorduraInsaturadaG != null ? alimento.gorduraInsaturadaG * porcoes : null);
 
   const caloriasCarbo = $derived(carboidratoG * 4);
   const caloriasGordura = $derived(gorduraG * 9);
@@ -157,7 +160,7 @@
     salvando = true;
     try {
       if (editandoItem) {
-        await atualizarItemDiario(itemDiarioId!, alimento, quantidade);
+        await atualizarItemDiario(itemDiarioId!, alimento, quantidade, refeicao.id);
       } else {
         await adicionarItemDiario({ alimento, data: dataResolvida, refeicaoId: refeicao.id, quantidade });
       }
@@ -219,11 +222,10 @@
 
     <div
       class="linha"
-      class:desabilitada={editandoItem}
       role="button"
       tabindex="0"
-      onclick={() => !editandoItem && abrirEscolhaRefeicao()}
-      onkeydown={(e) => e.key === "Enter" && !editandoItem && abrirEscolhaRefeicao()}
+      onclick={() => abrirEscolhaRefeicao()}
+      onkeydown={(e) => e.key === "Enter" && abrirEscolhaRefeicao()}
     >
       <span>Refeição</span>
       <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Selecione uma refeição"}</span>
@@ -273,6 +275,30 @@
         </div>
       </div>
     {/if}
+
+    <p class="nutrientes-titulo">Nutrientes</p>
+    <div class="nutrientes-lista">
+      <div class="nutriente-item">
+        <span>Carboidratos</span>
+        <span>{carboidratoG.toFixed(1)} g</span>
+      </div>
+      <div class="nutriente-item">
+        <span>Proteínas</span>
+        <span>{proteinaG.toFixed(1)} g</span>
+      </div>
+      <div class="nutriente-item">
+        <span>Gordura Saturada</span>
+        <span>{gorduraSaturadaG != null ? `${gorduraSaturadaG.toFixed(1)} g` : "—"}</span>
+      </div>
+      <div class="nutriente-item">
+        <span>Gordura Insaturada</span>
+        <span>{gorduraInsaturadaG != null ? `${gorduraInsaturadaG.toFixed(1)} g` : "—"}</span>
+      </div>
+      <div class="nutriente-item">
+        <span>Fibras</span>
+        <span>{fibraG != null ? `${fibraG.toFixed(1)} g` : "—"}</span>
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -392,9 +418,6 @@
     border-bottom: 1px solid var(--surface-border);
     cursor: pointer;
   }
-  .linha.desabilitada {
-    cursor: default;
-  }
   .linha span:first-child {
     color: var(--surface-fg);
   }
@@ -483,6 +506,28 @@
   }
   .meta-valor {
     font-size: 11px;
+    color: var(--surface-muted);
+  }
+  .nutrientes-titulo {
+    font-weight: 600;
+    margin: var(--space-2) 0 var(--space-3);
+  }
+  .nutrientes-lista {
+    display: flex;
+    flex-direction: column;
+  }
+  .nutriente-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--surface-border);
+    font-size: var(--font-size-sm);
+  }
+  .nutriente-item:last-child {
+    border-bottom: none;
+  }
+  .nutriente-item span:first-child {
     color: var(--surface-muted);
   }
   .muted {

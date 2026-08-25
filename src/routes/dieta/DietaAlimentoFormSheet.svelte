@@ -20,6 +20,9 @@
   let proteina = $state<number | null>(untrack(() => alimento?.proteinaG ?? null));
   let gordura = $state<number | null>(untrack(() => alimento?.gorduraG ?? null));
   let carboidrato = $state<number | null>(untrack(() => alimento?.carboidratoG ?? null));
+  let fibra = $state<number | null>(untrack(() => alimento?.fibraG ?? null));
+  let gorduraSaturada = $state<number | null>(untrack(() => alimento?.gorduraSaturadaG ?? null));
+  let gorduraInsaturada = $state<number | null>(untrack(() => alimento?.gorduraInsaturadaG ?? null));
   let salvando = $state(false);
 
   const valido = $derived(
@@ -45,6 +48,9 @@
         proteinaG: proteina!,
         gorduraG: gordura!,
         carboidratoG: carboidrato!,
+        fibraG: fibra,
+        gorduraSaturadaG: gorduraSaturada,
+        gorduraInsaturadaG: gorduraInsaturada,
       };
       if (editando) {
         await atualizarAlimentoManual(alimento!.id, input);
@@ -103,6 +109,21 @@
     <div class="campo">
       <label for="af-carboidrato">Carbo (g)</label>
       <input id="af-carboidrato" type="number" inputmode="decimal" step="0.1" bind:value={carboidrato} />
+    </div>
+  </div>
+
+  <div class="linha">
+    <div class="campo">
+      <label for="af-fibra">Fibra (g, opcional)</label>
+      <input id="af-fibra" type="number" inputmode="decimal" step="0.1" bind:value={fibra} />
+    </div>
+    <div class="campo">
+      <label for="af-gordura-sat">G. Saturada (g, opcional)</label>
+      <input id="af-gordura-sat" type="number" inputmode="decimal" step="0.1" bind:value={gorduraSaturada} />
+    </div>
+    <div class="campo">
+      <label for="af-gordura-insat">G. Insaturada (g, opcional)</label>
+      <input id="af-gordura-insat" type="number" inputmode="decimal" step="0.1" bind:value={gorduraInsaturada} />
     </div>
   </div>
 

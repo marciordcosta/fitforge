@@ -28,11 +28,14 @@ export interface Alimento {
   proteinaG: number;
   gorduraG: number;
   carboidratoG: number;
+  fibraG: number | null;
+  gorduraSaturadaG: number | null;
+  gorduraInsaturadaG: number | null;
   fonte: FonteAlimento;
 }
 
 const ALIMENTO_SELECT =
-  "id, nome, marca, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fonte";
+  "id, nome, marca, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g, gordura_insaturada_g, fonte";
 
 function mapAlimento(a: Record<string, unknown>): Alimento {
   return {
@@ -45,6 +48,9 @@ function mapAlimento(a: Record<string, unknown>): Alimento {
     proteinaG: a.proteina_g as number,
     gorduraG: a.gordura_g as number,
     carboidratoG: a.carboidrato_g as number,
+    fibraG: a.fibra_g as number | null,
+    gorduraSaturadaG: a.gordura_saturada_g as number | null,
+    gorduraInsaturadaG: a.gordura_insaturada_g as number | null,
     fonte: a.fonte as FonteAlimento,
   };
 }
@@ -98,6 +104,9 @@ export interface AlimentoManualInput {
   proteinaG: number;
   gorduraG: number;
   carboidratoG: number;
+  fibraG: number | null;
+  gorduraSaturadaG: number | null;
+  gorduraInsaturadaG: number | null;
 }
 
 export async function criarAlimentoManual(input: AlimentoManualInput): Promise<void> {
@@ -111,6 +120,9 @@ export async function criarAlimentoManual(input: AlimentoManualInput): Promise<v
     proteina_g: input.proteinaG,
     gordura_g: input.gorduraG,
     carboidrato_g: input.carboidratoG,
+    fibra_g: input.fibraG,
+    gordura_saturada_g: input.gorduraSaturadaG,
+    gordura_insaturada_g: input.gorduraInsaturadaG,
     fonte: "manual",
   });
   if (error) throw error;
@@ -128,6 +140,9 @@ export async function atualizarAlimentoManual(id: string, input: AlimentoManualI
       proteina_g: input.proteinaG,
       gordura_g: input.gorduraG,
       carboidrato_g: input.carboidratoG,
+      fibra_g: input.fibraG,
+      gordura_saturada_g: input.gorduraSaturadaG,
+      gordura_insaturada_g: input.gorduraInsaturadaG,
     })
     .eq("id", id);
   if (error) throw error;
@@ -147,6 +162,9 @@ export async function duplicarAlimento(alimento: Alimento): Promise<string> {
       proteina_g: alimento.proteinaG,
       gordura_g: alimento.gorduraG,
       carboidrato_g: alimento.carboidratoG,
+      fibra_g: alimento.fibraG,
+      gordura_saturada_g: alimento.gorduraSaturadaG,
+      gordura_insaturada_g: alimento.gorduraInsaturadaG,
       fonte: "manual",
     })
     .select("id")
@@ -318,13 +336,14 @@ export async function adicionarItemDiario(input: {
   if (error) throw error;
 }
 
-export async function atualizarItemDiario(id: string, alimento: Alimento, quantidade: number): Promise<void> {
+export async function atualizarItemDiario(id: string, alimento: Alimento, quantidade: number, refeicaoId: string): Promise<void> {
   const fator = quantidade / alimento.porcaoPadraoQtd;
   const { error } = await supabase
     .from("diario_alimentos")
     .update({
       quantidade,
       unidade: alimento.porcaoPadraoUnidade,
+      refeicao_id: refeicaoId,
       calorias: round1(alimento.caloriasPorPorcao * fator),
       proteina_g: round1(alimento.proteinaG * fator),
       gordura_g: round1(alimento.gorduraG * fator),
