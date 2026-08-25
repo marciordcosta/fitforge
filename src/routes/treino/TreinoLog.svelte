@@ -40,10 +40,18 @@
     return `${m}:${String(s).padStart(2, "0")}`;
   }
 
+  function formatDuracao(segundosTotais: number): string {
+    const h = Math.floor(segundosTotais / 3600);
+    const m = Math.floor((segundosTotais % 3600) / 60);
+    const s = Math.floor(segundosTotais % 60);
+    if (h > 0) return m > 0 ? `${h}h ${m}min` : `${h}h`;
+    if (m > 0) return s > 0 ? `${m}min ${s}s` : `${m}min`;
+    return `${s}s`;
+  }
+
   const duracaoLabel = $derived.by(() => {
     const total = Math.floor((agora - inicio) / 1000);
-    if (total < 60) return `${total}s`;
-    return formatMMSS(total);
+    return formatDuracao(total);
   });
 
   const seriesTotal = $derived(sessao.reduce((acc, ex) => acc + ex.sets.filter((s) => s.concluida).length, 0));
