@@ -235,31 +235,7 @@
   /** A meta é sempre semanal e parte da média móvel do primeiro dia visível, nunca do peso bruto de um dia só. */
   const pesoInicialMedia = $derived.by(() => mediaMovelGrafico[0]?.peso ?? null);
 
-  /** Linha reta de meta: da média móvel do primeiro dia até o peso-alvo calculado (percentual semanal composto, ou flat na manutenção). */
-  const metaLinha = $derived.by(() => {
-    if (!meta || !metaVisivel || pontosGrafico.length < 2 || pesoInicialMedia == null) return null;
-    let pesoAlvo: number;
-    if (meta.tipo === "manutencao") {
-      if (meta.pesoManutencao == null) return null;
-      pesoAlvo = meta.pesoManutencao;
-    } else {
-      if (meta.percentual == null) return null;
-      let dias = periodo.dias;
-      if (dias == null) {
-        const primeira = parseISODate(pesosGrafico[0].data);
-        const ultima = parseISODate(pesosGrafico[pesosGrafico.length - 1].data);
-        dias = Math.max(1, Math.round((ultima.getTime() - primeira.getTime()) / 86400000));
-      }
-      const semanas = dias / 7;
-      pesoAlvo = pesoInicialMedia * Math.pow(1 + meta.percentual / 100, semanas);
-    }
-    const linha = new Array<number | null>(pontosGrafico.length).fill(null);
-    linha[0] = meta.tipo === "manutencao" ? pesoAlvo : pesoInicialMedia;
-    linha[linha.length - 1] = pesoAlvo;
-    return linha;
-  });
-
-  /** Peso esperado pela meta em cada dia plotado, sempre projetado a partir da média móvel do primeiro dia visível. */
+  /** Peso esperado pela meta em cada dia plotado, sempre projetado a partir da média móvel do primeiro dia visível, usando os dias corridos reais entre cada ponto e esse primeiro dia (não o tamanho nominal do filtro). */
   const metaAlvoPorPonto = $derived.by(() => {
     if (!meta || !metaVisivel || !mediaMovelGrafico.length || pesoInicialMedia == null) return null;
     if (meta.tipo === "manutencao") {
@@ -274,6 +250,22 @@
       const diasDecorridos = Math.round((parseISODate(p.data).getTime() - dataInicial.getTime()) / 86400000);
       return pesoInicialMedia * Math.pow(1 + percentual / 100, diasDecorridos / 7);
     });
+  });
+
+  /**
+   * Linha reta de meta: da média móvel do primeiro dia até o peso-alvo do último ponto.
+   * Reaproveita o mesmo valor de metaAlvoPorPonto (em vez de recalcular a partir do tamanho
+   * nominal do filtro) pra garantir que a linha sempre bata com os rótulos por ponto — mesmo
+   * quando os dados visíveis não cobrem o período inteiro do filtro selecionado.
+   */
+  const metaLinha = $derived.by(() => {
+    const alvos = metaAlvoPorPonto;
+    if (!meta || !alvos || !alvos.length || pontosGrafico.length < 2 || pesoInicialMedia == null) return null;
+    const pesoAlvo = alvos[alvos.length - 1];
+    const linha = new Array<number | null>(pontosGrafico.length).fill(null);
+    linha[0] = meta.tipo === "manutencao" ? pesoAlvo : pesoInicialMedia;
+    linha[linha.length - 1] = pesoAlvo;
+    return linha;
   });
 
   /**
