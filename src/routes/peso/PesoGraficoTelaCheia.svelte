@@ -9,6 +9,7 @@
     metaLinha,
     diffMetaPorPonto,
     metaAlvoPorPonto,
+    pontosComRotulo,
     onFechar,
   }: {
     pontosGrafico: PesoRegistro[];
@@ -17,6 +18,7 @@
     metaLinha: (number | null)[] | null;
     diffMetaPorPonto: (number | null)[] | null;
     metaAlvoPorPonto: (number | null)[] | null;
+    pontosComRotulo: boolean[] | null;
     onFechar: () => void;
   } = $props();
 
@@ -72,7 +74,7 @@
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pontosGrafico.map((p) => formatDataCurta(p.data)),
+        labels: pontosGrafico.map((p, i) => (pontosComRotulo && !pontosComRotulo[i] ? "" : formatDataCurta(p.data))),
         datasets: [
           {
             data: pontosGrafico.map((p) => p.peso),

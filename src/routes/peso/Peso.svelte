@@ -339,6 +339,7 @@
     id: "datasEixo",
     afterDatasetsDraw(c: Chart) {
       const pontosDados = pontosGrafico;
+      const rotulo = pontosComRotulo;
       const pontos = c.getDatasetMeta(0).data;
       const y = c.chartArea.bottom + 11;
       const { ctx } = c;
@@ -348,6 +349,7 @@
       ctx.textBaseline = "middle";
       ctx.fillStyle = "#9aa0ab";
       pontos.forEach((ponto, i) => {
+        if (rotulo && !rotulo[i]) return;
         const p = pontosDados[i];
         if (!p) return;
         ctx.fillText(formatDataCurta(dataExibicao(p)), ponto.x, y);
@@ -634,6 +636,7 @@
     {metaLinha}
     {diffMetaPorPonto}
     {metaAlvoPorPonto}
+    {pontosComRotulo}
     onFechar={() => (mostrarGraficoCheio = false)}
   />
 {/if}
