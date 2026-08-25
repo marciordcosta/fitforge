@@ -24,9 +24,8 @@
     return un === "porcao" ? qtd * porcaoPadraoQtd : qtd;
   }
 
-  function trocarUnidade(nova: string) {
-    const novaUnidade = nova as "porcao" | "grama";
-    if (novaUnidade === unidade) return;
+  function alternarUnidade() {
+    const novaUnidade = unidade === "porcao" ? "grama" : "porcao";
     const total = totalNaUnidade(quantidade, unidade);
     unidade = novaUnidade;
     quantidade = novaUnidade === "porcao" ? total / porcaoPadraoQtd : total;
@@ -37,6 +36,15 @@
   }
 </script>
 
+{#snippet iconAlternar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 3l4 4-4 4" />
+    <path d="M21 7H7a4 4 0 0 0-4 4v1" />
+    <path d="M7 21l-4-4 4-4" />
+    <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
+  </svg>
+{/snippet}
+
 <div class="overlay" role="presentation" onclick={onCancelar}>
   <div class="card" role="presentation" onclick={(e) => e.stopPropagation()}>
     <p class="titulo">Quanto?</p>
@@ -46,10 +54,10 @@
       <span class="rotulo">Porção(ões) de</span>
     </div>
 
-    <select class="unidade-select" value={unidade} onchange={(e) => trocarUnidade(e.currentTarget.value)}>
-      <option value="porcao">{porcaoPadraoQtd} {porcaoPadraoUnidade} (porção completa)</option>
-      <option value="grama">1 {porcaoPadraoUnidade} (fracionada)</option>
-    </select>
+    <button class="unidade-toggle" onclick={alternarUnidade}>
+      <span>{unidade === "porcao" ? `${porcaoPadraoQtd} ${porcaoPadraoUnidade} (porção completa)` : `1 ${porcaoPadraoUnidade} (fracionada)`}</span>
+      {@render iconAlternar()}
+    </button>
 
     <div class="acoes">
       <button class="btn-texto" onclick={onCancelar}>Cancelar</button>
@@ -102,7 +110,11 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
   }
-  .unidade-select {
+  .unidade-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
     box-sizing: border-box;
     width: 100%;
     padding: var(--space-3);
@@ -112,6 +124,15 @@
     background: var(--surface-bg);
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .unidade-toggle svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    color: var(--color-primary);
   }
   .acoes {
     display: flex;
