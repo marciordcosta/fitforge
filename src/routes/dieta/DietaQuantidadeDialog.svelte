@@ -54,14 +54,16 @@
       <span class="rotulo">Porção(ões) de</span>
     </div>
 
-    <button class="unidade-toggle" onclick={alternarUnidade}>
-      <span>{unidade === "porcao" ? `${porcaoPadraoQtd} ${porcaoPadraoUnidade} (porção completa)` : `1 ${porcaoPadraoUnidade} (fracionada)`}</span>
-      {@render iconAlternar()}
-    </button>
+    <p class="unidade-texto">{unidade === "porcao" ? `${porcaoPadraoQtd} ${porcaoPadraoUnidade} (porção completa)` : `1 ${porcaoPadraoUnidade} (fracionada)`}</p>
 
     <div class="acoes">
-      <button class="btn-texto" onclick={onCancelar}>Cancelar</button>
-      <button class="btn-texto destaque" onclick={salvar}>Salvar</button>
+      <button class="icone-alternar" onclick={alternarUnidade} aria-label="Alternar unidade">
+        {@render iconAlternar()}
+      </button>
+      <div class="botoes-texto">
+        <button class="btn-texto" onclick={onCancelar}>Cancelar</button>
+        <button class="btn-texto destaque" onclick={salvar}>Salvar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -79,7 +81,7 @@
   }
   .card {
     width: 100%;
-    max-width: 340px;
+    max-width: 260px;
     background: var(--surface-card);
     border-radius: var(--radius-lg);
     padding: var(--space-5) var(--space-4) var(--space-4);
@@ -89,12 +91,14 @@
     font-size: var(--font-size-lg);
     font-weight: 700;
     margin: 0 0 var(--space-4);
+    text-align: center;
   }
   .linha-qtd {
     display: flex;
     align-items: baseline;
+    justify-content: center;
     gap: var(--space-3);
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--space-2);
   }
   .qtd-input {
     width: 70px;
@@ -105,38 +109,37 @@
     color: var(--surface-fg);
     font-size: var(--font-size-lg);
     font-weight: 700;
+    text-align: center;
   }
   .rotulo {
     color: var(--surface-fg);
     font-size: var(--font-size-base);
   }
-  .unidade-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    box-sizing: border-box;
-    width: 100%;
-    padding: var(--space-3);
-    margin-bottom: var(--space-5);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
-    color: var(--surface-fg);
+  .unidade-texto {
+    margin: 0 0 var(--space-5);
+    text-align: center;
+    color: var(--surface-muted);
     font-size: var(--font-size-base);
-    font-family: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-  .unidade-toggle svg {
-    flex-shrink: 0;
-    width: 18px;
-    height: 18px;
-    color: var(--color-primary);
   }
   .acoes {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .icone-alternar {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    cursor: pointer;
+    padding: var(--space-1);
+    display: flex;
+  }
+  .icone-alternar svg {
+    width: 20px;
+    height: 20px;
+  }
+  .botoes-texto {
+    display: flex;
     gap: var(--space-4);
   }
   .btn-texto {
