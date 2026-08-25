@@ -1,5 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import Sheet from "../../components/Sheet.svelte";
+  import Button from "../../components/Button.svelte";
 
   let {
     quantidadeInicial,
@@ -7,14 +9,14 @@
     porcaoPadraoQtd,
     porcaoPadraoUnidade,
     onSalvar,
-    onCancelar,
+    onFechar,
   }: {
     quantidadeInicial: number;
     unidadeInicial: "porcao" | "grama";
     porcaoPadraoQtd: number;
     porcaoPadraoUnidade: string;
     onSalvar: (quantidade: number, unidade: "porcao" | "grama") => void;
-    onCancelar: () => void;
+    onFechar: () => void;
   } = $props();
 
   let quantidade = $state(untrack(() => quantidadeInicial));
@@ -32,7 +34,9 @@
   }
 
   function salvar() {
-    if (quantidade > 0) onSalvar(quantidade, unidade);
+    if (quantidade > 0) {
+      onSalvar(quantidade, unidade);
+    }
   }
 </script>
 
@@ -45,117 +49,82 @@
   </svg>
 {/snippet}
 
-<div class="overlay" role="presentation" onclick={onCancelar}>
-  <div class="card" role="presentation" onclick={(e) => e.stopPropagation()}>
-    <p class="titulo">Quanto?</p>
-
-    <div class="linha-qtd">
-      <input class="qtd-input" type="number" inputmode="decimal" step="any" min="0" bind:value={quantidade} />
-      <div class="rotulo-coluna">
-        <span class="rotulo">Porção(ões) de</span>
-        <span class="unidade-texto">{unidade === "porcao" ? `${porcaoPadraoQtd} ${porcaoPadraoUnidade}` : `1 ${porcaoPadraoUnidade}`}</span>
-      </div>
-    </div>
-
-    <div class="acoes">
+<Sheet titulo="Quanto?" {onFechar}>
+  <div class="campo">
+    <label for="qtd-input">Porção(ões) de</label>
+    <div class="qtd-linha">
+      <input id="qtd-input" class="qtd-input" type="number" inputmode="decimal" step="any" min="0" bind:value={quantidade} />
+      <span class="unidade-texto">{unidade === "porcao" ? `${porcaoPadraoQtd} ${porcaoPadraoUnidade}` : `1 ${porcaoPadraoUnidade}`}</span>
       <button class="icone-alternar" onclick={alternarUnidade} aria-label="Alternar unidade">
         {@render iconAlternar()}
       </button>
-      <div class="botoes-texto">
-        <button class="btn-texto" onclick={onCancelar}>Cancelar</button>
-        <button class="btn-texto destaque" onclick={salvar}>Salvar</button>
-      </div>
     </div>
   </div>
-</div>
+
+  <div class="acoes">
+    <div class="acao-item">
+      <Button variant="secondary" onclick={onFechar}>Cancelar</Button>
+    </div>
+    <div class="acao-item">
+      <Button onclick={salvar} disabled={quantidade <= 0}>Salvar</Button>
+    </div>
+  </div>
+</Sheet>
 
 <style>
-  .overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-4);
-    z-index: 200;
-  }
-  .card {
-    width: 100%;
-    max-width: 260px;
-    background: var(--surface-card);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5) var(--space-4) var(--space-4);
-    box-shadow: var(--shadow-float);
-  }
-  .titulo {
-    font-size: var(--font-size-lg);
-    font-weight: 700;
-    margin: 0 0 var(--space-4);
-    text-align: center;
-  }
-  .linha-qtd {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-5);
-  }
-  .qtd-input {
-    width: 70px;
-    padding: var(--space-1) 0;
-    border: none;
-    border-bottom: 2px solid var(--color-primary);
-    background: none;
-    color: var(--surface-fg);
-    font-size: var(--font-size-lg);
-    font-weight: 700;
-    text-align: center;
-  }
-  .rotulo-coluna {
+  .campo {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
   }
-  .rotulo {
+  .campo label {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .qtd-linha {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    box-sizing: border-box;
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+  }
+  .qtd-input {
+    width: 50px;
+    padding: 0;
+    border: none;
+    background: none;
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+    font-weight: 400;
   }
   .unidade-texto {
+    flex: 1;
     color: var(--surface-muted);
     font-size: var(--font-size-sm);
   }
-  .acoes {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
   .icone-alternar {
+    flex-shrink: 0;
     background: none;
     border: none;
     color: var(--color-primary);
     cursor: pointer;
-    padding: var(--space-1);
+    padding: 0;
     display: flex;
   }
   .icone-alternar svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
   }
-  .botoes-texto {
+  .acoes {
     display: flex;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
-  .btn-texto {
-    background: none;
-    border: none;
-    color: var(--surface-muted);
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    cursor: pointer;
-    padding: var(--space-1);
-  }
-  .btn-texto.destaque {
-    color: var(--color-primary);
+  .acao-item {
+    flex: 1;
   }
 </style>

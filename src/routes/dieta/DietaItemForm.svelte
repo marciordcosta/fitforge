@@ -332,7 +332,7 @@
     porcaoPadraoQtd={alimento.porcaoPadraoQtd}
     porcaoPadraoUnidade={alimento.porcaoPadraoUnidade}
     onSalvar={aoSalvarQuantidade}
-    onCancelar={() => (mostrarQuantidade = false)}
+    onFechar={() => (mostrarQuantidade = false)}
   />
 {/if}
 
