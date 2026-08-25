@@ -623,6 +623,20 @@ export async function criarReceita(nome: string, itens: { alimentoId: string; qu
   return receita.id;
 }
 
+export async function atualizarReceita(id: string, nome: string): Promise<void> {
+  const { data: existente, error: erroExistente } = await supabase
+    .from("dieta_receitas")
+    .select("id")
+    .ilike("nome", nome)
+    .neq("id", id)
+    .maybeSingle();
+  if (erroExistente) throw erroExistente;
+  if (existente) throw new Error(`Já existe uma refeição chamada "${nome}".`);
+
+  const { error } = await supabase.from("dieta_receitas").update({ nome }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function excluirReceita(id: string): Promise<void> {
   const { error } = await supabase.from("dieta_receitas").delete().eq("id", id);
   if (error) throw error;

@@ -18,6 +18,8 @@
   <DietaRefeicaoVisualizar refeicaoId={segmentos[1]} />
 {:else if segmentos[0] === "item" && segmentos[1]}
   <DietaItemForm itemDiarioId={segmentos[1]} />
+{:else if segmentos[0] === "alimento" && segmentos[1] && segmentos[2] === "receita"}
+  <DietaItemForm alimentoId={segmentos[1]} modoReceita={true} />
 {:else if segmentos[0] === "alimento" && segmentos[1]}
   <DietaItemForm
     alimentoId={segmentos[1]}

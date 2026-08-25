@@ -20,17 +20,20 @@
     type MetasDiarias,
     type RefeicaoDia,
   } from "../../lib/dietaApi";
+  import { adicionarAoRascunho } from "../../lib/receitaRascunho.svelte";
 
   let {
     alimentoId,
     data,
     refeicaoIdInicial,
     itemDiarioId,
+    modoReceita,
   }: {
     alimentoId?: string;
     data?: string;
     refeicaoIdInicial?: string | null;
     itemDiarioId?: string;
+    modoReceita?: boolean;
   } = $props();
 
   const editandoItem = untrack(() => itemDiarioId != null);
@@ -142,6 +145,7 @@
   }
 
   function sufixoRota(): string {
+    if (modoReceita) return "/receita";
     return refeicao ? `/${dataResolvida}/${refeicao.id}` : dataResolvida ? `/${dataResolvida}` : "";
   }
 
@@ -162,7 +166,7 @@
     processandoAlimento = true;
     try {
       await excluirAlimento(alimento.id);
-      navigate("/dieta/alimentos");
+      navigate(modoReceita ? "/dieta/alimentos/receita" : "/dieta/alimentos");
     } catch (err) {
       alert("Erro ao excluir alimento: " + (err as Error).message);
       processandoAlimento = false;
@@ -170,7 +174,13 @@
   }
 
   async function salvar() {
-    if (!alimento || !refeicao) return;
+    if (!alimento) return;
+    if (modoReceita) {
+      adicionarAoRascunho(alimento, quantidade);
+      navigate("/dieta/receitas/nova");
+      return;
+    }
+    if (!refeicao) return;
     salvando = true;
     try {
       if (editandoItem) {
@@ -221,7 +231,7 @@
           {@render iconMenu()}
         </button>
       {/if}
-      <button class="salvar" onclick={salvar} disabled={salvando || !refeicao || loading} aria-label="Salvar">✓</button>
+      <button class="salvar" onclick={salvar} disabled={salvando || (!modoReceita && !refeicao) || loading} aria-label="Salvar">✓</button>
     </div>
   </div>
 
@@ -237,16 +247,18 @@
       <span class="porcao-padrao">{alimento.porcaoPadraoQtd}{alimento.porcaoPadraoUnidade}</span>
     </h2>
 
-    <div
-      class="linha"
-      role="button"
-      tabindex="0"
-      onclick={() => abrirEscolhaRefeicao()}
-      onkeydown={(e) => e.key === "Enter" && abrirEscolhaRefeicao()}
-    >
-      <span>Refeição</span>
-      <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Selecione uma refeição"}</span>
-    </div>
+    {#if !modoReceita}
+      <div
+        class="linha"
+        role="button"
+        tabindex="0"
+        onclick={() => abrirEscolhaRefeicao()}
+        onkeydown={(e) => e.key === "Enter" && abrirEscolhaRefeicao()}
+      >
+        <span>Refeição</span>
+        <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Selecione uma refeição"}</span>
+      </div>
+    {/if}
 
     <div
       class="linha"

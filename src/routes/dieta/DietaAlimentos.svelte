@@ -15,7 +15,6 @@
   } from "../../lib/dietaApi";
   import { adicionarAoRascunho } from "../../lib/receitaRascunho.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
-  import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
   /** Quando presente, cada alimento ganha um "+" pra adicionar direto a essa refeição, sem passar pelo detalhamento. Sem isso, é só o catálogo normal. */
@@ -35,7 +34,6 @@
   let adicionandoId = $state<string | null>(null);
   let mensagem = $state<string | null>(null);
   let erro = $state<string | null>(null);
-  let itemParaQuantidade = $state<Alimento | null>(null);
 
   let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
   let timeoutMensagem: ReturnType<typeof setTimeout> | undefined;
@@ -102,20 +100,12 @@
 
   function abrirDetalhamento(a: Alimento) {
     if (modoReceita) {
-      itemParaQuantidade = a;
+      navigate(`/dieta/alimento/${a.id}/receita`);
     } else if (modoAdicionar) {
       navigate(`/dieta/alimento/${a.id}/${refeicaoData}/${refeicaoIdFixo}`);
     } else {
       navigate(`/dieta/alimento/${a.id}/${hojeISO()}`);
     }
-  }
-
-  function aoSalvarQuantidadeReceita(qtd: number, unidade: "porcao" | "grama") {
-    if (!itemParaQuantidade) return;
-    const quantidade = unidade === "porcao" ? qtd * itemParaQuantidade.porcaoPadraoQtd : qtd;
-    adicionarAoRascunho(itemParaQuantidade, quantidade);
-    mostrarMensagem(`${itemParaQuantidade.nome} adicionado`);
-    itemParaQuantidade = null;
   }
 
   async function adicionarRapido(a: Alimento) {
@@ -261,17 +251,6 @@
 
 {#if mensagem}
   <div class="toast">{mensagem}</div>
-{/if}
-
-{#if itemParaQuantidade}
-  <DietaQuantidadeDialog
-    quantidadeInicial={itemParaQuantidade.porcaoPadraoQtd}
-    unidadeInicial="grama"
-    porcaoPadraoQtd={itemParaQuantidade.porcaoPadraoQtd}
-    porcaoPadraoUnidade={itemParaQuantidade.porcaoPadraoUnidade}
-    onSalvar={aoSalvarQuantidadeReceita}
-    onFechar={() => (itemParaQuantidade = null)}
-  />
 {/if}
 
 {#if mostrarEscolhaCriar}

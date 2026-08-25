@@ -13,6 +13,7 @@
     getRefeicaoDia,
     getMetasDiarias,
     adicionarReceitaAoDiario,
+    atualizarReceita,
     atualizarItemReceita,
     removerItemReceita,
     excluirReceita,
@@ -39,9 +40,19 @@
   let salvando = $state(false);
   let itemEditando = $state<ReceitaItem | null>(null);
   let itemParaRemover = $state<ReceitaItem | null>(null);
-  let processandoItem = $state(false);
   let confirmandoExclusao = $state(false);
   let excluindo = $state(false);
+
+  /** Cópia local editável — nome e itens só são gravados no banco ao tocar em "concluir". Saindo sem salvar, nada muda. */
+  let nomeEditavel = $state("");
+  let nomeEditando = $state(false);
+  let itensLocais = $state<ReceitaItem[]>([]);
+  let idsParaRemover = $state<string[]>([]);
+  let salvandoEdicoes = $state(false);
+
+  function round1(n: number): number {
+    return Math.round(n * 10) / 10;
+  }
 
   async function carregar() {
     loading = true;
@@ -55,6 +66,9 @@
       receita = receitaRes;
       metas = metasRes;
       refeicao = refeicoesHoje[0] ?? null;
+      nomeEditavel = receitaRes?.nome ?? "";
+      itensLocais = receitaRes?.itens ?? [];
+      idsParaRemover = [];
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -63,6 +77,30 @@
   }
 
   void carregar();
+
+  async function salvarEdicoes() {
+    if (!receita) return;
+    const nome = nomeEditavel.trim();
+    if (!nome) return;
+    salvandoEdicoes = true;
+    try {
+      if (nome !== receita.nome) {
+        await atualizarReceita(receita.id, nome);
+      }
+      for (const id of idsParaRemover) {
+        await removerItemReceita(id);
+      }
+      for (const item of itensLocais) {
+        await atualizarItemReceita(item.id, item.quantidade);
+      }
+      nomeEditando = false;
+      await carregar();
+    } catch (err) {
+      alert("Erro ao salvar alterações: " + (err as Error).message);
+    } finally {
+      salvandoEdicoes = false;
+    }
+  }
 
   async function abrirEscolhaRefeicao() {
     opcoesRefeicao = await getRefeicoesDoDia(hojeISO());
@@ -75,10 +113,10 @@
     void getRefeicaoDia(id).then((r) => (refeicao = r));
   }
 
-  const totalCalorias = $derived(receita ? receita.itens.reduce((acc, i) => acc + i.calorias, 0) : 0);
-  const totalProteina = $derived(receita ? receita.itens.reduce((acc, i) => acc + i.proteinaG, 0) : 0);
-  const totalGordura = $derived(receita ? receita.itens.reduce((acc, i) => acc + i.gorduraG, 0) : 0);
-  const totalCarboidrato = $derived(receita ? receita.itens.reduce((acc, i) => acc + i.carboidratoG, 0) : 0);
+  const totalCalorias = $derived(itensLocais.reduce((acc, i) => acc + i.calorias, 0));
+  const totalProteina = $derived(itensLocais.reduce((acc, i) => acc + i.proteinaG, 0));
+  const totalGordura = $derived(itensLocais.reduce((acc, i) => acc + i.gorduraG, 0));
+  const totalCarboidrato = $derived(itensLocais.reduce((acc, i) => acc + i.carboidratoG, 0));
 
   const caloriasCarbo = $derived(totalCarboidrato * 4);
   const caloriasGordura = $derived(totalGordura * 9);
@@ -109,33 +147,32 @@
     }
   }
 
-  async function aoSalvarQuantidadeItem(qtd: number, unidade: "porcao" | "grama") {
+  function aoSalvarQuantidadeItem(qtd: number, unidade: "porcao" | "grama") {
     if (!itemEditando) return;
-    const quantidade = unidade === "porcao" ? qtd * itemEditando.porcaoPadraoQtd : qtd;
-    processandoItem = true;
-    try {
-      await atualizarItemReceita(itemEditando.id, quantidade);
-      itemEditando = null;
-      await carregar();
-    } catch (err) {
-      alert("Erro ao atualizar item: " + (err as Error).message);
-    } finally {
-      processandoItem = false;
-    }
+    const novaQuantidade = unidade === "porcao" ? qtd * itemEditando.porcaoPadraoQtd : qtd;
+    const fatorAntigo = itemEditando.quantidade / itemEditando.porcaoPadraoQtd;
+    const fatorNovo = novaQuantidade / itemEditando.porcaoPadraoQtd;
+    const id = itemEditando.id;
+    itensLocais = itensLocais.map((it) =>
+      it.id === id
+        ? {
+            ...it,
+            quantidade: novaQuantidade,
+            calorias: round1((it.calorias / fatorAntigo) * fatorNovo),
+            proteinaG: round1((it.proteinaG / fatorAntigo) * fatorNovo),
+            gorduraG: round1((it.gorduraG / fatorAntigo) * fatorNovo),
+            carboidratoG: round1((it.carboidratoG / fatorAntigo) * fatorNovo),
+          }
+        : it,
+    );
+    itemEditando = null;
   }
 
-  async function removerItem() {
+  function removerItem() {
     if (!itemParaRemover) return;
-    processandoItem = true;
-    try {
-      await removerItemReceita(itemParaRemover.id);
-      itemParaRemover = null;
-      await carregar();
-    } catch (err) {
-      alert("Erro ao remover item: " + (err as Error).message);
-    } finally {
-      processandoItem = false;
-    }
+    idsParaRemover = [...idsParaRemover, itemParaRemover.id];
+    itensLocais = itensLocais.filter((it) => it.id !== itemParaRemover!.id);
+    itemParaRemover = null;
   }
 
   async function excluir() {
@@ -160,8 +197,17 @@
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
-    <h1>{receita?.nome ?? ""}</h1>
-    <span class="header-spacer"></span>
+    {#if nomeEditando}
+      <input
+        class="nome-input"
+        type="text"
+        bind:value={nomeEditavel}
+        onkeydown={(e) => e.key === "Enter" && salvarEdicoes()}
+      />
+    {:else}
+      <button class="nome-btn" onclick={() => (nomeEditando = true)}>{nomeEditavel}</button>
+    {/if}
+    <button class="salvar" onclick={salvarEdicoes} disabled={salvandoEdicoes || loading || !nomeEditavel.trim()} aria-label="Salvar">✓</button>
   </div>
 
   {#if loading}
@@ -182,7 +228,7 @@
       <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Selecione uma refeição"}</span>
     </div>
 
-    {#if receita.itens.length}
+    {#if itensLocais.length}
       <div class="resumo">
         <div class="donut" style={donutStyle}>
           <div class="donut-centro">
@@ -225,10 +271,10 @@
     {/if}
 
     <p class="itens-titulo">Itens</p>
-    {#if !receita.itens.length}
+    {#if !itensLocais.length}
       <p class="muted">Nenhum alimento nessa refeição.</p>
     {:else}
-      {#each receita.itens as item (item.id)}
+      {#each itensLocais as item (item.id)}
         <button class="item-card" onclick={() => (itemEditando = item)}>
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
@@ -319,28 +365,50 @@
     gap: var(--space-2);
     margin-bottom: var(--space-3);
   }
-  .header h1 {
+  .nome-btn {
     flex: 1;
     min-width: 0;
     font-size: var(--font-size-lg);
+    font-weight: 700;
+    font-family: inherit;
     margin: 0;
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    background: none;
+    border: none;
+    color: var(--surface-fg);
+    cursor: pointer;
+    padding: var(--space-1) 0;
   }
-  .header-spacer {
-    width: 24px;
-    flex-shrink: 0;
+  .nome-input {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    font-family: inherit;
+    text-align: center;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
   }
-  .back {
+  .back,
+  .salvar {
     background: none;
     border: none;
     color: var(--color-primary);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-lg);
     cursor: pointer;
     padding: var(--space-1);
     flex-shrink: 0;
+  }
+  .salvar:disabled {
+    color: var(--surface-muted);
+    cursor: not-allowed;
   }
   .linha {
     display: flex;

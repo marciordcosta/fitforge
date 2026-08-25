@@ -3,9 +3,8 @@
   import { navigate } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
-  import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts, getAlimento } from "../../lib/dietaApi";
+  import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts } from "../../lib/dietaApi";
   import { buscarProdutoPorCodigoBarras } from "../../lib/openFoodFacts";
-  import { adicionarAoRascunho } from "../../lib/receitaRascunho.svelte";
   import Button from "../../components/Button.svelte";
 
   let { data, refeicaoId, modoReceita }: { data?: string; refeicaoId?: string; modoReceita?: boolean } = $props();
@@ -46,9 +45,9 @@
     fase = "buscando";
     try {
       let alimentoId: string;
-      let alimento = await getAlimentoPorCodigoBarras(codigo);
-      if (alimento) {
-        alimentoId = alimento.id;
+      const existente = await getAlimentoPorCodigoBarras(codigo);
+      if (existente) {
+        alimentoId = existente.id;
       } else {
         const produto = await buscarProdutoPorCodigoBarras(codigo);
         if (!produto) {
@@ -57,18 +56,13 @@
           return;
         }
         alimentoId = await criarAlimentoOpenFoodFacts({ ...produto, codigoBarras: codigo });
-        alimento = await getAlimento(alimentoId);
       }
 
-      if (modoReceita) {
-        if (alimento) adicionarAoRascunho(alimento);
-        navigate("/dieta/receitas/nova");
-        return;
-      }
-
-      const destino = refeicaoId
-        ? `/dieta/alimento/${alimentoId}/${dataResolvida}/${refeicaoId}`
-        : `/dieta/alimento/${alimentoId}/${dataResolvida}`;
+      const destino = modoReceita
+        ? `/dieta/alimento/${alimentoId}/receita`
+        : refeicaoId
+          ? `/dieta/alimento/${alimentoId}/${dataResolvida}/${refeicaoId}`
+          : `/dieta/alimento/${alimentoId}/${dataResolvida}`;
       navigate(destino);
     } catch (err) {
       fase = "erro";
