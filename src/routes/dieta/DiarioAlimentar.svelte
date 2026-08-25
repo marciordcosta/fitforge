@@ -185,8 +185,9 @@
 
   <div class="quick-actions">
     <button class="quick-btn" onclick={() => navigate("/dieta/alimentos")}>Alimentos</button>
-    <button class="quick-btn" onclick={() => navigate("/dieta/distribuicao")}>Distribuição</button>
-    <button class="quick-btn" onclick={() => navigate("/dieta/historico")}>Histórico</button>
+    <button class="quick-btn" onclick={() => navigate("/dieta/receitas")}>Refeições</button>
+    <button class="quick-btn" onclick={() => navigate("/dieta/meta")}>Meta</button>
+    <div class="quick-btn-vazio"></div>
   </div>
 
   {#if loading}
@@ -393,6 +394,9 @@
     display: flex;
     gap: var(--space-2);
     margin-bottom: var(--space-5);
+  }
+  .quick-btn-vazio {
+    flex: 1;
   }
   .quick-btn {
     flex: 1;

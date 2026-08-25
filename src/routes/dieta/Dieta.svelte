@@ -5,6 +5,8 @@
   import DietaAlimentos from "./DietaAlimentos.svelte";
   import DietaItemForm from "./DietaItemForm.svelte";
   import DietaReceitaForm from "./DietaReceitaForm.svelte";
+  import DietaReceitas from "./DietaReceitas.svelte";
+  import DietaReceitaVisualizar from "./DietaReceitaVisualizar.svelte";
   import DietaRefeicoesGerenciar from "./DietaRefeicoesGerenciar.svelte";
   import Placeholder from "../Placeholder.svelte";
   import { hojeISO } from "../../lib/dates";
@@ -28,6 +30,10 @@
   <DietaAlimentos />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "nova"}
   <DietaReceitaForm />
+{:else if segmentos[0] === "receitas" && segmentos[1] === "ver" && segmentos[2]}
+  <DietaReceitaVisualizar receitaId={segmentos[2]} />
+{:else if segmentos[0] === "receitas"}
+  <DietaReceitas />
 {:else if segmentos[0] === "refeicoes" && segmentos[1] === "gerenciar"}
   <DietaRefeicoesGerenciar />
 {:else if segmentos[0] === "scanear"}
@@ -38,6 +44,8 @@
   <Placeholder titulo="Distribuição" />
 {:else if segmentos[0] === "historico"}
   <Placeholder titulo="Histórico" />
+{:else if segmentos[0] === "meta"}
+  <Placeholder titulo="Meta" />
 {:else}
   <DiarioAlimentar />
 {/if}

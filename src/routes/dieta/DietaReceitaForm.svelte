@@ -58,7 +58,7 @@
         nome.trim(),
         itens.map((i) => ({ alimentoId: i.alimento.id, quantidade: i.quantidade })),
       );
-      navigate("/dieta/alimentos");
+      navigate("/dieta/receitas");
     } catch (err) {
       alert("Erro ao criar refeição: " + (err as Error).message);
       salvando = false;
