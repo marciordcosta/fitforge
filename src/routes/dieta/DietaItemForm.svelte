@@ -5,6 +5,7 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
+  import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import {
     getAlimento,
     getItemDiario,
@@ -43,10 +44,16 @@
   let loading = $state(true);
   let dataResolvida = $state(untrack(() => data ?? ""));
   let refeicao = $state<RefeicaoDia | null>(null);
-  let porcoes = $state(1);
+  let unidadeQtd = $state<"porcao" | "grama">("porcao");
+  let quantidadeInput = $state(1);
+  const porcoes = $derived.by(() => {
+    if (!alimento) return 1;
+    return unidadeQtd === "porcao" ? quantidadeInput : quantidadeInput / alimento.porcaoPadraoQtd;
+  });
   let opcoesRefeicao = $state<RefeicaoDia[]>([]);
   let mostrarEscolhaRefeicao = $state(false);
   let mostrarCriarRefeicao = $state(false);
+  let mostrarQuantidade = $state(false);
   let mostrarMenuAlimento = $state(false);
   let mostrarEditar = $state(false);
   let confirmandoExclusao = $state(false);
@@ -70,7 +77,8 @@
         refeicao = refeicaoRes;
         metas = metasRes;
         dataResolvida = refeicaoRes?.data ?? "";
-        porcoes = alimentoRes ? item.quantidade / alimentoRes.porcaoPadraoQtd : 1;
+        unidadeQtd = "porcao";
+        quantidadeInput = alimentoRes ? item.quantidade / alimentoRes.porcaoPadraoQtd : 1;
       } else {
         const [alimentoRes, metasRes, refeicaoRes] = await Promise.all([
           getAlimento(alimentoId!),
@@ -99,6 +107,12 @@
     mostrarCriarRefeicao = false;
     mostrarEscolhaRefeicao = false;
     void getRefeicaoDia(id).then((r) => (refeicao = r));
+  }
+
+  function aoSalvarQuantidade(qtd: number, unidade: "porcao" | "grama") {
+    quantidadeInput = qtd;
+    unidadeQtd = unidade;
+    mostrarQuantidade = false;
   }
 
   const quantidade = $derived(alimento ? porcoes * alimento.porcaoPadraoQtd : 0);
@@ -234,9 +248,15 @@
       <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Selecione uma refeição"}</span>
     </div>
 
-    <div class="linha">
+    <div
+      class="linha"
+      role="button"
+      tabindex="0"
+      onclick={() => (mostrarQuantidade = true)}
+      onkeydown={(e) => e.key === "Enter" && (mostrarQuantidade = true)}
+    >
       <span>Quantidade de porções</span>
-      <input type="number" inputmode="decimal" step="0.5" min="0" bind:value={porcoes} />
+      <span>{quantidade.toFixed(0)}{alimento.porcaoPadraoUnidade}</span>
     </div>
 
     <div class="resumo">
@@ -304,6 +324,17 @@
     </div>
   {/if}
 </div>
+
+{#if mostrarQuantidade && alimento}
+  <DietaQuantidadeDialog
+    quantidadeInicial={quantidadeInput}
+    unidadeInicial={unidadeQtd}
+    porcaoPadraoQtd={alimento.porcaoPadraoQtd}
+    porcaoPadraoUnidade={alimento.porcaoPadraoUnidade}
+    onSalvar={aoSalvarQuantidade}
+    onCancelar={() => (mostrarQuantidade = false)}
+  />
+{/if}
 
 {#if mostrarEscolhaRefeicao}
   <ActionSheet
@@ -431,16 +462,6 @@
   }
   .linha span.placeholder {
     color: var(--color-danger);
-  }
-  .linha input {
-    width: 70px;
-    text-align: right;
-    padding: var(--space-1);
-    border: none;
-    background: none;
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    font-weight: 600;
   }
   .resumo {
     display: flex;

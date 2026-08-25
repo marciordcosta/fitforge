@@ -172,7 +172,7 @@
   {:else}
     <div class="acoes">
       <button class="acao-btn" disabled={processando} onclick={salvarComoReceita}>
-        <span class="acao-label">Salvar Refeição</span>
+        <span class="acao-label">Salvar</span>
         {@render iconSalvar()}
       </button>
       <button class="acao-btn" disabled={processando} onclick={() => (mostrarCopiarDe = true)}>
@@ -362,9 +362,10 @@
     cursor: not-allowed;
   }
   .acao-label {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 400;
     text-align: center;
+    white-space: nowrap;
   }
   .acao-btn svg {
     width: 20px;
