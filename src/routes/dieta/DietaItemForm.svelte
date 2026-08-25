@@ -478,7 +478,7 @@
   }
   .donut-centro {
     position: absolute;
-    inset: 14px;
+    inset: 12px;
     border-radius: 50%;
     background: var(--surface-bg);
     display: flex;
