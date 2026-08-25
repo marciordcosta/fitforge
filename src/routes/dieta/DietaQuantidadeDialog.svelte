@@ -51,10 +51,11 @@
 
     <div class="linha-qtd">
       <input class="qtd-input" type="number" inputmode="decimal" step="any" min="0" bind:value={quantidade} />
-      <span class="rotulo">Porção(ões) de</span>
+      <div class="rotulo-coluna">
+        <span class="rotulo">Porção(ões) de</span>
+        <span class="unidade-texto">{unidade === "porcao" ? `${porcaoPadraoQtd} ${porcaoPadraoUnidade}` : `1 ${porcaoPadraoUnidade}`}</span>
+      </div>
     </div>
-
-    <p class="unidade-texto">{unidade === "porcao" ? `${porcaoPadraoQtd} ${porcaoPadraoUnidade} (porção completa)` : `1 ${porcaoPadraoUnidade} (fracionada)`}</p>
 
     <div class="acoes">
       <button class="icone-alternar" onclick={alternarUnidade} aria-label="Alternar unidade">
@@ -98,7 +99,7 @@
     align-items: baseline;
     justify-content: center;
     gap: var(--space-3);
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-5);
   }
   .qtd-input {
     width: 70px;
@@ -111,15 +112,18 @@
     font-weight: 700;
     text-align: center;
   }
+  .rotulo-coluna {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
   .rotulo {
     color: var(--surface-fg);
     font-size: var(--font-size-base);
   }
   .unidade-texto {
-    margin: 0 0 var(--space-5);
-    text-align: center;
     color: var(--surface-muted);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-sm);
   }
   .acoes {
     display: flex;
