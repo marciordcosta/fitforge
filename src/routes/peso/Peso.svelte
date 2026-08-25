@@ -299,7 +299,7 @@
           const yLinha = escalaY.getPixelForValue(alvo) - 9;
           // Perto demais do rótulo do peso real (ex: primeiro ponto, onde a meta parte do mesmo valor) — pula pra não sobrepor.
           if (diff != null && Math.abs(yLinha - yDiff) < 12) return;
-          ctx.fillStyle = "#fff";
+          ctx.fillStyle = COR_TREINO;
           ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
         }
       });

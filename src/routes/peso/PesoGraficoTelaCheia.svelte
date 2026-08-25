@@ -51,7 +51,7 @@
         const diff = diffMetaPorPonto?.[i];
         const yDiff = ponto.y - 14;
         if (diff != null) {
-          ctx.fillStyle = COR_TREINO;
+          ctx.fillStyle = "#fff";
           const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
           ctx.fillText(texto, ponto.x, yDiff);
         }
