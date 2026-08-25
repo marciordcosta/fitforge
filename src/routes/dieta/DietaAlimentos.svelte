@@ -6,6 +6,7 @@
     buscarAlimentos,
     listAlimentos,
     buscarReceitas,
+    listReceitas,
     adicionarItemDiario,
     adicionarReceitaAoDiario,
     getRefeicaoDia,
@@ -47,7 +48,9 @@
     loading = true;
     erro = null;
     try {
-      alimentos = await listAlimentos();
+      const [alRes, recRes] = await Promise.all([listAlimentos(), modoAdicionar ? listReceitas() : Promise.resolve([])]);
+      alimentos = alRes;
+      resultadosReceitas = recRes;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -78,8 +81,9 @@
           alimentos = alRes;
           resultadosReceitas = recRes;
         } else {
-          alimentos = await listAlimentos();
-          resultadosReceitas = [];
+          const [alRes, recRes] = await Promise.all([listAlimentos(), modoAdicionar ? listReceitas() : Promise.resolve([])]);
+          alimentos = alRes;
+          resultadosReceitas = recRes;
         }
       } catch (err) {
         erro = (err as Error).message;
