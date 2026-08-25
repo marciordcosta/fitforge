@@ -169,9 +169,10 @@ export interface ProgressoMetaPeso {
 
 /**
  * Peso atual (média móvel dos últimos 7 dias, no registro mais recente) contra o alvo da meta ativa.
- * Pra meta percentual, o alvo é projetado a partir da média móvel do primeiro peso já registrado
- * (mesma lógica do gráfico em "Tudo"), pra dar um número estável, independente de filtro de tela.
- * Retorna null se não há meta ativa ou nenhum peso registrado ainda.
+ * Pra meta percentual, o alvo é projetado a partir da média móvel do primeiro peso registrado nos
+ * últimos 7 dias corridos — mesma janela "1 semana" que é o filtro padrão do gráfico de Peso — pra
+ * bater com os mesmos valores mostrados lá. Retorna null se não há meta ativa, nenhum peso registrado
+ * ainda, ou (só pra meta percentual) nenhum peso registrado na última semana.
  */
 export async function getProgressoMetaHoje(): Promise<ProgressoMetaPeso | null> {
   const meta = await getMeta();
@@ -197,7 +198,11 @@ export async function getProgressoMetaHoje(): Promise<ProgressoMetaPeso | null> 
     pesoAlvo = meta.pesoManutencao;
   } else {
     if (meta.percentual == null) return null;
-    const dataInicial = ordenados[0].data;
+    const hoje = parseISODate(hojeISO());
+    const inicioSemana = toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 7));
+    const registrosNaSemana = ordenados.filter((p) => p.data >= inicioSemana);
+    if (!registrosNaSemana.length) return null;
+    const dataInicial = registrosNaSemana[0].data;
     const pesoInicial = mediaMovelEm(dataInicial);
     const diasDecorridos = Math.round(
       (parseISODate(dataMaisRecente).getTime() - parseISODate(dataInicial).getTime()) / 86400000,
