@@ -273,12 +273,6 @@
         </div>
       </div>
     {/if}
-
-    <p class="itens-titulo">Item</p>
-    <div class="item-preview">
-      <span class="item-nome">{alimento.nome}</span>
-      <span class="item-sub">{quantidade.toFixed(0)}{alimento.porcaoPadraoUnidade} · {calorias.toFixed(0)} kcal</span>
-    </div>
   {/if}
 </div>
 
@@ -459,8 +453,7 @@
     text-align: center;
     line-height: 1.5;
   }
-  .metas-titulo,
-  .itens-titulo {
+  .metas-titulo {
     font-weight: 600;
     margin: var(--space-2) 0 var(--space-3);
   }
@@ -490,20 +483,6 @@
   }
   .meta-valor {
     font-size: 11px;
-    color: var(--surface-muted);
-  }
-  .item-preview {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--surface-border);
-  }
-  .item-nome {
-    font-size: var(--font-size-base);
-  }
-  .item-sub {
-    font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
   .muted {
