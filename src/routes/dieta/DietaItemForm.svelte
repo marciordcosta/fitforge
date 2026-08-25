@@ -430,7 +430,7 @@
     padding: var(--space-1);
     border: none;
     background: none;
-    color: var(--color-secondary);
+    color: var(--surface-fg);
     font-size: var(--font-size-base);
     font-weight: 600;
   }
