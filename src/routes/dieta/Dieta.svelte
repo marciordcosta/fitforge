@@ -4,6 +4,7 @@
   import DietaRefeicaoVisualizar from "./DietaRefeicaoVisualizar.svelte";
   import DietaAlimentos from "./DietaAlimentos.svelte";
   import DietaItemForm from "./DietaItemForm.svelte";
+  import DietaReceitaForm from "./DietaReceitaForm.svelte";
   import Placeholder from "../Placeholder.svelte";
   import { hojeISO } from "../../lib/dates";
   import type { Refeicao } from "../../lib/dietaApi";
@@ -21,6 +22,8 @@
   />
 {:else if segmentos[0] === "alimentos"}
   <DietaAlimentos />
+{:else if segmentos[0] === "receitas" && segmentos[1] === "nova"}
+  <DietaReceitaForm />
 {:else if segmentos[0] === "distribuicao"}
   <Placeholder titulo="Distribuição" />
 {:else if segmentos[0] === "historico"}

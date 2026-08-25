@@ -96,6 +96,7 @@
     refeicao={refeicaoParaAdicionar}
     data={dataAtual}
     onFechar={() => (refeicaoParaAdicionar = null)}
+    onAdicionado={carregar}
   />
 {/if}
 

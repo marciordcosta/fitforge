@@ -1,10 +1,15 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { navigate } from "../../lib/router.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import {
     getAlimento,
     getMetasDiarias,
     adicionarItemDiario,
+    duplicarAlimento,
+    excluirAlimento,
     REFEICOES,
     labelRefeicao,
     type Alimento,
@@ -28,7 +33,11 @@
   let refeicao = $state<Refeicao | null>(untrack(() => refeicaoInicial));
   let porcoes = $state(1);
   let mostrarEscolhaRefeicao = $state(false);
+  let mostrarMenuAlimento = $state(false);
+  let mostrarEditar = $state(false);
+  let confirmandoExclusao = $state(false);
   let salvando = $state(false);
+  let processandoAlimento = $state(false);
 
   async function carregar() {
     loading = true;
@@ -37,6 +46,34 @@
   }
 
   void carregar();
+
+  function sufixoRota(): string {
+    return refeicao ? `/${data}/${refeicao}` : data ? `/${data}` : "";
+  }
+
+  async function duplicar() {
+    if (!alimento) return;
+    processandoAlimento = true;
+    try {
+      const novoId = await duplicarAlimento(alimento);
+      navigate(`/dieta/alimento/${novoId}${sufixoRota()}`);
+    } catch (err) {
+      alert("Erro ao duplicar alimento: " + (err as Error).message);
+      processandoAlimento = false;
+    }
+  }
+
+  async function excluir() {
+    if (!alimento) return;
+    processandoAlimento = true;
+    try {
+      await excluirAlimento(alimento.id);
+      navigate("/dieta/alimentos");
+    } catch (err) {
+      alert("Erro ao excluir alimento: " + (err as Error).message);
+      processandoAlimento = false;
+    }
+  }
 
   const quantidade = $derived(alimento ? porcoes * alimento.porcaoPadraoQtd : 0);
   const calorias = $derived(alimento ? alimento.caloriasPorPorcao * porcoes : 0);
@@ -74,11 +111,43 @@
   }
 </script>
 
+{#snippet iconMenu()}
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <circle cx="12" cy="5" r="1.8" />
+    <circle cx="12" cy="12" r="1.8" />
+    <circle cx="12" cy="19" r="1.8" />
+  </svg>
+{/snippet}
+{#snippet iconEditar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+{/snippet}
+{#snippet iconDuplicar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+{/snippet}
+{#snippet iconExcluir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
     <h1>Adicionar Alimento</h1>
-    <button class="salvar" onclick={salvar} disabled={salvando || !refeicao || loading} aria-label="Salvar">✓</button>
+    <div class="header-acoes">
+      {#if alimento?.fonte === "manual"}
+        <button class="icone-acao" onclick={() => (mostrarMenuAlimento = true)} disabled={processandoAlimento} aria-label="Mais opções">
+          {@render iconMenu()}
+        </button>
+      {/if}
+      <button class="salvar" onclick={salvar} disabled={salvando || !refeicao || loading} aria-label="Salvar">✓</button>
+    </div>
   </div>
 
   {#if loading || !alimento}
@@ -152,6 +221,31 @@
   />
 {/if}
 
+{#if mostrarMenuAlimento}
+  <ActionSheet
+    titulo={alimento?.nome}
+    onFechar={() => (mostrarMenuAlimento = false)}
+    opcoes={[
+      { label: "Editar", icon: iconEditar, onSelect: () => (mostrarEditar = true) },
+      { label: "Duplicar", icon: iconDuplicar, onSelect: () => duplicar() },
+      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => (confirmandoExclusao = true) },
+    ]}
+  />
+{/if}
+
+{#if mostrarEditar && alimento}
+  <DietaAlimentoFormSheet {alimento} onFechar={() => (mostrarEditar = false)} onSalvo={carregar} />
+{/if}
+
+{#if confirmandoExclusao}
+  <ConfirmDialog
+    titulo="Tem certeza de que quer excluir este alimento?"
+    textoConfirmar="Excluir Alimento"
+    onConfirmar={excluir}
+    onCancelar={() => (confirmandoExclusao = false)}
+  />
+{/if}
+
 <style>
   .container {
     max-width: 480px;
@@ -188,6 +282,28 @@
   }
   .salvar:disabled {
     color: var(--surface-muted);
+    cursor: not-allowed;
+  }
+  .header-acoes {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+  }
+  .icone-acao {
+    background: none;
+    border: none;
+    color: var(--surface-fg);
+    cursor: pointer;
+    padding: var(--space-1);
+    display: flex;
+  }
+  .icone-acao svg {
+    width: 20px;
+    height: 20px;
+  }
+  .icone-acao:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
   }
   .nome-alimento {

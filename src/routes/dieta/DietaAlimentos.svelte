@@ -3,11 +3,13 @@
   import { hojeISO } from "../../lib/dates";
   import { buscarAlimentos, listAlimentos, type Alimento } from "../../lib/dietaApi";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
 
   let alimentos = $state<Alimento[]>([]);
   let loading = $state(true);
   let busca = $state("");
-  let mostrarCriar = $state(false);
+  let mostrarEscolhaCriar = $state(false);
+  let mostrarCriarAlimento = $state(false);
 
   let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
 
@@ -34,11 +36,27 @@
   }
 </script>
 
+{#snippet iconAlimento()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3v7a2 2 0 0 0 2 2v9" />
+    <path d="M7 3v4M11 3v4" />
+    <path d="M17 3c-1.5 0-3 1.5-3 4v3a2 2 0 0 0 2 2v9" />
+  </svg>
+{/snippet}
+{#snippet iconReceita()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="8" height="8" rx="1.5" />
+    <rect x="13" y="3" width="8" height="8" rx="1.5" />
+    <rect x="3" y="13" width="8" height="8" rx="1.5" />
+    <rect x="13" y="13" width="8" height="8" rx="1.5" />
+  </svg>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => navigate("/dieta")} aria-label="Voltar">←</button>
     <h1>Alimentos</h1>
-    <button class="criar" onclick={() => (mostrarCriar = true)}>Criar</button>
+    <button class="criar" onclick={() => (mostrarEscolhaCriar = true)}>Criar</button>
   </div>
 
   <input class="search" type="text" placeholder="Procurar alimento" bind:value={busca} oninput={aoDigitar} />
@@ -65,8 +83,19 @@
   {/if}
 </div>
 
-{#if mostrarCriar}
-  <DietaAlimentoFormSheet onFechar={() => (mostrarCriar = false)} onSalvo={carregarInicial} />
+{#if mostrarEscolhaCriar}
+  <ActionSheet
+    titulo="Criar"
+    onFechar={() => (mostrarEscolhaCriar = false)}
+    opcoes={[
+      { label: "Alimento", icon: iconAlimento, onSelect: () => (mostrarCriarAlimento = true) },
+      { label: "Refeição", icon: iconReceita, onSelect: () => navigate("/dieta/receitas/nova") },
+    ]}
+  />
+{/if}
+
+{#if mostrarCriarAlimento}
+  <DietaAlimentoFormSheet onFechar={() => (mostrarCriarAlimento = false)} onSalvo={carregarInicial} />
 {/if}
 
 <style>

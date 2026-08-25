@@ -1,18 +1,25 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
-  import { criarAlimentoManual } from "../../lib/dietaApi";
+  import { criarAlimentoManual, atualizarAlimentoManual, type Alimento } from "../../lib/dietaApi";
 
-  let { onFechar, onSalvo }: { onFechar: () => void; onSalvo: () => void } = $props();
+  let {
+    alimento,
+    onFechar,
+    onSalvo,
+  }: { alimento?: Alimento; onFechar: () => void; onSalvo: () => void } = $props();
 
-  let nome = $state("");
-  let marca = $state("");
-  let porcaoQtd = $state<number | null>(100);
-  let porcaoUnidade = $state<"g" | "ml" | "unidade">("g");
-  let calorias = $state<number | null>(null);
-  let proteina = $state<number | null>(null);
-  let gordura = $state<number | null>(null);
-  let carboidrato = $state<number | null>(null);
+  const editando = untrack(() => alimento != null);
+
+  let nome = $state(untrack(() => alimento?.nome ?? ""));
+  let marca = $state(untrack(() => alimento?.marca ?? ""));
+  let porcaoQtd = $state<number | null>(untrack(() => alimento?.porcaoPadraoQtd ?? 100));
+  let porcaoUnidade = $state<"g" | "ml" | "unidade">(untrack(() => (alimento?.porcaoPadraoUnidade as "g" | "ml" | "unidade") ?? "g"));
+  let calorias = $state<number | null>(untrack(() => alimento?.caloriasPorPorcao ?? null));
+  let proteina = $state<number | null>(untrack(() => alimento?.proteinaG ?? null));
+  let gordura = $state<number | null>(untrack(() => alimento?.gorduraG ?? null));
+  let carboidrato = $state<number | null>(untrack(() => alimento?.carboidratoG ?? null));
   let salvando = $state(false);
 
   const valido = $derived(
@@ -29,7 +36,7 @@
     if (!valido) return;
     salvando = true;
     try {
-      await criarAlimentoManual({
+      const input = {
         nome: nome.trim(),
         marca: marca.trim() || null,
         porcaoPadraoQtd: porcaoQtd!,
@@ -38,17 +45,22 @@
         proteinaG: proteina!,
         gorduraG: gordura!,
         carboidratoG: carboidrato!,
-      });
+      };
+      if (editando) {
+        await atualizarAlimentoManual(alimento!.id, input);
+      } else {
+        await criarAlimentoManual(input);
+      }
       onSalvo();
       onFechar();
     } catch (err) {
-      alert("Erro ao criar alimento: " + (err as Error).message);
+      alert("Erro ao salvar alimento: " + (err as Error).message);
       salvando = false;
     }
   }
 </script>
 
-<Sheet titulo="Novo Alimento" {onFechar}>
+<Sheet titulo={editando ? "Editar Alimento" : "Novo Alimento"} {onFechar}>
   <div class="campo">
     <label for="af-nome">Nome</label>
     <input id="af-nome" type="text" bind:value={nome} />
@@ -94,7 +106,7 @@
     </div>
   </div>
 
-  <Button onclick={salvar} disabled={salvando || !valido}>Criar Alimento</Button>
+  <Button onclick={salvar} disabled={salvando || !valido}>{editando ? "Salvar Alterações" : "Criar Alimento"}</Button>
 </Sheet>
 
 <style>

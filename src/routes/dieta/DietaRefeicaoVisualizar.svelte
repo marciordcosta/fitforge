@@ -93,6 +93,7 @@
     {refeicao}
     {data}
     onFechar={() => (mostrarAdicionar = false)}
+    onAdicionado={carregar}
   />
 {/if}
 

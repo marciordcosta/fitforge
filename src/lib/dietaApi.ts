@@ -20,6 +20,8 @@ export function labelRefeicao(refeicao: Refeicao): string {
   return REFEICOES.find((r) => r.valor === refeicao)?.label ?? refeicao;
 }
 
+export type FonteAlimento = "manual" | "taco" | "openfoodfacts";
+
 export interface Alimento {
   id: string;
   nome: string;
@@ -30,10 +32,11 @@ export interface Alimento {
   proteinaG: number;
   gorduraG: number;
   carboidratoG: number;
+  fonte: FonteAlimento;
 }
 
 const ALIMENTO_SELECT =
-  "id, nome, marca, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g";
+  "id, nome, marca, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fonte";
 
 function mapAlimento(a: Record<string, unknown>): Alimento {
   return {
@@ -46,6 +49,7 @@ function mapAlimento(a: Record<string, unknown>): Alimento {
     proteinaG: a.proteina_g as number,
     gorduraG: a.gordura_g as number,
     carboidratoG: a.carboidrato_g as number,
+    fonte: a.fonte as FonteAlimento,
   };
 }
 
@@ -79,7 +83,7 @@ export async function getAlimento(id: string): Promise<Alimento | null> {
   return data ? mapAlimento(data) : null;
 }
 
-export async function criarAlimentoManual(input: {
+export interface AlimentoManualInput {
   nome: string;
   marca: string | null;
   porcaoPadraoQtd: number;
@@ -88,7 +92,9 @@ export async function criarAlimentoManual(input: {
   proteinaG: number;
   gorduraG: number;
   carboidratoG: number;
-}): Promise<void> {
+}
+
+export async function criarAlimentoManual(input: AlimentoManualInput): Promise<void> {
   const { error } = await supabase.from("alimentos").insert({
     user_id: uid(),
     nome: input.nome,
@@ -101,6 +107,50 @@ export async function criarAlimentoManual(input: {
     carboidrato_g: input.carboidratoG,
     fonte: "manual",
   });
+  if (error) throw error;
+}
+
+export async function atualizarAlimentoManual(id: string, input: AlimentoManualInput): Promise<void> {
+  const { error } = await supabase
+    .from("alimentos")
+    .update({
+      nome: input.nome,
+      marca: input.marca,
+      porcao_padrao_qtd: input.porcaoPadraoQtd,
+      porcao_padrao_unidade: input.porcaoPadraoUnidade,
+      calorias_por_porcao: input.caloriasPorPorcao,
+      proteina_g: input.proteinaG,
+      gordura_g: input.gorduraG,
+      carboidrato_g: input.carboidratoG,
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Cria uma cópia editável de qualquer alimento (mesmo de fonte TACO/OpenFoodFacts) — a cópia é sempre "manual". */
+export async function duplicarAlimento(alimento: Alimento): Promise<string> {
+  const { data, error } = await supabase
+    .from("alimentos")
+    .insert({
+      user_id: uid(),
+      nome: `${alimento.nome} (cópia)`,
+      marca: alimento.marca,
+      porcao_padrao_qtd: alimento.porcaoPadraoQtd,
+      porcao_padrao_unidade: alimento.porcaoPadraoUnidade,
+      calorias_por_porcao: alimento.caloriasPorPorcao,
+      proteina_g: alimento.proteinaG,
+      gordura_g: alimento.gorduraG,
+      carboidrato_g: alimento.carboidratoG,
+      fonte: "manual",
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function excluirAlimento(id: string): Promise<void> {
+  const { error } = await supabase.from("alimentos").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -194,4 +244,123 @@ export async function getMetasDiarias(): Promise<MetasDiarias> {
     gorduraG: data.gordura_g_kg * data.peso_atual,
     carboidratoG: data.carboidrato_g_kg * data.peso_atual,
   };
+}
+
+// ---------------- Receitas (combo reutilizável de vários alimentos já cadastrados) ----------------
+
+export interface ReceitaResumo {
+  id: string;
+  nome: string;
+}
+
+export interface ReceitaItem {
+  alimentoId: string;
+  nome: string;
+  quantidade: number;
+  unidade: string;
+  calorias: number;
+  proteinaG: number;
+  gorduraG: number;
+  carboidratoG: number;
+}
+
+export interface Receita extends ReceitaResumo {
+  itens: ReceitaItem[];
+}
+
+function mapReceitaItem(l: Record<string, unknown>): ReceitaItem {
+  const a = l.alimento as Record<string, unknown>;
+  const fator = (l.quantidade as number) / (a.porcao_padrao_qtd as number);
+  return {
+    alimentoId: l.alimento_id as string,
+    nome: a.nome as string,
+    quantidade: l.quantidade as number,
+    unidade: a.porcao_padrao_unidade as string,
+    calorias: round1((a.calorias_por_porcao as number) * fator),
+    proteinaG: round1((a.proteina_g as number) * fator),
+    gorduraG: round1((a.gordura_g as number) * fator),
+    carboidratoG: round1((a.carboidrato_g as number) * fator),
+  };
+}
+
+export async function buscarReceitas(query: string): Promise<ReceitaResumo[]> {
+  const termo = query.trim();
+  if (!termo) return [];
+  const { data, error } = await supabase
+    .from("dieta_receitas")
+    .select("id, nome")
+    .ilike("nome", `%${termo}%`)
+    .order("nome", { ascending: true })
+    .limit(20);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function listReceitas(limite = 50): Promise<ReceitaResumo[]> {
+  const { data, error } = await supabase
+    .from("dieta_receitas")
+    .select("id, nome")
+    .order("nome", { ascending: true })
+    .limit(limite);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getReceita(id: string): Promise<Receita | null> {
+  const [receitaRes, itensRes] = await Promise.all([
+    supabase.from("dieta_receitas").select("id, nome").eq("id", id).maybeSingle(),
+    supabase
+      .from("dieta_receita_itens")
+      .select(
+        "alimento_id, quantidade, ordem, alimento:alimentos(nome, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g)",
+      )
+      .eq("receita_id", id)
+      .order("ordem", { ascending: true }),
+  ]);
+  if (receitaRes.error) throw receitaRes.error;
+  if (itensRes.error) throw itensRes.error;
+  if (!receitaRes.data) return null;
+  return {
+    id: receitaRes.data.id,
+    nome: receitaRes.data.nome,
+    itens: (itensRes.data ?? []).map((l) => mapReceitaItem(l as Record<string, unknown>)),
+  };
+}
+
+export async function criarReceita(nome: string, itens: { alimentoId: string; quantidade: number }[]): Promise<string> {
+  const { data: receita, error } = await supabase
+    .from("dieta_receitas")
+    .insert({ user_id: uid(), nome })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const linhas = itens.map((it, i) => ({
+    receita_id: receita.id,
+    alimento_id: it.alimentoId,
+    quantidade: it.quantidade,
+    ordem: i,
+  }));
+  const { error: errorItens } = await supabase.from("dieta_receita_itens").insert(linhas);
+  if (errorItens) throw errorItens;
+  return receita.id;
+}
+
+/** Loga todos os itens da receita de uma vez no diário, na mesma refeição/data. */
+export async function adicionarReceitaAoDiario(receitaId: string, data: string, refeicao: Refeicao): Promise<void> {
+  const receita = await getReceita(receitaId);
+  if (!receita) throw new Error("Refeição não encontrada.");
+  const linhas = receita.itens.map((it) => ({
+    user_id: uid(),
+    alimento_id: it.alimentoId,
+    data,
+    refeicao,
+    quantidade: it.quantidade,
+    unidade: it.unidade,
+    calorias: it.calorias,
+    proteina_g: it.proteinaG,
+    gordura_g: it.gorduraG,
+    carboidrato_g: it.carboidratoG,
+  }));
+  const { error } = await supabase.from("diario_alimentos").insert(linhas);
+  if (error) throw error;
 }

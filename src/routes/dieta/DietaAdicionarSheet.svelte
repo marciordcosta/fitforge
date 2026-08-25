@@ -1,56 +1,91 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
   import Sheet from "../../components/Sheet.svelte";
-  import { buscarAlimentos, type Alimento, type Refeicao } from "../../lib/dietaApi";
+  import {
+    buscarAlimentos,
+    buscarReceitas,
+    adicionarReceitaAoDiario,
+    type Alimento,
+    type ReceitaResumo,
+    type Refeicao,
+  } from "../../lib/dietaApi";
 
   let {
     refeicao,
     data,
     onFechar,
+    onAdicionado,
   }: {
     refeicao: Refeicao;
     data: string;
     onFechar: () => void;
+    onAdicionado?: () => void;
   } = $props();
 
   let termo = $state("");
-  let resultados = $state<Alimento[]>([]);
+  let resultadosAlimentos = $state<Alimento[]>([]);
+  let resultadosReceitas = $state<ReceitaResumo[]>([]);
   let buscando = $state(false);
+  let adicionandoReceita = $state<string | null>(null);
 
   let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
 
   function aoDigitar() {
     clearTimeout(timeoutBusca);
     if (termo.trim().length < 2) {
-      resultados = [];
+      resultadosAlimentos = [];
+      resultadosReceitas = [];
       return;
     }
     timeoutBusca = setTimeout(async () => {
       buscando = true;
       try {
-        resultados = await buscarAlimentos(termo);
+        [resultadosAlimentos, resultadosReceitas] = await Promise.all([buscarAlimentos(termo), buscarReceitas(termo)]);
       } finally {
         buscando = false;
       }
     }, 300);
   }
 
-  function selecionar(alimento: Alimento) {
+  function selecionarAlimento(alimento: Alimento) {
     onFechar();
     navigate(`/dieta/alimento/${alimento.id}/${data}/${refeicao}`);
   }
+
+  async function selecionarReceita(receita: ReceitaResumo) {
+    adicionandoReceita = receita.id;
+    try {
+      await adicionarReceitaAoDiario(receita.id, data, refeicao);
+      onAdicionado?.();
+      onFechar();
+    } catch (err) {
+      alert("Erro ao adicionar refeição: " + (err as Error).message);
+      adicionandoReceita = null;
+    }
+  }
+
+  const semResultados = $derived(termo.trim().length >= 2 && !resultadosAlimentos.length && !resultadosReceitas.length);
 </script>
 
 <Sheet titulo="Adicionar Alimento" {onFechar}>
-  <input class="busca-input" type="text" placeholder="Buscar alimento…" bind:value={termo} oninput={aoDigitar} />
+  <input class="busca-input" type="text" placeholder="Buscar alimento ou refeição…" bind:value={termo} oninput={aoDigitar} />
 
   {#if buscando}
     <p class="muted">Buscando…</p>
-  {:else if termo.trim().length >= 2 && !resultados.length}
-    <p class="muted">Nenhum alimento encontrado.</p>
+  {:else if semResultados}
+    <p class="muted">Nada encontrado.</p>
   {:else}
-    {#each resultados as alimento (alimento.id)}
-      <button class="resultado-item" onclick={() => selecionar(alimento)}>
+    {#each resultadosReceitas as receita (receita.id)}
+      <button class="resultado-item" onclick={() => selecionarReceita(receita)} disabled={adicionandoReceita != null}>
+        <span class="resultado-nome">
+          {receita.nome}
+          <span class="resultado-tag">Refeição</span>
+        </span>
+        <span class="resultado-cal">{adicionandoReceita === receita.id ? "Adicionando…" : "Adicionar"}</span>
+      </button>
+    {/each}
+    {#each resultadosAlimentos as alimento (alimento.id)}
+      <button class="resultado-item" onclick={() => selecionarAlimento(alimento)}>
         <span class="resultado-nome">
           {alimento.nome}
           {#if alimento.marca}<span class="resultado-marca">{alimento.marca}</span>{/if}
@@ -90,6 +125,10 @@
   .resultado-item:last-child {
     border-bottom: none;
   }
+  .resultado-item:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
   .resultado-nome {
     display: flex;
     flex-direction: column;
@@ -101,6 +140,12 @@
   .resultado-marca {
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .resultado-tag {
+    font-size: 11px;
+    color: var(--color-primary);
+    font-weight: 600;
+    text-transform: uppercase;
   }
   .resultado-cal {
     flex-shrink: 0;
