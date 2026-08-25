@@ -48,7 +48,7 @@
   <div class="header">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
     <h1>Refeições</h1>
-    <button class="criar" onclick={() => navigate("/dieta/receitas/nova")} aria-label="Nova refeição">+</button>
+    <button class="criar" onclick={() => navigate("/dieta/receitas/nova")}>Criar</button>
   </div>
 
   <input class="search" type="text" placeholder="Procurar refeição" bind:value={busca} oninput={aoDigitar} />
