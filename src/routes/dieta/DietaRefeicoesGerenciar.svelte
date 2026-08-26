@@ -429,25 +429,27 @@
         </div>
       </div>
 
-      <p class="secao-titulo">Proporção por peso (g/kg)</p>
-      <div class="tabela-macros">
-        <div class="tabela-linha">
-          <span class="tabela-rotulo">Proteína</span>
-          <button type="button" class="tabela-input" onclick={() => (campoEditando = "proteinaGKg")}>
-            {proteinaGKg.toFixed(2)}
-          </button>
-        </div>
-        <div class="tabela-linha">
-          <span class="tabela-rotulo">Gordura</span>
-          <button type="button" class="tabela-input" onclick={() => (campoEditando = "gorduraGKg")}>
-            {gorduraGKg.toFixed(2)}
-          </button>
-        </div>
-        <div class="tabela-linha">
-          <span class="tabela-rotulo">Carboidrato</span>
-          <button type="button" class="tabela-input" onclick={() => (campoEditando = "carboidratoGKg")}>
-            {carboidratoGKg.toFixed(2)}
-          </button>
+      <div class="card-proporcao">
+        <p class="secao-titulo">Proporção por peso (g/kg)</p>
+        <div class="tabela-macros">
+          <div class="tabela-linha">
+            <span class="tabela-rotulo">Proteína</span>
+            <button type="button" class="tabela-input" onclick={() => (campoEditando = "proteinaGKg")}>
+              {proteinaGKg.toFixed(2)}
+            </button>
+          </div>
+          <div class="tabela-linha">
+            <span class="tabela-rotulo">Gordura</span>
+            <button type="button" class="tabela-input" onclick={() => (campoEditando = "gorduraGKg")}>
+              {gorduraGKg.toFixed(2)}
+            </button>
+          </div>
+          <div class="tabela-linha">
+            <span class="tabela-rotulo">Carboidrato</span>
+            <button type="button" class="tabela-input" onclick={() => (campoEditando = "carboidratoGKg")}>
+              {carboidratoGKg.toFixed(2)}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -674,8 +676,17 @@
     font-weight: 600;
     margin: var(--space-2) 0 var(--space-1);
   }
-  .tabela-macros {
+  .card-proporcao {
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
     margin-bottom: var(--space-4);
+  }
+  .card-proporcao .secao-titulo {
+    margin-top: 0;
+  }
+  .tabela-macros {
+    margin-bottom: 0;
   }
   .tabela-linha {
     display: flex;
