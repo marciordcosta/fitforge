@@ -9,6 +9,7 @@
     garantirRefeicoesPadraoDoDia,
     getDiarioDoDia,
     getMetasDiarias,
+    listRefeicoesModelo,
     type RefeicaoDia,
     type ItemDiario,
     type MetasDiarias,
@@ -37,6 +38,20 @@
   let modoRestante = $state(false);
   let rotinaHoje = $state<Treino | null>(null);
   let progressoPeso = $state<ProgressoMetaPeso | null>(null);
+  let metasCaloriasPorRefeicao = $state<Map<string, number>>(new Map());
+
+  async function carregarMetasRefeicoes() {
+    try {
+      const modelos = await listRefeicoesModelo();
+      metasCaloriasPorRefeicao = new Map(
+        modelos.filter((m) => m.metaCalorias !== null).map((m) => [m.nome, m.metaCalorias as number]),
+      );
+    } catch {
+      // opcional — sem meta cadastrada, os cards seguem mostrando só o total
+    }
+  }
+
+  void carregarMetasRefeicoes();
 
   async function carregarInfoTopo() {
     try {
@@ -306,6 +321,7 @@
       {#each refeicoes as refeicao (refeicao.id)}
         {@const totais = totaisRefeicao(refeicao.id)}
         {@const temItens = itens.some((i) => i.refeicaoId === refeicao.id)}
+        {@const metaCal = metasCaloriasPorRefeicao.get(refeicao.nome)}
         <div
           class="refeicao-item"
           role="button"
@@ -316,7 +332,7 @@
           <div class="card-header">
             <h2>{refeicao.nome}</h2>
             {#if temItens}
-              <span class="card-cal">{totais.calorias.toFixed(0)} cal</span>
+              <span class="card-cal">{totais.calorias.toFixed(0)}{#if metaCal !== undefined} de {metaCal.toFixed(0)}{/if} cal</span>
             {/if}
           </div>
           <p class="preview" class:preview-colado={temItens}>{preview(refeicao.id)}</p>
