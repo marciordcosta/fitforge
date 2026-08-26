@@ -12,6 +12,7 @@
     removerRefeicaoDia,
     salvarRefeicaoComoReceita,
     getMetasDiarias,
+    getMetaRefeicaoPorNome,
     getAlimento,
     atualizarItemDiario,
     type RefeicaoDia,
@@ -34,6 +35,7 @@
   let refeicao = $state<RefeicaoDia | null>(null);
   let itens = $state<ItemDiario[]>([]);
   let metas = $state<MetasDiarias | null>(null);
+  let metaRefeicao = $state<MetasDiarias | null>(null);
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let itemParaRemover = $state<ItemDiario | null>(null);
@@ -49,6 +51,7 @@
     erro = null;
     try {
       [refeicao, itens, metas] = await Promise.all([getRefeicaoDia(refeicaoId), getItensDaRefeicao(refeicaoId), getMetasDiarias()]);
+      metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome) : null;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -57,6 +60,8 @@
   }
 
   void carregar();
+
+  const metasEfetivas = $derived(metaRefeicao ?? metas);
 
   const dataLabel = $derived.by(() => {
     if (!refeicao) return "";
@@ -236,28 +241,28 @@
         </div>
       </div>
 
-      {#if metas}
-        <p class="metas-titulo">Percentual das suas metas diárias</p>
+      {#if metasEfetivas}
+        <p class="metas-titulo">{metaRefeicao ? `Meta de ${refeicao?.nome}` : "Percentual das suas metas diárias"}</p>
         <div class="metas-grid">
           <div class="meta-col">
             <span class="meta-label">Calorias</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalCalorias, metas.calorias)}%; background:var(--color-secondary);`}></div></div>
-            <span class="meta-valor">{pctMeta(totalCalorias, metas.calorias).toFixed(0)}% · {metas.calorias.toFixed(0)}</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalCalorias, metasEfetivas.calorias)}%; background:var(--color-secondary);`}></div></div>
+            <span class="meta-valor">{pctMeta(totalCalorias, metasEfetivas.calorias).toFixed(0)}% · {metasEfetivas.calorias.toFixed(0)}</span>
           </div>
           <div class="meta-col">
             <span class="meta-label">Carb</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalCarboidrato, metas.carboidratoG)}%; background:${COR_CARBO};`}></div></div>
-            <span class="meta-valor">{pctMeta(totalCarboidrato, metas.carboidratoG).toFixed(0)}% · {metas.carboidratoG.toFixed(0)}g</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalCarboidrato, metasEfetivas.carboidratoG)}%; background:${COR_CARBO};`}></div></div>
+            <span class="meta-valor">{pctMeta(totalCarboidrato, metasEfetivas.carboidratoG).toFixed(0)}% · {metasEfetivas.carboidratoG.toFixed(0)}g</span>
           </div>
           <div class="meta-col">
             <span class="meta-label">Gorduras</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalGordura, metas.gorduraG)}%; background:${COR_GORDURA};`}></div></div>
-            <span class="meta-valor">{pctMeta(totalGordura, metas.gorduraG).toFixed(0)}% · {metas.gorduraG.toFixed(0)}g</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalGordura, metasEfetivas.gorduraG)}%; background:${COR_GORDURA};`}></div></div>
+            <span class="meta-valor">{pctMeta(totalGordura, metasEfetivas.gorduraG).toFixed(0)}% · {metasEfetivas.gorduraG.toFixed(0)}g</span>
           </div>
           <div class="meta-col">
             <span class="meta-label">Proteínas</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalProteina, metas.proteinaG)}%; background:${COR_PROTEINA};`}></div></div>
-            <span class="meta-valor">{pctMeta(totalProteina, metas.proteinaG).toFixed(0)}% · {metas.proteinaG.toFixed(0)}g</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalProteina, metasEfetivas.proteinaG)}%; background:${COR_PROTEINA};`}></div></div>
+            <span class="meta-valor">{pctMeta(totalProteina, metasEfetivas.proteinaG).toFixed(0)}% · {metasEfetivas.proteinaG.toFixed(0)}g</span>
           </div>
         </div>
       {/if}
