@@ -598,6 +598,8 @@
         />
       {/if}
 
+      <div class="separador"></div>
+
       <p class="nutrientes-titulo">Metas de Consumo</p>
       <div class="nutrientes-lista">
         <div class="nutriente-item">
@@ -613,6 +615,8 @@
           <span>{aguaL.toFixed(1)} L</span>
         </div>
       </div>
+
+      <div class="separador"></div>
 
       <p class="secao-titulo">Distribuição Semanal</p>
       <div class="tabs modo-toggle">
@@ -932,6 +936,10 @@
   }
   .tabela-input:focus {
     outline: none;
+  }
+  .separador {
+    border-top: 1px solid var(--surface-border);
+    margin: var(--space-6) 0;
   }
   .nutrientes-titulo {
     font-weight: 600;
