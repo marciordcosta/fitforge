@@ -1164,17 +1164,13 @@
   }
   .tabela-linha-3col {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr 88px 64px;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
   .tabela-rotulo {
     color: var(--surface-fg);
     font-size: var(--font-size-base);
-  }
-  .tabela-input-gkg {
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
   }
   .tabela-input {
     flex: 0 0 64px;
@@ -1190,6 +1186,11 @@
   }
   .tabela-input:focus {
     outline: none;
+  }
+  .tabela-input-gkg {
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+    font-weight: 400;
   }
   .separador {
     border-top: 1px solid var(--surface-border);
