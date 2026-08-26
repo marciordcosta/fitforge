@@ -1,5 +1,7 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
+import { getPesoMedioAtual } from "./pesoApi";
+import { DIAS_SEMANA_ABREV } from "./treinoApi";
 
 function uid(): string {
   const id = auth.user?.id;
@@ -583,6 +585,127 @@ export async function salvarPerfilDieta(input: {
     { onConflict: "user_id" },
   );
   if (error) throw error;
+}
+
+// ---------------- Distribuição semanal de calorias (Fixa / Ondulatória) ----------------
+
+/** Piso de calorias diárias (kcal/kg) — hoje fixo aqui, migra pra Parametrização depois. */
+export const CALORIA_MINIMA_KCAL_KG = 20;
+
+export interface CaloriasPorDia {
+  /** 0-6, 0 = domingo (mesma convenção de Date.getDay() usada em Treino). */
+  diaSemana: number;
+  calorias: number;
+  manual: boolean;
+}
+
+export interface DistribuicaoSemanal {
+  modo: "fixa" | "ondulatoria";
+  /** Sempre 7 entradas, ordenadas por diaSemana (0 a 6). */
+  dias: CaloriasPorDia[];
+}
+
+/**
+ * Calcula os 7 dias a partir dos dias travados manualmente: o que sobra da meta semanal
+ * (metaCalorias × 7 − soma dos manuais) é dividido em partes iguais pelos dias automáticos.
+ * Sempre precisa sobrar pelo menos 1 dia automático, e nenhum valor (manual ou automático)
+ * pode ficar abaixo do piso mínimo.
+ */
+function resolverDistribuicao(metaCalorias: number, manuais: Map<number, number>, minimo: number): CaloriasPorDia[] {
+  const todosOsDias = [0, 1, 2, 3, 4, 5, 6];
+  const diasAuto = todosOsDias.filter((d) => !manuais.has(d));
+  if (diasAuto.length === 0) {
+    throw new Error("Pelo menos 1 dia da semana precisa ficar automático pra fechar a meta.");
+  }
+  for (const [dia, valor] of manuais) {
+    if (valor < minimo) {
+      throw new Error(
+        `${DIAS_SEMANA_ABREV[dia]} ficaria com ${Math.round(valor)} kcal, abaixo do mínimo de ${Math.round(minimo)} kcal.`,
+      );
+    }
+  }
+  const somaManual = [...manuais.values()].reduce((acc, v) => acc + v, 0);
+  const restante = metaCalorias * 7 - somaManual;
+  const valorAuto = restante / diasAuto.length;
+  if (valorAuto < minimo) {
+    throw new Error(
+      `Isso deixaria os dias automáticos com ${Math.round(valorAuto)} kcal, abaixo do mínimo de ${Math.round(minimo)} kcal.`,
+    );
+  }
+  return todosOsDias.map((dia) =>
+    manuais.has(dia)
+      ? { diaSemana: dia, calorias: manuais.get(dia)!, manual: true }
+      : { diaSemana: dia, calorias: valorAuto, manual: false },
+  );
+}
+
+async function contextoDistribuicao(): Promise<{ metaCalorias: number; minimo: number }> {
+  const [metas, perfil, pesoMedio] = await Promise.all([getMetasDiarias(), getPerfilDietaEditavel(), getPesoMedioAtual()]);
+  const pesoAtual = pesoMedio ?? perfil.pesoAtual;
+  return { metaCalorias: metas.calorias, minimo: CALORIA_MINIMA_KCAL_KG * pesoAtual };
+}
+
+async function getManuaisAtuais(): Promise<Map<number, number>> {
+  const { data, error } = await supabase.from("dieta_calorias_dia").select("dia_semana, calorias");
+  if (error) throw error;
+  return new Map((data ?? []).map((l) => [l.dia_semana as number, l.calorias as number]));
+}
+
+export async function getDistribuicaoSemanal(): Promise<DistribuicaoSemanal> {
+  const { data: perfil, error } = await supabase.from("dieta_perfil").select("modo_calorias").maybeSingle();
+  if (error) throw error;
+  const modo: "fixa" | "ondulatoria" = perfil?.modo_calorias === "ondulatoria" ? "ondulatoria" : "fixa";
+
+  const { metaCalorias, minimo } = await contextoDistribuicao();
+
+  if (modo === "fixa") {
+    return {
+      modo,
+      dias: [0, 1, 2, 3, 4, 5, 6].map((dia) => ({ diaSemana: dia, calorias: metaCalorias, manual: false })),
+    };
+  }
+
+  const manuais = await getManuaisAtuais();
+  return { modo, dias: resolverDistribuicao(metaCalorias, manuais, minimo) };
+}
+
+export async function definirCaloriasDias(dias: number[], calorias: number): Promise<DistribuicaoSemanal> {
+  const { metaCalorias, minimo } = await contextoDistribuicao();
+  const manuais = await getManuaisAtuais();
+  for (const dia of dias) manuais.set(dia, calorias);
+
+  const resolvidos = resolverDistribuicao(metaCalorias, manuais, minimo);
+
+  const { error } = await supabase
+    .from("dieta_calorias_dia")
+    .upsert(
+      dias.map((dia) => ({ user_id: uid(), dia_semana: dia, calorias, updated_at: new Date().toISOString() })),
+      { onConflict: "user_id,dia_semana" },
+    );
+  if (error) throw error;
+
+  return { modo: "ondulatoria", dias: resolvidos };
+}
+
+export async function removerCaloriasDia(diaSemana: number): Promise<DistribuicaoSemanal> {
+  const { error } = await supabase.from("dieta_calorias_dia").delete().eq("user_id", uid()).eq("dia_semana", diaSemana);
+  if (error) throw error;
+
+  const { metaCalorias, minimo } = await contextoDistribuicao();
+  const manuais = await getManuaisAtuais();
+  return { modo: "ondulatoria", dias: resolverDistribuicao(metaCalorias, manuais, minimo) };
+}
+
+export async function definirModoCalorias(modo: "fixa" | "ondulatoria"): Promise<void> {
+  const { error } = await supabase
+    .from("dieta_perfil")
+    .upsert({ user_id: uid(), modo_calorias: modo, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) throw error;
+}
+
+/** Carboidrato do dia: mesma fórmula usada pra fechar a meta de calorias, só trocando a meta pela calorias daquele dia. */
+export function carboidratoGDoDia(caloriasDoDia: number, proteinaG: number, gorduraG: number): number {
+  return Math.max(0, Math.round((caloriasDoDia - 4 * proteinaG - 9 * gorduraG) / 4));
 }
 
 // ---------------- Receitas (combo reutilizável de vários alimentos já cadastrados) ----------------

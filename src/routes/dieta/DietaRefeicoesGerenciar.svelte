@@ -14,9 +14,16 @@
     salvarPerfilDieta,
     LIMITES_MACROS_G_KG,
     RATIOS_NUTRIENTES_AUTOMATICOS,
+    getDistribuicaoSemanal,
+    definirModoCalorias,
+    definirCaloriasDias,
+    removerCaloriasDia,
+    carboidratoGDoDia,
     type RefeicaoModelo,
+    type DistribuicaoSemanal,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
+  import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -37,6 +44,12 @@
   let carboidratoGKg = $state(2.93);
   let carboidratoGInput = $state<number | null>(null);
 
+  let distribuicao = $state<DistribuicaoSemanal | null>(null);
+  let diasSelecionados = $state<Set<number>>(new Set());
+  let mostrarDefinirCalorias = $state(false);
+  let caloriasGrupoInput = $state<number | null>(null);
+  let salvandoDistribuicao = $state(false);
+
   const caloriasCalc = $derived(
     Math.round(4 * (proteinaGInput ?? 0) + 9 * (gorduraGInput ?? 0) + 4 * (carboidratoGInput ?? 0)),
   );
@@ -54,7 +67,11 @@
 
   async function carregarMetas() {
     try {
-      const [perfil, pesoMedio] = await Promise.all([getPerfilDietaEditavel(), getPesoMedioAtual()]);
+      const [perfil, pesoMedio, dist] = await Promise.all([
+        getPerfilDietaEditavel(),
+        getPesoMedioAtual(),
+        getDistribuicaoSemanal(),
+      ]);
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
       proteinaGKg = perfil.proteinaGKg;
       gorduraGKg = perfil.gorduraGKg;
@@ -63,6 +80,7 @@
       gorduraGInput = Math.round(gorduraGKg * pesoAtual);
       carboidratoGInput = Math.round(carboidratoGKg * pesoAtual);
       caloriasInput = caloriasCalc;
+      distribuicao = dist;
       perfilCarregado = true;
     } catch (err) {
       erroMetas = (err as Error).message;
@@ -70,6 +88,46 @@
   }
 
   void carregarMetas();
+
+  async function alterarModoCalorias(modo: "fixa" | "ondulatoria") {
+    try {
+      await definirModoCalorias(modo);
+      distribuicao = await getDistribuicaoSemanal();
+      diasSelecionados = new Set();
+    } catch (err) {
+      alert("Erro ao mudar o modo: " + (err as Error).message);
+    }
+  }
+
+  function toggleDiaSelecionado(dia: number) {
+    const novo = new Set(diasSelecionados);
+    if (novo.has(dia)) novo.delete(dia);
+    else novo.add(dia);
+    diasSelecionados = novo;
+  }
+
+  async function confirmarCaloriasGrupo() {
+    if (caloriasGrupoInput == null || caloriasGrupoInput <= 0) return;
+    salvandoDistribuicao = true;
+    try {
+      distribuicao = await definirCaloriasDias([...diasSelecionados], caloriasGrupoInput);
+      diasSelecionados = new Set();
+      mostrarDefinirCalorias = false;
+      caloriasGrupoInput = null;
+    } catch (err) {
+      alert("Erro ao definir calorias: " + (err as Error).message);
+    } finally {
+      salvandoDistribuicao = false;
+    }
+  }
+
+  async function removerAjusteDia(dia: number) {
+    try {
+      distribuicao = await removerCaloriasDia(dia);
+    } catch (err) {
+      alert("Erro ao remover ajuste: " + (err as Error).message);
+    }
+  }
 
   function recalcularCaloriasDosMacros() {
     caloriasInput = caloriasCalc;
@@ -429,6 +487,57 @@
         </div>
       </div>
 
+      <p class="secao-titulo">Distribuição Semanal</p>
+      <div class="tabs modo-toggle">
+        <button class:active={distribuicao?.modo === "fixa"} onclick={() => alterarModoCalorias("fixa")}>Fixa</button>
+        <button class:active={distribuicao?.modo === "ondulatoria"} onclick={() => alterarModoCalorias("ondulatoria")}>Ondulatória</button>
+      </div>
+
+      {#if distribuicao?.modo === "ondulatoria"}
+        <div class="dias-lista">
+          {#each distribuicao.dias as dia (dia.diaSemana)}
+            <div
+              class="dia-linha"
+              role="button"
+              tabindex="0"
+              onclick={() => toggleDiaSelecionado(dia.diaSemana)}
+              onkeydown={(e) => e.key === "Enter" && toggleDiaSelecionado(dia.diaSemana)}
+            >
+              <span class="check-circulo" class:ativo={diasSelecionados.has(dia.diaSemana)}>
+                {#if diasSelecionados.has(dia.diaSemana)}✓{/if}
+              </span>
+              <span class="dia-nome">
+                {DIAS_SEMANA_ABREV[dia.diaSemana]}
+                {#if dia.manual}<span class="dia-manual-tag">manual</span>{/if}
+              </span>
+              <span class="dia-valores">
+                <span class="dia-cal">{Math.round(dia.calorias)} kcal</span>
+                <span class="dia-carb">carb {carboidratoGDoDia(dia.calorias, proteinaGInput ?? 0, gorduraGInput ?? 0)}g</span>
+              </span>
+              {#if dia.manual}
+                <button
+                  type="button"
+                  class="dia-remover"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    removerAjusteDia(dia.diaSemana);
+                  }}
+                  aria-label={`Remover ajuste manual de ${DIAS_SEMANA_ABREV[dia.diaSemana]}`}
+                >
+                  ✕
+                </button>
+              {/if}
+            </div>
+          {/each}
+        </div>
+
+        {#if diasSelecionados.size > 0}
+          <Button onclick={() => (mostrarDefinirCalorias = true)}>
+            Definir calorias pra {diasSelecionados.size} {diasSelecionados.size === 1 ? "dia" : "dias"}
+          </Button>
+        {/if}
+      {/if}
+
       <div class="card-proporcao">
         <p class="secao-titulo">Proporção por peso (g/kg)</p>
         <div class="tabela-macros">
@@ -544,6 +653,26 @@
     onConfirmar={excluir}
     onCancelar={() => (paraExcluir = null)}
   />
+{/if}
+
+{#if mostrarDefinirCalorias}
+  <Sheet
+    titulo={`Calorias para ${diasSelecionados.size} ${diasSelecionados.size === 1 ? "dia" : "dias"}`}
+    onFechar={() => (mostrarDefinirCalorias = false)}
+  >
+    <input
+      class="dia-calorias-input"
+      type="number"
+      inputmode="decimal"
+      step="1"
+      min="0"
+      placeholder="kcal"
+      bind:value={caloriasGrupoInput}
+    />
+    <Button onclick={confirmarCaloriasGrupo} disabled={salvandoDistribuicao || caloriasGrupoInput == null || caloriasGrupoInput <= 0}>
+      Salvar
+    </Button>
+  </Sheet>
 {/if}
 
 <style>
@@ -803,7 +932,8 @@
   .erro {
     color: var(--color-danger);
   }
-  .nome-input {
+  .nome-input,
+  .dia-calorias-input {
     box-sizing: border-box;
     width: 100%;
     padding: var(--space-3);
@@ -813,5 +943,80 @@
     background: var(--surface-bg);
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+  }
+  .modo-toggle {
+    margin-bottom: var(--space-3);
+  }
+  .dias-lista {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: var(--space-3);
+  }
+  .dia-linha {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--surface-border);
+    cursor: pointer;
+  }
+  .dia-linha:last-child {
+    border-bottom: none;
+  }
+  .check-circulo {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--surface-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--color-primary-fg);
+  }
+  .check-circulo.ativo {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+  .dia-nome {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+  }
+  .dia-manual-tag {
+    font-size: 11px;
+    color: var(--surface-muted);
+    border: 1px solid var(--surface-border);
+    border-radius: 999px;
+    padding: 1px 8px;
+  }
+  .dia-valores {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.4;
+  }
+  .dia-cal {
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+  }
+  .dia-carb {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .dia-remover {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--color-danger);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+    padding: var(--space-1);
   }
 </style>
