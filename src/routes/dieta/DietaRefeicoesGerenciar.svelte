@@ -36,7 +36,6 @@
   let gorduraGInput = $state<number | null>(null);
   let carboidratoGKg = $state(2.93);
   let carboidratoGInput = $state<number | null>(null);
-  let aguaL = $state<number | null>(null);
 
   const caloriasCalc = $derived(
     Math.round(4 * (proteinaGInput ?? 0) + 9 * (gorduraGInput ?? 0) + 4 * (carboidratoGInput ?? 0)),
@@ -48,10 +47,10 @@
     `background: conic-gradient(${COR_CARBO} 0% ${pctCarboidrato}%, ${COR_GORDURA} ${pctCarboidrato}% ${pctCarboidrato + pctGordura}%, ${COR_PROTEINA} ${pctCarboidrato + pctGordura}% 100%);`,
   );
 
-  /** Gordura saturada e fibras são calculadas automaticamente com base no peso — sem input manual por enquanto. */
-  const gordurasSaturadasG = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.gordurasSaturadasGKg * pesoAtual));
+  /** Metas de consumo puramente informativas — calculadas a partir do peso, sem input manual por enquanto. */
   const fibrasG = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.fibrasGKg * pesoAtual));
-  const gorduraInsaturadaG = $derived(Math.max(0, (gorduraGInput ?? 0) - gordurasSaturadasG));
+  const gorduraInsaturadaG = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.gordurasInsaturadasGKg * pesoAtual));
+  const aguaL = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.aguaLKg * pesoAtual * 10) / 10);
 
   async function carregarMetas() {
     try {
@@ -64,7 +63,6 @@
       gorduraGInput = Math.round(gorduraGKg * pesoAtual);
       carboidratoGInput = Math.round(carboidratoGKg * pesoAtual);
       caloriasInput = caloriasCalc;
-      aguaL = perfil.aguaL;
       perfilCarregado = true;
     } catch (err) {
       erroMetas = (err as Error).message;
@@ -225,7 +223,6 @@
         proteinaGKg,
         gorduraGKg,
         carboidratoGKg,
-        gordurasSaturadasG,
         fibrasG,
         aguaL,
       });
@@ -465,39 +462,24 @@
         />
       {/if}
 
-      <p class="nutrientes-titulo">Nutrientes</p>
+      <p class="nutrientes-titulo">Metas de Consumo</p>
       <div class="nutrientes-lista">
-        <div class="nutriente-item">
-          <span>Carboidratos</span>
-          <span>{carboidratoGInput ?? 0} g</span>
-        </div>
-        <div class="nutriente-item">
-          <span>Proteínas</span>
-          <span>{proteinaGInput ?? 0} g</span>
-        </div>
-        <div class="nutriente-item">
-          <span>Gordura Saturada</span>
-          <span>{gordurasSaturadasG} g</span>
-        </div>
-        <div class="nutriente-item">
-          <span>Gordura Insaturada</span>
-          <span>{gorduraInsaturadaG} g</span>
-        </div>
         <div class="nutriente-item">
           <span>Fibras</span>
           <span>{fibrasG} g</span>
         </div>
-      </div>
-
-      <div class="lista-metas">
-        <div class="linha-meta">
-          <label for="meta-agua">Água (L)</label>
-          <input id="meta-agua" class="valor-meta" type="number" inputmode="decimal" step="0.1" min="0" bind:value={aguaL} />
+        <div class="nutriente-item">
+          <span>Gorduras Insaturadas</span>
+          <span>{gorduraInsaturadaG} g</span>
+        </div>
+        <div class="nutriente-item">
+          <span>Água</span>
+          <span>{aguaL.toFixed(1)} L</span>
         </div>
       </div>
 
       <p class="dica">
-        Ajustar proteína ou gordura (g/kg ou gramas) recalcula as calorias. Ajustar as calorias reajusta o carboidrato pra fechar a conta. Gordura saturada e fibras seguem o peso automaticamente.
+        Ajustar proteína ou gordura (g/kg ou gramas) recalcula as calorias. Ajustar as calorias reajusta o carboidrato pra fechar a conta. Fibras, gorduras insaturadas e água são calculadas automaticamente com base no peso.
       </p>
 
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
@@ -623,40 +605,6 @@
   .peso-ref strong {
     color: var(--surface-fg);
   }
-  .lista-metas {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: var(--space-4);
-  }
-  .linha-meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--surface-border);
-  }
-  .linha-meta:last-child {
-    border-bottom: none;
-  }
-  .linha-meta label {
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-  }
-  .valor-meta {
-    flex: 0 0 90px;
-    min-width: 0;
-    box-sizing: border-box;
-    text-align: right;
-    border: none;
-    background: none;
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    padding: 0;
-  }
-  .valor-meta:focus {
-    outline: none;
-  }
   .resumo {
     display: flex;
     align-items: center;
@@ -671,6 +619,7 @@
     flex-shrink: 0;
     border: none;
     padding: 0;
+    color: var(--surface-fg);
     font-family: inherit;
     cursor: pointer;
   }

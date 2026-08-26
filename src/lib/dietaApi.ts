@@ -519,10 +519,11 @@ export const LIMITES_MACROS_G_KG: { proteina: LimiteMacroGKg; gordura: LimiteMac
   carboidrato: { min: 1, max: 10 },
 };
 
-/** Ratio (g/kg) usado pro cálculo automático de gordura saturada e fibras — hoje fixo aqui, migra pra Parametrização depois. */
+/** Ratio por peso usado pro cálculo automático das metas de consumo — hoje fixo aqui, migra pra Parametrização depois. */
 export const RATIOS_NUTRIENTES_AUTOMATICOS = {
-  gordurasSaturadasGKg: 0.21,
   fibrasGKg: 0.37,
+  gordurasInsaturadasGKg: 0.45,
+  aguaLKg: 0.05,
 };
 
 /** Perfil de metas editável na tela de Gerenciar (aba Calorias) — ratios em g/kg, não em gramas fixas. */
@@ -532,9 +533,6 @@ export interface PerfilDietaEditavel {
   proteinaGKg: number;
   gorduraGKg: number;
   carboidratoGKg: number;
-  gordurasSaturadasG: number | null;
-  fibrasG: number | null;
-  aguaL: number | null;
 }
 
 const PERFIL_PADRAO: PerfilDietaEditavel = {
@@ -543,15 +541,12 @@ const PERFIL_PADRAO: PerfilDietaEditavel = {
   proteinaGKg: 2.17,
   gorduraGKg: 0.66,
   carboidratoGKg: 2.93,
-  gordurasSaturadasG: 16,
-  fibrasG: 28,
-  aguaL: 3.8,
 };
 
 export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
   const { data, error } = await supabase
     .from("dieta_perfil")
-    .select("peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg, gorduras_saturadas_g, fibras_g, agua_l")
+    .select("peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg")
     .maybeSingle();
   if (error) throw error;
   if (!data) return PERFIL_PADRAO;
@@ -561,9 +556,6 @@ export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
     proteinaGKg: data.proteina_g_kg,
     gorduraGKg: data.gordura_g_kg,
     carboidratoGKg: data.carboidrato_g_kg,
-    gordurasSaturadasG: data.gorduras_saturadas_g,
-    fibrasG: data.fibras_g,
-    aguaL: data.agua_l,
   };
 }
 
@@ -573,9 +565,8 @@ export async function salvarPerfilDieta(input: {
   proteinaGKg: number;
   gorduraGKg: number;
   carboidratoGKg: number;
-  gordurasSaturadasG: number | null;
-  fibrasG: number | null;
-  aguaL: number | null;
+  fibrasG: number;
+  aguaL: number;
 }): Promise<void> {
   const { error } = await supabase.from("dieta_perfil").upsert(
     {
@@ -585,7 +576,6 @@ export async function salvarPerfilDieta(input: {
       proteina_g_kg: input.proteinaGKg,
       gordura_g_kg: input.gorduraGKg,
       carboidrato_g_kg: input.carboidratoGKg,
-      gorduras_saturadas_g: input.gordurasSaturadasG,
       fibras_g: input.fibrasG,
       agua_l: input.aguaL,
       updated_at: new Date().toISOString(),
