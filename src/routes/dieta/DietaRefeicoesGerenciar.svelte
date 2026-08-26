@@ -1156,7 +1156,7 @@
   }
   .separador {
     border-top: 1px solid var(--surface-border);
-    margin: var(--space-6) 0;
+    margin: var(--space-2) 0 var(--space-4);
   }
   .nutrientes-titulo {
     font-weight: 600;
@@ -1299,7 +1299,9 @@
     margin-bottom: var(--space-4);
   }
   .modal-dias-lista {
-    margin-bottom: var(--space-4);
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: var(--space-3);
     overflow-x: visible;
     flex-wrap: wrap;
   }
