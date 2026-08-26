@@ -706,24 +706,58 @@ export async function getMetasDiarias(): Promise<MetasDiarias> {
   };
 }
 
-/** Faixa permitida (g/kg) por macro — hoje fixa aqui, mas é o campo que vai virar editável em Parametrização. */
-export interface LimiteMacroGKg {
+// ---------------- Parâmetros (min/máx por kg de peso, editáveis em Parametrização) ----------------
+
+export interface DefinicaoParametro {
+  chave: string;
+  categoria: string;
+  label: string;
+  unidade: string;
+  /** Parâmetro só de piso (ex: calorias mínimas) — sem campo de máximo na tela. */
+  somenteMinimo: boolean;
+}
+
+export const DEFINICOES_PARAMETROS: DefinicaoParametro[] = [
+  { chave: "calorias", categoria: "Calorias", label: "Calorias mínimas", unidade: "kcal/kg", somenteMinimo: true },
+  { chave: "proteina", categoria: "Macronutrientes", label: "Proteína", unidade: "g/kg", somenteMinimo: false },
+  { chave: "gordura", categoria: "Macronutrientes", label: "Gordura", unidade: "g/kg", somenteMinimo: false },
+  { chave: "carboidrato", categoria: "Macronutrientes", label: "Carboidrato", unidade: "g/kg", somenteMinimo: false },
+  { chave: "fibras", categoria: "Metas de Consumo", label: "Fibras", unidade: "g/kg", somenteMinimo: false },
+  { chave: "gordura_insaturada", categoria: "Metas de Consumo", label: "Gorduras Insaturadas", unidade: "g/kg", somenteMinimo: false },
+  { chave: "agua", categoria: "Metas de Consumo", label: "Água", unidade: "L/kg", somenteMinimo: false },
+];
+
+export interface LimiteParametro {
   min: number;
   max: number;
 }
 
-export const LIMITES_MACROS_G_KG: { proteina: LimiteMacroGKg; gordura: LimiteMacroGKg; carboidrato: LimiteMacroGKg } = {
+/** Valores de hoje, usados como padrão pra qualquer chave sem linha salva ainda. */
+export const PARAMETROS_PADRAO: Record<string, LimiteParametro> = {
+  calorias: { min: 20, max: 20 },
   proteina: { min: 1, max: 3 },
   gordura: { min: 0.5, max: 1.5 },
   carboidrato: { min: 1, max: 10 },
+  fibras: { min: 0.37, max: 0.37 },
+  gordura_insaturada: { min: 0.45, max: 0.45 },
+  agua: { min: 0.05, max: 0.05 },
 };
 
-/** Ratio por peso usado pro cálculo automático das metas de consumo — hoje fixo aqui, migra pra Parametrização depois. */
-export const RATIOS_NUTRIENTES_AUTOMATICOS = {
-  fibrasGKg: 0.37,
-  gordurasInsaturadasGKg: 0.45,
-  aguaLKg: 0.05,
-};
+export async function getParametros(): Promise<Map<string, LimiteParametro>> {
+  const { data, error } = await supabase.from("dieta_parametros").select("chave, min_por_kg, max_por_kg");
+  if (error) throw error;
+  const mapa = new Map(Object.entries(PARAMETROS_PADRAO).map(([chave, v]) => [chave, { ...v }]));
+  for (const l of data ?? []) mapa.set(l.chave as string, { min: l.min_por_kg as number, max: l.max_por_kg as number });
+  return mapa;
+}
+
+export async function salvarParametro(chave: string, min: number, max: number): Promise<void> {
+  const { error } = await supabase.from("dieta_parametros").upsert(
+    { user_id: uid(), chave, min_por_kg: min, max_por_kg: max, updated_at: new Date().toISOString() },
+    { onConflict: "user_id,chave" },
+  );
+  if (error) throw error;
+}
 
 /** Perfil de metas editável na tela de Gerenciar (aba Calorias) — ratios em g/kg, não em gramas fixas. */
 export interface PerfilDietaEditavel {
@@ -785,9 +819,6 @@ export async function salvarPerfilDieta(input: {
 }
 
 // ---------------- Distribuição semanal de calorias (Fixa / Ondulatória) ----------------
-
-/** Piso de calorias diárias (kcal/kg) — hoje fixo aqui, migra pra Parametrização depois. */
-export const CALORIA_MINIMA_KCAL_KG = 20;
 
 export interface CaloriasPorDia {
   /** 0-6, 0 = domingo (mesma convenção de Date.getDay() usada em Treino). */
@@ -925,17 +956,18 @@ export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
   const modo = await getModoCalorias();
   if (modo === "fixa") return getMetasDiarias();
 
-  const [perfil, pesoMedio, manuais] = await Promise.all([
+  const [perfil, pesoMedio, manuais, parametros] = await Promise.all([
     getPerfilDietaEditavel(),
     getPesoMedioAtual(),
     getCaloriasDiaManuais(),
+    getParametros(),
   ]);
   const pesoAtual = pesoMedio ?? perfil.pesoAtual;
   const proteinaG = Math.round(perfil.proteinaGKg * pesoAtual);
   const gorduraG = Math.round(perfil.gorduraGKg * pesoAtual);
   const carboidratoG = Math.round(perfil.carboidratoGKg * pesoAtual);
   const caloriasMedia = Math.round(4 * proteinaG + 9 * gorduraG + 4 * carboidratoG);
-  const minimo = CALORIA_MINIMA_KCAL_KG * pesoAtual;
+  const minimo = (parametros.get("calorias")?.min ?? PARAMETROS_PADRAO.calorias.min) * pesoAtual;
   const manuaisCalorias = new Map([...manuais].map(([dia, v]) => [dia, v.calorias]));
 
   const diaSemana = parseISODate(data).getDay();

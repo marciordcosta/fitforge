@@ -11,9 +11,8 @@
     reordenarRefeicoesModelo,
     getPerfilDietaEditavel,
     salvarPerfilDieta,
-    LIMITES_MACROS_G_KG,
-    RATIOS_NUTRIENTES_AUTOMATICOS,
-    CALORIA_MINIMA_KCAL_KG,
+    getParametros,
+    PARAMETROS_PADRAO,
     getModoCalorias,
     getCaloriasDiaManuais,
     resolverDistribuicao,
@@ -29,6 +28,7 @@
     type CaloriasDiaManual,
     type MetaDiaModelo,
     type RefeicaoModeloDia,
+    type LimiteParametro,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
@@ -48,6 +48,10 @@
   let salvandoCalorias = $state(false);
 
   let pesoAtual = $state(76);
+  let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
+  function parametro(chave: string): LimiteParametro {
+    return parametros.get(chave) ?? PARAMETROS_PADRAO[chave];
+  }
   let caloriasInput = $state<number | null>(null);
   let proteinaGKg = $state(2.17);
   let proteinaGInput = $state<number | null>(null);
@@ -102,12 +106,19 @@
     `background: conic-gradient(${COR_CARBO} 0% ${pctCarboidrato}%, ${COR_GORDURA} ${pctCarboidrato}% ${pctCarboidrato + pctGordura}%, ${COR_PROTEINA} ${pctCarboidrato + pctGordura}% 100%);`,
   );
 
-  /** Metas de consumo puramente informativas — calculadas a partir do peso, sem input manual por enquanto. */
-  const fibrasG = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.fibrasGKg * pesoAtual));
-  const gorduraInsaturadaG = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.gordurasInsaturadasGKg * pesoAtual));
-  const aguaL = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.aguaLKg * pesoAtual * 10) / 10);
+  /** Metas de consumo puramente informativas — calculadas a partir do peso e da faixa parametrizada, sem input manual por enquanto. */
+  const fibrasMinG = $derived(Math.round(parametro("fibras").min * pesoAtual));
+  const fibrasMaxG = $derived(Math.round(parametro("fibras").max * pesoAtual));
+  const gorduraInsaturadaMinG = $derived(Math.round(parametro("gordura_insaturada").min * pesoAtual));
+  const gorduraInsaturadaMaxG = $derived(Math.round(parametro("gordura_insaturada").max * pesoAtual));
+  const aguaMinL = $derived(Math.round(parametro("agua").min * pesoAtual * 10) / 10);
+  const aguaMaxL = $derived(Math.round(parametro("agua").max * pesoAtual * 10) / 10);
 
-  const minimoCalorias = $derived(CALORIA_MINIMA_KCAL_KG * pesoAtual);
+  function formatarFaixa(min: number, max: number, casas: number): string {
+    return min === max ? min.toFixed(casas) : `${min.toFixed(casas)}–${max.toFixed(casas)}`;
+  }
+
+  const minimoCalorias = $derived(parametro("calorias").min * pesoAtual);
 
   /** Resolvida 100% localmente — trocar Fixa/Ondulatória ou olhar a tela não bate no banco. */
   const diasResolvidos = $derived.by((): CaloriasPorDia[] => {
@@ -180,11 +191,12 @@
 
   async function carregarMetas() {
     try {
-      const [perfil, pesoMedio, modo, manuais] = await Promise.all([
+      const [perfil, pesoMedio, modo, manuais, parametrosCarregados] = await Promise.all([
         getPerfilDietaEditavel(),
         getPesoMedioAtual(),
         getModoCalorias(),
         getCaloriasDiaManuais(),
+        getParametros(),
       ]);
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
       proteinaGKg = perfil.proteinaGKg;
@@ -196,6 +208,7 @@
       caloriasInput = caloriasCalc;
       modoCalorias = modo;
       manuaisCompletos = manuais;
+      parametros = parametrosCarregados;
       perfilCarregado = true;
     } catch (err) {
       erroMetas = (err as Error).message;
@@ -274,42 +287,42 @@
       case "proteina":
         return {
           titulo: "Proteína (g)",
-          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.proteina.min, LIMITES_MACROS_G_KG.proteina.max),
+          opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max),
           valorAtual: grupoProteinaG,
           onSelecionar: (v: number) => (grupoProteinaG = v),
         };
       case "gordura":
         return {
           titulo: "Gordura (g)",
-          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.gordura.min, LIMITES_MACROS_G_KG.gordura.max),
+          opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max),
           valorAtual: grupoGorduraG,
           onSelecionar: (v: number) => (grupoGorduraG = v),
         };
       case "carboidrato":
         return {
           titulo: "Carboidrato (g)",
-          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.carboidrato.min, LIMITES_MACROS_G_KG.carboidrato.max),
+          opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max),
           valorAtual: grupoCarboidratoG,
           onSelecionar: (v: number) => (grupoCarboidratoG = v),
         };
       case "proteinaGKg":
         return {
           titulo: "Proteína (g/kg)",
-          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.proteina.min, LIMITES_MACROS_G_KG.proteina.max),
+          opcoes: opcoesGKg(parametro("proteina").min, parametro("proteina").max),
           valorAtual: pesoAtual > 0 ? Math.round((grupoProteinaG / pesoAtual) * 100) / 100 : 0,
           onSelecionar: (v: number) => (grupoProteinaG = Math.round(v * pesoAtual)),
         };
       case "gorduraGKg":
         return {
           titulo: "Gordura (g/kg)",
-          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.gordura.min, LIMITES_MACROS_G_KG.gordura.max),
+          opcoes: opcoesGKg(parametro("gordura").min, parametro("gordura").max),
           valorAtual: pesoAtual > 0 ? Math.round((grupoGorduraG / pesoAtual) * 100) / 100 : 0,
           onSelecionar: (v: number) => (grupoGorduraG = Math.round(v * pesoAtual)),
         };
       case "carboidratoGKg":
         return {
           titulo: "Carboidrato (g/kg)",
-          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.carboidrato.min, LIMITES_MACROS_G_KG.carboidrato.max),
+          opcoes: opcoesGKg(parametro("carboidrato").min, parametro("carboidrato").max),
           valorAtual: pesoAtual > 0 ? Math.round((grupoCarboidratoG / pesoAtual) * 100) / 100 : 0,
           onSelecionar: (v: number) => (grupoCarboidratoG = Math.round(v * pesoAtual)),
         };
@@ -442,7 +455,7 @@
       case "proteinaGKg":
         return {
           titulo: "Proteína (g/kg)",
-          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.proteina.min, LIMITES_MACROS_G_KG.proteina.max),
+          opcoes: opcoesGKg(parametro("proteina").min, parametro("proteina").max),
           valorAtual: proteinaGKg,
           onSelecionar: (v: number) => {
             proteinaGKg = v;
@@ -452,7 +465,7 @@
       case "proteinaG":
         return {
           titulo: "Proteína (g)",
-          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.proteina.min, LIMITES_MACROS_G_KG.proteina.max),
+          opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max),
           valorAtual: proteinaGInput ?? 0,
           onSelecionar: (v: number) => {
             proteinaGInput = v;
@@ -462,7 +475,7 @@
       case "gorduraGKg":
         return {
           titulo: "Gordura (g/kg)",
-          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.gordura.min, LIMITES_MACROS_G_KG.gordura.max),
+          opcoes: opcoesGKg(parametro("gordura").min, parametro("gordura").max),
           valorAtual: gorduraGKg,
           onSelecionar: (v: number) => {
             gorduraGKg = v;
@@ -472,7 +485,7 @@
       case "gorduraG":
         return {
           titulo: "Gordura (g)",
-          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.gordura.min, LIMITES_MACROS_G_KG.gordura.max),
+          opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max),
           valorAtual: gorduraGInput ?? 0,
           onSelecionar: (v: number) => {
             gorduraGInput = v;
@@ -482,7 +495,7 @@
       case "carboidratoGKg":
         return {
           titulo: "Carboidrato (g/kg)",
-          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.carboidrato.min, LIMITES_MACROS_G_KG.carboidrato.max),
+          opcoes: opcoesGKg(parametro("carboidrato").min, parametro("carboidrato").max),
           valorAtual: carboidratoGKg,
           onSelecionar: (v: number) => {
             carboidratoGKg = v;
@@ -492,7 +505,7 @@
       case "carboidratoG":
         return {
           titulo: "Carboidrato (g)",
-          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.carboidrato.min, LIMITES_MACROS_G_KG.carboidrato.max),
+          opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max),
           valorAtual: carboidratoGInput ?? 0,
           onSelecionar: (v: number) => {
             carboidratoGInput = v;
@@ -511,8 +524,8 @@
         proteinaGKg,
         gorduraGKg,
         carboidratoGKg,
-        fibrasG,
-        aguaL,
+        fibrasG: Math.round((fibrasMinG + fibrasMaxG) / 2),
+        aguaL: Math.round(((aguaMinL + aguaMaxL) / 2) * 10) / 10,
       });
     } catch (err) {
       alert("Erro ao salvar metas: " + (err as Error).message);
@@ -935,15 +948,15 @@
       <div class="nutrientes-lista">
         <div class="nutriente-item">
           <span>Fibras</span>
-          <span>{fibrasG} g</span>
+          <span>{formatarFaixa(fibrasMinG, fibrasMaxG, 0)} g</span>
         </div>
         <div class="nutriente-item">
           <span>Gorduras Insaturadas</span>
-          <span>{gorduraInsaturadaG} g</span>
+          <span>{formatarFaixa(gorduraInsaturadaMinG, gorduraInsaturadaMaxG, 0)} g</span>
         </div>
         <div class="nutriente-item">
           <span>Água</span>
-          <span>{aguaL.toFixed(1)} L</span>
+          <span>{formatarFaixa(aguaMinL, aguaMaxL, 1)} L</span>
         </div>
       </div>
 

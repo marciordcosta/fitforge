@@ -8,6 +8,7 @@
   import DietaReceitas from "./DietaReceitas.svelte";
   import DietaReceitaVisualizar from "./DietaReceitaVisualizar.svelte";
   import DietaRefeicoesGerenciar from "./DietaRefeicoesGerenciar.svelte";
+  import DietaParametrizacao from "./DietaParametrizacao.svelte";
   import Placeholder from "../Placeholder.svelte";
   import { hojeISO } from "../../lib/dates";
 
@@ -63,7 +64,7 @@
 {:else if segmentos[0] === "meta"}
   <Placeholder titulo="Meta" />
 {:else if segmentos[0] === "parametrizacao"}
-  <Placeholder titulo="Parametrização" />
+  <DietaParametrizacao />
 {:else}
   <DiarioAlimentar />
 {/if}
