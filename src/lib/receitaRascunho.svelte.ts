@@ -12,7 +12,13 @@ export interface ItemRascunho {
  * editada) — sempre que um item é adicionado com um contexto diferente do atual, o rascunho
  * anterior (de uma sessão abandonada sem salvar) é descartado automaticamente antes.
  */
-export const receitaRascunho = $state({ nome: "", itens: [] as ItemRascunho[], contexto: null as string | null });
+export const receitaRascunho = $state({
+  nome: "",
+  itens: [] as ItemRascunho[],
+  contexto: null as string | null,
+  /** Se o rascunho em andamento, ao ser salvo, deve virar a meta dessa refeição do catálogo. */
+  metaParaModeloId: null as string | null,
+});
 
 export function definirContexto(contexto: string) {
   if (receitaRascunho.contexto !== contexto) {
@@ -34,4 +40,5 @@ export function limparRascunho() {
   receitaRascunho.nome = "";
   receitaRascunho.itens = [];
   receitaRascunho.contexto = null;
+  receitaRascunho.metaParaModeloId = null;
 }

@@ -10,9 +10,10 @@
     getItensDaRefeicao,
     removerItemDiario,
     removerRefeicaoDia,
-    salvarRefeicaoComoReceita,
     getMetasDiarias,
     getMetaRefeicaoPorNome,
+    getMetaReceitaIdPorNome,
+    adicionarReceitaAoDiario,
     getAlimento,
     atualizarItemDiario,
     type RefeicaoDia,
@@ -127,13 +128,19 @@
     }
   }
 
-  async function salvarComoReceita() {
+  async function puxarRefeicaoPadrao() {
+    if (!refeicao) return;
     processando = true;
     try {
-      await salvarRefeicaoComoReceita(refeicaoId);
-      alert("Refeição salva como modelo reutilizável — buscável ao adicionar alimento.");
+      const metaReceitaId = await getMetaReceitaIdPorNome(refeicao.nome);
+      if (!metaReceitaId) {
+        alert(`"${refeicao.nome}" não tem uma referência padrão configurada em Gerenciar > Refeições.`);
+        return;
+      }
+      await adicionarReceitaAoDiario(metaReceitaId, refeicao.data, refeicaoId);
+      await carregar();
     } catch (err) {
-      alert("Erro ao salvar refeição: " + (err as Error).message);
+      alert("Erro ao puxar a referência padrão: " + (err as Error).message);
     } finally {
       processando = false;
     }
@@ -161,11 +168,10 @@
   }
 </script>
 
-{#snippet iconSalvar()}
+{#snippet iconPratoPadrao()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
-    <path d="M17 21v-8H7v8" />
-    <path d="M7 3v5h8" />
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="4" />
   </svg>
 {/snippet}
 {#snippet iconCopiarDe()}
@@ -190,7 +196,7 @@
 
 <div class="header-fixo">
   <div class="header-fixo-inner">
-    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => navigate("/dieta")} aria-label="Voltar">←</button>
     <h1>
       {refeicao?.nome ?? ""}
       <span class="data-inline">{dataLabel}</span>
@@ -208,9 +214,9 @@
     <p class="muted">Refeição não encontrada.</p>
   {:else}
     <div class="acoes">
-      <button class="acao-btn" disabled={processando} onclick={salvarComoReceita}>
-        <span class="acao-label">Salvar</span>
-        {@render iconSalvar()}
+      <button class="acao-btn" disabled={processando} onclick={puxarRefeicaoPadrao}>
+        <span class="acao-label">Ref padrão</span>
+        {@render iconPratoPadrao()}
       </button>
       <button class="acao-btn" disabled={processando} onclick={() => (mostrarCopiarDe = true)}>
         <span class="acao-label">Copiar de</span>

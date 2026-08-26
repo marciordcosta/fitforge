@@ -318,6 +318,13 @@ export async function getMetaRefeicaoPorNome(nome: string): Promise<MetasDiarias
   };
 }
 
+/** Id do prato vinculado como meta da refeição do catálogo com esse nome, ou null — select enxuto, sem os totais. */
+export async function getMetaReceitaIdPorNome(nome: string): Promise<string | null> {
+  const { data, error } = await supabase.from("dieta_refeicoes_modelo").select("meta_receita_id").eq("nome", nome).maybeSingle();
+  if (error) throw error;
+  return data?.meta_receita_id ?? null;
+}
+
 export async function vincularMetaReceita(modeloId: string, receitaId: string): Promise<void> {
   const { error } = await supabase.from("dieta_refeicoes_modelo").update({ meta_receita_id: receitaId }).eq("id", modeloId);
   if (error) throw error;

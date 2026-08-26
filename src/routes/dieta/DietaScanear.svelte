@@ -5,6 +5,7 @@
   import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
   import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts } from "../../lib/dietaApi";
   import { buscarProdutoPorCodigoBarras } from "../../lib/openFoodFacts";
+  import { receitaRascunho } from "../../lib/receitaRascunho.svelte";
   import Button from "../../components/Button.svelte";
   import Sheet from "../../components/Sheet.svelte";
 
@@ -99,11 +100,25 @@
     }
     navigate(refeicaoId ? `/dieta/alimentos/refeicao/${refeicaoId}` : "/dieta/alimentos");
   }
+
+  function voltar() {
+    if (modoReceita) {
+      if (receitaIdExistente) {
+        navigate(`/dieta/receitas/ver/${receitaIdExistente}`);
+      } else {
+        navigate(receitaRascunho.metaParaModeloId ? `/dieta/receitas/nova/meta/${receitaRascunho.metaParaModeloId}` : "/dieta/receitas/nova");
+      }
+    } else if (refeicaoId) {
+      navigate(`/dieta/refeicao/${refeicaoId}`);
+    } else {
+      navigate("/dieta");
+    }
+  }
 </script>
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={voltar} aria-label="Voltar">←</button>
     <h1>Escanear Alimento</h1>
     <span class="header-spacer"></span>
   </div>

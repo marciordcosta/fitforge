@@ -1,10 +1,13 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { navigate } from "../../lib/router.svelte";
   import { criarReceita, vincularMetaReceita, getMetasDiarias, type MetasDiarias } from "../../lib/dietaApi";
   import { receitaRascunho, removerDoRascunho, limparRascunho, type ItemRascunho } from "../../lib/receitaRascunho.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
 
   let { metaParaModeloId }: { metaParaModeloId?: string } = $props();
+
+  untrack(() => (receitaRascunho.metaParaModeloId = metaParaModeloId ?? null));
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -109,7 +112,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => navigate(metaParaModeloId ? "/dieta/refeicoes/gerenciar" : "/dieta/receitas")} aria-label="Voltar">←</button>
     <h1>Nova Refeição</h1>
     <button class="salvar" onclick={salvar} disabled={salvando || !valido} aria-label="Salvar">✓</button>
   </div>

@@ -21,7 +21,7 @@
     type MetasDiarias,
     type RefeicaoDia,
   } from "../../lib/dietaApi";
-  import { adicionarAoRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
+  import { receitaRascunho, adicionarAoRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
 
   let {
     alimentoId,
@@ -164,6 +164,15 @@
     return refeicao ? `/${dataResolvida}/${refeicao.id}` : dataResolvida ? `/${dataResolvida}` : "";
   }
 
+  function destinoVoltar(): string {
+    if (modoReceita) {
+      if (receitaIdExistente) return `/dieta/receitas/ver/${receitaIdExistente}`;
+      return receitaRascunho.metaParaModeloId ? `/dieta/receitas/nova/meta/${receitaRascunho.metaParaModeloId}` : "/dieta/receitas/nova";
+    }
+    if (refeicao) return `/dieta/refeicao/${refeicao.id}`;
+    return "/dieta";
+  }
+
   async function duplicarAlimentoCadastro() {
     if (!alimento) return;
     processandoAlimento = true;
@@ -193,7 +202,7 @@
     if (modoReceita) {
       definirContexto(receitaIdExistente ?? "nova");
       adicionarAoRascunho(alimento, quantidade);
-      navigate(receitaIdExistente ? `/dieta/receitas/ver/${receitaIdExistente}` : "/dieta/receitas/nova");
+      navigate(destinoVoltar());
       return;
     }
     if (!refeicao) return;
@@ -204,7 +213,7 @@
       } else {
         await adicionarItemDiario({ alimento, data: dataResolvida, refeicaoId: refeicao.id, quantidade });
       }
-      window.history.back();
+      navigate(destinoVoltar());
     } catch (err) {
       alert("Erro ao salvar alimento: " + (err as Error).message);
       salvando = false;
@@ -239,7 +248,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => navigate(destinoVoltar())} aria-label="Voltar">←</button>
     <h1>{editandoItem ? "Editar Alimento" : "Adicionar Alimento"}</h1>
     <div class="header-acoes">
       {#if alimento?.fonte === "manual"}

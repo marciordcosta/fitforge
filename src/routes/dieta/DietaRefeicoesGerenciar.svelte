@@ -422,7 +422,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => navigate("/dieta")} aria-label="Voltar">←</button>
     <h1>Gerenciar</h1>
     {#if aba === "refeicoes"}
       <button class="criar" onclick={abrirNovo} aria-label="Nova refeição">+</button>

@@ -220,7 +220,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => navigate("/dieta/receitas")} aria-label="Voltar">←</button>
     {#if nomeEditando}
       <input
         class="nome-input"

@@ -13,7 +13,7 @@
     type Alimento,
     type ReceitaResumo,
   } from "../../lib/dietaApi";
-  import { adicionarAoRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
+  import { receitaRascunho, adicionarAoRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
@@ -111,6 +111,20 @@
     return (partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "");
   }
 
+  function voltar() {
+    if (modoReceita) {
+      if (receitaIdExistente) {
+        navigate(`/dieta/receitas/ver/${receitaIdExistente}`);
+      } else {
+        navigate(receitaRascunho.metaParaModeloId ? `/dieta/receitas/nova/meta/${receitaRascunho.metaParaModeloId}` : "/dieta/receitas/nova");
+      }
+    } else if (refeicaoId) {
+      navigate(`/dieta/refeicao/${refeicaoId}`);
+    } else {
+      navigate("/dieta");
+    }
+  }
+
   function abrirDetalhamento(a: Alimento) {
     if (modoReceita) {
       navigate(`/dieta/alimento/${a.id}/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`);
@@ -191,7 +205,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={voltar} aria-label="Voltar">←</button>
     <h1>Alimentos</h1>
     <button class="criar" onclick={() => (mostrarEscolhaCriar = true)}>Criar</button>
   </div>
