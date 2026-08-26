@@ -119,7 +119,15 @@
   const totalCarboidrato = $derived(itens.reduce((acc, i) => acc + i.carboidratoG, 0));
 
   function pctMeta(valor: number, meta: number): number {
-    return meta > 0 ? Math.min(100, (valor / meta) * 100) : 0;
+    return meta > 0 ? (valor / meta) * 100 : 0;
+  }
+
+  function larguraBarra(pct: number): number {
+    return Math.min(100, pct);
+  }
+
+  function corBarra(pct: number, corBase: string): string {
+    return pct > 100 ? "var(--color-danger)" : corBase;
   }
 
   function restante(valor: number, meta: number): number {
@@ -244,7 +252,7 @@
           <span class="calorias-restantes"><strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes</span>
         </div>
         <div class="barra-wrap-grande">
-          <div class="barra-grande" style={`width:${pctMeta(totalCalorias, metas.calorias)}%; background:var(--color-secondary);`}></div>
+          <div class="barra-grande" style={`width:${larguraBarra(pctMeta(totalCalorias, metas.calorias))}%; background:${corBarra(pctMeta(totalCalorias, metas.calorias), "var(--color-secondary)")};`}></div>
         </div>
       </div>
 
@@ -263,7 +271,7 @@
               {/if}
             </p>
             <div class="barra-wrap">
-              <div class="barra" style={`width:${pctMeta(totalCarboidrato, metas.carboidratoG)}%; background:${COR_CARBO};`}></div>
+              <div class="barra" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%; background:${corBarra(pctMeta(totalCarboidrato, metas.carboidratoG), COR_CARBO)};`}></div>
             </div>
           </div>
           <div class="macro-col">
@@ -276,7 +284,7 @@
               {/if}
             </p>
             <div class="barra-wrap">
-              <div class="barra" style={`width:${pctMeta(totalGordura, metas.gorduraG)}%; background:${COR_GORDURA};`}></div>
+              <div class="barra" style={`width:${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%; background:${corBarra(pctMeta(totalGordura, metas.gorduraG), COR_GORDURA)};`}></div>
             </div>
           </div>
           <div class="macro-col">
@@ -289,7 +297,7 @@
               {/if}
             </p>
             <div class="barra-wrap">
-              <div class="barra" style={`width:${pctMeta(totalProteina, metas.proteinaG)}%; background:${COR_PROTEINA};`}></div>
+              <div class="barra" style={`width:${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%; background:${corBarra(pctMeta(totalProteina, metas.proteinaG), COR_PROTEINA)};`}></div>
             </div>
           </div>
         </div>

@@ -156,7 +156,15 @@
   );
 
   function pctMeta(valor: number, meta: number): number {
-    return meta > 0 ? Math.min(100, (valor / meta) * 100) : 0;
+    return meta > 0 ? (valor / meta) * 100 : 0;
+  }
+
+  function larguraBarra(pct: number): number {
+    return Math.min(100, pct);
+  }
+
+  function corBarra(pct: number, corBase: string): string {
+    return pct > 100 ? "var(--color-danger)" : corBase;
   }
 
   function sufixoRota(): string {
@@ -315,22 +323,22 @@
       <div class="metas-grid">
         <div class="meta-col">
           <span class="meta-label">Calorias</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(calorias, metasEfetivas.calorias)}%; background:var(--color-secondary);`}></div></div>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(calorias, metasEfetivas.calorias))}%; background:${corBarra(pctMeta(calorias, metasEfetivas.calorias), "var(--color-secondary)")};`}></div></div>
           <span class="meta-valor">{pctMeta(calorias, metasEfetivas.calorias).toFixed(0)}% · {metasEfetivas.calorias.toFixed(0)}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Carb</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(carboidratoG, metasEfetivas.carboidratoG)}%; background:${COR_CARBO};`}></div></div>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(carboidratoG, metasEfetivas.carboidratoG))}%; background:${corBarra(pctMeta(carboidratoG, metasEfetivas.carboidratoG), COR_CARBO)};`}></div></div>
           <span class="meta-valor">{pctMeta(carboidratoG, metasEfetivas.carboidratoG).toFixed(0)}% · {metasEfetivas.carboidratoG.toFixed(0)}g</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Gorduras</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(gorduraG, metasEfetivas.gorduraG)}%; background:${COR_GORDURA};`}></div></div>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(gorduraG, metasEfetivas.gorduraG))}%; background:${corBarra(pctMeta(gorduraG, metasEfetivas.gorduraG), COR_GORDURA)};`}></div></div>
           <span class="meta-valor">{pctMeta(gorduraG, metasEfetivas.gorduraG).toFixed(0)}% · {metasEfetivas.gorduraG.toFixed(0)}g</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Proteínas</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(proteinaG, metasEfetivas.proteinaG)}%; background:${COR_PROTEINA};`}></div></div>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(proteinaG, metasEfetivas.proteinaG))}%; background:${corBarra(pctMeta(proteinaG, metasEfetivas.proteinaG), COR_PROTEINA)};`}></div></div>
           <span class="meta-valor">{pctMeta(proteinaG, metasEfetivas.proteinaG).toFixed(0)}% · {metasEfetivas.proteinaG.toFixed(0)}g</span>
         </div>
       </div>
