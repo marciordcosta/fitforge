@@ -112,6 +112,28 @@
     return null;
   }
 
+  interface GrupoDias {
+    dias: number[];
+    calorias: number;
+    manual: boolean;
+    cor: string | null;
+  }
+
+  /** Dias com a mesma meta de calorias viram um único bloco de refeições — não faz sentido configurar cada dia igual separadamente. Ordem preservada pela primeira ocorrência (Dom..Sáb). */
+  const gruposDias = $derived.by((): GrupoDias[] => {
+    const grupos = new Map<number, GrupoDias>();
+    for (const d of diasResolvidos) {
+      const chave = Math.round(d.calorias);
+      let g = grupos.get(chave);
+      if (!g) {
+        g = { dias: [], calorias: d.calorias, manual: d.manual, cor: d.manual ? (corPorGrupoManual.get(chave) ?? null) : null };
+        grupos.set(chave, g);
+      }
+      g.dias.push(d.diaSemana);
+    }
+    return [...grupos.values()];
+  });
+
   async function carregarMetas() {
     try {
       const [perfil, pesoMedio, modo, manuais] = await Promise.all([
@@ -483,13 +505,14 @@
     return diaCalorias > 0 ? Math.round((calorias / diaCalorias) * 100) : 0;
   }
 
-  function abrirMeta(m: RefeicaoModelo, diaSemana?: number) {
-    const receitaId = diaSemana != null ? metaEfetivaDoDia(m, diaSemana).receitaId : m.metaReceitaId;
+  /** diasGrupo: todos os dias que compartilham essa meta de calorias — vincular um prato aqui vale pro grupo inteiro de uma vez. */
+  function abrirMeta(m: RefeicaoModelo, diasGrupo?: number[]) {
+    const receitaId = diasGrupo?.length ? metaEfetivaDoDia(m, diasGrupo[0]).receitaId : m.metaReceitaId;
     if (receitaId) {
       navigate(`/dieta/receitas/ver/${receitaId}`);
       return;
     }
-    const diaSeg = diaSemana != null ? `/${diaSemana}` : "";
+    const diaSeg = diasGrupo?.length ? `/${diasGrupo.join(",")}` : "";
     navigate(`/dieta/receitas/buscar/meta/${m.id}/${encodeURIComponent(m.nome)}${diaSeg}`);
   }
 
@@ -757,32 +780,31 @@
     {:else if !modelos.length}
       <p class="muted">Nenhuma refeição cadastrada ainda.</p>
     {:else if modoCalorias === "ondulatoria"}
-      {#each diasResolvidos as dia (dia.diaSemana)}
-        {@const corDia = corDoDia(dia)}
-        <div class="dia-card dia-secao-header" class:colorido={corDia != null} style={corDia ? `background:${corDia}; border-color:${corDia};` : ""}>
-          <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia.diaSemana]}</span>
-          <span class="dia-card-cal">{Math.round(dia.calorias)}</span>
+      {#each gruposDias as grupo (grupo.dias[0])}
+        <div class="dia-card dia-secao-header" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
+          <span class="dia-card-nome">{grupo.dias.map((d) => DIAS_SEMANA_ABREV[d]).join(" · ")}</span>
+          <span class="dia-card-cal">{Math.round(grupo.calorias)}</span>
         </div>
         <ul class="lista lista-dia">
           {#each modelos as m, i (m.id)}
-            {@const meta = metaEfetivaDoDia(m, dia.diaSemana)}
+            {@const meta = metaEfetivaDoDia(m, grupo.dias[0])}
             <li
               class="linha"
-              class:arrastando={arrastandoDia === dia.diaSemana && arrastandoIndex === i}
-              bind:this={itemRefsDia[dia.diaSemana][i]}
-              style={arrastandoDia === dia.diaSemana && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
+              class:arrastando={arrastandoDia === grupo.dias[0] && arrastandoIndex === i}
+              bind:this={itemRefsDia[grupo.dias[0]][i]}
+              style={arrastandoDia === grupo.dias[0] && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
             >
-              <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, dia.diaSemana)} aria-label="Reordenar">
+              <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, grupo.dias[0])} aria-label="Reordenar">
                 {@render iconArrastar()}
               </button>
-              <button class="nome-btn" onclick={() => abrirMeta(m, dia.diaSemana)}>
+              <button class="nome-btn" onclick={() => abrirMeta(m, grupo.dias)}>
                 <span class="nome-linha">
                   <span class="nome">{m.nome}</span>
                   {#if meta.calorias != null}<span class="nome-cal">{Math.round(meta.calorias)} cal</span>{/if}
                 </span>
                 <span class="nome-macros" class:invisivel={meta.calorias == null}>
                   <span>carb {(meta.carboidratoG ?? 0).toFixed(0)}g · gord {(meta.gorduraG ?? 0).toFixed(0)}g · prot {(meta.proteinaG ?? 0).toFixed(0)}g</span>
-                  <span class="nome-pct">{pctDeDia(meta.calorias ?? 0, dia.calorias)}%</span>
+                  <span class="nome-pct">{pctDeDia(meta.calorias ?? 0, grupo.calorias)}%</span>
                 </span>
               </button>
               <button class="remover-btn" onclick={() => (paraExcluir = m)} aria-label={`Remover ${m.nome}`}>✕</button>
@@ -1268,13 +1290,17 @@
   }
   .dia-secao-header {
     flex-direction: row;
+    flex-wrap: wrap;
     justify-content: space-between;
+    align-items: baseline;
     width: 100%;
     min-width: 0;
     cursor: default;
     margin: var(--space-5) 0 var(--space-2);
   }
   .dia-secao-header .dia-card-nome {
+    flex: 1;
+    min-width: 0;
     font-size: var(--font-size-base);
   }
   .dias-acoes {

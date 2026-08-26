@@ -363,9 +363,16 @@ export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
   });
 }
 
-export async function vincularMetaReceitaDia(modeloId: string, diaSemana: number, receitaId: string): Promise<void> {
+/** Vincula o mesmo prato como meta pra todos os dias informados de uma vez — um grupo de dias com a mesma meta de calorias sempre compartilha a mesma composição de refeições. */
+export async function vincularMetaReceitaDias(modeloId: string, diasSemana: number[], receitaId: string): Promise<void> {
   const { error } = await supabase.from("dieta_refeicoes_modelo_meta_dia").upsert(
-    { user_id: uid(), modelo_id: modeloId, dia_semana: diaSemana, meta_receita_id: receitaId, updated_at: new Date().toISOString() },
+    diasSemana.map((diaSemana) => ({
+      user_id: uid(),
+      modelo_id: modeloId,
+      dia_semana: diaSemana,
+      meta_receita_id: receitaId,
+      updated_at: new Date().toISOString(),
+    })),
     { onConflict: "user_id,modelo_id,dia_semana" },
   );
   if (error) throw error;
