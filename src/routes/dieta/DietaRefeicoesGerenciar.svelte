@@ -867,7 +867,7 @@
               </div>
             {/each}
           </div>
-          <span class="secao-dias-cal">{Math.round(somaCaloriasInformadas(grupo.dias[0]))}/{Math.round(grupo.calorias)} cal</span>
+          <span class="secao-dias-cal">{Math.round(somaCaloriasInformadas(grupo.dias[0]))} de {Math.round(grupo.calorias)} calorias</span>
         </div>
         <ul class="lista lista-dia">
           {#each modelos as m, i (m.id)}
