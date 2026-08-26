@@ -325,6 +325,10 @@
     mostrarForm = true;
   }
 
+  function pctDoDia(calorias: number): number {
+    return caloriasCalc > 0 ? Math.round((calorias / caloriasCalc) * 100) : 0;
+  }
+
   function abrirMeta(m: RefeicaoModelo) {
     if (m.metaReceitaId) {
       navigate(`/dieta/receitas/ver/${m.metaReceitaId}`);
@@ -604,7 +608,12 @@
             <button class="nome-btn" onclick={() => abrirMeta(m)}>
               <span class="nome-linha">
                 <span class="nome">{m.nome}</span>
-                {#if m.metaCalorias != null}<span class="nome-cal">{Math.round(m.metaCalorias)} cal</span>{/if}
+                {#if m.metaCalorias != null}
+                  <span class="nome-cal-col">
+                    <span class="nome-cal">{Math.round(m.metaCalorias)} cal</span>
+                    <span class="nome-pct">{pctDoDia(m.metaCalorias)}%</span>
+                  </span>
+                {/if}
               </span>
               {#if m.metaCalorias != null}
                 <span class="nome-macros">
@@ -905,7 +914,7 @@
   }
   .nome-linha {
     display: flex;
-    align-items: baseline;
+    align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-2);
   }
@@ -917,10 +926,20 @@
     font-size: var(--font-size-base);
     color: var(--surface-fg);
   }
-  .nome-cal {
+  .nome-cal-col {
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .nome-cal {
     font-size: 12px;
     color: var(--surface-muted);
+  }
+  .nome-pct {
+    font-size: 11px;
+    color: var(--surface-muted);
+    opacity: 0.8;
   }
   .nome-macros {
     font-size: var(--font-size-sm);
