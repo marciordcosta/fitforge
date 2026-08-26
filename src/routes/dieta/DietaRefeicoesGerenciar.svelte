@@ -598,8 +598,6 @@
         />
       {/if}
 
-      <div class="separador"></div>
-
       <p class="nutrientes-titulo">Metas de Consumo</p>
       <div class="nutrientes-lista">
         <div class="nutriente-item">
