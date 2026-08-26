@@ -57,6 +57,10 @@
   let grupoGorduraG = $state(0);
   let grupoCarboidratoG = $state(0);
   const caloriasGrupoCalc = $derived(Math.round(4 * grupoProteinaG + 9 * grupoGorduraG + 4 * grupoCarboidratoG));
+
+  function gKgGrupo(gramas: number): string {
+    return pesoAtual > 0 ? (gramas / pesoAtual).toFixed(2) : "0.00";
+  }
   type CampoMacroGrupo = "proteina" | "gordura" | "carboidrato";
   let campoEditandoGrupo = $state<CampoMacroGrupo | null>(null);
 
@@ -720,15 +724,15 @@
         <span class="tabela-input tabela-valor-calculado">{caloriasGrupoCalc}</span>
       </div>
       <div class="tabela-linha">
-        <span class="tabela-rotulo">Proteína</span>
+        <span class="tabela-rotulo">Proteína <span class="tabela-rotulo-gkg">{gKgGrupo(grupoProteinaG)} g/kg</span></span>
         <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "proteina")}>{grupoProteinaG} g</button>
       </div>
       <div class="tabela-linha">
-        <span class="tabela-rotulo">Gordura</span>
+        <span class="tabela-rotulo">Gordura <span class="tabela-rotulo-gkg">{gKgGrupo(grupoGorduraG)} g/kg</span></span>
         <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "gordura")}>{grupoGorduraG} g</button>
       </div>
       <div class="tabela-linha">
-        <span class="tabela-rotulo">Carboidrato</span>
+        <span class="tabela-rotulo">Carboidrato <span class="tabela-rotulo-gkg">{gKgGrupo(grupoCarboidratoG)} g/kg</span></span>
         <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "carboidrato")}>{grupoCarboidratoG} g</button>
       </div>
     </div>
@@ -909,6 +913,10 @@
   .tabela-rotulo {
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+  }
+  .tabela-rotulo-gkg {
+    color: var(--surface-muted);
+    font-size: 12px;
   }
   .tabela-input {
     flex: 0 0 64px;
