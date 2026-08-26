@@ -234,6 +234,10 @@
   .par select:focus {
     outline: none;
   }
+  .par select option {
+    background: var(--surface-card);
+    color: var(--surface-fg);
+  }
   .opaca {
     opacity: 0.5;
   }
