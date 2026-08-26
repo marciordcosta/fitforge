@@ -322,9 +322,9 @@
           <p class="preview" class:preview-colado={temItens}>{preview(refeicao.id)}</p>
           {#if temItens}
             <p class="refeicao-macros">
-              prot <span class="valor-macro">{totais.proteinaG.toFixed(0)}</span>g ·
-              gord <span class="valor-macro">{totais.gorduraG.toFixed(0)}</span>g ·
-              carb <span class="valor-macro">{totais.carboidratoG.toFixed(0)}</span>g
+              prot <span class="valor-macro">{totais.proteinaG.toFixed(0)}g</span> ·
+              gord <span class="valor-macro">{totais.gorduraG.toFixed(0)}g</span> ·
+              carb <span class="valor-macro">{totais.carboidratoG.toFixed(0)}g</span>
             </p>
           {/if}
           <Button
