@@ -286,14 +286,17 @@ export interface RefeicaoDia {
   data: string;
 }
 
+/** Ordena pelo mesmo critério de "Gerenciar Refeições" (por nome) — refeições avulsas, sem nome no catálogo, ficam no fim, na ordem em que foram criadas. */
 export async function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
-  const { data: linhas, error } = await supabase
-    .from("dieta_refeicoes_dia")
-    .select("id, nome, data")
-    .eq("data", data)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return linhas ?? [];
+  const [linhasRes, catalogo] = await Promise.all([
+    supabase.from("dieta_refeicoes_dia").select("id, nome, data").eq("data", data).order("created_at", { ascending: true }),
+    listRefeicoesModelo(),
+  ]);
+  if (linhasRes.error) throw linhasRes.error;
+  const ordemPorNome = new Map(catalogo.map((m, i) => [m.nome, i]));
+  return [...(linhasRes.data ?? [])].sort(
+    (a, b) => (ordemPorNome.get(a.nome) ?? Infinity) - (ordemPorNome.get(b.nome) ?? Infinity),
+  );
 }
 
 /** Se o dia ainda não tem nenhuma refeição, cria uma pra cada item do catálogo (as refeições "padrão" de todo dia) e retorna a lista já pronta. */
