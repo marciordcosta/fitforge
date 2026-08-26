@@ -854,9 +854,12 @@
       <p class="muted">Nenhuma refeição cadastrada ainda.</p>
     {:else if modoCalorias === "ondulatoria"}
       {#each gruposDias as grupo (grupo.dias[0])}
-        <div class="dia-card dia-secao-header" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
-          <span class="dia-card-nome">{grupo.dias.map((d) => DIAS_SEMANA_ABREV[d]).join(" · ")}</span>
-          <span class="dia-card-cal">{Math.round(grupo.calorias)}</span>
+        <div class="dias-lista secao-dias-lista">
+          {#each grupo.dias as dia (dia)}
+            <div class="dia-card" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
+              <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
+            </div>
+          {/each}
         </div>
         <ul class="lista lista-dia">
           {#each modelos as m, i (m.id)}
@@ -1443,20 +1446,14 @@
     font-size: 12px;
     opacity: 0.8;
   }
-  .dia-secao-header {
-    flex-direction: row;
+  .secao-dias-lista {
+    overflow-x: visible;
     flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: baseline;
-    width: 100%;
-    min-width: 0;
-    cursor: default;
+    padding-top: 0;
     margin: var(--space-5) 0 var(--space-2);
   }
-  .dia-secao-header .dia-card-nome {
-    flex: 1;
-    min-width: 0;
-    font-size: var(--font-size-base);
+  .secao-dias-lista .dia-card {
+    cursor: default;
   }
   .dias-acoes {
     display: flex;
