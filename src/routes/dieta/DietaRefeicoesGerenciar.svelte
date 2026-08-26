@@ -12,6 +12,8 @@
     type RefeicaoModelo,
   } from "../../lib/dietaApi";
 
+  let aba = $state<"calorias" | "refeicoes">("refeicoes");
+
   let modelos = $state<RefeicaoModelo[]>([]);
   let loading = $state(true);
   let erro = $state<string | null>(null);
@@ -161,38 +163,51 @@
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
-    <h1>Gerenciar Refeições</h1>
-    <button class="criar" onclick={abrirNovo} aria-label="Nova refeição">+</button>
+    <h1>Gerenciar</h1>
+    {#if aba === "refeicoes"}
+      <button class="criar" onclick={abrirNovo} aria-label="Nova refeição">+</button>
+    {:else}
+      <span class="header-spacer"></span>
+    {/if}
   </div>
 
-  <p class="dica">
-    Essas refeições são criadas automaticamente em todo dia que você abrir. Editar ou excluir aqui não afeta as refeições já lançadas em dias passados.
-  </p>
+  <div class="tabs">
+    <button class:active={aba === "calorias"} onclick={() => (aba = "calorias")}>Calorias</button>
+    <button class:active={aba === "refeicoes"} onclick={() => (aba = "refeicoes")}>Refeições</button>
+  </div>
 
-  {#if loading}
-    <p class="muted">Carregando…</p>
-  {:else if erro}
-    <p class="erro">Erro ao carregar refeições: {erro}</p>
-  {:else if !modelos.length}
-    <p class="muted">Nenhuma refeição cadastrada ainda.</p>
+  {#if aba === "calorias"}
+    <p class="muted">Em breve: metas de calorias e macronutrientes.</p>
   {:else}
-    <ul class="lista">
-      {#each modelos as m, i (m.id)}
-        <li
-          class="linha"
-          class:arrastando={arrastandoIndex === i}
-          bind:this={itemRefs[i]}
-          style={arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
-        >
-          <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
-            {@render iconArrastar()}
-          </button>
-          <button class="nome-btn" onclick={() => (itemMenu = m)}>
-            <span class="nome">{m.nome}</span>
-          </button>
-        </li>
-      {/each}
-    </ul>
+    <p class="dica">
+      Essas refeições são criadas automaticamente em todo dia que você abrir. Editar ou excluir aqui não afeta as refeições já lançadas em dias passados.
+    </p>
+
+    {#if loading}
+      <p class="muted">Carregando…</p>
+    {:else if erro}
+      <p class="erro">Erro ao carregar refeições: {erro}</p>
+    {:else if !modelos.length}
+      <p class="muted">Nenhuma refeição cadastrada ainda.</p>
+    {:else}
+      <ul class="lista">
+        {#each modelos as m, i (m.id)}
+          <li
+            class="linha"
+            class:arrastando={arrastandoIndex === i}
+            bind:this={itemRefs[i]}
+            style={arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
+          >
+            <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
+              {@render iconArrastar()}
+            </button>
+            <button class="nome-btn" onclick={() => (itemMenu = m)}>
+              <span class="nome">{m.nome}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
   {/if}
 </div>
 
@@ -251,6 +266,30 @@
     font-size: var(--font-size-base);
     cursor: pointer;
     padding: var(--space-1);
+  }
+  .header-spacer {
+    width: 24px;
+    flex-shrink: 0;
+  }
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--surface-border);
+    margin-bottom: var(--space-4);
+  }
+  .tabs button {
+    flex: 1;
+    padding: var(--space-3);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tabs button.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
   }
   .dica {
     color: var(--surface-muted);
