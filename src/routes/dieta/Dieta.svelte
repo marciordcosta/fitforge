@@ -38,6 +38,8 @@
   <DietaReceitaForm />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "ver" && segmentos[2]}
   <DietaReceitaVisualizar receitaId={segmentos[2]} />
+{:else if segmentos[0] === "receitas" && segmentos[1] === "buscar" && segmentos[2] === "meta" && segmentos[3]}
+  <DietaReceitas metaParaModeloId={segmentos[3]} nomeInicial={decodeURIComponent(segmentos[4] ?? "")} />
 {:else if segmentos[0] === "receitas"}
   <DietaReceitas />
 {:else if segmentos[0] === "refeicoes" && segmentos[1] === "gerenciar"}

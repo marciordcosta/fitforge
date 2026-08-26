@@ -1,19 +1,40 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
-  import { buscarReceitas, listReceitas, type ReceitaResumo } from "../../lib/dietaApi";
-  import { limparRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
+  import { buscarReceitas, listReceitas, vincularMetaReceita, type ReceitaResumo } from "../../lib/dietaApi";
+  import { receitaRascunho, limparRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
+
+  let { metaParaModeloId, nomeInicial }: { metaParaModeloId?: string; nomeInicial?: string } = $props();
 
   let receitas = $state<ReceitaResumo[]>([]);
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let busca = $state("");
+  let vinculando = $state<string | null>(null);
 
   let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
 
   function criarNova() {
     limparRascunho();
     definirContexto("nova");
-    navigate("/dieta/receitas/nova");
+    if (metaParaModeloId && nomeInicial) {
+      receitaRascunho.nome = nomeInicial;
+    }
+    navigate(metaParaModeloId ? `/dieta/receitas/nova/meta/${metaParaModeloId}` : "/dieta/receitas/nova");
+  }
+
+  async function selecionar(r: ReceitaResumo) {
+    if (!metaParaModeloId) {
+      navigate(`/dieta/receitas/ver/${r.id}`);
+      return;
+    }
+    vinculando = r.id;
+    try {
+      await vincularMetaReceita(metaParaModeloId, r.id);
+      navigate("/dieta/refeicoes/gerenciar");
+    } catch (err) {
+      alert("Erro ao vincular refeição: " + (err as Error).message);
+      vinculando = null;
+    }
   }
 
   async function carregarInicial() {
@@ -70,13 +91,13 @@
     <ul class="lista">
       {#each receitas as r (r.id)}
         <li class="linha">
-          <button class="info-btn" onclick={() => navigate(`/dieta/receitas/ver/${r.id}`)}>
+          <button class="info-btn" onclick={() => selecionar(r)} disabled={vinculando === r.id}>
             <span class="avatar">{iniciais(r.nome)}</span>
             <span class="info">
               <span class="nome">{r.nome}</span>
             </span>
           </button>
-          <span class="chevron">›</span>
+          <span class="chevron">{vinculando === r.id ? "…" : "›"}</span>
         </li>
       {/each}
     </ul>
