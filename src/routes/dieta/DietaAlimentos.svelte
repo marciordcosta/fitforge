@@ -27,10 +27,24 @@
   const modoAdicionar = untrack(() => refeicaoId != null);
   const refeicaoIdFixo = untrack(() => refeicaoId);
 
+  function lerBuscaDaUrl(): string {
+    return new URLSearchParams(window.location.search).get("q") ?? "";
+  }
+
+  function atualizarUrlBusca(valor: string) {
+    const url = new URL(window.location.href);
+    if (valor.trim()) {
+      url.searchParams.set("q", valor);
+    } else {
+      url.searchParams.delete("q");
+    }
+    window.history.replaceState({}, "", url.pathname + url.search);
+  }
+
   let alimentos = $state<Alimento[]>([]);
   let resultadosReceitas = $state<ReceitaResumo[]>([]);
   let loading = $state(true);
-  let busca = $state("");
+  let busca = $state(untrack(() => lerBuscaDaUrl()));
   let mostrarEscolhaCriar = $state(false);
   let mostrarCriarAlimento = $state(false);
   let refeicaoData = $state("");
@@ -48,18 +62,31 @@
     timeoutMensagem = setTimeout(() => (mensagem = null), 2000);
   }
 
-  async function carregarInicial() {
+  async function executarBusca(query: string) {
     loading = true;
     erro = null;
     try {
-      const [alRes, recRes] = await Promise.all([listAlimentos(), modoAdicionar ? listReceitas() : Promise.resolve([])]);
-      alimentos = alRes;
-      resultadosReceitas = recRes;
+      if (query.trim()) {
+        const [alRes, recRes] = await Promise.all([
+          buscarAlimentos(query),
+          modoAdicionar ? buscarReceitas(query) : Promise.resolve([]),
+        ]);
+        alimentos = alRes;
+        resultadosReceitas = recRes;
+      } else {
+        const [alRes, recRes] = await Promise.all([listAlimentos(), modoAdicionar ? listReceitas() : Promise.resolve([])]);
+        alimentos = alRes;
+        resultadosReceitas = recRes;
+      }
     } catch (err) {
       erro = (err as Error).message;
     } finally {
       loading = false;
     }
+  }
+
+  async function carregarInicial() {
+    await executarBusca(busca);
   }
 
   void carregarInicial();
@@ -73,27 +100,9 @@
 
   function aoDigitar() {
     clearTimeout(timeoutBusca);
-    timeoutBusca = setTimeout(async () => {
-      loading = true;
-      erro = null;
-      try {
-        if (busca.trim()) {
-          const [alRes, recRes] = await Promise.all([
-            buscarAlimentos(busca),
-            modoAdicionar ? buscarReceitas(busca) : Promise.resolve([]),
-          ]);
-          alimentos = alRes;
-          resultadosReceitas = recRes;
-        } else {
-          const [alRes, recRes] = await Promise.all([listAlimentos(), modoAdicionar ? listReceitas() : Promise.resolve([])]);
-          alimentos = alRes;
-          resultadosReceitas = recRes;
-        }
-      } catch (err) {
-        erro = (err as Error).message;
-      } finally {
-        loading = false;
-      }
+    timeoutBusca = setTimeout(() => {
+      atualizarUrlBusca(busca);
+      void executarBusca(busca);
     }, 300);
   }
 
