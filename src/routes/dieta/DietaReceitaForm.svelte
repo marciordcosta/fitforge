@@ -1,16 +1,35 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
-  import { criarReceita, vincularMetaReceita } from "../../lib/dietaApi";
+  import { criarReceita, vincularMetaReceita, getMetasDiarias, type MetasDiarias } from "../../lib/dietaApi";
   import { receitaRascunho, removerDoRascunho, limparRascunho, type ItemRascunho } from "../../lib/receitaRascunho.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
 
   let { metaParaModeloId }: { metaParaModeloId?: string } = $props();
 
+  const COR_CARBO = "#5eead4";
+  const COR_GORDURA = "#f9a8d4";
+  const COR_PROTEINA = "#fbbf24";
+
   let salvando = $state(false);
   let itemEditandoIndex = $state<number | null>(null);
+  let metas = $state<MetasDiarias | null>(null);
 
+  void getMetasDiarias().then((m) => (metas = m));
+
+  function fatorItem(item: ItemRascunho): number {
+    return item.quantidade / item.alimento.porcaoPadraoQtd;
+  }
   function caloriasItem(item: ItemRascunho): number {
-    return item.alimento.caloriasPorPorcao * (item.quantidade / item.alimento.porcaoPadraoQtd);
+    return item.alimento.caloriasPorPorcao * fatorItem(item);
+  }
+  function proteinaItem(item: ItemRascunho): number {
+    return item.alimento.proteinaG * fatorItem(item);
+  }
+  function gorduraItem(item: ItemRascunho): number {
+    return item.alimento.gorduraG * fatorItem(item);
+  }
+  function carboidratoItem(item: ItemRascunho): number {
+    return item.alimento.carboidratoG * fatorItem(item);
   }
 
   function aoSalvarQuantidade(qtd: number) {
@@ -20,6 +39,26 @@
   }
 
   const totalCalorias = $derived(receitaRascunho.itens.reduce((acc, i) => acc + caloriasItem(i), 0));
+  const totalProteina = $derived(receitaRascunho.itens.reduce((acc, i) => acc + proteinaItem(i), 0));
+  const totalGordura = $derived(receitaRascunho.itens.reduce((acc, i) => acc + gorduraItem(i), 0));
+  const totalCarboidrato = $derived(receitaRascunho.itens.reduce((acc, i) => acc + carboidratoItem(i), 0));
+
+  const caloriasCarbo = $derived(totalCarboidrato * 4);
+  const caloriasGordura = $derived(totalGordura * 9);
+  const caloriasProteina = $derived(totalProteina * 4);
+  const caloriasMacros = $derived(caloriasCarbo + caloriasGordura + caloriasProteina);
+
+  const pctCarbo = $derived(caloriasMacros > 0 ? (caloriasCarbo / caloriasMacros) * 100 : 0);
+  const pctGordura = $derived(caloriasMacros > 0 ? (caloriasGordura / caloriasMacros) * 100 : 0);
+  const pctProteina = $derived(caloriasMacros > 0 ? (caloriasProteina / caloriasMacros) * 100 : 0);
+
+  const donutStyle = $derived(
+    `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
+  );
+
+  function pctMeta(valor: number, meta: number): number {
+    return meta > 0 ? Math.min(100, (valor / meta) * 100) : 0;
+  }
 
   const valido = $derived(receitaRascunho.nome.trim().length > 0 && receitaRascunho.itens.length > 0);
 
@@ -62,6 +101,11 @@
     <path d="M17 8v8" />
   </svg>
 {/snippet}
+{#snippet iconExcluir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -83,23 +127,70 @@
     </button>
   </div>
 
-  <p class="itens-titulo">Itens ({receitaRascunho.itens.length})</p>
+  {#if receitaRascunho.itens.length}
+    <div class="resumo">
+      <div class="donut" style={donutStyle}>
+        <div class="donut-centro">
+          <strong>{totalCalorias.toFixed(0)}</strong>
+          <span>Cal</span>
+        </div>
+      </div>
+      <div class="resumo-macros">
+        <p><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br /><span class="valor-g">{totalCarboidrato.toFixed(1)} g</span><br />Carb</p>
+        <p><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br /><span class="valor-g">{totalGordura.toFixed(1)} g</span><br />Gorduras</p>
+        <p><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{totalProteina.toFixed(1)} g</span><br />Proteínas</p>
+      </div>
+    </div>
+
+    {#if metas}
+      <p class="metas-titulo">Percentual das suas metas diárias</p>
+      <div class="metas-grid">
+        <div class="meta-col">
+          <span class="meta-label">Calorias</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalCalorias, metas.calorias)}%; background:var(--color-secondary);`}></div></div>
+          <span class="meta-valor">{pctMeta(totalCalorias, metas.calorias).toFixed(0)}% · {metas.calorias.toFixed(0)}</span>
+        </div>
+        <div class="meta-col">
+          <span class="meta-label">Carb</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalCarboidrato, metas.carboidratoG)}%; background:${COR_CARBO};`}></div></div>
+          <span class="meta-valor">{pctMeta(totalCarboidrato, metas.carboidratoG).toFixed(0)}% · {metas.carboidratoG.toFixed(0)}g</span>
+        </div>
+        <div class="meta-col">
+          <span class="meta-label">Gorduras</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalGordura, metas.gorduraG)}%; background:${COR_GORDURA};`}></div></div>
+          <span class="meta-valor">{pctMeta(totalGordura, metas.gorduraG).toFixed(0)}% · {metas.gorduraG.toFixed(0)}g</span>
+        </div>
+        <div class="meta-col">
+          <span class="meta-label">Proteínas</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${pctMeta(totalProteina, metas.proteinaG)}%; background:${COR_PROTEINA};`}></div></div>
+          <span class="meta-valor">{pctMeta(totalProteina, metas.proteinaG).toFixed(0)}% · {metas.proteinaG.toFixed(0)}g</span>
+        </div>
+      </div>
+    {/if}
+  {/if}
+
+  <p class="itens-titulo">Itens</p>
   {#if !receitaRascunho.itens.length}
     <p class="muted">Nenhum alimento adicionado ainda.</p>
   {:else}
     {#each receitaRascunho.itens as item, i (item.alimento.id + i)}
-      <div class="item-card">
+      <button class="item-card" onclick={() => (itemEditandoIndex = i)}>
         <div class="item-info">
           <p class="item-nome">{item.alimento.nome}</p>
-          <p class="item-cal">{caloriasItem(item).toFixed(0)} kcal</p>
+          <p class="item-qtd">{item.quantidade}{item.alimento.porcaoPadraoUnidade} · {caloriasItem(item).toFixed(0)} kcal</p>
         </div>
-        <button type="button" class="qtd-btn" onclick={() => (itemEditandoIndex = i)}>
-          {item.quantidade}{item.alimento.porcaoPadraoUnidade}
-        </button>
-        <button class="item-remover" onclick={() => removerDoRascunho(i)} aria-label="Remover item">✕</button>
-      </div>
+        <span
+          class="item-remover"
+          role="button"
+          tabindex="0"
+          onclick={(e) => { e.stopPropagation(); removerDoRascunho(i); }}
+          onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); removerDoRascunho(i); } }}
+          aria-label="Remover item"
+        >
+          {@render iconExcluir()}
+        </span>
+      </button>
     {/each}
-    <p class="total">Total: {totalCalorias.toFixed(0)} kcal</p>
   {/if}
 </div>
 
@@ -187,19 +278,104 @@
     flex-shrink: 0;
     color: var(--color-primary);
   }
-  .itens-titulo {
-    font-weight: 600;
-    margin: var(--space-4) 0 var(--space-3);
-  }
-  .item-card {
+  .resumo {
     display: flex;
     align-items: center;
+    gap: var(--space-5);
+    padding: var(--space-3) 0 var(--space-5);
+  }
+  .donut {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .donut-centro {
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    background: var(--surface-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .donut-centro strong {
+    font-size: var(--font-size-lg);
+  }
+  .donut-centro span {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .resumo-macros {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
     gap: var(--space-2);
+  }
+  .resumo-macros p {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .resumo-macros .pct {
+    font-size: var(--font-size-base);
+  }
+  .resumo-macros .valor-g {
+    font-size: 17px;
+  }
+  .metas-titulo {
+    font-weight: 600;
+    margin: var(--space-2) 0 var(--space-3);
+  }
+  .metas-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+  }
+  .meta-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .meta-label {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .meta-barra {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface-border);
+    overflow: hidden;
+  }
+  .meta-barra-fill {
+    height: 100%;
+  }
+  .meta-valor {
+    font-size: 11px;
+    color: var(--surface-muted);
+  }
+  .itens-titulo {
+    font-weight: 600;
+    margin: var(--space-2) 0 var(--space-3);
+  }
+  .item-card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
     background: var(--surface-card);
-    padding: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-2);
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
   }
   .item-info {
     flex: 1;
@@ -208,39 +384,29 @@
   .item-nome {
     margin: 0;
     font-size: var(--font-size-base);
+    color: var(--surface-fg);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .item-cal {
+  .item-qtd {
     margin: 2px 0 0;
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
-  .qtd-btn {
-    flex-shrink: 0;
-    min-width: 56px;
-    text-align: center;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
-    color: var(--surface-fg);
-    font-size: var(--font-size-sm);
-    font-family: inherit;
-    cursor: pointer;
-  }
   .item-remover {
-    background: none;
-    border: none;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--color-danger);
     cursor: pointer;
-    padding: var(--space-1);
   }
-  .total {
-    text-align: right;
-    font-weight: 600;
-    margin-top: var(--space-3);
+  .item-remover svg {
+    width: 18px;
+    height: 18px;
   }
   .muted {
     color: var(--surface-muted);
