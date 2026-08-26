@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import { criarAlimentoManual, atualizarAlimentoManual, type Alimento } from "../../lib/dietaApi";
 
   let {
@@ -25,6 +26,7 @@
   let gorduraExpandida = $state(
     untrack(() => alimento?.gorduraSaturadaG != null || alimento?.gorduraInsaturadaG != null),
   );
+  let mostrarEscolhaUnidade = $state(false);
   let salvando = $state(false);
 
   $effect(() => {
@@ -110,13 +112,21 @@
     </div>
 
     <div class="linha">
-      <label for="af-porcao">Porção</label>
-      <input id="af-porcao" class="valor-num" type="number" inputmode="decimal" step="1" min="0" bind:value={porcaoQtd} />
-      <select class="valor-extra" bind:value={porcaoUnidade}>
-        <option value="g">g</option>
-        <option value="ml">ml</option>
-        <option value="unidade">unidade</option>
-      </select>
+      <span class="rotulo-com-seta">
+        <label for="af-porcao">Porção</label>
+        <button
+          type="button"
+          class="chevron"
+          onclick={() => (mostrarEscolhaUnidade = true)}
+          aria-label="Escolher unidade da porção"
+        >
+          {@render iconChevron()}
+        </button>
+      </span>
+      <span class="valor-grupo">
+        <input id="af-porcao" class="valor-num-inline" type="number" inputmode="decimal" step="1" min="0" bind:value={porcaoQtd} />
+        <span class="unidade-texto">{porcaoUnidade}</span>
+      </span>
     </div>
 
     <div class="linha">
@@ -180,6 +190,18 @@
   <Button onclick={salvar} disabled={salvando || !valido}>{editando ? "Salvar Alterações" : "Criar Alimento"}</Button>
 </Sheet>
 
+{#if mostrarEscolhaUnidade}
+  <ActionSheet
+    titulo="Unidade da porção"
+    onFechar={() => (mostrarEscolhaUnidade = false)}
+    opcoes={[
+      { label: "g", onSelect: () => (porcaoUnidade = "g") },
+      { label: "ml", onSelect: () => (porcaoUnidade = "ml") },
+      { label: "unidade", onSelect: () => (porcaoUnidade = "unidade") },
+    ]}
+  />
+{/if}
+
 <style>
   .lista {
     display: flex;
@@ -235,20 +257,30 @@
     text-align: right;
     padding: 0;
   }
-  .valor-extra {
-    grid-column: 3;
-    justify-self: end;
+  .valor-grupo {
+    grid-column: 2 / span 2;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .valor-num-inline {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 60px;
+    box-sizing: border-box;
     border: none;
     background: none;
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+    text-align: right;
+    padding: 0;
   }
-  .valor-extra:focus {
-    outline: none;
-  }
-  .valor-extra option {
-    background: var(--surface-card);
+  .unidade-texto {
+    flex-shrink: 0;
     color: var(--surface-fg);
+    font-size: var(--font-size-base);
   }
   .linha input:focus {
     outline: none;
