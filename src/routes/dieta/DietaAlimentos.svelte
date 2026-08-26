@@ -204,7 +204,12 @@
     <button class="criar" onclick={() => (mostrarEscolhaCriar = true)}>Criar</button>
   </div>
 
-  <input class="search" type="text" placeholder="Procurar alimento" bind:value={busca} oninput={aoDigitar} />
+  <div class="busca-linha">
+    <input class="search" type="text" placeholder="Procurar alimento" bind:value={busca} oninput={aoDigitar} />
+    <button class="scanner-btn" onclick={abrirScanner} aria-label="Escanear código de barras">
+      {@render iconScanner()}
+    </button>
+  </div>
 
   {#if loading}
     <p class="muted">Carregando…</p>
@@ -314,8 +319,15 @@
     cursor: pointer;
     padding: var(--space-1);
   }
+  .busca-linha {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
   .search {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     box-sizing: border-box;
     padding: var(--space-3);
     border-radius: var(--radius-md);
@@ -323,7 +335,23 @@
     background: var(--surface-card);
     color: var(--surface-fg);
     font-size: var(--font-size-base);
-    margin-bottom: var(--space-4);
+  }
+  .scanner-btn {
+    flex-shrink: 0;
+    width: 48px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .scanner-btn svg {
+    width: 20px;
+    height: 20px;
   }
   .secao-titulo {
     font-size: var(--font-size-sm);
