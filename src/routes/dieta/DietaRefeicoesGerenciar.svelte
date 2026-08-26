@@ -622,10 +622,6 @@
     return Math.min(100, pct);
   }
 
-  function corBarra(pct: number, corBase: string): string {
-    return pct > 100 ? "var(--color-danger)" : corBase;
-  }
-
   function restante(valor: number, meta: number): number {
     return Math.max(0, meta - valor);
   }
@@ -1070,7 +1066,7 @@
                 {/if}
               </p>
               <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.calorias, metaGrupo.calorias))}%; background:${corBarra(pctMeta(somaGrupo.calorias, metaGrupo.calorias), "var(--color-secondary)")};`}></div>
+                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.calorias, metaGrupo.calorias))}%; background:var(--color-secondary);`}></div>
               </div>
             </div>
             <div class="macro-col">
@@ -1083,7 +1079,7 @@
                 {/if}
               </p>
               <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG))}%; background:${corBarra(pctMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG), COR_CARBO)};`}></div>
+                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG))}%; background:${COR_CARBO};`}></div>
               </div>
             </div>
             <div class="macro-col">
@@ -1096,7 +1092,7 @@
                 {/if}
               </p>
               <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.gorduraG, metaGrupo.gorduraG))}%; background:${corBarra(pctMeta(somaGrupo.gorduraG, metaGrupo.gorduraG), COR_GORDURA)};`}></div>
+                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.gorduraG, metaGrupo.gorduraG))}%; background:${COR_GORDURA};`}></div>
               </div>
             </div>
             <div class="macro-col">
@@ -1109,7 +1105,7 @@
                 {/if}
               </p>
               <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG))}%; background:${corBarra(pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG), COR_PROTEINA)};`}></div>
+                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG))}%; background:${COR_PROTEINA};`}></div>
               </div>
             </div>
           </div>
