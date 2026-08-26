@@ -938,7 +938,7 @@
     align-items: baseline;
     justify-content: space-between;
     gap: var(--space-2);
-    font-size: var(--font-size-sm);
+    font-size: 12px;
     color: var(--surface-muted);
   }
   .nome-pct {
