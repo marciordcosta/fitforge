@@ -6,6 +6,7 @@
   import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts } from "../../lib/dietaApi";
   import { buscarProdutoPorCodigoBarras } from "../../lib/openFoodFacts";
   import Button from "../../components/Button.svelte";
+  import Sheet from "../../components/Sheet.svelte";
 
   let {
     data,
@@ -20,6 +21,8 @@
   let fase = $state<"camera" | "buscando" | "erro">("camera");
   let mensagemErro = $state("");
   let controls: IScannerControls | null = null;
+  let mostrarManual = $state(false);
+  let codigoManual = $state("");
 
   async function iniciarCamera(el: HTMLVideoElement) {
     try {
@@ -80,6 +83,15 @@
     fase = "camera";
   }
 
+  function buscarCodigoManual() {
+    const codigo = codigoManual.trim();
+    if (!codigo) return;
+    mostrarManual = false;
+    controls?.stop();
+    controls = null;
+    void aoDetectar(codigo);
+  }
+
   function irParaCadastroManual() {
     if (modoReceita) {
       navigate(`/dieta/alimentos/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`);
@@ -102,6 +114,7 @@
       <div class="mira"></div>
     </div>
     <p class="dica">Aponte a câmera para o código de barras do produto.</p>
+    <Button variant="secondary" onclick={() => (mostrarManual = true)}>Digitar código manualmente</Button>
   {:else if fase === "buscando"}
     <p class="muted">Buscando informações do produto…</p>
   {:else if fase === "erro"}
@@ -112,6 +125,20 @@
     </div>
   {/if}
 </div>
+
+{#if mostrarManual}
+  <Sheet titulo="Digitar código de barras" onFechar={() => (mostrarManual = false)}>
+    <input
+      class="codigo-input"
+      type="text"
+      inputmode="numeric"
+      placeholder="Ex: 7891000100103"
+      bind:value={codigoManual}
+      onkeydown={(e) => e.key === "Enter" && buscarCodigoManual()}
+    />
+    <Button onclick={buscarCodigoManual} disabled={!codigoManual.trim()}>Buscar</Button>
+  </Sheet>
+{/if}
 
 <style>
   .container {
@@ -170,7 +197,18 @@
     text-align: center;
     color: var(--surface-muted);
     font-size: var(--font-size-sm);
-    margin-top: var(--space-4);
+    margin: var(--space-4) 0;
+  }
+  .codigo-input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: var(--space-3);
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
   }
   .muted {
     color: var(--surface-muted);
