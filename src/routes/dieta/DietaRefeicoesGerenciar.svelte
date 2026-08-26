@@ -22,10 +22,13 @@
     removerCaloriasDia,
     listMetasDiaModelo,
     carboidratoGDoDia,
+    listRefeicoesModeloDia,
+    definirRefeicoesDoDia,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
     type MetaDiaModelo,
+    type RefeicaoModeloDia,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
@@ -137,16 +140,37 @@
     calorias: number;
     manual: boolean;
     cor: string | null;
+    modelos: RefeicaoModelo[];
   }
 
-  /** Dias com a mesma meta de calorias viram um único bloco de refeições — não faz sentido configurar cada dia igual separadamente. Ordem preservada pela primeira ocorrência (Dom..Sáb). */
+  /** Refeições do catálogo que aparecem nesse dia, na ordem salva — sem customização ainda, cai no catálogo global inteiro. */
+  function modelosDoDia(dia: number): RefeicaoModelo[] {
+    const linhas = modelosPorDia.filter((r) => r.diaSemana === dia);
+    if (!linhas.length) return modelos;
+    const porId = new Map(modelos.map((m) => [m.id, m]));
+    return linhas
+      .slice()
+      .sort((a, b) => a.ordem - b.ordem)
+      .map((r) => porId.get(r.modeloId))
+      .filter((m): m is RefeicaoModelo => m != null);
+  }
+
+  /** Dias com a mesma meta de calorias E as mesmas refeições (na mesma ordem) viram um único bloco — dias diferentes em qualquer um dos dois saem em blocos separados. Ordem preservada pela primeira ocorrência (Dom..Sáb). */
   const gruposDias = $derived.by((): GrupoDias[] => {
-    const grupos = new Map<number, GrupoDias>();
+    const grupos = new Map<string, GrupoDias>();
     for (const d of diasResolvidos) {
-      const chave = Math.round(d.calorias);
+      const chaveCal = Math.round(d.calorias);
+      const listaDia = modelosDoDia(d.diaSemana);
+      const chave = `${chaveCal}|${listaDia.map((m) => m.id).join(",")}`;
       let g = grupos.get(chave);
       if (!g) {
-        g = { dias: [], calorias: d.calorias, manual: d.manual, cor: d.manual ? (corPorGrupoManual.get(chave) ?? null) : null };
+        g = {
+          dias: [],
+          calorias: d.calorias,
+          manual: d.manual,
+          cor: d.manual ? (corPorGrupoManual.get(chaveCal) ?? null) : null,
+          modelos: listaDia,
+        };
         grupos.set(chave, g);
       }
       g.dias.push(d.diaSemana);
@@ -499,6 +523,7 @@
 
   let modelos = $state<RefeicaoModelo[]>([]);
   let metasDiaModelo = $state<MetaDiaModelo[]>([]);
+  let modelosPorDia = $state<RefeicaoModeloDia[]>([]);
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let mostrarForm = $state(false);
@@ -516,6 +541,9 @@
   let alturaLinha = 0;
   let startY = 0;
   let ordemMudou = false;
+  /** Cópia local da lista do grupo sendo arrastado (Ondulatória) — não mexe no catálogo global. */
+  let arrastoListaDia = $state<RefeicaoModelo[]>([]);
+  let arrastandoGrupoDiasCompleto: number[] = [];
 
   const metaDiaMap = $derived(new Map(metasDiaModelo.map((md) => [`${md.modeloId}:${md.diaSemana}`, md])));
 
@@ -544,7 +572,7 @@
 
   /** Soma dos macros já configurados nas refeições desse dia — pra comparar com a meta do dia. */
   function somaMacrosInformados(dia: number) {
-    return modelos.reduce(
+    return modelosDoDia(dia).reduce(
       (acc, m) => {
         const meta = metaEfetivaDoDia(m, dia);
         return {
@@ -587,7 +615,7 @@
     loading = true;
     erro = null;
     try {
-      [modelos, metasDiaModelo] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo()]);
+      [modelos, metasDiaModelo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo(), listRefeicoesModeloDia()]);
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -687,10 +715,15 @@
     cancelarEsperaArrastar();
     alturaLinha = el.getBoundingClientRect().height;
     startY = pointerDownY;
-    arrastandoDia = dia;
     arrastandoIndex = index;
     arrastarOffsetY = 0;
     ordemMudou = false;
+    if (dia != null) {
+      const grupo = gruposDias.find((g) => g.dias.includes(dia));
+      arrastandoGrupoDiasCompleto = grupo?.dias ?? [dia];
+      arrastoListaDia = grupo ? grupo.modelos.slice() : [];
+    }
+    arrastandoDia = dia;
     if (navigator.vibrate) navigator.vibrate(10);
     window.addEventListener("pointermove", aoPointerMove);
     window.addEventListener("pointerup", aoPointerUp);
@@ -702,12 +735,14 @@
     arrastarOffsetY = delta;
     const passos = Math.round(delta / alturaLinha);
     if (passos !== 0) {
-      const novoIndex = Math.min(modelos.length - 1, Math.max(0, arrastandoIndex + passos));
+      const listaAtual = arrastandoDia == null ? modelos : arrastoListaDia;
+      const novoIndex = Math.min(listaAtual.length - 1, Math.max(0, arrastandoIndex + passos));
       if (novoIndex !== arrastandoIndex) {
-        const copia = modelos.slice();
+        const copia = listaAtual.slice();
         const [item] = copia.splice(arrastandoIndex, 1);
         copia.splice(novoIndex, 0, item);
-        modelos = copia;
+        if (arrastandoDia == null) modelos = copia;
+        else arrastoListaDia = copia;
         arrastandoIndex = novoIndex;
         startY = e.clientY;
         arrastarOffsetY = 0;
@@ -716,18 +751,71 @@
     }
   }
 
+  /** Atualiza o estado local de modelosPorDia depois de gravar uma nova lista pra um grupo de dias, sem precisar recarregar tudo do banco. */
+  function aplicarModelosPorDiaLocal(dias: number[], ids: string[]) {
+    const novo = modelosPorDia.filter((r) => !dias.includes(r.diaSemana));
+    for (const dia of dias) {
+      ids.forEach((modeloId, i) => novo.push({ modeloId, diaSemana: dia, ordem: i }));
+    }
+    modelosPorDia = novo;
+  }
+
   async function aoPointerUp() {
     window.removeEventListener("pointermove", aoPointerMove);
     window.removeEventListener("pointerup", aoPointerUp);
+    const diaArrastado = arrastandoDia;
+    const diasGrupoArrastado = arrastandoGrupoDiasCompleto;
+    const listaFinal = arrastoListaDia;
     arrastandoDia = null;
     arrastandoIndex = null;
     arrastarOffsetY = 0;
     if (!ordemMudou) return;
     try {
-      await reordenarRefeicoesModelo(modelos.map((m) => m.id));
+      if (diaArrastado == null) {
+        await reordenarRefeicoesModelo(modelos.map((m) => m.id));
+      } else {
+        const ids = listaFinal.map((m) => m.id);
+        await Promise.all(diasGrupoArrastado.map((dia) => definirRefeicoesDoDia(dia, ids)));
+        aplicarModelosPorDiaLocal(diasGrupoArrastado, ids);
+      }
     } catch (err) {
       alert("Erro ao salvar a nova ordem: " + (err as Error).message);
       await carregar();
+    }
+  }
+
+  async function removerDoGrupo(grupo: GrupoDias, m: RefeicaoModelo) {
+    const ids = grupo.modelos.filter((x) => x.id !== m.id).map((x) => x.id);
+    try {
+      await Promise.all(grupo.dias.map((dia) => definirRefeicoesDoDia(dia, ids)));
+      aplicarModelosPorDiaLocal(grupo.dias, ids);
+    } catch (err) {
+      alert("Erro ao remover refeição desse dia: " + (err as Error).message);
+    }
+  }
+
+  let mostrarAdicionarRefeicaoGrupo = $state(false);
+  let grupoParaAdicionar = $state<GrupoDias | null>(null);
+
+  function abrirAdicionarRefeicao(grupo: GrupoDias) {
+    grupoParaAdicionar = grupo;
+    mostrarAdicionarRefeicaoGrupo = true;
+  }
+
+  const refeicoesDisponiveisParaGrupo = $derived(
+    grupoParaAdicionar ? modelos.filter((m) => !grupoParaAdicionar!.modelos.some((x) => x.id === m.id)) : [],
+  );
+
+  async function adicionarAoGrupo(m: RefeicaoModelo) {
+    if (!grupoParaAdicionar) return;
+    const grupo = grupoParaAdicionar;
+    const ids = [...grupo.modelos.map((x) => x.id), m.id];
+    mostrarAdicionarRefeicaoGrupo = false;
+    try {
+      await Promise.all(grupo.dias.map((dia) => definirRefeicoesDoDia(dia, ids)));
+      aplicarModelosPorDiaLocal(grupo.dias, ids);
+    } catch (err) {
+      alert("Erro ao adicionar refeição: " + (err as Error).message);
     }
   }
 </script>
@@ -1007,7 +1095,7 @@
         </div>
 
         <ul class="lista lista-dia">
-          {#each modelos as m, i (m.id)}
+          {#each (arrastandoDia === grupo.dias[0] ? arrastoListaDia : grupo.modelos) as m, i (m.id)}
             {@const meta = metaEfetivaDoDia(m, grupo.dias[0])}
             <li
               class="linha"
@@ -1028,10 +1116,13 @@
                   <span class="nome-pct">{pctDeDia(meta.calorias ?? 0, grupo.calorias)}%</span>
                 </span>
               </button>
-              <button class="remover-btn" onclick={() => (paraExcluir = m)} aria-label={`Remover ${m.nome}`}>✕</button>
+              <button class="remover-btn" onclick={() => removerDoGrupo(grupo, m)} aria-label={`Remover ${m.nome} desse dia`}>✕</button>
             </li>
           {/each}
         </ul>
+        {#if grupo.modelos.length < modelos.length}
+          <button type="button" class="add-refeicao-btn" onclick={() => abrirAdicionarRefeicao(grupo)}>+ Adicionar refeição</button>
+        {/if}
       {/each}
     {:else}
       <ul class="lista">
@@ -1138,6 +1229,17 @@
     opcoes={diasDisponiveisParaAdicionar.map((d) => ({
       label: DIAS_SEMANA_ABREV[d.diaSemana],
       onSelect: () => adicionarDiaAoGrupo(d.diaSemana),
+    }))}
+  />
+{/if}
+
+{#if mostrarAdicionarRefeicaoGrupo}
+  <ActionSheet
+    titulo="Adicionar refeição"
+    onFechar={() => (mostrarAdicionarRefeicaoGrupo = false)}
+    opcoes={refeicoesDisponiveisParaGrupo.map((m) => ({
+      label: m.nome,
+      onSelect: () => adicionarAoGrupo(m),
     }))}
   />
 {/if}
@@ -1378,6 +1480,19 @@
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+  .add-refeicao-btn {
+    width: 100%;
+    padding: var(--space-3);
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--surface-border);
+    background: none;
+    color: var(--color-primary);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    cursor: pointer;
   }
   .linha {
     display: flex;

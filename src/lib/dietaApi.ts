@@ -413,6 +413,45 @@ export async function excluirRefeicaoModelo(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Quais refeições do catálogo aparecem num dia da semana específico (modo Ondulatória), e em que ordem. */
+export interface RefeicaoModeloDia {
+  modeloId: string;
+  diaSemana: number;
+  ordem: number;
+}
+
+/** Ausência de qualquer linha pra um dia = esse dia ainda usa o catálogo global inteiro, na ordem global. */
+export async function listRefeicoesModeloDia(): Promise<RefeicaoModeloDia[]> {
+  const { data, error } = await supabase.from("dieta_refeicoes_modelo_dia").select("modelo_id, dia_semana, ordem");
+  if (error) throw error;
+  return (data ?? []).map((l) => ({ modeloId: l.modelo_id as string, diaSemana: l.dia_semana as number, ordem: l.ordem as number }));
+}
+
+/**
+ * Substitui de uma vez a lista inteira de refeições de um dia da semana — cobre adicionar,
+ * remover e reordenar com uma única operação: quem chama sempre manda a lista final completa,
+ * já na ordem desejada.
+ */
+export async function definirRefeicoesDoDia(diaSemana: number, modeloIds: string[]): Promise<void> {
+  const { error: errDel } = await supabase
+    .from("dieta_refeicoes_modelo_dia")
+    .delete()
+    .eq("user_id", uid())
+    .eq("dia_semana", diaSemana);
+  if (errDel) throw errDel;
+  if (!modeloIds.length) return;
+  const { error: errIns } = await supabase.from("dieta_refeicoes_modelo_dia").insert(
+    modeloIds.map((modeloId, i) => ({
+      user_id: uid(),
+      modelo_id: modeloId,
+      dia_semana: diaSemana,
+      ordem: i,
+      updated_at: new Date().toISOString(),
+    })),
+  );
+  if (errIns) throw errIns;
+}
+
 // ---------------- Refeições do dia (dinâmicas, nomeadas pelo usuário) ----------------
 
 export interface RefeicaoDia {
