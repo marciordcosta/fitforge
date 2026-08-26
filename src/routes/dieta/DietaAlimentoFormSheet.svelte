@@ -101,43 +101,32 @@
 
     <div class="linha">
       <label for="af-porcao">Porção</label>
-      <div class="par">
-        <input id="af-porcao" class="campo-curto" type="number" inputmode="decimal" step="1" bind:value={porcaoQtd} />
-        <select bind:value={porcaoUnidade}>
-          <option value="g">g</option>
-          <option value="ml">ml</option>
-          <option value="unidade">unidade</option>
-        </select>
-      </div>
+      <input id="af-porcao" class="valor-num" type="number" inputmode="decimal" step="1" bind:value={porcaoQtd} />
+      <select class="valor-extra" bind:value={porcaoUnidade}>
+        <option value="g">g</option>
+        <option value="ml">ml</option>
+        <option value="unidade">unidade</option>
+      </select>
     </div>
 
     <div class="linha">
       <span class="rotulo-estatico">Calorias (kcal)</span>
-      <span class="valor-calculado">{calorias}</span>
+      <span class="valor-num valor-calculado">{calorias}</span>
     </div>
 
     <div class="linha">
       <label for="af-proteina">Proteína (g)</label>
-      <input id="af-proteina" type="number" inputmode="decimal" step="0.1" bind:value={proteina} />
+      <input id="af-proteina" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={proteina} />
     </div>
 
     <div class="linha">
       <label for="af-carboidrato">Carboidrato (g)</label>
-      <input id="af-carboidrato" type="number" inputmode="decimal" step="0.1" bind:value={carboidrato} />
+      <input id="af-carboidrato" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={carboidrato} />
     </div>
 
     <div class="linha">
-      <label for="af-gordura">Gordura (g)</label>
-      <div class="par">
-        <input
-          id="af-gordura"
-          type="number"
-          inputmode="decimal"
-          step="0.1"
-          bind:value={gordura}
-          disabled={gorduraExpandida}
-          class:opaca={gorduraExpandida}
-        />
+      <span class="rotulo-com-seta">
+        <label for="af-gordura">Gordura (g)</label>
         <button
           type="button"
           class="chevron"
@@ -147,23 +136,33 @@
         >
           {@render iconChevron()}
         </button>
-      </div>
+      </span>
+      <input
+        id="af-gordura"
+        class="valor-num"
+        class:opaca={gorduraExpandida}
+        type="number"
+        inputmode="decimal"
+        step="0.1"
+        bind:value={gordura}
+        disabled={gorduraExpandida}
+      />
     </div>
 
     {#if gorduraExpandida}
       <div class="linha sub">
         <label for="af-gordura-sat">Saturada (g)</label>
-        <input id="af-gordura-sat" type="number" inputmode="decimal" step="0.1" bind:value={gorduraSaturada} />
+        <input id="af-gordura-sat" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={gorduraSaturada} />
       </div>
       <div class="linha sub">
         <label for="af-gordura-insat">Insaturada (g)</label>
-        <input id="af-gordura-insat" type="number" inputmode="decimal" step="0.1" bind:value={gorduraInsaturada} />
+        <input id="af-gordura-insat" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={gorduraInsaturada} />
       </div>
     {/if}
 
     <div class="linha">
       <label for="af-fibra">Fibra (g, opcional)</label>
-      <input id="af-fibra" type="number" inputmode="decimal" step="0.1" bind:value={fibra} />
+      <input id="af-fibra" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={fibra} />
     </div>
   </div>
 
@@ -177,10 +176,10 @@
     margin-bottom: var(--space-4);
   }
   .linha {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 68px 74px;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
+    column-gap: var(--space-2);
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--surface-border);
   }
@@ -188,14 +187,21 @@
     border-bottom: none;
   }
   .linha label,
-  .rotulo-estatico {
-    flex-shrink: 0;
+  .rotulo-estatico,
+  .rotulo-com-seta {
+    grid-column: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .linha input[type="text"],
-  .linha input[type="number"] {
-    flex: 1;
+  .linha input[type="text"] {
+    grid-column: 2 / span 2;
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
@@ -206,37 +212,39 @@
     text-align: right;
     padding: 0;
   }
+  .valor-num {
+    grid-column: 2;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    border: none;
+    background: none;
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    text-align: right;
+    padding: 0;
+  }
+  .valor-extra {
+    grid-column: 3;
+    justify-self: end;
+    border: none;
+    background: none;
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+  }
+  .valor-extra:focus {
+    outline: none;
+  }
+  .valor-extra option {
+    background: var(--surface-card);
+    color: var(--surface-fg);
+  }
   .linha input:focus {
     outline: none;
   }
   .valor-calculado {
     color: var(--surface-muted);
     font-weight: 600;
-  }
-  .par {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    flex: 1;
-    min-width: 0;
-  }
-  .par input {
-    flex: 0 1 64px;
-  }
-  .par select {
-    flex-shrink: 0;
-    border: none;
-    background: none;
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-  }
-  .par select:focus {
-    outline: none;
-  }
-  .par select option {
-    background: var(--surface-card);
-    color: var(--surface-fg);
   }
   .opaca {
     opacity: 0.5;
