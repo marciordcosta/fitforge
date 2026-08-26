@@ -507,6 +507,24 @@ export async function getMetasDiarias(): Promise<MetasDiarias> {
   };
 }
 
+/** Faixa permitida (g/kg) por macro — hoje fixa aqui, mas é o campo que vai virar editável em Parametrização. */
+export interface LimiteMacroGKg {
+  min: number;
+  max: number;
+}
+
+export const LIMITES_MACROS_G_KG: { proteina: LimiteMacroGKg; gordura: LimiteMacroGKg; carboidrato: LimiteMacroGKg } = {
+  proteina: { min: 1, max: 3 },
+  gordura: { min: 0.5, max: 1.5 },
+  carboidrato: { min: 1, max: 10 },
+};
+
+/** Ratio (g/kg) usado pro cálculo automático de gordura saturada e fibras — hoje fixo aqui, migra pra Parametrização depois. */
+export const RATIOS_NUTRIENTES_AUTOMATICOS = {
+  gordurasSaturadasGKg: 0.21,
+  fibrasGKg: 0.37,
+};
+
 /** Perfil de metas editável na tela de Gerenciar (aba Calorias) — ratios em g/kg, não em gramas fixas. */
 export interface PerfilDietaEditavel {
   pesoAtual: number;

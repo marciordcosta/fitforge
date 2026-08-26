@@ -3,6 +3,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import WheelPicker from "../../components/WheelPicker.svelte";
   import {
     listRefeicoesModelo,
     criarRefeicaoModelo,
@@ -11,9 +12,15 @@
     reordenarRefeicoesModelo,
     getPerfilDietaEditavel,
     salvarPerfilDieta,
+    LIMITES_MACROS_G_KG,
+    RATIOS_NUTRIENTES_AUTOMATICOS,
     type RefeicaoModelo,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
+
+  const COR_CARBO = "#5eead4";
+  const COR_GORDURA = "#f9a8d4";
+  const COR_PROTEINA = "#fbbf24";
 
   let aba = $state<"calorias" | "refeicoes">("refeicoes");
 
@@ -29,8 +36,6 @@
   let gorduraGInput = $state<number | null>(null);
   let carboidratoGKg = $state(2.93);
   let carboidratoGInput = $state<number | null>(null);
-  let gordurasSaturadasG = $state<number | null>(null);
-  let fibrasG = $state<number | null>(null);
   let aguaL = $state<number | null>(null);
 
   const caloriasCalc = $derived(
@@ -39,6 +44,14 @@
   const pctProteina = $derived(caloriasCalc > 0 ? (4 * (proteinaGInput ?? 0) * 100) / caloriasCalc : 0);
   const pctGordura = $derived(caloriasCalc > 0 ? (9 * (gorduraGInput ?? 0) * 100) / caloriasCalc : 0);
   const pctCarboidrato = $derived(caloriasCalc > 0 ? (4 * (carboidratoGInput ?? 0) * 100) / caloriasCalc : 0);
+  const donutStyle = $derived(
+    `background: conic-gradient(${COR_CARBO} 0% ${pctCarboidrato}%, ${COR_GORDURA} ${pctCarboidrato}% ${pctCarboidrato + pctGordura}%, ${COR_PROTEINA} ${pctCarboidrato + pctGordura}% 100%);`,
+  );
+
+  /** Gordura saturada e fibras são calculadas automaticamente com base no peso — sem input manual por enquanto. */
+  const gordurasSaturadasG = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.gordurasSaturadasGKg * pesoAtual));
+  const fibrasG = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.fibrasGKg * pesoAtual));
+  const gorduraInsaturadaG = $derived(Math.max(0, (gorduraGInput ?? 0) - gordurasSaturadasG));
 
   async function carregarMetas() {
     try {
@@ -51,8 +64,6 @@
       gorduraGInput = Math.round(gorduraGKg * pesoAtual);
       carboidratoGInput = Math.round(carboidratoGKg * pesoAtual);
       caloriasInput = caloriasCalc;
-      gordurasSaturadasG = perfil.gordurasSaturadasG;
-      fibrasG = perfil.fibrasG;
       aguaL = perfil.aguaL;
       perfilCarregado = true;
     } catch (err) {
@@ -95,6 +106,114 @@
     const novoCarboG = Math.max(0, Math.round((caloriasInput - 4 * (proteinaGInput ?? 0) - 9 * (gorduraGInput ?? 0)) / 4));
     carboidratoGInput = novoCarboG;
     carboidratoGKg = pesoAtual > 0 ? Math.round((novoCarboG / pesoAtual) * 100) / 100 : 0;
+  }
+
+  type CampoMacro =
+    | "calorias"
+    | "proteinaGKg"
+    | "proteinaG"
+    | "gorduraGKg"
+    | "gorduraG"
+    | "carboidratoGKg"
+    | "carboidratoG";
+  let campoEditando = $state<CampoMacro | null>(null);
+
+  function opcoesGKg(min: number, max: number): { valor: number; label: string }[] {
+    const opcoes: { valor: number; label: string }[] = [];
+    for (let v = Math.round(min * 100); v <= Math.round(max * 100); v += 1) {
+      const valor = v / 100;
+      opcoes.push({ valor, label: valor.toFixed(2).replace(".", ",") });
+    }
+    return opcoes;
+  }
+
+  function opcoesGramas(minGKg: number, maxGKg: number): { valor: number; label: string }[] {
+    const minG = Math.round(minGKg * pesoAtual);
+    const maxG = Math.round(maxGKg * pesoAtual);
+    const opcoes: { valor: number; label: string }[] = [];
+    for (let v = minG; v <= maxG; v++) opcoes.push({ valor: v, label: `${v} g` });
+    return opcoes;
+  }
+
+  function opcoesCalorias(): { valor: number; label: string }[] {
+    const opcoes: { valor: number; label: string }[] = [];
+    for (let v = 800; v <= 6000; v += 10) opcoes.push({ valor: v, label: `${v} kcal` });
+    return opcoes;
+  }
+
+  function infoCampo(campo: CampoMacro) {
+    switch (campo) {
+      case "calorias":
+        return {
+          titulo: "Calorias (kcal)",
+          opcoes: opcoesCalorias(),
+          valorAtual: Math.round((caloriasInput ?? caloriasCalc) / 10) * 10,
+          onSelecionar: (v: number) => {
+            caloriasInput = v;
+            aoEditarCalorias();
+          },
+        };
+      case "proteinaGKg":
+        return {
+          titulo: "Proteína (g/kg)",
+          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.proteina.min, LIMITES_MACROS_G_KG.proteina.max),
+          valorAtual: proteinaGKg,
+          onSelecionar: (v: number) => {
+            proteinaGKg = v;
+            aoEditarProteinaGKg();
+          },
+        };
+      case "proteinaG":
+        return {
+          titulo: "Proteína (g)",
+          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.proteina.min, LIMITES_MACROS_G_KG.proteina.max),
+          valorAtual: proteinaGInput ?? 0,
+          onSelecionar: (v: number) => {
+            proteinaGInput = v;
+            aoEditarProteinaGramas();
+          },
+        };
+      case "gorduraGKg":
+        return {
+          titulo: "Gordura (g/kg)",
+          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.gordura.min, LIMITES_MACROS_G_KG.gordura.max),
+          valorAtual: gorduraGKg,
+          onSelecionar: (v: number) => {
+            gorduraGKg = v;
+            aoEditarGorduraGKg();
+          },
+        };
+      case "gorduraG":
+        return {
+          titulo: "Gordura (g)",
+          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.gordura.min, LIMITES_MACROS_G_KG.gordura.max),
+          valorAtual: gorduraGInput ?? 0,
+          onSelecionar: (v: number) => {
+            gorduraGInput = v;
+            aoEditarGorduraGramas();
+          },
+        };
+      case "carboidratoGKg":
+        return {
+          titulo: "Carboidrato (g/kg)",
+          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.carboidrato.min, LIMITES_MACROS_G_KG.carboidrato.max),
+          valorAtual: carboidratoGKg,
+          onSelecionar: (v: number) => {
+            carboidratoGKg = v;
+            aoEditarCarboidratoGKg();
+          },
+        };
+      case "carboidratoG":
+        return {
+          titulo: "Carboidrato (g)",
+          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.carboidrato.min, LIMITES_MACROS_G_KG.carboidrato.max),
+          valorAtual: carboidratoGInput ?? 0,
+          onSelecionar: (v: number) => {
+            carboidratoGInput = v;
+            aoEditarCarboidratoGramas();
+          },
+        };
+    }
   }
 
   async function salvarCalorias() {
@@ -287,106 +406,101 @@
     {:else}
       <p class="peso-ref">Com base no peso médio atual: <strong>{pesoAtual.toFixed(1)} kg</strong></p>
 
-      <div class="lista-metas">
-        <div class="linha-meta">
-          <label for="meta-calorias">Calorias (kcal)</label>
-          <input
-            id="meta-calorias"
-            class="valor-meta"
-            type="number"
-            inputmode="decimal"
-            step="1"
-            min="0"
-            bind:value={caloriasInput}
-            oninput={aoEditarCalorias}
-          />
+      <div
+        class="linha-tap"
+        role="button"
+        tabindex="0"
+        onclick={() => (campoEditando = "calorias")}
+        onkeydown={(e) => e.key === "Enter" && (campoEditando = "calorias")}
+      >
+        <span>Calorias (kcal)</span>
+        <span>{caloriasInput ?? caloriasCalc}</span>
+      </div>
+
+      <div class="resumo">
+        <div class="donut" style={donutStyle}>
+          <div class="donut-centro">
+            <strong>{caloriasCalc}</strong>
+            <span>Cal</span>
+          </div>
+        </div>
+        <div class="resumo-macros">
+          <button type="button" class="macro-col" onclick={() => (campoEditando = "carboidratoG")}>
+            <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarboidrato.toFixed(0)}%</strong>
+            <span class="valor-g">{carboidratoGInput ?? 0} g</span>
+            <span class="rotulo-macro">Carb</span>
+          </button>
+          <button type="button" class="macro-col" onclick={() => (campoEditando = "gorduraG")}>
+            <strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong>
+            <span class="valor-g">{gorduraGInput ?? 0} g</span>
+            <span class="rotulo-macro">Gorduras</span>
+          </button>
+          <button type="button" class="macro-col" onclick={() => (campoEditando = "proteinaG")}>
+            <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
+            <span class="valor-g">{proteinaGInput ?? 0} g</span>
+            <span class="rotulo-macro">Proteínas</span>
+          </button>
         </div>
       </div>
 
+      <p class="secao-titulo">Proporção por peso (g/kg)</p>
       <div class="tabela-macros">
-        <div class="tabela-cabecalho">
-          <span></span>
-          <span>g/kg</span>
-          <span>%</span>
-          <span>g</span>
-        </div>
         <div class="tabela-linha">
           <span class="tabela-rotulo">Proteína</span>
-          <input
-            class="tabela-input"
-            type="number"
-            inputmode="decimal"
-            step="0.01"
-            min="0"
-            bind:value={proteinaGKg}
-            oninput={aoEditarProteinaGKg}
-          />
-          <span class="tabela-calc">{pctProteina.toFixed(0)}%</span>
-          <input
-            class="tabela-input"
-            type="number"
-            inputmode="decimal"
-            step="1"
-            min="0"
-            bind:value={proteinaGInput}
-            oninput={aoEditarProteinaGramas}
-          />
+          <button type="button" class="tabela-input" onclick={() => (campoEditando = "proteinaGKg")}>
+            {proteinaGKg.toFixed(2)}
+          </button>
         </div>
         <div class="tabela-linha">
           <span class="tabela-rotulo">Gordura</span>
-          <input
-            class="tabela-input"
-            type="number"
-            inputmode="decimal"
-            step="0.01"
-            min="0"
-            bind:value={gorduraGKg}
-            oninput={aoEditarGorduraGKg}
-          />
-          <span class="tabela-calc">{pctGordura.toFixed(0)}%</span>
-          <input
-            class="tabela-input"
-            type="number"
-            inputmode="decimal"
-            step="1"
-            min="0"
-            bind:value={gorduraGInput}
-            oninput={aoEditarGorduraGramas}
-          />
+          <button type="button" class="tabela-input" onclick={() => (campoEditando = "gorduraGKg")}>
+            {gorduraGKg.toFixed(2)}
+          </button>
         </div>
         <div class="tabela-linha">
           <span class="tabela-rotulo">Carboidrato</span>
-          <input
-            class="tabela-input"
-            type="number"
-            inputmode="decimal"
-            step="0.01"
-            min="0"
-            bind:value={carboidratoGKg}
-            oninput={aoEditarCarboidratoGKg}
-          />
-          <span class="tabela-calc">{pctCarboidrato.toFixed(0)}%</span>
-          <input
-            class="tabela-input"
-            type="number"
-            inputmode="decimal"
-            step="1"
-            min="0"
-            bind:value={carboidratoGInput}
-            oninput={aoEditarCarboidratoGramas}
-          />
+          <button type="button" class="tabela-input" onclick={() => (campoEditando = "carboidratoGKg")}>
+            {carboidratoGKg.toFixed(2)}
+          </button>
+        </div>
+      </div>
+
+      {#if campoEditando}
+        {@const info = infoCampo(campoEditando)}
+        <WheelPicker
+          titulo={info.titulo}
+          opcoes={info.opcoes}
+          valorAtual={info.valorAtual}
+          onSelecionar={info.onSelecionar}
+          onFechar={() => (campoEditando = null)}
+        />
+      {/if}
+
+      <p class="nutrientes-titulo">Nutrientes</p>
+      <div class="nutrientes-lista">
+        <div class="nutriente-item">
+          <span>Carboidratos</span>
+          <span>{carboidratoGInput ?? 0} g</span>
+        </div>
+        <div class="nutriente-item">
+          <span>Proteínas</span>
+          <span>{proteinaGInput ?? 0} g</span>
+        </div>
+        <div class="nutriente-item">
+          <span>Gordura Saturada</span>
+          <span>{gordurasSaturadasG} g</span>
+        </div>
+        <div class="nutriente-item">
+          <span>Gordura Insaturada</span>
+          <span>{gorduraInsaturadaG} g</span>
+        </div>
+        <div class="nutriente-item">
+          <span>Fibras</span>
+          <span>{fibrasG} g</span>
         </div>
       </div>
 
       <div class="lista-metas">
-        <div class="linha-meta">
-          <label for="meta-gord-sat">Gorduras Saturadas (g)</label>
-          <input id="meta-gord-sat" class="valor-meta" type="number" inputmode="decimal" step="1" min="0" bind:value={gordurasSaturadasG} />
-        </div>
-        <div class="linha-meta">
-          <label for="meta-fibras">Fibras (g)</label>
-          <input id="meta-fibras" class="valor-meta" type="number" inputmode="decimal" step="1" min="0" bind:value={fibrasG} />
-        </div>
         <div class="linha-meta">
           <label for="meta-agua">Água (L)</label>
           <input id="meta-agua" class="valor-meta" type="number" inputmode="decimal" step="0.1" min="0" bind:value={aguaL} />
@@ -394,7 +508,7 @@
       </div>
 
       <p class="dica">
-        Ajustar proteína ou gordura (g/kg ou gramas) recalcula as calorias. Ajustar as calorias reajusta o carboidrato pra fechar a conta.
+        Ajustar proteína ou gordura (g/kg ou gramas) recalcula as calorias. Ajustar as calorias reajusta o carboidrato pra fechar a conta. Gordura saturada e fibras seguem o peso automaticamente.
       </p>
 
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
@@ -554,26 +668,88 @@
   .valor-meta:focus {
     outline: none;
   }
+  .linha-tap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--surface-border);
+    cursor: pointer;
+  }
+  .linha-tap span:first-child {
+    color: var(--surface-fg);
+  }
+  .resumo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    padding: var(--space-5) 0;
+  }
+  .donut {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .donut-centro {
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    background: var(--surface-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .donut-centro strong {
+    font-size: var(--font-size-lg);
+  }
+  .donut-centro span {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .resumo-macros {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .macro-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+    text-align: center;
+    line-height: 1.5;
+    cursor: pointer;
+  }
+  .macro-col .pct {
+    font-size: var(--font-size-base);
+  }
+  .macro-col .valor-g {
+    font-size: 17px;
+  }
+  .macro-col .rotulo-macro {
+    color: var(--surface-muted);
+  }
+  .secao-titulo {
+    font-weight: 600;
+    margin: var(--space-2) 0 var(--space-1);
+  }
   .tabela-macros {
     margin-bottom: var(--space-4);
   }
-  .tabela-cabecalho,
   .tabela-linha {
-    display: grid;
-    grid-template-columns: 1fr 64px 48px 64px;
+    display: flex;
     align-items: center;
-    gap: var(--space-2);
-  }
-  .tabela-cabecalho {
-    padding-bottom: var(--space-2);
-    color: var(--surface-muted);
-    font-size: 11px;
-    text-transform: uppercase;
-  }
-  .tabela-cabecalho span:not(:first-child) {
-    text-align: right;
-  }
-  .tabela-linha {
+    justify-content: space-between;
     padding: var(--space-2) 0;
     border-bottom: 1px solid var(--surface-border);
   }
@@ -585,22 +761,42 @@
     font-size: var(--font-size-base);
   }
   .tabela-input {
+    flex: 0 0 64px;
     box-sizing: border-box;
-    width: 100%;
     text-align: right;
     border: none;
     background: none;
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+    font-family: inherit;
     padding: 0;
+    cursor: pointer;
   }
   .tabela-input:focus {
     outline: none;
   }
-  .tabela-calc {
-    text-align: right;
+  .nutrientes-titulo {
+    font-weight: 600;
+    margin: var(--space-2) 0 var(--space-3);
+  }
+  .nutrientes-lista {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: var(--space-4);
+  }
+  .nutriente-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--surface-border);
+    font-size: var(--font-size-sm);
+  }
+  .nutriente-item:last-child {
+    border-bottom: none;
+  }
+  .nutriente-item span:first-child {
     color: var(--surface-muted);
-    font-size: var(--font-size-base);
   }
   .dica {
     color: var(--surface-muted);
