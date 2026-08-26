@@ -13,7 +13,7 @@
     type Alimento,
     type ReceitaResumo,
   } from "../../lib/dietaApi";
-  import { adicionarAoRascunho, definirContexto, limparRascunho } from "../../lib/receitaRascunho.svelte";
+  import { adicionarAoRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
@@ -170,14 +170,6 @@
     <path d="M17 3c-1.5 0-3 1.5-3 4v3a2 2 0 0 0 2 2v9" />
   </svg>
 {/snippet}
-{#snippet iconReceita()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="3" y="3" width="8" height="8" rx="1.5" />
-    <rect x="13" y="3" width="8" height="8" rx="1.5" />
-    <rect x="3" y="13" width="8" height="8" rx="1.5" />
-    <rect x="13" y="13" width="8" height="8" rx="1.5" />
-  </svg>
-{/snippet}
 {#snippet iconMais()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" />
@@ -206,9 +198,11 @@
 
   <div class="busca-linha">
     <input class="search" type="text" placeholder="Procurar alimento" bind:value={busca} oninput={aoDigitar} />
-    <button class="scanner-btn" onclick={abrirScanner} aria-label="Escanear código de barras">
-      {@render iconScanner()}
-    </button>
+    {#if modoAdicionar || modoReceita}
+      <button class="scanner-btn" onclick={abrirScanner} aria-label="Escanear código de barras">
+        {@render iconScanner()}
+      </button>
+    {/if}
   </div>
 
   {#if loading}
@@ -277,11 +271,8 @@
     titulo="Criar"
     onFechar={() => (mostrarEscolhaCriar = false)}
     opcoes={[
-      { label: "Alimento", icon: iconAlimento, onSelect: () => (mostrarCriarAlimento = true) },
-      ...(modoReceita
-        ? []
-        : [{ label: "Refeição", icon: iconReceita, onSelect: () => { limparRascunho(); navigate("/dieta/receitas/nova"); } }]),
-      { label: "Escanear Alimento", icon: iconScanner, onSelect: abrirScanner },
+      { label: "Escanear", icon: iconScanner, onSelect: abrirScanner },
+      { label: "Adicionar Manual", icon: iconAlimento, onSelect: () => (mostrarCriarAlimento = true) },
     ]}
   />
 {/if}
