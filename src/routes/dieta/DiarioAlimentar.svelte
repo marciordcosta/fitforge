@@ -594,10 +594,8 @@
     font-weight: 400;
   }
   .refeicao-macros {
-    margin: var(--space-3) 0;
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--surface-border);
-    font-size: var(--font-size-sm);
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-base);
     color: var(--surface-muted);
   }
   .preview {
