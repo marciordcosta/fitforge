@@ -1334,14 +1334,22 @@
     font-size: var(--font-size-base);
   }
   .calorias-grupo-tabela {
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-3);
   }
   .modal-dias-lista {
     padding-top: 0;
     padding-bottom: 0;
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--space-2);
     overflow-x: visible;
     flex-wrap: wrap;
+  }
+  .modal-dias-lista .dia-card {
+    min-width: 48px;
+    padding: var(--space-2);
+    gap: 0;
+  }
+  .modal-dias-lista .dia-card-add {
+    padding: var(--space-2);
   }
   .dia-card-add {
     background: #ffffff;
