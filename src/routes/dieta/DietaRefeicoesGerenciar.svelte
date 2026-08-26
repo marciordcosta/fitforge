@@ -1321,9 +1321,11 @@
     flex-shrink: 0;
   }
   .remover-btn {
-    flex-shrink: 0;
-    width: 22px;
-    height: 22px;
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1331,7 +1333,7 @@
     border-radius: 50%;
     background: var(--color-danger);
     color: #fff;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1;
     padding: 0;
     cursor: pointer;
