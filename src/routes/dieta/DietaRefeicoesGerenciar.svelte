@@ -583,6 +583,33 @@
         </div>
       </div>
 
+      {#if campoEditando}
+        {@const info = infoCampo(campoEditando)}
+        <WheelPicker
+          titulo={info.titulo}
+          opcoes={info.opcoes}
+          valorAtual={info.valorAtual}
+          onSelecionar={info.onSelecionar}
+          onFechar={() => (campoEditando = null)}
+        />
+      {/if}
+
+      <p class="nutrientes-titulo">Metas de Consumo</p>
+      <div class="nutrientes-lista">
+        <div class="nutriente-item">
+          <span>Fibras</span>
+          <span>{fibrasG} g</span>
+        </div>
+        <div class="nutriente-item">
+          <span>Gorduras Insaturadas</span>
+          <span>{gorduraInsaturadaG} g</span>
+        </div>
+        <div class="nutriente-item">
+          <span>Água</span>
+          <span>{aguaL.toFixed(1)} L</span>
+        </div>
+      </div>
+
       <p class="secao-titulo">Distribuição Semanal</p>
       <div class="tabs modo-toggle">
         <button class:active={modoCalorias === "fixa"} onclick={() => alterarModoCalorias("fixa")}>Fixa</button>
@@ -619,33 +646,6 @@
         {/if}
       {/if}
 
-      {#if campoEditando}
-        {@const info = infoCampo(campoEditando)}
-        <WheelPicker
-          titulo={info.titulo}
-          opcoes={info.opcoes}
-          valorAtual={info.valorAtual}
-          onSelecionar={info.onSelecionar}
-          onFechar={() => (campoEditando = null)}
-        />
-      {/if}
-
-      <p class="nutrientes-titulo">Metas de Consumo</p>
-      <div class="nutrientes-lista">
-        <div class="nutriente-item">
-          <span>Fibras</span>
-          <span>{fibrasG} g</span>
-        </div>
-        <div class="nutriente-item">
-          <span>Gorduras Insaturadas</span>
-          <span>{gorduraInsaturadaG} g</span>
-        </div>
-        <div class="nutriente-item">
-          <span>Água</span>
-          <span>{aguaL.toFixed(1)} L</span>
-        </div>
-      </div>
-
       <p class="dica">
         Ajustar proteína ou gordura (g/kg ou gramas) recalcula as calorias. Ajustar as calorias reajusta o carboidrato pra fechar a conta. Fibras, gorduras insaturadas e água são calculadas automaticamente com base no peso.
       </p>
@@ -680,12 +680,10 @@
                 <span class="nome">{m.nome}</span>
                 {#if m.metaCalorias != null}<span class="nome-cal">{Math.round(m.metaCalorias)} cal</span>{/if}
               </span>
-              {#if m.metaCalorias != null}
-                <span class="nome-macros">
-                  <span>carb {m.metaCarboidratoG?.toFixed(0)}g · gord {m.metaGorduraG?.toFixed(0)}g · prot {m.metaProteinaG?.toFixed(0)}g</span>
-                  <span class="nome-pct">{pctDoDia(m.metaCalorias)}%</span>
-                </span>
-              {/if}
+              <span class="nome-macros" class:invisivel={m.metaCalorias == null}>
+                <span>carb {(m.metaCarboidratoG ?? 0).toFixed(0)}g · gord {(m.metaGorduraG ?? 0).toFixed(0)}g · prot {(m.metaProteinaG ?? 0).toFixed(0)}g</span>
+                <span class="nome-pct">{pctDoDia(m.metaCalorias ?? 0)}%</span>
+              </span>
             </button>
             <button class="remover-btn" onclick={() => (paraExcluir = m)} aria-label={`Remover ${m.nome}`}>✕</button>
           </li>
@@ -1032,6 +1030,9 @@
     font-size: 12px;
     color: var(--surface-muted);
   }
+  .nome-macros.invisivel {
+    visibility: hidden;
+  }
   .nome-pct {
     flex-shrink: 0;
   }
@@ -1070,14 +1071,15 @@
     font-weight: 600;
   }
   .modo-toggle {
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--space-5);
   }
   .dias-lista {
     display: flex;
     gap: var(--space-2);
     overflow-x: auto;
-    padding-bottom: var(--space-1);
-    margin-bottom: var(--space-3);
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-3);
+    margin-bottom: var(--space-5);
   }
   .dia-card {
     flex: 0 0 auto;
