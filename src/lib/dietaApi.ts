@@ -427,6 +427,25 @@ export async function encontrarOuCriarRefeicaoDia(data: string, nome: string): P
   return criarRefeicaoDia(data, nome);
 }
 
+/** Se existe alguma outra refeição com esse mesmo nome (outro dia) que já teve algum alimento lançado — usado pra habilitar "Copiar de"/"Copiar para". */
+export async function refeicaoTemHistorico(nome: string, excluirId: string): Promise<boolean> {
+  const { data: outras, error: errOutras } = await supabase
+    .from("dieta_refeicoes_dia")
+    .select("id")
+    .eq("nome", nome)
+    .neq("id", excluirId);
+  if (errOutras) throw errOutras;
+  const ids = (outras ?? []).map((r) => r.id);
+  if (!ids.length) return false;
+  const { data: itens, error: errItens } = await supabase
+    .from("diario_alimentos")
+    .select("id")
+    .in("refeicao_id", ids)
+    .limit(1);
+  if (errItens) throw errItens;
+  return (itens ?? []).length > 0;
+}
+
 /** Copia todos os itens de uma refeição pra outra (já existente), preservando quantidade/unidade/macros congelados. */
 export async function copiarItensEntreRefeicoes(origemId: string, destinoId: string): Promise<void> {
   const [itens, destino] = await Promise.all([getItensDaRefeicao(origemId), getRefeicaoDia(destinoId)]);

@@ -13,6 +13,7 @@
     getMetasDiarias,
     getMetaRefeicaoPorNome,
     getMetaReceitaIdPorNome,
+    refeicaoTemHistorico,
     adicionarReceitaAoDiario,
     getAlimento,
     atualizarItemDiario,
@@ -37,6 +38,7 @@
   let itens = $state<ItemDiario[]>([]);
   let metas = $state<MetasDiarias | null>(null);
   let metaRefeicao = $state<MetasDiarias | null>(null);
+  let temHistorico = $state(false);
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let itemParaRemover = $state<ItemDiario | null>(null);
@@ -52,7 +54,10 @@
     erro = null;
     try {
       [refeicao, itens, metas] = await Promise.all([getRefeicaoDia(refeicaoId), getItensDaRefeicao(refeicaoId), getMetasDiarias()]);
-      metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome) : null;
+      [metaRefeicao, temHistorico] = await Promise.all([
+        refeicao ? getMetaRefeicaoPorNome(refeicao.nome) : Promise.resolve(null),
+        refeicao ? refeicaoTemHistorico(refeicao.nome, refeicaoId) : Promise.resolve(false),
+      ]);
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -214,15 +219,15 @@
     <p class="muted">Refeição não encontrada.</p>
   {:else}
     <div class="acoes">
-      <button class="acao-btn" disabled={processando} onclick={puxarRefeicaoPadrao}>
+      <button class="acao-btn" disabled={processando || !metaRefeicao} onclick={puxarRefeicaoPadrao}>
         <span class="acao-label">Ref padrão</span>
         {@render iconPratoPadrao()}
       </button>
-      <button class="acao-btn" disabled={processando} onclick={() => (mostrarCopiarDe = true)}>
+      <button class="acao-btn" disabled={processando || !temHistorico} onclick={() => (mostrarCopiarDe = true)}>
         <span class="acao-label">Copiar de</span>
         {@render iconCopiarDe()}
       </button>
-      <button class="acao-btn" disabled={processando} onclick={() => (mostrarCopiarPara = true)}>
+      <button class="acao-btn" disabled={processando || !temHistorico} onclick={() => (mostrarCopiarPara = true)}>
         <span class="acao-label">Copiar para</span>
         {@render iconCopiarPara()}
       </button>
