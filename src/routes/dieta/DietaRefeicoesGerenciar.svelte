@@ -66,8 +66,19 @@
   function gKgGrupo(gramas: number): string {
     return pesoAtual > 0 ? (gramas / pesoAtual).toFixed(2) : "0.00";
   }
-  type CampoMacroGrupo = "proteina" | "gordura" | "carboidrato";
+  type CampoMacroGrupo = "calorias" | "proteina" | "gordura" | "carboidrato";
   let campoEditandoGrupo = $state<CampoMacroGrupo | null>(null);
+
+  /** Calorias só de proteína+gordura — piso do total ao editar calorias manualmente (carboidrato não pode ficar negativo). */
+  const caloriasGrupoMin = $derived(Math.round(4 * grupoProteinaG + 9 * grupoGorduraG));
+
+  function opcoesCaloriasGrupo(): { valor: number; label: string }[] {
+    const min = caloriasGrupoMin;
+    const max = Math.max(min + 10, 6000);
+    const opcoes: { valor: number; label: string }[] = [];
+    for (let v = min; v <= max; v += 10) opcoes.push({ valor: v, label: `${v} kcal` });
+    return opcoes;
+  }
 
   const caloriasCalc = $derived(
     Math.round(4 * (proteinaGInput ?? 0) + 9 * (gorduraGInput ?? 0) + 4 * (carboidratoGInput ?? 0)),
@@ -204,6 +215,15 @@
 
   function infoCampoGrupo(campo: CampoMacroGrupo) {
     switch (campo) {
+      case "calorias":
+        return {
+          titulo: "Calorias (kcal)",
+          opcoes: opcoesCaloriasGrupo(),
+          valorAtual: caloriasGrupoCalc,
+          onSelecionar: (v: number) => {
+            grupoCarboidratoG = Math.max(0, Math.round((v - 4 * grupoProteinaG - 9 * grupoGorduraG) / 4));
+          },
+        };
       case "proteina":
         return {
           titulo: "Proteína (g)",
@@ -859,14 +879,18 @@
 {/if}
 
 {#if mostrarDefinirCalorias}
-  <Sheet
-    titulo={`Calorias para ${diasSelecionados.size} ${diasSelecionados.size === 1 ? "dia" : "dias"}`}
-    onFechar={() => (mostrarDefinirCalorias = false)}
-  >
+  <Sheet titulo="Calorias" onFechar={() => (mostrarDefinirCalorias = false)}>
+    <div class="dias-lista modal-dias-lista">
+      {#each [...diasSelecionados].sort((a, b) => a - b) as dia (dia)}
+        <div class="dia-card">
+          <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
+        </div>
+      {/each}
+    </div>
     <div class="tabela-macros calorias-grupo-tabela">
       <div class="tabela-linha">
         <span class="tabela-rotulo">Calorias (kcal)</span>
-        <span class="tabela-input tabela-valor-calculado">{caloriasGrupoCalc}</span>
+        <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "calorias")}>{caloriasGrupoCalc}</button>
       </div>
       <div class="tabela-linha">
         <span class="tabela-rotulo">Proteína <span class="tabela-rotulo-gkg">{gKgGrupo(grupoProteinaG)} g/kg</span></span>
@@ -1222,10 +1246,10 @@
   .calorias-grupo-tabela {
     margin-bottom: var(--space-4);
   }
-  .tabela-valor-calculado {
-    cursor: default;
-    color: var(--surface-muted);
-    font-weight: 600;
+  .modal-dias-lista {
+    margin-bottom: var(--space-4);
+    overflow-x: visible;
+    flex-wrap: wrap;
   }
   .distribuicao-header {
     display: flex;
