@@ -2,12 +2,10 @@
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
-  import ActionSheet from "../../components/ActionSheet.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
   import {
     listRefeicoesModelo,
     criarRefeicaoModelo,
-    atualizarRefeicaoModelo,
     excluirRefeicaoModelo,
     reordenarRefeicoesModelo,
     getPerfilDietaEditavel,
@@ -24,6 +22,8 @@
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
+  import { navigate } from "../../lib/router.svelte";
+  import { receitaRascunho, limparRascunho } from "../../lib/receitaRascunho.svelte";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -295,12 +295,10 @@
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let mostrarForm = $state(false);
-  let editando = $state<RefeicaoModelo | null>(null);
   let nome = $state("");
   let salvando = $state(false);
   let paraExcluir = $state<RefeicaoModelo | null>(null);
   let excluindo = $state(false);
-  let itemMenu = $state<RefeicaoModelo | null>(null);
 
   let itemRefs: (HTMLLIElement | null)[] = [];
   let arrastandoIndex = $state<number | null>(null);
@@ -324,26 +322,25 @@
   void carregar();
 
   function abrirNovo() {
-    editando = null;
     nome = "";
     mostrarForm = true;
   }
 
-  function abrirEdicao(m: RefeicaoModelo) {
-    editando = m;
-    nome = m.nome;
-    mostrarForm = true;
+  function abrirMeta(m: RefeicaoModelo) {
+    if (m.metaReceitaId) {
+      navigate(`/dieta/receitas/ver/${m.metaReceitaId}`);
+      return;
+    }
+    limparRascunho();
+    receitaRascunho.nome = m.nome;
+    navigate(`/dieta/receitas/nova/meta/${m.id}`);
   }
 
   async function salvar() {
     if (!nome.trim()) return;
     salvando = true;
     try {
-      if (editando) {
-        await atualizarRefeicaoModelo(editando.id, nome.trim());
-      } else {
-        await criarRefeicaoModelo(nome.trim());
-      }
+      await criarRefeicaoModelo(nome.trim());
       mostrarForm = false;
       await carregar();
     } catch (err) {
@@ -415,17 +412,6 @@
   }
 </script>
 
-{#snippet iconEditar()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-  </svg>
-{/snippet}
-{#snippet iconExcluir()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 6L6 18M6 6l12 12" />
-  </svg>
-{/snippet}
 {#snippet iconArrastar()}
   <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
     <circle cx="9" cy="6" r="1.6" />
@@ -618,9 +604,18 @@
             <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
               {@render iconArrastar()}
             </button>
-            <button class="nome-btn" onclick={() => (itemMenu = m)}>
-              <span class="nome">{m.nome}</span>
+            <button class="nome-btn" onclick={() => abrirMeta(m)}>
+              <span class="nome-linha">
+                <span class="nome">{m.nome}</span>
+                {#if m.metaCalorias != null}<span class="nome-cal">{Math.round(m.metaCalorias)} cal</span>{/if}
+              </span>
+              {#if m.metaCalorias != null}
+                <span class="nome-macros">
+                  carb {m.metaCarboidratoG?.toFixed(0)}g · gord {m.metaGorduraG?.toFixed(0)}g · prot {m.metaProteinaG?.toFixed(0)}g
+                </span>
+              {/if}
             </button>
+            <button class="remover-btn" onclick={() => (paraExcluir = m)} aria-label={`Remover ${m.nome}`}>✕</button>
           </li>
         {/each}
       </ul>
@@ -628,19 +623,8 @@
   {/if}
 </div>
 
-{#if itemMenu}
-  <ActionSheet
-    titulo={itemMenu.nome}
-    onFechar={() => (itemMenu = null)}
-    opcoes={[
-      { label: "Editar", icon: iconEditar, onSelect: () => abrirEdicao(itemMenu!) },
-      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => (paraExcluir = itemMenu) },
-    ]}
-  />
-{/if}
-
 {#if mostrarForm}
-  <Sheet titulo={editando ? "Editar Refeição" : "Nova Refeição"} onFechar={() => (mostrarForm = false)}>
+  <Sheet titulo="Nova Refeição" onFechar={() => (mostrarForm = false)}>
     <input class="nome-input" type="text" placeholder="Nome da refeição" bind:value={nome} />
     <Button onclick={salvar} disabled={salvando || !nome.trim()}>Salvar</Button>
   </Sheet>
@@ -912,6 +896,9 @@
     flex: 1;
     min-width: 0;
     display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
     text-align: left;
     border: none;
     background: none;
@@ -919,12 +906,37 @@
     cursor: pointer;
     font-family: inherit;
   }
+  .nome-linha {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
   .nome {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--font-size-base);
     color: var(--surface-fg);
+  }
+  .nome-cal {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--surface-muted);
+  }
+  .nome-macros {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .remover-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--color-danger);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+    padding: var(--space-2);
   }
   .muted {
     color: var(--surface-muted);

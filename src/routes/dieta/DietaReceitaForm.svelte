@@ -1,7 +1,9 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
-  import { criarReceita } from "../../lib/dietaApi";
+  import { criarReceita, vincularMetaReceita } from "../../lib/dietaApi";
   import { receitaRascunho, removerDoRascunho, limparRascunho, type ItemRascunho } from "../../lib/receitaRascunho.svelte";
+
+  let { metaParaModeloId }: { metaParaModeloId?: string } = $props();
 
   let salvando = $state(false);
 
@@ -17,12 +19,15 @@
     if (!valido) return;
     salvando = true;
     try {
-      await criarReceita(
+      const novoId = await criarReceita(
         receitaRascunho.nome.trim(),
         receitaRascunho.itens.map((i) => ({ alimentoId: i.alimento.id, quantidade: i.quantidade })),
       );
+      if (metaParaModeloId) {
+        await vincularMetaReceita(metaParaModeloId, novoId);
+      }
       limparRascunho();
-      navigate("/dieta/receitas");
+      navigate(metaParaModeloId ? "/dieta/refeicoes/gerenciar" : "/dieta/receitas");
     } catch (err) {
       alert("Erro ao criar refeição: " + (err as Error).message);
       salvando = false;

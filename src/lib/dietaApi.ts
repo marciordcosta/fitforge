@@ -234,17 +234,93 @@ export async function criarAlimentoOpenFoodFacts(input: AlimentoOpenFoodFactsInp
 export interface RefeicaoModelo {
   id: string;
   nome: string;
+  /** Prato vinculado (dieta_receitas) que serve como meta de macros/calorias dessa refeição, se houver. */
+  metaReceitaId: string | null;
+  metaCalorias: number | null;
+  metaProteinaG: number | null;
+  metaGorduraG: number | null;
+  metaCarboidratoG: number | null;
+}
+
+const REFEICAO_MODELO_SELECT =
+  "id, nome, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g)))";
+
+interface ItemReceitaBruto {
+  quantidade: number;
+  alimento: {
+    porcao_padrao_qtd: number;
+    calorias_por_porcao: number;
+    proteina_g: number;
+    gordura_g: number;
+    carboidrato_g: number;
+  } | null;
+}
+
+function somarTotaisItensReceita(itens: ItemReceitaBruto[]) {
+  return itens.reduce(
+    (acc, it) => {
+      if (!it.alimento) return acc;
+      const fator = it.quantidade / it.alimento.porcao_padrao_qtd;
+      return {
+        calorias: acc.calorias + it.alimento.calorias_por_porcao * fator,
+        proteinaG: acc.proteinaG + it.alimento.proteina_g * fator,
+        gorduraG: acc.gorduraG + it.alimento.gordura_g * fator,
+        carboidratoG: acc.carboidratoG + it.alimento.carboidrato_g * fator,
+      };
+    },
+    { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+  );
+}
+
+function mapRefeicaoModelo(l: Record<string, unknown>): RefeicaoModelo {
+  const metaReceita = l.meta_receita as { itens: ItemReceitaBruto[] } | null;
+  const base = { id: l.id as string, nome: l.nome as string, metaReceitaId: l.meta_receita_id as string | null };
+  if (!metaReceita) {
+    return { ...base, metaCalorias: null, metaProteinaG: null, metaGorduraG: null, metaCarboidratoG: null };
+  }
+  const totais = somarTotaisItensReceita(metaReceita.itens ?? []);
+  return {
+    ...base,
+    metaCalorias: round1(totais.calorias),
+    metaProteinaG: round1(totais.proteinaG),
+    metaGorduraG: round1(totais.gorduraG),
+    metaCarboidratoG: round1(totais.carboidratoG),
+  };
 }
 
 /** Lista o catálogo já na ordem escolhida pelo usuário (arrastar na tela de Gerenciar Refeições). */
 export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
   const { data, error } = await supabase
     .from("dieta_refeicoes_modelo")
-    .select("id, nome")
+    .select(REFEICAO_MODELO_SELECT)
     .order("ordem", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((l) => mapRefeicaoModelo(l as Record<string, unknown>));
+}
+
+/** Meta de macros/calorias da refeição do catálogo com esse nome (via prato vinculado), ou null se não achar/sem prato. */
+export async function getMetaRefeicaoPorNome(nome: string): Promise<MetasDiarias | null> {
+  const { data, error } = await supabase
+    .from("dieta_refeicoes_modelo")
+    .select(REFEICAO_MODELO_SELECT)
+    .eq("nome", nome)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const modelo = mapRefeicaoModelo(data as Record<string, unknown>);
+  if (modelo.metaCalorias == null) return null;
+  return {
+    calorias: modelo.metaCalorias,
+    proteinaG: modelo.metaProteinaG!,
+    gorduraG: modelo.metaGorduraG!,
+    carboidratoG: modelo.metaCarboidratoG!,
+  };
+}
+
+export async function vincularMetaReceita(modeloId: string, receitaId: string): Promise<void> {
+  const { error } = await supabase.from("dieta_refeicoes_modelo").update({ meta_receita_id: receitaId }).eq("id", modeloId);
+  if (error) throw error;
 }
 
 export async function criarRefeicaoModelo(nome: string): Promise<string> {
