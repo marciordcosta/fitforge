@@ -23,7 +23,7 @@
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
   import { navigate } from "../../lib/router.svelte";
-  import { receitaRascunho, limparRascunho } from "../../lib/receitaRascunho.svelte";
+  import { receitaRascunho, limparRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -332,6 +332,7 @@
       return;
     }
     limparRascunho();
+    definirContexto("nova");
     receitaRascunho.nome = m.nome;
     navigate(`/dieta/receitas/nova/meta/${m.id}`);
   }

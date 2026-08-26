@@ -1,7 +1,7 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
   import { buscarReceitas, listReceitas, type ReceitaResumo } from "../../lib/dietaApi";
-  import { limparRascunho } from "../../lib/receitaRascunho.svelte";
+  import { limparRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
 
   let receitas = $state<ReceitaResumo[]>([]);
   let loading = $state(true);
@@ -12,6 +12,7 @@
 
   function criarNova() {
     limparRascunho();
+    definirContexto("nova");
     navigate("/dieta/receitas/nova");
   }
 

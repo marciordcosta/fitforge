@@ -2,13 +2,21 @@
   import { navigate } from "../../lib/router.svelte";
   import { criarReceita, vincularMetaReceita } from "../../lib/dietaApi";
   import { receitaRascunho, removerDoRascunho, limparRascunho, type ItemRascunho } from "../../lib/receitaRascunho.svelte";
+  import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
 
   let { metaParaModeloId }: { metaParaModeloId?: string } = $props();
 
   let salvando = $state(false);
+  let itemEditandoIndex = $state<number | null>(null);
 
   function caloriasItem(item: ItemRascunho): number {
     return item.alimento.caloriasPorPorcao * (item.quantidade / item.alimento.porcaoPadraoQtd);
+  }
+
+  function aoSalvarQuantidade(qtd: number) {
+    if (itemEditandoIndex == null) return;
+    receitaRascunho.itens[itemEditandoIndex].quantidade = qtd;
+    itemEditandoIndex = null;
   }
 
   const totalCalorias = $derived(receitaRascunho.itens.reduce((acc, i) => acc + caloriasItem(i), 0));
@@ -85,21 +93,24 @@
           <p class="item-nome">{item.alimento.nome}</p>
           <p class="item-cal">{caloriasItem(item).toFixed(0)} kcal</p>
         </div>
-        <input
-          class="qtd-input"
-          type="number"
-          inputmode="decimal"
-          step="1"
-          min="0"
-          bind:value={item.quantidade}
-        />
-        <span class="qtd-unidade">{item.alimento.porcaoPadraoUnidade}</span>
+        <button type="button" class="qtd-btn" onclick={() => (itemEditandoIndex = i)}>
+          {item.quantidade}{item.alimento.porcaoPadraoUnidade}
+        </button>
         <button class="item-remover" onclick={() => removerDoRascunho(i)} aria-label="Remover item">✕</button>
       </div>
     {/each}
     <p class="total">Total: {totalCalorias.toFixed(0)} kcal</p>
   {/if}
 </div>
+
+{#if itemEditandoIndex != null}
+  <DietaQuantidadeDialog
+    quantidadeInicial={receitaRascunho.itens[itemEditandoIndex].quantidade}
+    porcaoPadraoUnidade={receitaRascunho.itens[itemEditandoIndex].alimento.porcaoPadraoUnidade}
+    onSalvar={aoSalvarQuantidade}
+    onFechar={() => (itemEditandoIndex = null)}
+  />
+{/if}
 
 <style>
   .container {
@@ -206,19 +217,18 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
-  .qtd-input {
-    width: 56px;
-    text-align: right;
-    padding: var(--space-1);
+  .qtd-btn {
+    flex-shrink: 0;
+    min-width: 56px;
+    text-align: center;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     border: 1px solid var(--surface-border);
     background: var(--surface-bg);
     color: var(--surface-fg);
     font-size: var(--font-size-sm);
-  }
-  .qtd-unidade {
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
+    font-family: inherit;
+    cursor: pointer;
   }
   .item-remover {
     background: none;
