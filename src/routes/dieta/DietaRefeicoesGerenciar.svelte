@@ -31,6 +31,9 @@
   const COR_GORDURA = "#f9a8d4";
   const COR_PROTEINA = "#fbbf24";
 
+  /** Uma cor por meta de calorias distinta nos dias manuais — pra não confundir 2+ ajustes diferentes. */
+  const CORES_GRUPOS_DIA = ["#5eead4", "#f9a8d4", "#fbbf24", "#93c5fd", "#c4b5fd", "#fca5a5"];
+
   let aba = $state<"calorias" | "refeicoes">("calorias");
 
   let perfilCarregado = $state(false);
@@ -93,6 +96,20 @@
     }
   });
 
+  /** Cor fixa por valor de calorias manual distinto — grupos diferentes de dias saem com cores diferentes. */
+  const corPorGrupoManual = $derived.by(() => {
+    const valores = [...new Set(diasResolvidos.filter((d) => d.manual).map((d) => Math.round(d.calorias)))].sort((a, b) => a - b);
+    return new Map(valores.map((v, i) => [v, CORES_GRUPOS_DIA[i % CORES_GRUPOS_DIA.length]]));
+  });
+
+  function corDoDia(dia: CaloriasPorDia): string | null {
+    if (dia.manual) return corPorGrupoManual.get(Math.round(dia.calorias)) ?? null;
+    if (diasSelecionados.has(dia.diaSemana)) {
+      return CORES_GRUPOS_DIA[corPorGrupoManual.size % CORES_GRUPOS_DIA.length];
+    }
+    return null;
+  }
+
   async function carregarMetas() {
     try {
       const [perfil, pesoMedio, modo, manuais] = await Promise.all([
@@ -123,6 +140,10 @@
     modoCalorias = modo;
     diasSelecionados = new Set();
     definirModoCalorias(modo).catch((err) => alert("Erro ao salvar o modo: " + (err as Error).message));
+  }
+
+  function alternarModoToggle() {
+    alterarModoCalorias(modoCalorias === "fixa" ? "ondulatoria" : "fixa");
   }
 
   function toggleDiaSelecionado(dia: number) {
@@ -495,6 +516,14 @@
   }
 </script>
 
+{#snippet iconToggle()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 3l4 4-4 4" />
+    <path d="M21 7H7a4 4 0 0 0-4 4v1" />
+    <path d="M7 21l-4-4 4-4" />
+    <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
+  </svg>
+{/snippet}
 {#snippet iconArrastar()}
   <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
     <circle cx="9" cy="6" r="1.6" />
@@ -616,20 +645,23 @@
 
       <div class="separador"></div>
 
-      <p class="secao-titulo">Distribuição Semanal</p>
-      <div class="tabs modo-toggle">
-        <button class:active={modoCalorias === "fixa"} onclick={() => alterarModoCalorias("fixa")}>Fixa</button>
-        <button class:active={modoCalorias === "ondulatoria"} onclick={() => alterarModoCalorias("ondulatoria")}>Ondulatória</button>
+      <div class="distribuicao-header">
+        <p class="secao-titulo distribuicao-titulo">Distribuição {modoCalorias === "fixa" ? "Fixa" : "Ondulatória"}</p>
+        <button type="button" class="toggle-modo-btn" onclick={alternarModoToggle} aria-label="Alternar modo de distribuição">
+          {@render iconToggle()}
+        </button>
       </div>
 
       {#if modoCalorias === "ondulatoria"}
         <div class="dias-lista">
           {#each diasResolvidos as dia (dia.diaSemana)}
+            {@const cor = corDoDia(dia)}
             <button
               type="button"
               class="dia-card"
               class:selecionado={diasSelecionados.has(dia.diaSemana)}
-              class:manual={dia.manual}
+              class:colorido={cor != null}
+              style={cor ? `background:${cor}; border-color:${cor};` : ""}
               onclick={() => toggleDiaSelecionado(dia.diaSemana)}
             >
               <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia.diaSemana]}</span>
@@ -1084,8 +1116,29 @@
     color: var(--surface-muted);
     font-weight: 600;
   }
-  .modo-toggle {
+  .distribuicao-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: var(--space-5);
+  }
+  .distribuicao-titulo {
+    margin: 0;
+  }
+  .toggle-modo-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    padding: var(--space-1);
+    cursor: pointer;
+  }
+  .toggle-modo-btn svg {
+    width: 20px;
+    height: 20px;
   }
   .dias-lista {
     display: flex;
@@ -1104,19 +1157,17 @@
     gap: 4px;
     padding: var(--space-3) var(--space-2);
     border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
+    border: 2px solid var(--surface-border);
     background: var(--surface-card);
     color: var(--surface-fg);
     font-family: inherit;
     cursor: pointer;
   }
-  .dia-card.manual {
-    border-color: var(--color-primary);
+  .dia-card.colorido {
+    color: var(--color-primary-fg);
   }
   .dia-card.selecionado {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: var(--color-primary-fg);
+    box-shadow: 0 0 0 2px #ffffff;
   }
   .dia-card-nome {
     font-size: var(--font-size-sm);
