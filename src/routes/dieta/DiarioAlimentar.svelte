@@ -304,6 +304,8 @@
       <p class="muted">Nenhuma refeição ainda. Toque em + pra criar.</p>
     {:else}
       {#each refeicoes as refeicao (refeicao.id)}
+        {@const totais = totaisRefeicao(refeicao.id)}
+        {@const temItens = itens.some((i) => i.refeicaoId === refeicao.id)}
         <div
           class="refeicao-item"
           role="button"
@@ -313,11 +315,8 @@
         >
           <div class="card-header">
             <h2>{refeicao.nome}</h2>
-            {#if itens.some((i) => i.refeicaoId === refeicao.id)}
-              {@const t = totaisRefeicao(refeicao.id)}
-              <span class="card-totais">
-                prot {t.proteinaG.toFixed(0)}g - gord {t.gorduraG.toFixed(0)}g - carb {t.carboidratoG.toFixed(0)}g<span class="card-totais-cal">{t.calorias.toFixed(0)} cal</span>
-              </span>
+            {#if temItens}
+              <span class="card-cal">{totais.calorias.toFixed(0)} cal</span>
             {/if}
           </div>
           <p class="preview">{preview(refeicao.id)}</p>
@@ -329,6 +328,9 @@
           >
             Adicionar Alimento
           </Button>
+          {#if temItens}
+            <p class="card-macros">prot {totais.proteinaG.toFixed(0)}g · gord {totais.gorduraG.toFixed(0)}g · carb {totais.carboidratoG.toFixed(0)}g</p>
+          {/if}
         </div>
       {/each}
     {/if}
@@ -585,17 +587,18 @@
     font-size: var(--font-size-lg);
     margin: 0;
   }
-  .card-totais {
-    min-width: 0;
+  .card-cal {
+    flex-shrink: 0;
     color: var(--surface-muted);
     font-size: 12px;
     font-weight: 400;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
-  .card-totais-cal {
-    margin-left: var(--space-3);
+  .card-macros {
+    margin: var(--space-3) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--surface-border);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .preview {
     color: var(--surface-muted);
