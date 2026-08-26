@@ -22,7 +22,7 @@
   const COR_GORDURA = "#f9a8d4";
   const COR_PROTEINA = "#fbbf24";
 
-  let aba = $state<"calorias" | "refeicoes">("refeicoes");
+  let aba = $state<"calorias" | "refeicoes">("calorias");
 
   let perfilCarregado = $state(false);
   let erroMetas = $state<string | null>(null);
