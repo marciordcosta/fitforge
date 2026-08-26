@@ -67,7 +67,14 @@
   function gKgGrupo(gramas: number): string {
     return pesoAtual > 0 ? (gramas / pesoAtual).toFixed(2) : "0.00";
   }
-  type CampoMacroGrupo = "calorias" | "proteina" | "gordura" | "carboidrato";
+  type CampoMacroGrupo =
+    | "calorias"
+    | "proteina"
+    | "gordura"
+    | "carboidrato"
+    | "proteinaGKg"
+    | "gorduraGKg"
+    | "carboidratoGKg";
   let campoEditandoGrupo = $state<CampoMacroGrupo | null>(null);
 
   /** Calorias só de proteína+gordura — piso do total ao editar calorias manualmente (carboidrato não pode ficar negativo). */
@@ -259,6 +266,27 @@
           opcoes: opcoesGramas(LIMITES_MACROS_G_KG.carboidrato.min, LIMITES_MACROS_G_KG.carboidrato.max),
           valorAtual: grupoCarboidratoG,
           onSelecionar: (v: number) => (grupoCarboidratoG = v),
+        };
+      case "proteinaGKg":
+        return {
+          titulo: "Proteína (g/kg)",
+          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.proteina.min, LIMITES_MACROS_G_KG.proteina.max),
+          valorAtual: pesoAtual > 0 ? Math.round((grupoProteinaG / pesoAtual) * 100) / 100 : 0,
+          onSelecionar: (v: number) => (grupoProteinaG = Math.round(v * pesoAtual)),
+        };
+      case "gorduraGKg":
+        return {
+          titulo: "Gordura (g/kg)",
+          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.gordura.min, LIMITES_MACROS_G_KG.gordura.max),
+          valorAtual: pesoAtual > 0 ? Math.round((grupoGorduraG / pesoAtual) * 100) / 100 : 0,
+          onSelecionar: (v: number) => (grupoGorduraG = Math.round(v * pesoAtual)),
+        };
+      case "carboidratoGKg":
+        return {
+          titulo: "Carboidrato (g/kg)",
+          opcoes: opcoesGKg(LIMITES_MACROS_G_KG.carboidrato.min, LIMITES_MACROS_G_KG.carboidrato.max),
+          valorAtual: pesoAtual > 0 ? Math.round((grupoCarboidratoG / pesoAtual) * 100) / 100 : 0,
+          onSelecionar: (v: number) => (grupoCarboidratoG = Math.round(v * pesoAtual)),
         };
     }
   }
@@ -933,16 +961,19 @@
         <span class="tabela-rotulo">Calorias (kcal)</span>
         <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "calorias")}>{caloriasGrupoCalc}</button>
       </div>
-      <div class="tabela-linha">
-        <span class="tabela-rotulo">Proteína <span class="tabela-rotulo-gkg">{gKgGrupo(grupoProteinaG)} g/kg</span></span>
+      <div class="tabela-linha tabela-linha-3col">
+        <span class="tabela-rotulo">Proteína</span>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (campoEditandoGrupo = "proteinaGKg")}>{gKgGrupo(grupoProteinaG)} g/kg</button>
         <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "proteina")}>{grupoProteinaG} g</button>
       </div>
-      <div class="tabela-linha">
-        <span class="tabela-rotulo">Gordura <span class="tabela-rotulo-gkg">{gKgGrupo(grupoGorduraG)} g/kg</span></span>
+      <div class="tabela-linha tabela-linha-3col">
+        <span class="tabela-rotulo">Gordura</span>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (campoEditandoGrupo = "gorduraGKg")}>{gKgGrupo(grupoGorduraG)} g/kg</button>
         <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "gordura")}>{grupoGorduraG} g</button>
       </div>
-      <div class="tabela-linha">
-        <span class="tabela-rotulo">Carboidrato <span class="tabela-rotulo-gkg">{gKgGrupo(grupoCarboidratoG)} g/kg</span></span>
+      <div class="tabela-linha tabela-linha-3col">
+        <span class="tabela-rotulo">Carboidrato</span>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (campoEditandoGrupo = "carboidratoGKg")}>{gKgGrupo(grupoCarboidratoG)} g/kg</button>
         <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "carboidrato")}>{grupoCarboidratoG} g</button>
       </div>
     </div>
@@ -1131,13 +1162,19 @@
   .tabela-linha:last-child {
     border-bottom: none;
   }
+  .tabela-linha-3col {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: var(--space-3);
+  }
   .tabela-rotulo {
     color: var(--surface-fg);
     font-size: var(--font-size-base);
   }
-  .tabela-rotulo-gkg {
+  .tabela-input-gkg {
     color: var(--surface-muted);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
   }
   .tabela-input {
     flex: 0 0 64px;
