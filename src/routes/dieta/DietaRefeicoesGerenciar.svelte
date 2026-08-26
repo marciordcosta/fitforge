@@ -618,7 +618,8 @@
               </span>
               {#if m.metaCalorias != null}
                 <span class="nome-macros">
-                  carb {m.metaCarboidratoG?.toFixed(0)}g · gord {m.metaGorduraG?.toFixed(0)}g · prot {m.metaProteinaG?.toFixed(0)}g · {pctDoDia(m.metaCalorias)}%
+                  <span>carb {m.metaCarboidratoG?.toFixed(0)}g · gord {m.metaGorduraG?.toFixed(0)}g · prot {m.metaProteinaG?.toFixed(0)}g</span>
+                  <span class="nome-pct">{pctDoDia(m.metaCalorias)}%</span>
                 </span>
               {/if}
             </button>
@@ -933,8 +934,15 @@
     color: var(--surface-muted);
   }
   .nome-macros {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .nome-pct {
+    flex-shrink: 0;
   }
   .remover-btn {
     flex-shrink: 0;
