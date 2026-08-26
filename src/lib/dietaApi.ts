@@ -694,7 +694,7 @@ export interface DistribuicaoSemanal {
  * Sempre precisa sobrar pelo menos 1 dia automático, e nenhum valor (manual ou automático)
  * pode ficar abaixo do piso mínimo.
  */
-function resolverDistribuicao(metaCalorias: number, manuais: Map<number, number>, minimo: number): CaloriasPorDia[] {
+export function resolverDistribuicao(metaCalorias: number, manuais: Map<number, number>, minimo: number): CaloriasPorDia[] {
   const todosOsDias = [0, 1, 2, 3, 4, 5, 6];
   const diasAuto = todosOsDias.filter((d) => !manuais.has(d));
   if (diasAuto.length === 0) {

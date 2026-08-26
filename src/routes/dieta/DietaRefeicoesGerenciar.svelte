@@ -608,16 +608,11 @@
             <button class="nome-btn" onclick={() => abrirMeta(m)}>
               <span class="nome-linha">
                 <span class="nome">{m.nome}</span>
-                {#if m.metaCalorias != null}
-                  <span class="nome-cal-col">
-                    <span class="nome-cal">{Math.round(m.metaCalorias)} cal</span>
-                    <span class="nome-pct">{pctDoDia(m.metaCalorias)}%</span>
-                  </span>
-                {/if}
+                {#if m.metaCalorias != null}<span class="nome-cal">{Math.round(m.metaCalorias)} cal</span>{/if}
               </span>
               {#if m.metaCalorias != null}
                 <span class="nome-macros">
-                  carb {m.metaCarboidratoG?.toFixed(0)}g · gord {m.metaGorduraG?.toFixed(0)}g · prot {m.metaProteinaG?.toFixed(0)}g
+                  carb {m.metaCarboidratoG?.toFixed(0)}g · gord {m.metaGorduraG?.toFixed(0)}g · prot {m.metaProteinaG?.toFixed(0)}g · {pctDoDia(m.metaCalorias)}%
                 </span>
               {/if}
             </button>
@@ -914,7 +909,7 @@
   }
   .nome-linha {
     display: flex;
-    align-items: flex-start;
+    align-items: baseline;
     justify-content: space-between;
     gap: var(--space-2);
   }
@@ -926,20 +921,10 @@
     font-size: var(--font-size-base);
     color: var(--surface-fg);
   }
-  .nome-cal-col {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-  }
   .nome-cal {
+    flex-shrink: 0;
     font-size: 12px;
     color: var(--surface-muted);
-  }
-  .nome-pct {
-    font-size: 11px;
-    color: var(--surface-muted);
-    opacity: 0.8;
   }
   .nome-macros {
     font-size: var(--font-size-sm);
