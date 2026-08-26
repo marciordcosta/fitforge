@@ -182,23 +182,23 @@
   }
 
   /**
-   * Um dia já configurado (manual) não pode entrar numa seleção nova pra definir outra meta —
-   * primeiro precisa ser removido. Tocar num dia manual só permite selecioná-lo sozinho (pra
-   * oferecer "Remover ajuste"); tocar num dia automático enquanto um manual estava selecionado
-   * começa uma seleção nova do zero.
+   * Um dia já configurado (manual) nunca entra numa seleção nova pra definir outra meta — o "x"
+   * no card é o único jeito de desvincular. Tocar o card em si: se não há nenhuma seleção em
+   * andamento, abre direto a edição da meta desse dia; se já tem outros dias sendo selecionados
+   * pra uma meta nova, o toque é ignorado (não mistura um dia já configurado numa seleção nova).
    */
   function toggleDiaSelecionado(dia: number) {
     const ehManual = diasResolvidos.find((d) => d.diaSemana === dia)?.manual ?? false;
 
     if (ehManual) {
-      diasSelecionados = diasSelecionados.size === 1 && diasSelecionados.has(dia) ? new Set() : new Set([dia]);
+      if (diasSelecionados.size === 0) {
+        diasSelecionados = new Set([dia]);
+        abrirDefinirCalorias();
+      }
       return;
     }
 
-    const selecaoTinhaManual = [...diasSelecionados].some(
-      (d) => diasResolvidos.find((r) => r.diaSemana === d)?.manual,
-    );
-    const novo = selecaoTinhaManual ? new Set<number>() : new Set(diasSelecionados);
+    const novo = new Set(diasSelecionados);
     if (novo.has(dia)) novo.delete(dia);
     else novo.add(dia);
     diasSelecionados = novo;
@@ -754,30 +754,40 @@
         <div class="dias-lista">
           {#each diasResolvidos as dia (dia.diaSemana)}
             {@const cor = corDoDia(dia)}
-            <button
-              type="button"
-              class="dia-card"
-              class:selecionado={diasSelecionados.has(dia.diaSemana)}
-              class:colorido={cor != null}
-              style={cor ? `background:${cor}; border-color:${cor};` : ""}
-              onclick={() => toggleDiaSelecionado(dia.diaSemana)}
-            >
-              <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia.diaSemana]}</span>
-              <span class="dia-card-cal">{Math.round(dia.calorias)}</span>
-            </button>
+            <div class="dia-card-slot">
+              <div
+                class="dia-card"
+                class:selecionado={diasSelecionados.has(dia.diaSemana)}
+                class:colorido={cor != null}
+                style={cor ? `background:${cor}; border-color:${cor};` : ""}
+                role="button"
+                tabindex="0"
+                onclick={() => toggleDiaSelecionado(dia.diaSemana)}
+                onkeydown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") toggleDiaSelecionado(dia.diaSemana);
+                }}
+              >
+                <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia.diaSemana]}</span>
+                <span class="dia-card-cal">{Math.round(dia.calorias)}</span>
+              </div>
+              {#if dia.manual}
+                <button
+                  type="button"
+                  class="dia-card-x"
+                  onclick={() => removerAjusteDia(dia.diaSemana)}
+                  aria-label={`Remover ajuste de ${DIAS_SEMANA_ABREV[dia.diaSemana]}`}
+                >
+                  ✕
+                </button>
+              {/if}
+            </div>
           {/each}
         </div>
 
         {#if diasSelecionados.size > 0}
-          {@const diaManual = diasSelecionados.size === 1 ? diasResolvidos.find((d) => diasSelecionados.has(d.diaSemana) && d.manual) : undefined}
           <div class="dias-acoes">
-            {#if diaManual}
-              <Button onclick={() => removerAjusteDia(diaManual.diaSemana)}>Remover ajuste</Button>
-            {:else}
-              <Button onclick={abrirDefinirCalorias}>
-                Definir calorias pra {diasSelecionados.size} {diasSelecionados.size === 1 ? "dia" : "dias"}
-              </Button>
-            {/if}
+            <button type="button" class="acao-dia-btn" onclick={abrirDefinirCalorias}>Definir calorias</button>
+            <button type="button" class="acao-dia-btn" onclick={() => (diasSelecionados = new Set())}>Limpar seleção</button>
           </div>
         {/if}
       {/if}
@@ -879,7 +889,13 @@
 {/if}
 
 {#if mostrarDefinirCalorias}
-  <Sheet titulo="Calorias" onFechar={() => (mostrarDefinirCalorias = false)}>
+  <Sheet
+    titulo="Calorias"
+    onFechar={() => {
+      mostrarDefinirCalorias = false;
+      diasSelecionados = new Set();
+    }}
+  >
     <div class="dias-lista modal-dias-lista">
       {#each [...diasSelecionados].sort((a, b) => a - b) as dia (dia)}
         <div class="dia-card">
@@ -1304,6 +1320,28 @@
   .dia-card.selecionado {
     box-shadow: 0 0 0 2px #ffffff;
   }
+  .dia-card-slot {
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .dia-card-x {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: var(--color-danger);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+  }
   .dia-card-nome {
     font-size: var(--font-size-sm);
     font-weight: 600;
@@ -1329,9 +1367,20 @@
   }
   .dias-acoes {
     display: flex;
-    flex-direction: column;
     gap: var(--space-2);
     margin-bottom: var(--space-3);
+  }
+  .acao-dia-btn {
+    flex: 1;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 2px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
   }
 
 </style>
