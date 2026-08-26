@@ -1,6 +1,5 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
-import { getPesoMedioAtual } from "./pesoApi";
 import { DIAS_SEMANA_ABREV } from "./treinoApi";
 
 function uid(): string {
@@ -682,12 +681,6 @@ export interface CaloriasPorDia {
   manual: boolean;
 }
 
-export interface DistribuicaoSemanal {
-  modo: "fixa" | "ondulatoria";
-  /** Sempre 7 entradas, ordenadas por diaSemana (0 a 6). */
-  dias: CaloriasPorDia[];
-}
-
 /**
  * Calcula os 7 dias a partir dos dias travados manualmente: o que sobra da meta semanal
  * (metaCalorias × 7 − soma dos manuais) é dividido em partes iguais pelos dias automáticos.
@@ -722,42 +715,33 @@ export function resolverDistribuicao(metaCalorias: number, manuais: Map<number, 
   );
 }
 
-async function contextoDistribuicao(): Promise<{ metaCalorias: number; minimo: number }> {
-  const [metas, perfil, pesoMedio] = await Promise.all([getMetasDiarias(), getPerfilDietaEditavel(), getPesoMedioAtual()]);
-  const pesoAtual = pesoMedio ?? perfil.pesoAtual;
-  return { metaCalorias: metas.calorias, minimo: CALORIA_MINIMA_KCAL_KG * pesoAtual };
+export async function getModoCalorias(): Promise<"fixa" | "ondulatoria"> {
+  const { data, error } = await supabase.from("dieta_perfil").select("modo_calorias").maybeSingle();
+  if (error) throw error;
+  return data?.modo_calorias === "ondulatoria" ? "ondulatoria" : "fixa";
 }
 
-async function getManuaisAtuais(): Promise<Map<number, number>> {
+export async function getCaloriasDiaManuais(): Promise<Map<number, number>> {
   const { data, error } = await supabase.from("dieta_calorias_dia").select("dia_semana, calorias");
   if (error) throw error;
   return new Map((data ?? []).map((l) => [l.dia_semana as number, l.calorias as number]));
 }
 
-export async function getDistribuicaoSemanal(): Promise<DistribuicaoSemanal> {
-  const { data: perfil, error } = await supabase.from("dieta_perfil").select("modo_calorias").maybeSingle();
-  if (error) throw error;
-  const modo: "fixa" | "ondulatoria" = perfil?.modo_calorias === "ondulatoria" ? "ondulatoria" : "fixa";
-
-  const { metaCalorias, minimo } = await contextoDistribuicao();
-
-  if (modo === "fixa") {
-    return {
-      modo,
-      dias: [0, 1, 2, 3, 4, 5, 6].map((dia) => ({ diaSemana: dia, calorias: metaCalorias, manual: false })),
-    };
-  }
-
-  const manuais = await getManuaisAtuais();
-  return { modo, dias: resolverDistribuicao(metaCalorias, manuais, minimo) };
-}
-
-export async function definirCaloriasDias(dias: number[], calorias: number): Promise<DistribuicaoSemanal> {
-  const { metaCalorias, minimo } = await contextoDistribuicao();
-  const manuais = await getManuaisAtuais();
+/**
+ * Trava `dias` em `calorias` e persiste — `metaCalorias`/`minimo`/`manuaisAtuais` já
+ * carregados pelo chamador (evita reconsultar peso/perfil/metas de novo a cada ajuste).
+ * Valida com `resolverDistribuicao` antes de gravar (lança se a combinação não fechar a conta).
+ */
+export async function definirCaloriasDias(
+  dias: number[],
+  calorias: number,
+  metaCalorias: number,
+  minimo: number,
+  manuaisAtuais: Map<number, number>,
+): Promise<void> {
+  const manuais = new Map(manuaisAtuais);
   for (const dia of dias) manuais.set(dia, calorias);
-
-  const resolvidos = resolverDistribuicao(metaCalorias, manuais, minimo);
+  resolverDistribuicao(metaCalorias, manuais, minimo);
 
   const { error } = await supabase
     .from("dieta_calorias_dia")
@@ -766,17 +750,11 @@ export async function definirCaloriasDias(dias: number[], calorias: number): Pro
       { onConflict: "user_id,dia_semana" },
     );
   if (error) throw error;
-
-  return { modo: "ondulatoria", dias: resolvidos };
 }
 
-export async function removerCaloriasDia(diaSemana: number): Promise<DistribuicaoSemanal> {
+export async function removerCaloriasDia(diaSemana: number): Promise<void> {
   const { error } = await supabase.from("dieta_calorias_dia").delete().eq("user_id", uid()).eq("dia_semana", diaSemana);
   if (error) throw error;
-
-  const { metaCalorias, minimo } = await contextoDistribuicao();
-  const manuais = await getManuaisAtuais();
-  return { modo: "ondulatoria", dias: resolverDistribuicao(metaCalorias, manuais, minimo) };
 }
 
 export async function definirModoCalorias(modo: "fixa" | "ondulatoria"): Promise<void> {

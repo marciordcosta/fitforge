@@ -12,13 +12,15 @@
     salvarPerfilDieta,
     LIMITES_MACROS_G_KG,
     RATIOS_NUTRIENTES_AUTOMATICOS,
-    getDistribuicaoSemanal,
+    CALORIA_MINIMA_KCAL_KG,
+    getModoCalorias,
+    getCaloriasDiaManuais,
+    resolverDistribuicao,
     definirModoCalorias,
     definirCaloriasDias,
     removerCaloriasDia,
-    carboidratoGDoDia,
     type RefeicaoModelo,
-    type DistribuicaoSemanal,
+    type CaloriasPorDia,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
@@ -43,7 +45,8 @@
   let carboidratoGKg = $state(2.93);
   let carboidratoGInput = $state<number | null>(null);
 
-  let distribuicao = $state<DistribuicaoSemanal | null>(null);
+  let modoCalorias = $state<"fixa" | "ondulatoria">("fixa");
+  let manuaisDias = $state<Map<number, number>>(new Map());
   let diasSelecionados = $state<Set<number>>(new Set());
   let mostrarDefinirCalorias = $state(false);
   let caloriasGrupoInput = $state<number | null>(null);
@@ -64,12 +67,27 @@
   const gorduraInsaturadaG = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.gordurasInsaturadasGKg * pesoAtual));
   const aguaL = $derived(Math.round(RATIOS_NUTRIENTES_AUTOMATICOS.aguaLKg * pesoAtual * 10) / 10);
 
+  const minimoCalorias = $derived(CALORIA_MINIMA_KCAL_KG * pesoAtual);
+
+  /** Resolvida 100% localmente — trocar Fixa/Ondulatória ou olhar a tela não bate no banco. */
+  const diasResolvidos = $derived.by((): CaloriasPorDia[] => {
+    if (modoCalorias === "fixa") {
+      return [0, 1, 2, 3, 4, 5, 6].map((dia) => ({ diaSemana: dia, calorias: caloriasCalc, manual: false }));
+    }
+    try {
+      return resolverDistribuicao(caloriasCalc, manuaisDias, minimoCalorias);
+    } catch {
+      return [0, 1, 2, 3, 4, 5, 6].map((dia) => ({ diaSemana: dia, calorias: caloriasCalc, manual: manuaisDias.has(dia) }));
+    }
+  });
+
   async function carregarMetas() {
     try {
-      const [perfil, pesoMedio, dist] = await Promise.all([
+      const [perfil, pesoMedio, modo, manuais] = await Promise.all([
         getPerfilDietaEditavel(),
         getPesoMedioAtual(),
-        getDistribuicaoSemanal(),
+        getModoCalorias(),
+        getCaloriasDiaManuais(),
       ]);
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
       proteinaGKg = perfil.proteinaGKg;
@@ -79,7 +97,8 @@
       gorduraGInput = Math.round(gorduraGKg * pesoAtual);
       carboidratoGInput = Math.round(carboidratoGKg * pesoAtual);
       caloriasInput = caloriasCalc;
-      distribuicao = dist;
+      modoCalorias = modo;
+      manuaisDias = manuais;
       perfilCarregado = true;
     } catch (err) {
       erroMetas = (err as Error).message;
@@ -88,14 +107,10 @@
 
   void carregarMetas();
 
-  async function alterarModoCalorias(modo: "fixa" | "ondulatoria") {
-    try {
-      await definirModoCalorias(modo);
-      distribuicao = await getDistribuicaoSemanal();
-      diasSelecionados = new Set();
-    } catch (err) {
-      alert("Erro ao mudar o modo: " + (err as Error).message);
-    }
+  function alterarModoCalorias(modo: "fixa" | "ondulatoria") {
+    modoCalorias = modo;
+    diasSelecionados = new Set();
+    definirModoCalorias(modo).catch((err) => alert("Erro ao salvar o modo: " + (err as Error).message));
   }
 
   function toggleDiaSelecionado(dia: number) {
@@ -109,7 +124,10 @@
     if (caloriasGrupoInput == null || caloriasGrupoInput <= 0) return;
     salvandoDistribuicao = true;
     try {
-      distribuicao = await definirCaloriasDias([...diasSelecionados], caloriasGrupoInput);
+      await definirCaloriasDias([...diasSelecionados], caloriasGrupoInput, caloriasCalc, minimoCalorias, manuaisDias);
+      const novoManual = new Map(manuaisDias);
+      for (const dia of diasSelecionados) novoManual.set(dia, caloriasGrupoInput);
+      manuaisDias = novoManual;
       diasSelecionados = new Set();
       mostrarDefinirCalorias = false;
       caloriasGrupoInput = null;
@@ -122,7 +140,10 @@
 
   async function removerAjusteDia(dia: number) {
     try {
-      distribuicao = await removerCaloriasDia(dia);
+      await removerCaloriasDia(dia);
+      const novoManual = new Map(manuaisDias);
+      novoManual.delete(dia);
+      manuaisDias = novoManual;
     } catch (err) {
       alert("Erro ao remover ajuste: " + (err as Error).message);
     }
@@ -476,52 +497,37 @@
 
       <p class="secao-titulo">Distribuição Semanal</p>
       <div class="tabs modo-toggle">
-        <button class:active={distribuicao?.modo === "fixa"} onclick={() => alterarModoCalorias("fixa")}>Fixa</button>
-        <button class:active={distribuicao?.modo === "ondulatoria"} onclick={() => alterarModoCalorias("ondulatoria")}>Ondulatória</button>
+        <button class:active={modoCalorias === "fixa"} onclick={() => alterarModoCalorias("fixa")}>Fixa</button>
+        <button class:active={modoCalorias === "ondulatoria"} onclick={() => alterarModoCalorias("ondulatoria")}>Ondulatória</button>
       </div>
 
-      {#if distribuicao?.modo === "ondulatoria"}
+      {#if modoCalorias === "ondulatoria"}
         <div class="dias-lista">
-          {#each distribuicao.dias as dia (dia.diaSemana)}
-            <div
-              class="dia-linha"
-              role="button"
-              tabindex="0"
+          {#each diasResolvidos as dia (dia.diaSemana)}
+            <button
+              type="button"
+              class="dia-card"
+              class:selecionado={diasSelecionados.has(dia.diaSemana)}
+              class:manual={dia.manual}
               onclick={() => toggleDiaSelecionado(dia.diaSemana)}
-              onkeydown={(e) => e.key === "Enter" && toggleDiaSelecionado(dia.diaSemana)}
             >
-              <span class="check-circulo" class:ativo={diasSelecionados.has(dia.diaSemana)}>
-                {#if diasSelecionados.has(dia.diaSemana)}✓{/if}
-              </span>
-              <span class="dia-nome">
-                {DIAS_SEMANA_ABREV[dia.diaSemana]}
-                {#if dia.manual}<span class="dia-manual-tag">manual</span>{/if}
-              </span>
-              <span class="dia-valores">
-                <span class="dia-cal">{Math.round(dia.calorias)} kcal</span>
-                <span class="dia-carb">carb {carboidratoGDoDia(dia.calorias, proteinaGInput ?? 0, gorduraGInput ?? 0)}g</span>
-              </span>
-              {#if dia.manual}
-                <button
-                  type="button"
-                  class="dia-remover"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    removerAjusteDia(dia.diaSemana);
-                  }}
-                  aria-label={`Remover ajuste manual de ${DIAS_SEMANA_ABREV[dia.diaSemana]}`}
-                >
-                  ✕
-                </button>
-              {/if}
-            </div>
+              <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia.diaSemana]}</span>
+              <span class="dia-card-cal">{Math.round(dia.calorias)}</span>
+            </button>
           {/each}
         </div>
 
         {#if diasSelecionados.size > 0}
-          <Button onclick={() => (mostrarDefinirCalorias = true)}>
-            Definir calorias pra {diasSelecionados.size} {diasSelecionados.size === 1 ? "dia" : "dias"}
-          </Button>
+          <div class="dias-acoes">
+            <Button onclick={() => (mostrarDefinirCalorias = true)}>
+              Definir calorias pra {diasSelecionados.size} {diasSelecionados.size === 1 ? "dia" : "dias"}
+            </Button>
+            {#if diasSelecionados.size === 1 && diasResolvidos.find((d) => diasSelecionados.has(d.diaSemana))?.manual}
+              <button type="button" class="link-remover" onclick={() => removerAjusteDia([...diasSelecionados][0])}>
+                Remover ajuste
+              </button>
+            {/if}
+          </div>
         {/if}
       {/if}
 
@@ -962,73 +968,54 @@
   }
   .dias-lista {
     display: flex;
-    flex-direction: column;
+    gap: var(--space-2);
+    overflow-x: auto;
+    padding-bottom: var(--space-1);
     margin-bottom: var(--space-3);
   }
-  .dia-linha {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--surface-border);
-    cursor: pointer;
-  }
-  .dia-linha:last-child {
-    border-bottom: none;
-  }
-  .check-circulo {
-    flex-shrink: 0;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 1px solid var(--surface-border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    color: var(--color-primary-fg);
-  }
-  .check-circulo.ativo {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-  }
-  .dia-nome {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-  }
-  .dia-manual-tag {
-    font-size: 11px;
-    color: var(--surface-muted);
-    border: 1px solid var(--surface-border);
-    border-radius: 999px;
-    padding: 1px 8px;
-  }
-  .dia-valores {
-    flex-shrink: 0;
+  .dia-card {
+    flex: 0 0 auto;
+    min-width: 60px;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    line-height: 1.4;
-  }
-  .dia-cal {
-    font-size: var(--font-size-base);
+    align-items: center;
+    gap: 4px;
+    padding: var(--space-3) var(--space-2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
     color: var(--surface-fg);
+    font-family: inherit;
+    cursor: pointer;
   }
-  .dia-carb {
+  .dia-card.manual {
+    border-color: var(--color-primary);
+  }
+  .dia-card.selecionado {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-primary-fg);
+  }
+  .dia-card-nome {
     font-size: var(--font-size-sm);
-    color: var(--surface-muted);
+    font-weight: 600;
   }
-  .dia-remover {
-    flex-shrink: 0;
+  .dia-card-cal {
+    font-size: 12px;
+    opacity: 0.8;
+  }
+  .dias-acoes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .link-remover {
     background: none;
     border: none;
     color: var(--color-danger);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-sm);
+    text-align: center;
     cursor: pointer;
     padding: var(--space-1);
   }
