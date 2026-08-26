@@ -1149,6 +1149,7 @@
   }
   .secao-titulo {
     font-weight: 600;
+    font-size: var(--font-size-base);
     margin: var(--space-2) 0 var(--space-1);
   }
   .card-proporcao {
@@ -1209,6 +1210,7 @@
   }
   .nutrientes-titulo {
     font-weight: 600;
+    font-size: var(--font-size-base);
     margin: var(--space-2) 0 var(--space-3);
   }
   .nutrientes-lista {
