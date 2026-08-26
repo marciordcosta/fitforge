@@ -15,14 +15,33 @@
   } = $props();
 
   const rotuloUnidade = untrack(() => (porcaoPadraoUnidade === "unidade" ? "un" : porcaoPadraoUnidade));
-  const maxPadrao = untrack(() => (porcaoPadraoUnidade === "unidade" ? 100 : 1000));
-  const valorInicial = untrack(() => Math.max(1, Math.round(quantidadeInicial)));
-  const maxFinal = Math.max(maxPadrao, valorInicial);
+  const ehPeso = untrack(() => porcaoPadraoUnidade !== "unidade");
+  const valorBruto = untrack(() => Math.max(1, Math.round(quantidadeInicial)));
 
-  const opcoes = Array.from({ length: maxFinal }, (_, i) => i + 1).map((v) => ({
-    valor: v,
-    label: `${v} ${rotuloUnidade}`,
-  }));
+  /** 1 a 5 de 1 em 1, depois de 5 em 5 até 500 (limite da porção em g/ml na refeição). */
+  function gerarValoresPeso(): number[] {
+    const valores = [1, 2, 3, 4, 5];
+    for (let v = 10; v <= 500; v += 5) valores.push(v);
+    if (valorBruto > 500) {
+      const alvo = Math.ceil(valorBruto / 5) * 5;
+      for (let v = 505; v <= alvo; v += 5) valores.push(v);
+    }
+    return valores;
+  }
+
+  function gerarValoresUnidade(): number[] {
+    const max = Math.max(100, valorBruto);
+    return Array.from({ length: max }, (_, i) => i + 1);
+  }
+
+  function maisProximo(valor: number, valores: number[]): number {
+    return valores.reduce((melhor, atual) => (Math.abs(atual - valor) < Math.abs(melhor - valor) ? atual : melhor), valores[0]);
+  }
+
+  const valoresBase = ehPeso ? gerarValoresPeso() : gerarValoresUnidade();
+  const valorInicial = maisProximo(valorBruto, valoresBase);
+
+  const opcoes = valoresBase.map((v) => ({ valor: v, label: `${v} ${rotuloUnidade}` }));
 </script>
 
 <WheelPicker
