@@ -406,24 +406,13 @@
     {:else}
       <p class="peso-ref">Com base no peso médio atual: <strong>{pesoAtual.toFixed(1)} kg</strong></p>
 
-      <div
-        class="linha-tap"
-        role="button"
-        tabindex="0"
-        onclick={() => (campoEditando = "calorias")}
-        onkeydown={(e) => e.key === "Enter" && (campoEditando = "calorias")}
-      >
-        <span>Calorias (kcal)</span>
-        <span>{caloriasInput ?? caloriasCalc}</span>
-      </div>
-
       <div class="resumo">
-        <div class="donut" style={donutStyle}>
+        <button type="button" class="donut" style={donutStyle} onclick={() => (campoEditando = "calorias")} aria-label="Ajustar calorias">
           <div class="donut-centro">
             <strong>{caloriasCalc}</strong>
             <span>Cal</span>
           </div>
-        </div>
+        </button>
         <div class="resumo-macros">
           <button type="button" class="macro-col" onclick={() => (campoEditando = "carboidratoG")}>
             <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarboidrato.toFixed(0)}%</strong>
@@ -668,17 +657,6 @@
   .valor-meta:focus {
     outline: none;
   }
-  .linha-tap {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--surface-border);
-    cursor: pointer;
-  }
-  .linha-tap span:first-child {
-    color: var(--surface-fg);
-  }
   .resumo {
     display: flex;
     align-items: center;
@@ -691,6 +669,10 @@
     height: 100px;
     border-radius: 50%;
     flex-shrink: 0;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    cursor: pointer;
   }
   .donut-centro {
     position: absolute;
