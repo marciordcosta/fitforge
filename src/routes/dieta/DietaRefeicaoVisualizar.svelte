@@ -2,6 +2,7 @@
   import { navigate } from "../../lib/router.svelte";
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import DietaCopiarParaSheet from "./DietaCopiarParaSheet.svelte";
   import DietaCopiarDeSheet from "./DietaCopiarDeSheet.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
@@ -15,6 +16,7 @@
     getMetaReceitaIdPorNome,
     refeicaoTemHistorico,
     adicionarReceitaAoDiario,
+    removerItensDaRefeicao,
     getAlimento,
     atualizarItemDiario,
     type RefeicaoDia,
@@ -46,6 +48,7 @@
   let processando = $state(false);
   let mostrarCopiarPara = $state(false);
   let mostrarCopiarDe = $state(false);
+  let mostrarOpcoesRefPadrao = $state(false);
   let itemEditando = $state<ItemDiario | null>(null);
   let alimentoEditando = $state<Alimento | null>(null);
 
@@ -133,7 +136,15 @@
     }
   }
 
-  async function puxarRefeicaoPadrao() {
+  function iniciarRefPadrao() {
+    if (itens.length > 0) {
+      mostrarOpcoesRefPadrao = true;
+      return;
+    }
+    void aplicarRefPadrao(false);
+  }
+
+  async function aplicarRefPadrao(substituir: boolean) {
     if (!refeicao) return;
     processando = true;
     try {
@@ -142,6 +153,7 @@
         alert(`"${refeicao.nome}" não tem uma referência padrão configurada em Gerenciar > Refeições.`);
         return;
       }
+      if (substituir) await removerItensDaRefeicao(refeicaoId);
       await adicionarReceitaAoDiario(metaReceitaId, refeicao.data, refeicaoId);
       await carregar();
     } catch (err) {
@@ -219,7 +231,7 @@
     <p class="muted">Refeição não encontrada.</p>
   {:else}
     <div class="acoes">
-      <button class="acao-btn" disabled={processando || !metaRefeicao} onclick={puxarRefeicaoPadrao}>
+      <button class="acao-btn" disabled={processando || !metaRefeicao} onclick={iniciarRefPadrao}>
         <span class="acao-label">Ref padrão</span>
         {@render iconPratoPadrao()}
       </button>
@@ -312,6 +324,18 @@
     textoConfirmar="Remover"
     onConfirmar={remover}
     onCancelar={() => (itemParaRemover = null)}
+  />
+{/if}
+
+{#if mostrarOpcoesRefPadrao}
+  <ActionSheet
+    titulo="Ref padrão"
+    onFechar={() => (mostrarOpcoesRefPadrao = false)}
+    opcoes={[
+      { label: "Adicionar à refeição", onSelect: () => aplicarRefPadrao(false) },
+      { label: "Substituir refeição", onSelect: () => aplicarRefPadrao(true) },
+      { label: "Cancelar", onSelect: () => {} },
+    ]}
   />
 {/if}
 

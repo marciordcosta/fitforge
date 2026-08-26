@@ -583,6 +583,12 @@ export async function removerItemDiario(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Remove todos os itens já lançados nessa refeição — usado por "Substituir refeição" ao puxar a referência padrão. */
+export async function removerItensDaRefeicao(refeicaoId: string): Promise<void> {
+  const { error } = await supabase.from("diario_alimentos").delete().eq("refeicao_id", refeicaoId);
+  if (error) throw error;
+}
+
 // ---------------- Metas diárias ----------------
 
 /** Metas diárias (calorias + macros em gramas). Macros vêm de g/kg × peso de referência do perfil. */
