@@ -83,6 +83,16 @@
     return nomes.join(", ");
   }
 
+  function totaisRefeicao(refeicaoId: string) {
+    const doItens = itens.filter((i) => i.refeicaoId === refeicaoId);
+    return {
+      calorias: doItens.reduce((acc, i) => acc + i.calorias, 0),
+      proteinaG: doItens.reduce((acc, i) => acc + i.proteinaG, 0),
+      gorduraG: doItens.reduce((acc, i) => acc + i.gorduraG, 0),
+      carboidratoG: doItens.reduce((acc, i) => acc + i.carboidratoG, 0),
+    };
+  }
+
   function aoCriarRefeicao(id: string) {
     mostrarCriarRefeicao = false;
     navigate(`/dieta/refeicao/${id}`);
@@ -303,6 +313,12 @@
         >
           <div class="card-header">
             <h2>{refeicao.nome}</h2>
+            {#if itens.some((i) => i.refeicaoId === refeicao.id)}
+              {@const t = totaisRefeicao(refeicao.id)}
+              <span class="card-totais">
+                prot {t.proteinaG.toFixed(0)}g - gord {t.gorduraG.toFixed(0)}g - carb {t.carboidratoG.toFixed(0)}g<span class="card-totais-cal">{t.calorias.toFixed(0)} cal</span>
+              </span>
+            {/if}
           </div>
           <p class="preview">{preview(refeicao.id)}</p>
           <Button
@@ -559,13 +575,27 @@
   }
   .card-header {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
+    gap: var(--space-2);
     margin-bottom: var(--space-2);
   }
   .card-header h2 {
+    flex-shrink: 0;
     font-size: var(--font-size-lg);
     margin: 0;
+  }
+  .card-totais {
+    min-width: 0;
+    color: var(--surface-muted);
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-totais-cal {
+    margin-left: var(--space-3);
   }
   .preview {
     color: var(--surface-muted);
