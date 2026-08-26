@@ -319,7 +319,7 @@
               <span class="card-cal">{totais.calorias.toFixed(0)} cal</span>
             {/if}
           </div>
-          <p class="preview">{preview(refeicao.id)}</p>
+          <p class="preview" class:preview-colado={temItens}>{preview(refeicao.id)}</p>
           {#if temItens}
             <p class="refeicao-macros">prot {totais.proteinaG.toFixed(0)}g · gord {totais.gorduraG.toFixed(0)}g · carb {totais.carboidratoG.toFixed(0)}g</p>
           {/if}
@@ -608,6 +608,9 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
+  }
+  .preview.preview-colado {
+    margin-bottom: 0;
   }
   .muted {
     color: var(--surface-muted);
