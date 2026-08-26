@@ -1511,10 +1511,6 @@
   }
   .card-macros {
     position: relative;
-    background: var(--surface-card);
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
-    box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
   }
   .toggle-btn {
