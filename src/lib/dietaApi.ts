@@ -507,6 +507,76 @@ export async function getMetasDiarias(): Promise<MetasDiarias> {
   };
 }
 
+/** Perfil de metas editável na tela de Gerenciar (aba Calorias) — ratios em g/kg, não em gramas fixas. */
+export interface PerfilDietaEditavel {
+  pesoAtual: number;
+  metaCalorias: number;
+  proteinaGKg: number;
+  gorduraGKg: number;
+  carboidratoGKg: number;
+  gordurasSaturadasG: number | null;
+  fibrasG: number | null;
+  aguaL: number | null;
+}
+
+const PERFIL_PADRAO: PerfilDietaEditavel = {
+  pesoAtual: 76,
+  metaCalorias: 2000,
+  proteinaGKg: 2.17,
+  gorduraGKg: 0.66,
+  carboidratoGKg: 2.93,
+  gordurasSaturadasG: 16,
+  fibrasG: 28,
+  aguaL: 3.8,
+};
+
+export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
+  const { data, error } = await supabase
+    .from("dieta_perfil")
+    .select("peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg, gorduras_saturadas_g, fibras_g, agua_l")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return PERFIL_PADRAO;
+  return {
+    pesoAtual: data.peso_atual,
+    metaCalorias: data.meta_calorias,
+    proteinaGKg: data.proteina_g_kg,
+    gorduraGKg: data.gordura_g_kg,
+    carboidratoGKg: data.carboidrato_g_kg,
+    gordurasSaturadasG: data.gorduras_saturadas_g,
+    fibrasG: data.fibras_g,
+    aguaL: data.agua_l,
+  };
+}
+
+export async function salvarPerfilDieta(input: {
+  pesoAtual: number;
+  metaCalorias: number;
+  proteinaGKg: number;
+  gorduraGKg: number;
+  carboidratoGKg: number;
+  gordurasSaturadasG: number | null;
+  fibrasG: number | null;
+  aguaL: number | null;
+}): Promise<void> {
+  const { error } = await supabase.from("dieta_perfil").upsert(
+    {
+      user_id: uid(),
+      peso_atual: input.pesoAtual,
+      meta_calorias: input.metaCalorias,
+      proteina_g_kg: input.proteinaGKg,
+      gordura_g_kg: input.gorduraGKg,
+      carboidrato_g_kg: input.carboidratoGKg,
+      gorduras_saturadas_g: input.gordurasSaturadasG,
+      fibras_g: input.fibrasG,
+      agua_l: input.aguaL,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (error) throw error;
+}
+
 // ---------------- Receitas (combo reutilizável de vários alimentos já cadastrados) ----------------
 
 export interface ReceitaResumo {

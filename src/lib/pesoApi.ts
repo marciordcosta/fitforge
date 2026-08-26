@@ -160,6 +160,18 @@ export async function excluirMeta(): Promise<void> {
   if (error) throw error;
 }
 
+/** Peso atual (média móvel dos últimos 7 dias, ancorada no registro mais recente). null se não há nenhum peso registrado ainda. */
+export async function getPesoMedioAtual(): Promise<number | null> {
+  const registros = await getPesosDoPeriodo("1900-01-01", hojeISO());
+  if (!registros.length) return null;
+  const ordenados = [...registros].sort((a, b) => a.data.localeCompare(b.data));
+  const dataMaisRecente = ordenados[ordenados.length - 1].data;
+  const d = parseISODate(dataMaisRecente);
+  const limite = toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 6));
+  const janela = ordenados.filter((p) => p.data >= limite && p.data <= dataMaisRecente);
+  return janela.reduce((acc, p) => acc + p.peso, 0) / janela.length;
+}
+
 export interface ProgressoMetaPeso {
   pesoAtual: number;
   pesoAlvo: number;
