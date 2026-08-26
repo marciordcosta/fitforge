@@ -1,6 +1,8 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { DIAS_SEMANA_ABREV } from "./treinoApi";
+import { getPesoMedioAtual } from "./pesoApi";
+import { parseISODate } from "./dates";
 
 function uid(): string {
   const id = auth.user?.id;
@@ -871,6 +873,51 @@ export async function definirModoCalorias(modo: "fixa" | "ondulatoria"): Promise
 /** Carboidrato do dia: mesma fórmula usada pra fechar a meta de calorias, só trocando a meta pela calorias daquele dia. */
 export function carboidratoGDoDia(caloriasDoDia: number, proteinaG: number, gorduraG: number): number {
   return Math.max(0, Math.round((caloriasDoDia - 4 * proteinaG - 9 * gorduraG) / 4));
+}
+
+/**
+ * Meta de macros/calorias efetiva pra uma data específica — respeita o modo Fixa/Ondulatória.
+ * Em Fixa, é a mesma meta global de sempre (getMetasDiarias). Em Ondulatória, resolve o dia da
+ * semana dessa data: se estiver travado manualmente, usa a composição salva daquele ajuste;
+ * senão usa os padrões globais de proteína/gordura com o carboidrato calculado pra fechar a
+ * meta de calorias automática daquele dia — mesma lógica usada em Gerenciar > Refeições.
+ */
+export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
+  const modo = await getModoCalorias();
+  if (modo === "fixa") return getMetasDiarias();
+
+  const [perfil, pesoMedio, manuais] = await Promise.all([
+    getPerfilDietaEditavel(),
+    getPesoMedioAtual(),
+    getCaloriasDiaManuais(),
+  ]);
+  const pesoAtual = pesoMedio ?? perfil.pesoAtual;
+  const proteinaG = Math.round(perfil.proteinaGKg * pesoAtual);
+  const gorduraG = Math.round(perfil.gorduraGKg * pesoAtual);
+  const carboidratoG = Math.round(perfil.carboidratoGKg * pesoAtual);
+  const caloriasMedia = Math.round(4 * proteinaG + 9 * gorduraG + 4 * carboidratoG);
+  const minimo = CALORIA_MINIMA_KCAL_KG * pesoAtual;
+  const manuaisCalorias = new Map([...manuais].map(([dia, v]) => [dia, v.calorias]));
+
+  const diaSemana = parseISODate(data).getDay();
+  let diaResolvido: CaloriasPorDia;
+  try {
+    const dias = resolverDistribuicao(caloriasMedia, manuaisCalorias, minimo);
+    diaResolvido = dias.find((d) => d.diaSemana === diaSemana) ?? { diaSemana, calorias: caloriasMedia, manual: false };
+  } catch {
+    diaResolvido = { diaSemana, calorias: caloriasMedia, manual: manuaisCalorias.has(diaSemana) };
+  }
+
+  if (diaResolvido.manual) {
+    const dados = manuais.get(diaSemana);
+    if (dados) return { calorias: dados.calorias, proteinaG: dados.proteinaG, gorduraG: dados.gorduraG, carboidratoG: dados.carboidratoG };
+  }
+  return {
+    calorias: diaResolvido.calorias,
+    proteinaG,
+    gorduraG,
+    carboidratoG: carboidratoGDoDia(diaResolvido.calorias, proteinaG, gorduraG),
+  };
 }
 
 // ---------------- Receitas (combo reutilizável de vários alimentos já cadastrados) ----------------

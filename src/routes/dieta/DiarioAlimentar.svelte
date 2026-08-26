@@ -8,7 +8,7 @@
   import {
     garantirRefeicoesPadraoDoDia,
     getDiarioDoDia,
-    getMetasDiarias,
+    getMetasDoDia,
     listRefeicoesModelo,
     type RefeicaoDia,
     type ItemDiario,
@@ -70,7 +70,7 @@
     loading = true;
     erro = null;
     try {
-      [refeicoes, itens, metas] = await Promise.all([garantirRefeicoesPadraoDoDia(dataAtual), getDiarioDoDia(dataAtual), getMetasDiarias()]);
+      [refeicoes, itens, metas] = await Promise.all([garantirRefeicoesPadraoDoDia(dataAtual), getDiarioDoDia(dataAtual), getMetasDoDia(dataAtual)]);
     } catch (err) {
       erro = (err as Error).message;
     } finally {

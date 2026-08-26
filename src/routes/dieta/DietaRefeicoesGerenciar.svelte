@@ -908,32 +908,6 @@
           </div>
           <span class="secao-dias-cal">{Math.round(somaGrupo.calorias)} de {Math.round(grupo.calorias)} calorias</span>
         </div>
-        <ul class="lista lista-dia">
-          {#each modelos as m, i (m.id)}
-            {@const meta = metaEfetivaDoDia(m, grupo.dias[0])}
-            <li
-              class="linha"
-              class:arrastando={arrastandoDia === grupo.dias[0] && arrastandoIndex === i}
-              bind:this={itemRefsDia[grupo.dias[0]][i]}
-              style={arrastandoDia === grupo.dias[0] && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
-            >
-              <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, grupo.dias[0])} aria-label="Reordenar">
-                {@render iconArrastar()}
-              </button>
-              <button class="nome-btn" onclick={() => abrirMeta(m, grupo.dias)}>
-                <span class="nome-linha">
-                  <span class="nome">{m.nome}</span>
-                  {#if meta.calorias != null}<span class="nome-cal">{Math.round(meta.calorias)} cal</span>{/if}
-                </span>
-                <span class="nome-macros" class:invisivel={meta.calorias == null}>
-                  <span>carb {(meta.carboidratoG ?? 0).toFixed(0)}g · gord {(meta.gorduraG ?? 0).toFixed(0)}g · prot {(meta.proteinaG ?? 0).toFixed(0)}g</span>
-                  <span class="nome-pct">{pctDeDia(meta.calorias ?? 0, grupo.calorias)}%</span>
-                </span>
-              </button>
-              <button class="remover-btn" onclick={() => (paraExcluir = m)} aria-label={`Remover ${m.nome}`}>✕</button>
-            </li>
-          {/each}
-        </ul>
 
         <div class="card-macros">
           <button
@@ -999,6 +973,33 @@
             </div>
           </div>
         </div>
+
+        <ul class="lista lista-dia">
+          {#each modelos as m, i (m.id)}
+            {@const meta = metaEfetivaDoDia(m, grupo.dias[0])}
+            <li
+              class="linha"
+              class:arrastando={arrastandoDia === grupo.dias[0] && arrastandoIndex === i}
+              bind:this={itemRefsDia[grupo.dias[0]][i]}
+              style={arrastandoDia === grupo.dias[0] && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
+            >
+              <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, grupo.dias[0])} aria-label="Reordenar">
+                {@render iconArrastar()}
+              </button>
+              <button class="nome-btn" onclick={() => abrirMeta(m, grupo.dias)}>
+                <span class="nome-linha">
+                  <span class="nome">{m.nome}</span>
+                  {#if meta.calorias != null}<span class="nome-cal">{Math.round(meta.calorias)} cal</span>{/if}
+                </span>
+                <span class="nome-macros" class:invisivel={meta.calorias == null}>
+                  <span>carb {(meta.carboidratoG ?? 0).toFixed(0)}g · gord {(meta.gorduraG ?? 0).toFixed(0)}g · prot {(meta.proteinaG ?? 0).toFixed(0)}g</span>
+                  <span class="nome-pct">{pctDeDia(meta.calorias ?? 0, grupo.calorias)}%</span>
+                </span>
+              </button>
+              <button class="remover-btn" onclick={() => (paraExcluir = m)} aria-label={`Remover ${m.nome}`}>✕</button>
+            </li>
+          {/each}
+        </ul>
       {/each}
     {:else}
       <ul class="lista">
