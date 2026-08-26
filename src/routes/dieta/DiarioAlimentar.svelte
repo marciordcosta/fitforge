@@ -322,9 +322,9 @@
           <p class="preview" class:preview-colado={temItens}>{preview(refeicao.id)}</p>
           {#if temItens}
             <p class="refeicao-macros">
-              prot <span class="valor-macro">{totais.proteinaG.toFixed(0)}g</span> ·
-              gord <span class="valor-macro">{totais.gorduraG.toFixed(0)}g</span> ·
-              carb <span class="valor-macro">{totais.carboidratoG.toFixed(0)}g</span>
+              carb {totais.carboidratoG.toFixed(0)}g ·
+              gord {totais.gorduraG.toFixed(0)}g ·
+              prot {totais.proteinaG.toFixed(0)}g
             </p>
           {/if}
           <Button
@@ -601,9 +601,6 @@
     margin: 0 0 var(--space-3);
     font-size: var(--font-size-base);
     color: var(--surface-muted);
-  }
-  .valor-macro {
-    color: var(--surface-fg);
   }
   .preview {
     color: var(--surface-muted);
