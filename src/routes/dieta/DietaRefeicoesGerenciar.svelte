@@ -1427,19 +1427,12 @@
   }
   .remover-btn {
     flex-shrink: 0;
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background: none;
     border: none;
-    border-radius: 50%;
-    background: var(--color-danger);
-    color: #fff;
-    font-size: 12px;
-    line-height: 1;
-    padding: 0;
+    color: var(--color-danger);
+    font-size: var(--font-size-base);
     cursor: pointer;
+    padding: var(--space-2);
   }
   .muted {
     color: var(--surface-muted);
@@ -1511,6 +1504,10 @@
   }
   .card-macros {
     position: relative;
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
   }
   .toggle-btn {
