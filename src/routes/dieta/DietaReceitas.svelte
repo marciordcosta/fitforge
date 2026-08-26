@@ -95,6 +95,7 @@
             <span class="avatar">{iniciais(r.nome)}</span>
             <span class="info">
               <span class="nome">{r.nome}</span>
+              <span class="sub">{r.calorias.toFixed(0)} kcal</span>
             </span>
           </button>
           <span class="chevron">{vinculando === r.id ? "…" : "›"}</span>
@@ -200,6 +201,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .sub {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .muted {
     color: var(--surface-muted);

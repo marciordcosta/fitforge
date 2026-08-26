@@ -793,6 +793,14 @@ export function carboidratoGDoDia(caloriasDoDia: number, proteinaG: number, gord
 export interface ReceitaResumo {
   id: string;
   nome: string;
+  calorias: number;
+}
+
+const RECEITA_RESUMO_SELECT = "id, nome, itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g))";
+
+function mapReceitaResumo(l: Record<string, unknown>): ReceitaResumo {
+  const itens = (l.itens as ItemReceitaBruto[]) ?? [];
+  return { id: l.id as string, nome: l.nome as string, calorias: round1(somarTotaisItensReceita(itens).calorias) };
 }
 
 export interface ReceitaItem {
@@ -833,21 +841,21 @@ function mapReceitaItem(l: Record<string, unknown>): ReceitaItem {
 export async function buscarReceitas(query: string): Promise<ReceitaResumo[]> {
   const termo = query.trim();
   if (!termo) return [];
-  const { data, error } = await porPalavras(supabase.from("dieta_receitas").select("id, nome"), "nome", termo)
+  const { data, error } = await porPalavras(supabase.from("dieta_receitas").select(RECEITA_RESUMO_SELECT), "nome", termo)
     .order("nome", { ascending: true })
     .limit(20);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((l) => mapReceitaResumo(l as unknown as Record<string, unknown>));
 }
 
 export async function listReceitas(limite = 50): Promise<ReceitaResumo[]> {
   const { data, error } = await supabase
     .from("dieta_receitas")
-    .select("id, nome")
+    .select(RECEITA_RESUMO_SELECT)
     .order("nome", { ascending: true })
     .limit(limite);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((l) => mapReceitaResumo(l as unknown as Record<string, unknown>));
 }
 
 export async function getReceita(id: string): Promise<Receita | null> {
@@ -864,10 +872,12 @@ export async function getReceita(id: string): Promise<Receita | null> {
   if (receitaRes.error) throw receitaRes.error;
   if (itensRes.error) throw itensRes.error;
   if (!receitaRes.data) return null;
+  const itens = (itensRes.data ?? []).map((l) => mapReceitaItem(l as Record<string, unknown>));
   return {
     id: receitaRes.data.id,
     nome: receitaRes.data.nome,
-    itens: (itensRes.data ?? []).map((l) => mapReceitaItem(l as Record<string, unknown>)),
+    calorias: round1(itens.reduce((acc, it) => acc + it.calorias, 0)),
+    itens,
   };
 }
 
