@@ -170,9 +170,8 @@
     }
   }
 
-  function aoSalvarQuantidadeItem(qtd: number, unidade: "porcao" | "grama") {
+  function aoSalvarQuantidadeItem(novaQuantidade: number) {
     if (!itemEditando) return;
-    const novaQuantidade = unidade === "porcao" ? qtd * itemEditando.porcaoPadraoQtd : qtd;
     const fatorAntigo = itemEditando.quantidade / itemEditando.porcaoPadraoQtd;
     const fatorNovo = novaQuantidade / itemEditando.porcaoPadraoQtd;
     const id = itemEditando.id;
@@ -358,8 +357,6 @@
 {#if itemEditando}
   <DietaQuantidadeDialog
     quantidadeInicial={itemEditando.quantidade}
-    unidadeInicial="grama"
-    porcaoPadraoQtd={itemEditando.porcaoPadraoQtd}
     porcaoPadraoUnidade={itemEditando.unidade}
     onSalvar={aoSalvarQuantidadeItem}
     onFechar={() => (itemEditando = null)}

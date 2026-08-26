@@ -95,9 +95,8 @@
     }
   }
 
-  async function aoSalvarQuantidadeItem(qtd: number, unidade: "porcao" | "grama") {
+  async function aoSalvarQuantidadeItem(quantidade: number) {
     if (!itemEditando || !alimentoEditando) return;
-    const quantidade = unidade === "porcao" ? qtd * alimentoEditando.porcaoPadraoQtd : qtd;
     processando = true;
     try {
       await atualizarItemDiario(itemEditando.id, alimentoEditando, quantidade, refeicaoId);
@@ -331,8 +330,6 @@
 {#if itemEditando && alimentoEditando}
   <DietaQuantidadeDialog
     quantidadeInicial={itemEditando.quantidade}
-    unidadeInicial="grama"
-    porcaoPadraoQtd={alimentoEditando.porcaoPadraoQtd}
     porcaoPadraoUnidade={itemEditando.unidade}
     onSalvar={aoSalvarQuantidadeItem}
     onFechar={() => { itemEditando = null; alimentoEditando = null; }}

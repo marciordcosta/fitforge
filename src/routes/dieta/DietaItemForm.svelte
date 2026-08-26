@@ -49,12 +49,7 @@
   let loading = $state(true);
   let dataResolvida = $state(untrack(() => data ?? ""));
   let refeicao = $state<RefeicaoDia | null>(null);
-  let unidadeQtd = $state<"porcao" | "grama">("porcao");
-  let quantidadeInput = $state(1);
-  const porcoes = $derived.by(() => {
-    if (!alimento) return 1;
-    return unidadeQtd === "porcao" ? quantidadeInput : quantidadeInput / alimento.porcaoPadraoQtd;
-  });
+  let quantidade = $state(0);
   let opcoesRefeicao = $state<RefeicaoDia[]>([]);
   let mostrarEscolhaRefeicao = $state(false);
   let mostrarCriarRefeicao = $state(false);
@@ -82,8 +77,7 @@
         refeicao = refeicaoRes;
         metas = metasRes;
         dataResolvida = refeicaoRes?.data ?? "";
-        unidadeQtd = "porcao";
-        quantidadeInput = alimentoRes ? item.quantidade / alimentoRes.porcaoPadraoQtd : 1;
+        quantidade = item.quantidade;
       } else {
         const [alimentoRes, metasRes, refeicaoRes] = await Promise.all([
           getAlimento(alimentoId!),
@@ -93,6 +87,7 @@
         alimento = alimentoRes;
         metas = metasRes;
         refeicao = refeicaoRes;
+        quantidade = alimentoRes ? alimentoRes.porcaoPadraoQtd : 0;
       }
     } catch (err) {
       erro = (err as Error).message;
@@ -114,20 +109,19 @@
     void getRefeicaoDia(id).then((r) => (refeicao = r));
   }
 
-  function aoSalvarQuantidade(qtd: number, unidade: "porcao" | "grama") {
-    quantidadeInput = qtd;
-    unidadeQtd = unidade;
+  function aoSalvarQuantidade(qtd: number) {
+    quantidade = qtd;
     mostrarQuantidade = false;
   }
 
-  const quantidade = $derived(alimento ? porcoes * alimento.porcaoPadraoQtd : 0);
-  const calorias = $derived(alimento ? alimento.caloriasPorPorcao * porcoes : 0);
-  const proteinaG = $derived(alimento ? alimento.proteinaG * porcoes : 0);
-  const gorduraG = $derived(alimento ? alimento.gorduraG * porcoes : 0);
-  const carboidratoG = $derived(alimento ? alimento.carboidratoG * porcoes : 0);
-  const fibraG = $derived(alimento?.fibraG != null ? alimento.fibraG * porcoes : null);
-  const gorduraSaturadaG = $derived(alimento?.gorduraSaturadaG != null ? alimento.gorduraSaturadaG * porcoes : null);
-  const gorduraInsaturadaG = $derived(alimento?.gorduraInsaturadaG != null ? alimento.gorduraInsaturadaG * porcoes : null);
+  const fator = $derived(alimento && alimento.porcaoPadraoQtd > 0 ? quantidade / alimento.porcaoPadraoQtd : 0);
+  const calorias = $derived(alimento ? alimento.caloriasPorPorcao * fator : 0);
+  const proteinaG = $derived(alimento ? alimento.proteinaG * fator : 0);
+  const gorduraG = $derived(alimento ? alimento.gorduraG * fator : 0);
+  const carboidratoG = $derived(alimento ? alimento.carboidratoG * fator : 0);
+  const fibraG = $derived(alimento?.fibraG != null ? alimento.fibraG * fator : null);
+  const gorduraSaturadaG = $derived(alimento?.gorduraSaturadaG != null ? alimento.gorduraSaturadaG * fator : null);
+  const gorduraInsaturadaG = $derived(alimento?.gorduraInsaturadaG != null ? alimento.gorduraInsaturadaG * fator : null);
 
   const caloriasCarbo = $derived(carboidratoG * 4);
   const caloriasGordura = $derived(gorduraG * 9);
@@ -270,7 +264,7 @@
       onclick={() => (mostrarQuantidade = true)}
       onkeydown={(e) => e.key === "Enter" && (mostrarQuantidade = true)}
     >
-      <span>Quantidade de porções</span>
+      <span>Quantidade</span>
       <span>{quantidade.toFixed(0)}{alimento.porcaoPadraoUnidade}</span>
     </div>
 
@@ -342,9 +336,7 @@
 
 {#if mostrarQuantidade && alimento}
   <DietaQuantidadeDialog
-    quantidadeInicial={quantidadeInput}
-    unidadeInicial={unidadeQtd}
-    porcaoPadraoQtd={alimento.porcaoPadraoQtd}
+    quantidadeInicial={quantidade}
     porcaoPadraoUnidade={alimento.porcaoPadraoUnidade}
     onSalvar={aoSalvarQuantidade}
     onFechar={() => (mostrarQuantidade = false)}
