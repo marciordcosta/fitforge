@@ -332,7 +332,7 @@
           <div class="card-header">
             <h2>{refeicao.nome}</h2>
             {#if temItens}
-              <span class="card-cal">{totais.calorias.toFixed(0)}{#if metaCal !== undefined} de {metaCal.toFixed(0)}{/if} cal</span>
+              <span class="card-cal">{totais.calorias.toFixed(0)}{metaCal !== undefined ? ` de ${metaCal.toFixed(0)}` : ""} cal</span>
             {/if}
           </div>
           <p class="preview" class:preview-colado={temItens}>{preview(refeicao.id)}</p>
