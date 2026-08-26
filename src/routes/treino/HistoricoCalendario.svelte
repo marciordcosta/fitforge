@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
   import { toISODate } from "../../lib/dates";
   import { getDiasComTreino, type DiaComTreino } from "../../lib/treinoApi";
 
@@ -62,7 +62,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => navigate("/treino")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">←</button>
     <h1>Histórico</h1>
     <span class="spacer"></span>
   </div>

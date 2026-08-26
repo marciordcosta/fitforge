@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
   import { buscarReceitas, listReceitas, vincularMetaReceita, vincularMetaReceitaDias, type ReceitaResumo } from "../../lib/dietaApi";
   import { receitaRascunho, limparRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
 
@@ -83,7 +83,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => navigate(metaParaModeloId ? "/dieta/refeicoes/gerenciar" : "/dieta")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar(metaParaModeloId ? "/dieta/refeicoes/gerenciar" : "/dieta")} aria-label="Voltar">←</button>
     <h1>Refeições</h1>
     <button class="criar" onclick={criarNova}>Criar</button>
   </div>

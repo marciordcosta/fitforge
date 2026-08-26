@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
@@ -252,7 +252,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => navigate(destinoVoltar())} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar(destinoVoltar())} aria-label="Voltar">←</button>
     <h1>{editandoItem ? "Editar Alimento" : "Adicionar Alimento"}</h1>
     <div class="header-acoes">
       {#if alimento?.fonte === "manual"}

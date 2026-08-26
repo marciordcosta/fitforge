@@ -34,7 +34,7 @@
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -861,7 +861,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => navigate("/dieta")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/dieta")} aria-label="Voltar">←</button>
     <h1>Gerenciar</h1>
     {#if aba === "refeicoes"}
       <button class="criar" onclick={abrirNovo} aria-label="Nova refeição">+</button>

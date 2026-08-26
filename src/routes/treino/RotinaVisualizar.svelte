@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
   import { formatMinSeg } from "../../lib/tempo";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import {
@@ -75,7 +75,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">←</button>
     <h1>
       {treino?.nome_treino ?? ""}
       {#if treino?.dia_semana != null}

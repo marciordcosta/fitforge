@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
   import {
     createExercicio,
     construirMusculosInput,
@@ -42,7 +42,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/treino/exercicios")} aria-label="Voltar">←</button>
     <h1>Novo Exercício</h1>
     <button class="salvar" disabled={salvando} onclick={salvar}>Criar</button>
   </div>

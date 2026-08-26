@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
@@ -217,7 +217,7 @@
 
 <div class="header-fixo">
   <div class="header-fixo-inner">
-    <button class="back" onclick={() => navigate("/dieta")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/dieta")} aria-label="Voltar">←</button>
     <h1>
       {refeicao?.nome ?? ""}
       <span class="data-inline">{dataLabel}</span>

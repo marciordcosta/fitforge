@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate, router } from "../../lib/router.svelte";
+  import { navigate, voltar, router } from "../../lib/router.svelte";
   import { toISODate, parseISODate } from "../../lib/dates";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
@@ -315,7 +315,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => navigate("/treino")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">←</button>
     <h1>Distribuição Muscular</h1>
     <span class="spacer"></span>
   </div>

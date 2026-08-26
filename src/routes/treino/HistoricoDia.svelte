@@ -1,5 +1,6 @@
 <script lang="ts">
   import { parseISODate } from "../../lib/dates";
+  import { voltar } from "../../lib/router.svelte";
   import { getHistoricoDia, salvarRegistrosDoDia, type SetRegistro } from "../../lib/treinoApi";
 
   let { treinoId, data }: { treinoId: string; data: string } = $props();
@@ -63,7 +64,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => window.history.back()} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/treino/historico")} aria-label="Voltar">←</button>
     <h1>{treinoNome}</h1>
     <button class="salvar" disabled={salvando || loading} onclick={salvar}>{salvando ? "Salvando…" : "Salvar"}</button>
   </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import Button from "../../components/Button.svelte";
@@ -224,7 +224,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => navigate("/dieta/receitas")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/dieta/receitas")} aria-label="Voltar">←</button>
     {#if nomeEditando}
       <input
         class="nome-input"
