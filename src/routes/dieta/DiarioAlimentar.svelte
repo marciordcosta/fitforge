@@ -172,13 +172,6 @@
     <rect x="13" y="13" width="8" height="8" rx="1.5" />
   </svg>
 {/snippet}
-{#snippet iconQuickMeta()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="8" />
-    <circle cx="12" cy="12" r="4" />
-    <circle cx="12" cy="12" r="0.5" fill="currentColor" />
-  </svg>
-{/snippet}
 {#snippet iconQuickParametrizacao()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="3" />
@@ -287,9 +280,9 @@
         <span class="quick-btn-label">Refeições</span>
         {@render iconQuickRefeicoes()}
       </button>
-      <button class="quick-btn" onclick={() => navigate("/dieta/meta")}>
-        <span class="quick-btn-label">Meta</span>
-        {@render iconQuickMeta()}
+      <button class="quick-btn" onclick={() => navigate("/dieta/refeicoes/gerenciar")}>
+        <span class="quick-btn-label">Gerenciar</span>
+        {@render iconGerenciar()}
       </button>
       <button class="quick-btn" onclick={() => navigate("/dieta/parametrizacao")}>
         <span class="quick-btn-label">Parâmetros</span>
@@ -331,7 +324,6 @@
     onFechar={() => (mostrarMenuMais = false)}
     opcoes={[
       { label: "Refeição avulsa", subtitulo: "Apenas para hoje", icon: iconRefeicaoAvulsa, onSelect: () => (mostrarCriarRefeicao = true) },
-      { label: "Gerenciar refeições", subtitulo: "Cadastro e edição das refeições", icon: iconGerenciar, onSelect: () => navigate("/dieta/refeicoes/gerenciar") },
       { label: "Escanear alimento", subtitulo: "Ler código de barras", icon: iconScanner, onSelect: () => navigate(`/dieta/scanear/${dataAtual}`) },
     ]}
   />
