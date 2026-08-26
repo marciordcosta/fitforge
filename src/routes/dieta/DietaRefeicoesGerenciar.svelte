@@ -649,16 +649,49 @@
     }
   }
 
+  /** Tempo segurando o handle parado antes do arrasto realmente começar — evita que um toque de rolagem vire reordenação sem querer. */
+  const ATRASO_ARRASTAR_MS = 250;
+  const TOLERANCIA_MOVIMENTO_PX = 8;
+  let timeoutArrastar: ReturnType<typeof setTimeout> | undefined;
+  let pointerDownX = 0;
+  let pointerDownY = 0;
+
   function aoPointerDownHandle(e: PointerEvent, index: number, dia: number | null = null) {
-    e.preventDefault();
     const el = dia == null ? itemRefs[index] : itemRefsDia[dia][index];
     if (!el) return;
+    pointerDownX = e.clientX;
+    pointerDownY = e.clientY;
+    window.addEventListener("pointermove", aoPointerMoveEsperando);
+    window.addEventListener("pointerup", aoPointerUpEsperando);
+    timeoutArrastar = setTimeout(() => iniciarArrasto(el, index, dia), ATRASO_ARRASTAR_MS);
+  }
+
+  function cancelarEsperaArrastar() {
+    clearTimeout(timeoutArrastar);
+    timeoutArrastar = undefined;
+    window.removeEventListener("pointermove", aoPointerMoveEsperando);
+    window.removeEventListener("pointerup", aoPointerUpEsperando);
+  }
+
+  function aoPointerMoveEsperando(e: PointerEvent) {
+    if (Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY) > TOLERANCIA_MOVIMENTO_PX) {
+      cancelarEsperaArrastar();
+    }
+  }
+
+  function aoPointerUpEsperando() {
+    cancelarEsperaArrastar();
+  }
+
+  function iniciarArrasto(el: HTMLLIElement, index: number, dia: number | null) {
+    cancelarEsperaArrastar();
     alturaLinha = el.getBoundingClientRect().height;
-    startY = e.clientY;
+    startY = pointerDownY;
     arrastandoDia = dia;
     arrastandoIndex = index;
     arrastarOffsetY = 0;
     ordemMudou = false;
+    if (navigator.vibrate) navigator.vibrate(10);
     window.addEventListener("pointermove", aoPointerMove);
     window.addEventListener("pointerup", aoPointerUp);
   }
