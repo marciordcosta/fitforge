@@ -21,6 +21,7 @@
     removerCaloriasDia,
     type RefeicaoModelo,
     type CaloriasPorDia,
+    type CaloriasDiaManual,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
@@ -46,11 +47,18 @@
   let carboidratoGInput = $state<number | null>(null);
 
   let modoCalorias = $state<"fixa" | "ondulatoria">("fixa");
-  let manuaisDias = $state<Map<number, number>>(new Map());
+  let manuaisCompletos = $state<Map<number, CaloriasDiaManual>>(new Map());
+  const manuaisDias = $derived(new Map([...manuaisCompletos].map(([dia, v]) => [dia, v.calorias])));
   let diasSelecionados = $state<Set<number>>(new Set());
   let mostrarDefinirCalorias = $state(false);
-  let caloriasGrupoInput = $state<number | null>(null);
   let salvandoDistribuicao = $state(false);
+
+  let grupoProteinaG = $state(0);
+  let grupoGorduraG = $state(0);
+  let grupoCarboidratoG = $state(0);
+  const caloriasGrupoCalc = $derived(Math.round(4 * grupoProteinaG + 9 * grupoGorduraG + 4 * grupoCarboidratoG));
+  type CampoMacroGrupo = "proteina" | "gordura" | "carboidrato";
+  let campoEditandoGrupo = $state<CampoMacroGrupo | null>(null);
 
   const caloriasCalc = $derived(
     Math.round(4 * (proteinaGInput ?? 0) + 9 * (gorduraGInput ?? 0) + 4 * (carboidratoGInput ?? 0)),
@@ -98,7 +106,7 @@
       carboidratoGInput = Math.round(carboidratoGKg * pesoAtual);
       caloriasInput = caloriasCalc;
       modoCalorias = modo;
-      manuaisDias = manuais;
+      manuaisCompletos = manuais;
       perfilCarregado = true;
     } catch (err) {
       erroMetas = (err as Error).message;
@@ -120,17 +128,66 @@
     diasSelecionados = novo;
   }
 
+  function abrirDefinirCalorias() {
+    const dias = [...diasSelecionados];
+    const existente = dias.length === 1 ? manuaisCompletos.get(dias[0]) : undefined;
+    grupoProteinaG = existente?.proteinaG ?? proteinaGInput ?? 0;
+    grupoGorduraG = existente?.gorduraG ?? gorduraGInput ?? 0;
+    grupoCarboidratoG = existente?.carboidratoG ?? carboidratoGInput ?? 0;
+    mostrarDefinirCalorias = true;
+  }
+
+  function infoCampoGrupo(campo: CampoMacroGrupo) {
+    switch (campo) {
+      case "proteina":
+        return {
+          titulo: "Proteína (g)",
+          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.proteina.min, LIMITES_MACROS_G_KG.proteina.max),
+          valorAtual: grupoProteinaG,
+          onSelecionar: (v: number) => (grupoProteinaG = v),
+        };
+      case "gordura":
+        return {
+          titulo: "Gordura (g)",
+          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.gordura.min, LIMITES_MACROS_G_KG.gordura.max),
+          valorAtual: grupoGorduraG,
+          onSelecionar: (v: number) => (grupoGorduraG = v),
+        };
+      case "carboidrato":
+        return {
+          titulo: "Carboidrato (g)",
+          opcoes: opcoesGramas(LIMITES_MACROS_G_KG.carboidrato.min, LIMITES_MACROS_G_KG.carboidrato.max),
+          valorAtual: grupoCarboidratoG,
+          onSelecionar: (v: number) => (grupoCarboidratoG = v),
+        };
+    }
+  }
+
   async function confirmarCaloriasGrupo() {
-    if (caloriasGrupoInput == null || caloriasGrupoInput <= 0) return;
+    if (caloriasGrupoCalc <= 0) return;
     salvandoDistribuicao = true;
     try {
-      await definirCaloriasDias([...diasSelecionados], caloriasGrupoInput, caloriasCalc, minimoCalorias, manuaisDias);
-      const novoManual = new Map(manuaisDias);
-      for (const dia of diasSelecionados) novoManual.set(dia, caloriasGrupoInput);
-      manuaisDias = novoManual;
+      await definirCaloriasDias(
+        [...diasSelecionados],
+        grupoProteinaG,
+        grupoGorduraG,
+        grupoCarboidratoG,
+        caloriasCalc,
+        minimoCalorias,
+        manuaisDias,
+      );
+      const novoManual = new Map(manuaisCompletos);
+      for (const dia of diasSelecionados) {
+        novoManual.set(dia, {
+          calorias: caloriasGrupoCalc,
+          proteinaG: grupoProteinaG,
+          gorduraG: grupoGorduraG,
+          carboidratoG: grupoCarboidratoG,
+        });
+      }
+      manuaisCompletos = novoManual;
       diasSelecionados = new Set();
       mostrarDefinirCalorias = false;
-      caloriasGrupoInput = null;
     } catch (err) {
       alert("Erro ao definir calorias: " + (err as Error).message);
     } finally {
@@ -141,9 +198,9 @@
   async function removerAjusteDia(dia: number) {
     try {
       await removerCaloriasDia(dia);
-      const novoManual = new Map(manuaisDias);
+      const novoManual = new Map(manuaisCompletos);
       novoManual.delete(dia);
-      manuaisDias = novoManual;
+      manuaisCompletos = novoManual;
     } catch (err) {
       alert("Erro ao remover ajuste: " + (err as Error).message);
     }
@@ -550,7 +607,7 @@
 
         {#if diasSelecionados.size > 0}
           <div class="dias-acoes">
-            <Button onclick={() => (mostrarDefinirCalorias = true)}>
+            <Button onclick={abrirDefinirCalorias}>
               Definir calorias pra {diasSelecionados.size} {diasSelecionados.size === 1 ? "dia" : "dias"}
             </Button>
             {#if diasSelecionados.size === 1 && diasResolvidos.find((d) => diasSelecionados.has(d.diaSemana))?.manual}
@@ -659,19 +716,39 @@
     titulo={`Calorias para ${diasSelecionados.size} ${diasSelecionados.size === 1 ? "dia" : "dias"}`}
     onFechar={() => (mostrarDefinirCalorias = false)}
   >
-    <input
-      class="dia-calorias-input"
-      type="number"
-      inputmode="decimal"
-      step="1"
-      min="0"
-      placeholder="kcal"
-      bind:value={caloriasGrupoInput}
-    />
-    <Button onclick={confirmarCaloriasGrupo} disabled={salvandoDistribuicao || caloriasGrupoInput == null || caloriasGrupoInput <= 0}>
+    <div class="tabela-macros calorias-grupo-tabela">
+      <div class="tabela-linha">
+        <span class="tabela-rotulo">Calorias (kcal)</span>
+        <span class="tabela-input tabela-valor-calculado">{caloriasGrupoCalc}</span>
+      </div>
+      <div class="tabela-linha">
+        <span class="tabela-rotulo">Proteína</span>
+        <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "proteina")}>{grupoProteinaG} g</button>
+      </div>
+      <div class="tabela-linha">
+        <span class="tabela-rotulo">Gordura</span>
+        <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "gordura")}>{grupoGorduraG} g</button>
+      </div>
+      <div class="tabela-linha">
+        <span class="tabela-rotulo">Carboidrato</span>
+        <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "carboidrato")}>{grupoCarboidratoG} g</button>
+      </div>
+    </div>
+    <Button onclick={confirmarCaloriasGrupo} disabled={salvandoDistribuicao || caloriasGrupoCalc <= 0}>
       Salvar
     </Button>
   </Sheet>
+{/if}
+
+{#if campoEditandoGrupo}
+  {@const infoGrupo = infoCampoGrupo(campoEditandoGrupo)}
+  <WheelPicker
+    titulo={infoGrupo.titulo}
+    opcoes={infoGrupo.opcoes}
+    valorAtual={infoGrupo.valorAtual}
+    onSelecionar={infoGrupo.onSelecionar}
+    onFechar={() => (campoEditandoGrupo = null)}
+  />
 {/if}
 
 <style>
@@ -887,13 +964,15 @@
     display: flex;
     align-items: center;
     gap: var(--space-1);
-    border-bottom: 1px solid var(--surface-border);
-    background: var(--surface-bg);
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    padding: 0 var(--space-3);
+    margin-bottom: var(--space-2);
     position: relative;
   }
   .linha.arrastando {
     z-index: 10;
-    background: var(--surface-card);
   }
   .handle {
     flex-shrink: 0;
@@ -971,8 +1050,7 @@
   .erro {
     color: var(--color-danger);
   }
-  .nome-input,
-  .dia-calorias-input {
+  .nome-input {
     box-sizing: border-box;
     width: 100%;
     padding: var(--space-3);
@@ -982,6 +1060,14 @@
     background: var(--surface-bg);
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+  }
+  .calorias-grupo-tabela {
+    margin-bottom: var(--space-4);
+  }
+  .tabela-valor-calculado {
+    cursor: default;
+    color: var(--surface-muted);
+    font-weight: 600;
   }
   .modo-toggle {
     margin-bottom: var(--space-3);

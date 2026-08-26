@@ -740,34 +740,64 @@ export async function getModoCalorias(): Promise<"fixa" | "ondulatoria"> {
   return data?.modo_calorias === "ondulatoria" ? "ondulatoria" : "fixa";
 }
 
-export async function getCaloriasDiaManuais(): Promise<Map<number, number>> {
-  const { data, error } = await supabase.from("dieta_calorias_dia").select("dia_semana, calorias");
+/** Composição de um dia travado manualmente na Distribuição Semanal. */
+export interface CaloriasDiaManual {
+  calorias: number;
+  proteinaG: number;
+  gorduraG: number;
+  carboidratoG: number;
+}
+
+export async function getCaloriasDiaManuais(): Promise<Map<number, CaloriasDiaManual>> {
+  const { data, error } = await supabase
+    .from("dieta_calorias_dia")
+    .select("dia_semana, calorias, proteina_g, gordura_g, carboidrato_g");
   if (error) throw error;
-  return new Map((data ?? []).map((l) => [l.dia_semana as number, l.calorias as number]));
+  return new Map(
+    (data ?? []).map((l) => [
+      l.dia_semana as number,
+      {
+        calorias: l.calorias as number,
+        proteinaG: (l.proteina_g as number | null) ?? 0,
+        gorduraG: (l.gordura_g as number | null) ?? 0,
+        carboidratoG: (l.carboidrato_g as number | null) ?? 0,
+      },
+    ]),
+  );
 }
 
 /**
- * Trava `dias` em `calorias` e persiste — `metaCalorias`/`minimo`/`manuaisAtuais` já
- * carregados pelo chamador (evita reconsultar peso/perfil/metas de novo a cada ajuste).
- * Valida com `resolverDistribuicao` antes de gravar (lança se a combinação não fechar a conta).
+ * Trava `dias` na composição de macros informada (calorias calculadas a partir dela) e
+ * persiste — `metaCalorias`/`minimo`/`manuaisAtuais` já carregados pelo chamador (evita
+ * reconsultar peso/perfil/metas de novo a cada ajuste). Valida com `resolverDistribuicao`
+ * antes de gravar (lança se a combinação não fechar a conta).
  */
 export async function definirCaloriasDias(
   dias: number[],
-  calorias: number,
+  proteinaG: number,
+  gorduraG: number,
+  carboidratoG: number,
   metaCalorias: number,
   minimo: number,
   manuaisAtuais: Map<number, number>,
 ): Promise<void> {
+  const calorias = Math.round(4 * proteinaG + 9 * gorduraG + 4 * carboidratoG);
   const manuais = new Map(manuaisAtuais);
   for (const dia of dias) manuais.set(dia, calorias);
   resolverDistribuicao(metaCalorias, manuais, minimo);
 
-  const { error } = await supabase
-    .from("dieta_calorias_dia")
-    .upsert(
-      dias.map((dia) => ({ user_id: uid(), dia_semana: dia, calorias, updated_at: new Date().toISOString() })),
-      { onConflict: "user_id,dia_semana" },
-    );
+  const { error } = await supabase.from("dieta_calorias_dia").upsert(
+    dias.map((dia) => ({
+      user_id: uid(),
+      dia_semana: dia,
+      calorias,
+      proteina_g: proteinaG,
+      gordura_g: gorduraG,
+      carboidrato_g: carboidratoG,
+      updated_at: new Date().toISOString(),
+    })),
+    { onConflict: "user_id,dia_semana" },
+  );
   if (error) throw error;
 }
 
