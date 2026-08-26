@@ -541,6 +541,11 @@
     return { receitaId: m.metaReceitaId, calorias: m.metaCalorias, proteinaG: m.metaProteinaG, gorduraG: m.metaGorduraG, carboidratoG: m.metaCarboidratoG };
   }
 
+  /** Soma das calorias já configuradas nas refeições desse dia — pra comparar com a meta total do dia. */
+  function somaCaloriasInformadas(dia: number): number {
+    return modelos.reduce((acc, m) => acc + (metaEfetivaDoDia(m, dia).calorias ?? 0), 0);
+  }
+
   async function carregar() {
     loading = true;
     erro = null;
@@ -862,7 +867,7 @@
               </div>
             {/each}
           </div>
-          <span class="secao-dias-cal">{Math.round(grupo.calorias)} cal</span>
+          <span class="secao-dias-cal">{Math.round(somaCaloriasInformadas(grupo.dias[0]))}/{Math.round(grupo.calorias)} cal</span>
         </div>
         <ul class="lista lista-dia">
           {#each modelos as m, i (m.id)}
