@@ -3,6 +3,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import {
     listRefeicoesModelo,
     criarRefeicaoModelo,
@@ -184,15 +185,19 @@
   /**
    * Um dia já configurado (manual) nunca entra numa seleção nova pra definir outra meta — o "x"
    * no card é o único jeito de desvincular. Tocar o card em si: se não há nenhuma seleção em
-   * andamento, abre direto a edição da meta desse dia; se já tem outros dias sendo selecionados
-   * pra uma meta nova, o toque é ignorado (não mistura um dia já configurado numa seleção nova).
+   * andamento, seleciona todo o grupo de dias com essa mesma meta (não só o dia tocado) e abre
+   * direto a edição; se já tem outros dias sendo selecionados pra uma meta nova, o toque é
+   * ignorado (não mistura um dia já configurado numa seleção nova).
    */
   function toggleDiaSelecionado(dia: number) {
-    const ehManual = diasResolvidos.find((d) => d.diaSemana === dia)?.manual ?? false;
+    const info = diasResolvidos.find((d) => d.diaSemana === dia);
+    if (!info) return;
 
-    if (ehManual) {
+    if (info.manual) {
       if (diasSelecionados.size === 0) {
-        diasSelecionados = new Set([dia]);
+        const chave = Math.round(info.calorias);
+        const grupo = diasResolvidos.filter((d) => d.manual && Math.round(d.calorias) === chave).map((d) => d.diaSemana);
+        diasSelecionados = new Set(grupo);
         abrirDefinirCalorias();
       }
       return;
@@ -204,9 +209,19 @@
     diasSelecionados = novo;
   }
 
+  /** Dias automáticos (sem configuração própria) que ainda não estão na seleção em andamento — candidatos pro "+" no modal. */
+  const diasDisponiveisParaAdicionar = $derived(
+    diasResolvidos.filter((d) => !d.manual && !diasSelecionados.has(d.diaSemana)),
+  );
+  let mostrarAdicionarDiaGrupo = $state(false);
+
+  function adicionarDiaAoGrupo(dia: number) {
+    diasSelecionados = new Set([...diasSelecionados, dia]);
+  }
+
   function abrirDefinirCalorias() {
     const dias = [...diasSelecionados];
-    const existente = dias.length === 1 ? manuaisCompletos.get(dias[0]) : undefined;
+    const existente = dias.length ? manuaisCompletos.get(dias[0]) : undefined;
     grupoProteinaG = existente?.proteinaG ?? proteinaGInput ?? 0;
     grupoGorduraG = existente?.gorduraG ?? gorduraGInput ?? 0;
     grupoCarboidratoG = existente?.carboidratoG ?? carboidratoGInput ?? 0;
@@ -902,6 +917,16 @@
           <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
         </div>
       {/each}
+      {#if diasDisponiveisParaAdicionar.length > 0}
+        <button
+          type="button"
+          class="dia-card dia-card-add"
+          onclick={() => (mostrarAdicionarDiaGrupo = true)}
+          aria-label="Adicionar dia a essa configuração"
+        >
+          +
+        </button>
+      {/if}
     </div>
     <div class="tabela-macros calorias-grupo-tabela">
       <div class="tabela-linha">
@@ -925,6 +950,17 @@
       Salvar
     </Button>
   </Sheet>
+{/if}
+
+{#if mostrarAdicionarDiaGrupo}
+  <ActionSheet
+    titulo="Adicionar dia"
+    onFechar={() => (mostrarAdicionarDiaGrupo = false)}
+    opcoes={diasDisponiveisParaAdicionar.map((d) => ({
+      label: DIAS_SEMANA_ABREV[d.diaSemana],
+      onSelect: () => adicionarDiaAoGrupo(d.diaSemana),
+    }))}
+  />
 {/if}
 
 {#if campoEditandoGrupo}
@@ -1267,6 +1303,15 @@
     overflow-x: visible;
     flex-wrap: wrap;
   }
+  .dia-card-add {
+    background: #ffffff;
+    border-color: #ffffff;
+    color: #05221c;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+  }
   .distribuicao-header {
     display: flex;
     align-items: center;
@@ -1295,7 +1340,7 @@
     display: flex;
     gap: var(--space-2);
     overflow-x: auto;
-    padding-top: var(--space-1);
+    padding-top: var(--space-3);
     padding-bottom: var(--space-3);
     margin-bottom: var(--space-5);
   }
