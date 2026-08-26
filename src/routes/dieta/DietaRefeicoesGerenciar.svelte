@@ -470,28 +470,59 @@
       <p class="peso-ref">Com base no peso médio atual: <strong>{pesoAtual.toFixed(1)} kg</strong></p>
 
       <div class="resumo">
-        <button type="button" class="donut" style={donutStyle} onclick={() => (campoEditando = "calorias")} aria-label="Ajustar calorias">
+        <button
+          type="button"
+          class="donut"
+          style={donutStyle}
+          disabled={modoCalorias === "ondulatoria"}
+          onclick={() => (campoEditando = "calorias")}
+          aria-label="Ajustar calorias"
+        >
           <div class="donut-centro">
             <strong>{caloriasCalc}</strong>
             <span>Cal</span>
           </div>
         </button>
         <div class="resumo-macros">
-          <button type="button" class="macro-col" onclick={() => (campoEditando = "carboidratoG")}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "carboidratoG")}>
             <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarboidrato.toFixed(0)}%</strong>
             <span class="valor-g">{carboidratoGInput ?? 0} g</span>
             <span class="rotulo-macro">Carb</span>
           </button>
-          <button type="button" class="macro-col" onclick={() => (campoEditando = "gorduraG")}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "gorduraG")}>
             <strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong>
             <span class="valor-g">{gorduraGInput ?? 0} g</span>
             <span class="rotulo-macro">Gorduras</span>
           </button>
-          <button type="button" class="macro-col" onclick={() => (campoEditando = "proteinaG")}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "proteinaG")}>
             <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
             <span class="valor-g">{proteinaGInput ?? 0} g</span>
             <span class="rotulo-macro">Proteínas</span>
           </button>
+        </div>
+      </div>
+
+      <div class="card-proporcao">
+        <p class="secao-titulo">Proporção por peso (g/kg)</p>
+        <div class="tabela-macros">
+          <div class="tabela-linha">
+            <span class="tabela-rotulo">Proteína</span>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "proteinaGKg")}>
+              {proteinaGKg.toFixed(2)}
+            </button>
+          </div>
+          <div class="tabela-linha">
+            <span class="tabela-rotulo">Gordura</span>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "gorduraGKg")}>
+              {gorduraGKg.toFixed(2)}
+            </button>
+          </div>
+          <div class="tabela-linha">
+            <span class="tabela-rotulo">Carboidrato</span>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "carboidratoGKg")}>
+              {carboidratoGKg.toFixed(2)}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -530,30 +561,6 @@
           </div>
         {/if}
       {/if}
-
-      <div class="card-proporcao">
-        <p class="secao-titulo">Proporção por peso (g/kg)</p>
-        <div class="tabela-macros">
-          <div class="tabela-linha">
-            <span class="tabela-rotulo">Proteína</span>
-            <button type="button" class="tabela-input" onclick={() => (campoEditando = "proteinaGKg")}>
-              {proteinaGKg.toFixed(2)}
-            </button>
-          </div>
-          <div class="tabela-linha">
-            <span class="tabela-rotulo">Gordura</span>
-            <button type="button" class="tabela-input" onclick={() => (campoEditando = "gorduraGKg")}>
-              {gorduraGKg.toFixed(2)}
-            </button>
-          </div>
-          <div class="tabela-linha">
-            <span class="tabela-rotulo">Carboidrato</span>
-            <button type="button" class="tabela-input" onclick={() => (campoEditando = "carboidratoGKg")}>
-              {carboidratoGKg.toFixed(2)}
-            </button>
-          </div>
-        </div>
-      </div>
 
       {#if campoEditando}
         {@const info = infoCampo(campoEditando)}
@@ -733,6 +740,11 @@
     align-items: center;
     gap: var(--space-5);
     padding: var(--space-5) 0;
+  }
+  .donut:disabled,
+  .macro-col:disabled,
+  .tabela-input:disabled {
+    cursor: default;
   }
   .donut {
     position: relative;
