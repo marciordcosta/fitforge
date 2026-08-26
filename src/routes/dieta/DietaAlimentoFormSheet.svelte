@@ -33,6 +33,16 @@
     }
   });
 
+  $effect(() => {
+    if (porcaoQtd != null && porcaoQtd < 0) porcaoQtd = 0;
+    if (proteina != null && proteina < 0) proteina = 0;
+    if (gordura != null && gordura < 0) gordura = 0;
+    if (carboidrato != null && carboidrato < 0) carboidrato = 0;
+    if (fibra != null && fibra < 0) fibra = 0;
+    if (gorduraSaturada != null && gorduraSaturada < 0) gorduraSaturada = 0;
+    if (gorduraInsaturada != null && gorduraInsaturada < 0) gorduraInsaturada = 0;
+  });
+
   function alternarGordura() {
     gorduraExpandida = !gorduraExpandida;
   }
@@ -101,7 +111,7 @@
 
     <div class="linha">
       <label for="af-porcao">Porção</label>
-      <input id="af-porcao" class="valor-num" type="number" inputmode="decimal" step="1" bind:value={porcaoQtd} />
+      <input id="af-porcao" class="valor-num" type="number" inputmode="decimal" step="1" min="0" bind:value={porcaoQtd} />
       <select class="valor-extra" bind:value={porcaoUnidade}>
         <option value="g">g</option>
         <option value="ml">ml</option>
@@ -116,12 +126,12 @@
 
     <div class="linha">
       <label for="af-proteina">Proteína (g)</label>
-      <input id="af-proteina" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={proteina} />
+      <input id="af-proteina" class="valor-num" type="number" inputmode="decimal" step="0.1" min="0" bind:value={proteina} />
     </div>
 
     <div class="linha">
       <label for="af-carboidrato">Carboidrato (g)</label>
-      <input id="af-carboidrato" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={carboidrato} />
+      <input id="af-carboidrato" class="valor-num" type="number" inputmode="decimal" step="0.1" min="0" bind:value={carboidrato} />
     </div>
 
     <div class="linha">
@@ -144,6 +154,7 @@
         type="number"
         inputmode="decimal"
         step="0.1"
+        min="0"
         bind:value={gordura}
         disabled={gorduraExpandida}
       />
@@ -152,17 +163,17 @@
     {#if gorduraExpandida}
       <div class="linha sub">
         <label for="af-gordura-sat">Saturada (g)</label>
-        <input id="af-gordura-sat" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={gorduraSaturada} />
+        <input id="af-gordura-sat" class="valor-num" type="number" inputmode="decimal" step="0.1" min="0" bind:value={gorduraSaturada} />
       </div>
       <div class="linha sub">
         <label for="af-gordura-insat">Insaturada (g)</label>
-        <input id="af-gordura-insat" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={gorduraInsaturada} />
+        <input id="af-gordura-insat" class="valor-num" type="number" inputmode="decimal" step="0.1" min="0" bind:value={gorduraInsaturada} />
       </div>
     {/if}
 
     <div class="linha">
       <label for="af-fibra">Fibra (g, opcional)</label>
-      <input id="af-fibra" class="valor-num" type="number" inputmode="decimal" step="0.1" bind:value={fibra} />
+      <input id="af-fibra" class="valor-num" type="number" inputmode="decimal" step="0.1" min="0" bind:value={fibra} />
     </div>
   </div>
 
