@@ -21,6 +21,7 @@
     definirCaloriasDias,
     removerCaloriasDia,
     listMetasDiaModelo,
+    carboidratoGDoDia,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
@@ -541,10 +542,46 @@
     return { receitaId: m.metaReceitaId, calorias: m.metaCalorias, proteinaG: m.metaProteinaG, gorduraG: m.metaGorduraG, carboidratoG: m.metaCarboidratoG };
   }
 
-  /** Soma das calorias já configuradas nas refeições desse dia — pra comparar com a meta total do dia. */
-  function somaCaloriasInformadas(dia: number): number {
-    return modelos.reduce((acc, m) => acc + (metaEfetivaDoDia(m, dia).calorias ?? 0), 0);
+  /** Soma dos macros já configurados nas refeições desse dia — pra comparar com a meta do dia. */
+  function somaMacrosInformados(dia: number) {
+    return modelos.reduce(
+      (acc, m) => {
+        const meta = metaEfetivaDoDia(m, dia);
+        return {
+          calorias: acc.calorias + (meta.calorias ?? 0),
+          proteinaG: acc.proteinaG + (meta.proteinaG ?? 0),
+          gorduraG: acc.gorduraG + (meta.gorduraG ?? 0),
+          carboidratoG: acc.carboidratoG + (meta.carboidratoG ?? 0),
+        };
+      },
+      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+    );
   }
+
+  /**
+   * Meta de macros do dia pra esse grupo: se é manual, usa a composição salva (proteína/gordura/
+   * carboidrato explícitos daquele ajuste); se é automático, usa os padrões globais de proteína/
+   * gordura com o carboidrato calculado pra fechar a meta de calorias desse dia.
+   */
+  function metaMacrosDoGrupo(grupo: GrupoDias) {
+    if (grupo.manual) {
+      const dados = manuaisCompletos.get(grupo.dias[0]);
+      if (dados) return dados;
+    }
+    const proteinaG = proteinaGInput ?? 0;
+    const gorduraG = gorduraGInput ?? 0;
+    return { calorias: grupo.calorias, proteinaG, gorduraG, carboidratoG: carboidratoGDoDia(grupo.calorias, proteinaG, gorduraG) };
+  }
+
+  function pctMeta(valor: number, meta: number): number {
+    return meta > 0 ? Math.min(100, (valor / meta) * 100) : 0;
+  }
+
+  function restante(valor: number, meta: number): number {
+    return Math.max(0, meta - valor);
+  }
+
+  let modoRestanteRefeicoes = $state(false);
 
   async function carregar() {
     loading = true;
@@ -859,6 +896,8 @@
       <p class="muted">Nenhuma refeição cadastrada ainda.</p>
     {:else if modoCalorias === "ondulatoria"}
       {#each gruposDias as grupo (grupo.dias[0])}
+        {@const somaGrupo = somaMacrosInformados(grupo.dias[0])}
+        {@const metaGrupo = metaMacrosDoGrupo(grupo)}
         <div class="secao-dias-header">
           <div class="dias-lista secao-dias-lista">
             {#each grupo.dias as dia (dia)}
@@ -867,7 +906,7 @@
               </div>
             {/each}
           </div>
-          <span class="secao-dias-cal">{Math.round(somaCaloriasInformadas(grupo.dias[0]))} de {Math.round(grupo.calorias)} calorias</span>
+          <span class="secao-dias-cal">{Math.round(somaGrupo.calorias)} de {Math.round(grupo.calorias)} calorias</span>
         </div>
         <ul class="lista lista-dia">
           {#each modelos as m, i (m.id)}
@@ -895,6 +934,71 @@
             </li>
           {/each}
         </ul>
+
+        <div class="card-macros">
+          <button
+            type="button"
+            class="toggle-btn"
+            onclick={() => (modoRestanteRefeicoes = !modoRestanteRefeicoes)}
+            aria-label="Alternar exibição"
+          >
+            {@render iconToggle()}
+          </button>
+          <div class="macros-grid macros-grid-4">
+            <div class="macro-col">
+              <p class="macro-nome">Calorias</p>
+              <p class="macro-valor">
+                {#if modoRestanteRefeicoes}
+                  <strong>{restante(somaGrupo.calorias, metaGrupo.calorias).toFixed(0)}</strong> <span class="macro-meta">restantes</span>
+                {:else}
+                  <strong>{somaGrupo.calorias.toFixed(0)}</strong> <span class="macro-meta">/ {metaGrupo.calorias.toFixed(0)}</span>
+                {/if}
+              </p>
+              <div class="barra-wrap">
+                <div class="barra" style={`width:${pctMeta(somaGrupo.calorias, metaGrupo.calorias)}%; background:var(--color-secondary);`}></div>
+              </div>
+            </div>
+            <div class="macro-col">
+              <p class="macro-nome">Carb</p>
+              <p class="macro-valor">
+                {#if modoRestanteRefeicoes}
+                  <strong>{restante(somaGrupo.carboidratoG, metaGrupo.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                {:else}
+                  <strong>{somaGrupo.carboidratoG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGrupo.carboidratoG.toFixed(0)}</span>
+                {/if}
+              </p>
+              <div class="barra-wrap">
+                <div class="barra" style={`width:${pctMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG)}%; background:${COR_CARBO};`}></div>
+              </div>
+            </div>
+            <div class="macro-col">
+              <p class="macro-nome">Gorduras</p>
+              <p class="macro-valor">
+                {#if modoRestanteRefeicoes}
+                  <strong>{restante(somaGrupo.gorduraG, metaGrupo.gorduraG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                {:else}
+                  <strong>{somaGrupo.gorduraG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGrupo.gorduraG.toFixed(0)}</span>
+                {/if}
+              </p>
+              <div class="barra-wrap">
+                <div class="barra" style={`width:${pctMeta(somaGrupo.gorduraG, metaGrupo.gorduraG)}%; background:${COR_GORDURA};`}></div>
+              </div>
+            </div>
+            <div class="macro-col">
+              <p class="macro-nome">Proteínas</p>
+              <p class="macro-valor">
+                {#if modoRestanteRefeicoes}
+                  <strong>{restante(somaGrupo.proteinaG, metaGrupo.proteinaG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                {:else}
+                  <strong>{somaGrupo.proteinaG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGrupo.proteinaG.toFixed(0)}</span>
+                {/if}
+              </p>
+              <div class="barra-wrap">
+                <div class="barra" style={`width:${pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG)}%; background:${COR_PROTEINA};`}></div>
+              </div>
+            </div>
+          </div>
+        </div>
       {/each}
     {:else}
       <ul class="lista">
@@ -1405,6 +1509,65 @@
   .toggle-modo-btn svg {
     width: 20px;
     height: 20px;
+  }
+  .card-macros {
+    position: relative;
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-card);
+    margin-bottom: var(--space-4);
+  }
+  .toggle-btn {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .toggle-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .macros-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3);
+    padding-right: 32px;
+  }
+  .macros-grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .macro-nome {
+    margin: 0 0 var(--space-1);
+    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+  }
+  .macro-valor {
+    margin: 0 0 var(--space-2);
+    font-size: 12px;
+    color: var(--surface-fg);
+  }
+  .macro-meta {
+    color: var(--surface-muted);
+  }
+  .barra-wrap {
+    height: 8px;
+    background: var(--surface-border);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .barra {
+    height: 100%;
+    border-radius: 5px;
   }
   .dias-lista {
     display: flex;
