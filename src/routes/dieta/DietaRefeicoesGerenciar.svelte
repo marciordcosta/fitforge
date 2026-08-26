@@ -939,10 +939,6 @@
               </div>
             {/each}
           </div>
-          <span class="secao-dias-cal">{Math.round(somaGrupo.calorias)} de {Math.round(grupo.calorias)} calorias</span>
-        </div>
-
-        <div class="card-macros">
           <button
             type="button"
             class="toggle-btn"
@@ -951,6 +947,9 @@
           >
             {@render iconToggle()}
           </button>
+        </div>
+
+        <div class="card-macros">
           <div class="macros-grid macros-grid-4">
             <div class="macro-col">
               <p class="macro-nome">Calorias</p>
@@ -1536,7 +1535,6 @@
     height: 20px;
   }
   .card-macros {
-    position: relative;
     background: var(--surface-card);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
@@ -1544,9 +1542,7 @@
     margin-bottom: var(--space-4);
   }
   .toggle-btn {
-    position: absolute;
-    top: var(--space-3);
-    right: var(--space-3);
+    flex-shrink: 0;
     width: 28px;
     height: 28px;
     border-radius: 50%;
@@ -1566,7 +1562,6 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--space-3);
-    padding-right: 32px;
   }
   .macros-grid-4 {
     grid-template-columns: repeat(4, 1fr);
@@ -1668,11 +1663,6 @@
   }
   .secao-dias-lista .dia-card {
     cursor: default;
-  }
-  .secao-dias-cal {
-    flex-shrink: 0;
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
   }
   .dias-acoes {
     display: flex;
