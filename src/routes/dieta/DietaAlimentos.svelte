@@ -13,7 +13,7 @@
     type Alimento,
     type ReceitaResumo,
   } from "../../lib/dietaApi";
-  import { receitaRascunho, adicionarAoRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
+  import { receitaRascunho, adicionarAoRascunho, definirContexto, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
@@ -116,7 +116,7 @@
       if (receitaIdExistente) {
         navigate(`/dieta/receitas/ver/${receitaIdExistente}`);
       } else {
-        navigate(receitaRascunho.metaParaModeloId ? `/dieta/receitas/nova/meta/${receitaRascunho.metaParaModeloId}` : "/dieta/receitas/nova");
+        navigate(urlNovaReceitaMeta());
       }
     } else if (refeicaoId) {
       navigate(`/dieta/refeicao/${refeicaoId}`);

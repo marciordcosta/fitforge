@@ -329,6 +329,48 @@ export async function vincularMetaReceita(modeloId: string, receitaId: string): 
   if (error) throw error;
 }
 
+/** Meta de macros/calorias de uma refeição do catálogo específica de um dia da semana (modo Ondulatória). */
+export interface MetaDiaModelo {
+  modeloId: string;
+  diaSemana: number;
+  metaReceitaId: string;
+  metaCalorias: number;
+  metaProteinaG: number;
+  metaGorduraG: number;
+  metaCarboidratoG: number;
+}
+
+const META_DIA_MODELO_SELECT =
+  "modelo_id, dia_semana, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g)))";
+
+/** Todas as metas por dia já configuradas (qualquer refeição, qualquer dia) — ausência de linha pra um (modelo, dia) usa o meta_receita_id global como fallback. */
+export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
+  const { data, error } = await supabase.from("dieta_refeicoes_modelo_meta_dia").select(META_DIA_MODELO_SELECT);
+  if (error) throw error;
+  return (data ?? []).map((l) => {
+    const linha = l as Record<string, unknown>;
+    const metaReceita = linha.meta_receita as { itens: ItemReceitaBruto[] } | null;
+    const totais = somarTotaisItensReceita(metaReceita?.itens ?? []);
+    return {
+      modeloId: linha.modelo_id as string,
+      diaSemana: linha.dia_semana as number,
+      metaReceitaId: linha.meta_receita_id as string,
+      metaCalorias: round1(totais.calorias),
+      metaProteinaG: round1(totais.proteinaG),
+      metaGorduraG: round1(totais.gorduraG),
+      metaCarboidratoG: round1(totais.carboidratoG),
+    };
+  });
+}
+
+export async function vincularMetaReceitaDia(modeloId: string, diaSemana: number, receitaId: string): Promise<void> {
+  const { error } = await supabase.from("dieta_refeicoes_modelo_meta_dia").upsert(
+    { user_id: uid(), modelo_id: modeloId, dia_semana: diaSemana, meta_receita_id: receitaId, updated_at: new Date().toISOString() },
+    { onConflict: "user_id,modelo_id,dia_semana" },
+  );
+  if (error) throw error;
+}
+
 export async function criarRefeicaoModelo(nome: string): Promise<string> {
   const { count, error: erroCount } = await supabase
     .from("dieta_refeicoes_modelo")

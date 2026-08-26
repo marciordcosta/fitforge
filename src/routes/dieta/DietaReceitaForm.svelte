@@ -1,13 +1,16 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { navigate } from "../../lib/router.svelte";
-  import { criarReceita, vincularMetaReceita, getMetasDiarias, type MetasDiarias } from "../../lib/dietaApi";
+  import { criarReceita, vincularMetaReceita, vincularMetaReceitaDia, getMetasDiarias, type MetasDiarias } from "../../lib/dietaApi";
   import { receitaRascunho, removerDoRascunho, limparRascunho, type ItemRascunho } from "../../lib/receitaRascunho.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
 
-  let { metaParaModeloId }: { metaParaModeloId?: string } = $props();
+  let { metaParaModeloId, metaParaDiaSemana }: { metaParaModeloId?: string; metaParaDiaSemana?: number } = $props();
 
-  untrack(() => (receitaRascunho.metaParaModeloId = metaParaModeloId ?? null));
+  untrack(() => {
+    receitaRascunho.metaParaModeloId = metaParaModeloId ?? null;
+    receitaRascunho.metaParaDiaSemana = metaParaDiaSemana ?? null;
+  });
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -74,7 +77,11 @@
         receitaRascunho.itens.map((i) => ({ alimentoId: i.alimento.id, quantidade: i.quantidade })),
       );
       if (metaParaModeloId) {
-        await vincularMetaReceita(metaParaModeloId, novoId);
+        if (metaParaDiaSemana != null) {
+          await vincularMetaReceitaDia(metaParaModeloId, metaParaDiaSemana, novoId);
+        } else {
+          await vincularMetaReceita(metaParaModeloId, novoId);
+        }
       }
       limparRascunho();
       navigate(metaParaModeloId ? "/dieta/refeicoes/gerenciar" : "/dieta/receitas");

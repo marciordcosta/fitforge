@@ -21,7 +21,7 @@
     type MetasDiarias,
     type RefeicaoDia,
   } from "../../lib/dietaApi";
-  import { receitaRascunho, adicionarAoRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
+  import { receitaRascunho, adicionarAoRascunho, definirContexto, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
 
   let {
     alimentoId,
@@ -167,7 +167,7 @@
   function destinoVoltar(): string {
     if (modoReceita) {
       if (receitaIdExistente) return `/dieta/receitas/ver/${receitaIdExistente}`;
-      return receitaRascunho.metaParaModeloId ? `/dieta/receitas/nova/meta/${receitaRascunho.metaParaModeloId}` : "/dieta/receitas/nova";
+      return urlNovaReceitaMeta();
     }
     if (refeicao) return `/dieta/refeicao/${refeicao.id}`;
     return "/dieta";

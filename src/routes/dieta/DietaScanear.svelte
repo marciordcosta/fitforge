@@ -5,7 +5,7 @@
   import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
   import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts } from "../../lib/dietaApi";
   import { buscarProdutoPorCodigoBarras } from "../../lib/openFoodFacts";
-  import { receitaRascunho } from "../../lib/receitaRascunho.svelte";
+  import { receitaRascunho, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
   import Button from "../../components/Button.svelte";
   import Sheet from "../../components/Sheet.svelte";
 
@@ -106,7 +106,7 @@
       if (receitaIdExistente) {
         navigate(`/dieta/receitas/ver/${receitaIdExistente}`);
       } else {
-        navigate(receitaRascunho.metaParaModeloId ? `/dieta/receitas/nova/meta/${receitaRascunho.metaParaModeloId}` : "/dieta/receitas/nova");
+        navigate(urlNovaReceitaMeta());
       }
     } else if (refeicaoId) {
       navigate(`/dieta/refeicao/${refeicaoId}`);

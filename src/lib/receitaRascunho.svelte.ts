@@ -18,6 +18,8 @@ export const receitaRascunho = $state({
   contexto: null as string | null,
   /** Se o rascunho em andamento, ao ser salvo, deve virar a meta dessa refeição do catálogo. */
   metaParaModeloId: null as string | null,
+  /** Se informado junto de metaParaModeloId, vincula como meta só desse dia da semana (modo Ondulatória) em vez da meta global. */
+  metaParaDiaSemana: null as number | null,
 });
 
 export function definirContexto(contexto: string) {
@@ -36,9 +38,17 @@ export function removerDoRascunho(index: number) {
   receitaRascunho.itens.splice(index, 1);
 }
 
+/** Destino de "Nova Refeição" pro rascunho atual — inclui o modeloId/dia da meta em andamento, se houver. */
+export function urlNovaReceitaMeta(): string {
+  if (!receitaRascunho.metaParaModeloId) return "/dieta/receitas/nova";
+  const dia = receitaRascunho.metaParaDiaSemana != null ? `/${receitaRascunho.metaParaDiaSemana}` : "";
+  return `/dieta/receitas/nova/meta/${receitaRascunho.metaParaModeloId}${dia}`;
+}
+
 export function limparRascunho() {
   receitaRascunho.nome = "";
   receitaRascunho.itens = [];
   receitaRascunho.contexto = null;
   receitaRascunho.metaParaModeloId = null;
+  receitaRascunho.metaParaDiaSemana = null;
 }

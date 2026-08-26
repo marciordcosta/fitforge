@@ -32,12 +32,16 @@
   <DietaAlimentos modoReceita={true} receitaIdExistente={segmentos[2]} />
 {:else if segmentos[0] === "alimentos"}
   <DietaAlimentos />
+{:else if segmentos[0] === "receitas" && segmentos[1] === "nova" && segmentos[2] === "meta" && segmentos[3] && segmentos[4]}
+  <DietaReceitaForm metaParaModeloId={segmentos[3]} metaParaDiaSemana={Number(segmentos[4])} />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "nova" && segmentos[2] === "meta" && segmentos[3]}
   <DietaReceitaForm metaParaModeloId={segmentos[3]} />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "nova"}
   <DietaReceitaForm />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "ver" && segmentos[2]}
   <DietaReceitaVisualizar receitaId={segmentos[2]} />
+{:else if segmentos[0] === "receitas" && segmentos[1] === "buscar" && segmentos[2] === "meta" && segmentos[3] && segmentos[5]}
+  <DietaReceitas metaParaModeloId={segmentos[3]} nomeInicial={decodeURIComponent(segmentos[4] ?? "")} metaParaDiaSemana={Number(segmentos[5])} />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "buscar" && segmentos[2] === "meta" && segmentos[3]}
   <DietaReceitas metaParaModeloId={segmentos[3]} nomeInicial={decodeURIComponent(segmentos[4] ?? "")} />
 {:else if segmentos[0] === "receitas"}

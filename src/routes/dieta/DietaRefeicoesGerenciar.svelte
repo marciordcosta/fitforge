@@ -19,9 +19,11 @@
     definirModoCalorias,
     definirCaloriasDias,
     removerCaloriasDia,
+    listMetasDiaModelo,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
+    type MetaDiaModelo,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
@@ -146,8 +148,24 @@
     alterarModoCalorias(modoCalorias === "fixa" ? "ondulatoria" : "fixa");
   }
 
+  /**
+   * Um dia já configurado (manual) não pode entrar numa seleção nova pra definir outra meta —
+   * primeiro precisa ser removido. Tocar num dia manual só permite selecioná-lo sozinho (pra
+   * oferecer "Remover ajuste"); tocar num dia automático enquanto um manual estava selecionado
+   * começa uma seleção nova do zero.
+   */
   function toggleDiaSelecionado(dia: number) {
-    const novo = new Set(diasSelecionados);
+    const ehManual = diasResolvidos.find((d) => d.diaSemana === dia)?.manual ?? false;
+
+    if (ehManual) {
+      diasSelecionados = diasSelecionados.size === 1 && diasSelecionados.has(dia) ? new Set() : new Set([dia]);
+      return;
+    }
+
+    const selecaoTinhaManual = [...diasSelecionados].some(
+      (d) => diasResolvidos.find((r) => r.diaSemana === d)?.manual,
+    );
+    const novo = selecaoTinhaManual ? new Set<number>() : new Set(diasSelecionados);
     if (novo.has(dia)) novo.delete(dia);
     else novo.add(dia);
     diasSelecionados = novo;
@@ -394,6 +412,7 @@
   }
 
   let modelos = $state<RefeicaoModelo[]>([]);
+  let metasDiaModelo = $state<MetaDiaModelo[]>([]);
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let mostrarForm = $state(false);
@@ -403,17 +422,45 @@
   let excluindo = $state(false);
 
   let itemRefs: (HTMLLIElement | null)[] = [];
+  let itemRefsDia: (HTMLLIElement | null)[][] = [[], [], [], [], [], [], []];
+  /** null = arrastando na lista única (Fixa); número = arrastando dentro da seção desse dia (Ondulatória). */
+  let arrastandoDia = $state<number | null>(null);
   let arrastandoIndex = $state<number | null>(null);
   let arrastarOffsetY = $state(0);
   let alturaLinha = 0;
   let startY = 0;
   let ordemMudou = false;
 
+  const metaDiaMap = $derived(new Map(metasDiaModelo.map((md) => [`${md.modeloId}:${md.diaSemana}`, md])));
+
+  interface MetaEfetiva {
+    receitaId: string | null;
+    calorias: number | null;
+    proteinaG: number | null;
+    gorduraG: number | null;
+    carboidratoG: number | null;
+  }
+
+  /** Meta de uma refeição do catálogo num dia específico — usa o override daquele dia se houver, senão cai pra meta global (m). */
+  function metaEfetivaDoDia(m: RefeicaoModelo, dia: number): MetaEfetiva {
+    const override = metaDiaMap.get(`${m.id}:${dia}`);
+    if (override) {
+      return {
+        receitaId: override.metaReceitaId,
+        calorias: override.metaCalorias,
+        proteinaG: override.metaProteinaG,
+        gorduraG: override.metaGorduraG,
+        carboidratoG: override.metaCarboidratoG,
+      };
+    }
+    return { receitaId: m.metaReceitaId, calorias: m.metaCalorias, proteinaG: m.metaProteinaG, gorduraG: m.metaGorduraG, carboidratoG: m.metaCarboidratoG };
+  }
+
   async function carregar() {
     loading = true;
     erro = null;
     try {
-      modelos = await listRefeicoesModelo();
+      [modelos, metasDiaModelo] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo()]);
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -432,12 +479,18 @@
     return caloriasCalc > 0 ? Math.round((calorias / caloriasCalc) * 100) : 0;
   }
 
-  function abrirMeta(m: RefeicaoModelo) {
-    if (m.metaReceitaId) {
-      navigate(`/dieta/receitas/ver/${m.metaReceitaId}`);
+  function pctDeDia(calorias: number, diaCalorias: number): number {
+    return diaCalorias > 0 ? Math.round((calorias / diaCalorias) * 100) : 0;
+  }
+
+  function abrirMeta(m: RefeicaoModelo, diaSemana?: number) {
+    const receitaId = diaSemana != null ? metaEfetivaDoDia(m, diaSemana).receitaId : m.metaReceitaId;
+    if (receitaId) {
+      navigate(`/dieta/receitas/ver/${receitaId}`);
       return;
     }
-    navigate(`/dieta/receitas/buscar/meta/${m.id}/${encodeURIComponent(m.nome)}`);
+    const diaSeg = diaSemana != null ? `/${diaSemana}` : "";
+    navigate(`/dieta/receitas/buscar/meta/${m.id}/${encodeURIComponent(m.nome)}${diaSeg}`);
   }
 
   async function salvar() {
@@ -468,12 +521,13 @@
     }
   }
 
-  function aoPointerDownHandle(e: PointerEvent, index: number) {
+  function aoPointerDownHandle(e: PointerEvent, index: number, dia: number | null = null) {
     e.preventDefault();
-    const el = itemRefs[index];
+    const el = dia == null ? itemRefs[index] : itemRefsDia[dia][index];
     if (!el) return;
     alturaLinha = el.getBoundingClientRect().height;
     startY = e.clientY;
+    arrastandoDia = dia;
     arrastandoIndex = index;
     arrastarOffsetY = 0;
     ordemMudou = false;
@@ -504,6 +558,7 @@
   async function aoPointerUp() {
     window.removeEventListener("pointermove", aoPointerMove);
     window.removeEventListener("pointerup", aoPointerUp);
+    arrastandoDia = null;
     arrastandoIndex = null;
     arrastarOffsetY = 0;
     if (!ordemMudou) return;
@@ -671,14 +726,14 @@
         </div>
 
         {#if diasSelecionados.size > 0}
+          {@const diaManual = diasSelecionados.size === 1 ? diasResolvidos.find((d) => diasSelecionados.has(d.diaSemana) && d.manual) : undefined}
           <div class="dias-acoes">
-            <Button onclick={abrirDefinirCalorias}>
-              Definir calorias pra {diasSelecionados.size} {diasSelecionados.size === 1 ? "dia" : "dias"}
-            </Button>
-            {#if diasSelecionados.size === 1 && diasResolvidos.find((d) => diasSelecionados.has(d.diaSemana))?.manual}
-              <button type="button" class="link-remover" onclick={() => removerAjusteDia([...diasSelecionados][0])}>
-                Remover ajuste
-              </button>
+            {#if diaManual}
+              <Button onclick={() => removerAjusteDia(diaManual.diaSemana)}>Remover ajuste</Button>
+            {:else}
+              <Button onclick={abrirDefinirCalorias}>
+                Definir calorias pra {diasSelecionados.size} {diasSelecionados.size === 1 ? "dia" : "dias"}
+              </Button>
             {/if}
           </div>
         {/if}
@@ -701,14 +756,48 @@
       <p class="erro">Erro ao carregar refeições: {erro}</p>
     {:else if !modelos.length}
       <p class="muted">Nenhuma refeição cadastrada ainda.</p>
+    {:else if modoCalorias === "ondulatoria"}
+      {#each diasResolvidos as dia (dia.diaSemana)}
+        {@const corDia = corDoDia(dia)}
+        <div class="dia-card dia-secao-header" class:colorido={corDia != null} style={corDia ? `background:${corDia}; border-color:${corDia};` : ""}>
+          <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia.diaSemana]}</span>
+          <span class="dia-card-cal">{Math.round(dia.calorias)}</span>
+        </div>
+        <ul class="lista lista-dia">
+          {#each modelos as m, i (m.id)}
+            {@const meta = metaEfetivaDoDia(m, dia.diaSemana)}
+            <li
+              class="linha"
+              class:arrastando={arrastandoDia === dia.diaSemana && arrastandoIndex === i}
+              bind:this={itemRefsDia[dia.diaSemana][i]}
+              style={arrastandoDia === dia.diaSemana && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
+            >
+              <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, dia.diaSemana)} aria-label="Reordenar">
+                {@render iconArrastar()}
+              </button>
+              <button class="nome-btn" onclick={() => abrirMeta(m, dia.diaSemana)}>
+                <span class="nome-linha">
+                  <span class="nome">{m.nome}</span>
+                  {#if meta.calorias != null}<span class="nome-cal">{Math.round(meta.calorias)} cal</span>{/if}
+                </span>
+                <span class="nome-macros" class:invisivel={meta.calorias == null}>
+                  <span>carb {(meta.carboidratoG ?? 0).toFixed(0)}g · gord {(meta.gorduraG ?? 0).toFixed(0)}g · prot {(meta.proteinaG ?? 0).toFixed(0)}g</span>
+                  <span class="nome-pct">{pctDeDia(meta.calorias ?? 0, dia.calorias)}%</span>
+                </span>
+              </button>
+              <button class="remover-btn" onclick={() => (paraExcluir = m)} aria-label={`Remover ${m.nome}`}>✕</button>
+            </li>
+          {/each}
+        </ul>
+      {/each}
     {:else}
       <ul class="lista">
         {#each modelos as m, i (m.id)}
           <li
             class="linha"
-            class:arrastando={arrastandoIndex === i}
+            class:arrastando={arrastandoDia === null && arrastandoIndex === i}
             bind:this={itemRefs[i]}
-            style={arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
+            style={arrastandoDia === null && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
           >
             <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
               {@render iconArrastar()}
@@ -1177,19 +1266,22 @@
     font-size: 12px;
     opacity: 0.8;
   }
+  .dia-secao-header {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    min-width: 0;
+    cursor: default;
+    margin: var(--space-5) 0 var(--space-2);
+  }
+  .dia-secao-header .dia-card-nome {
+    font-size: var(--font-size-base);
+  }
   .dias-acoes {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
     margin-bottom: var(--space-3);
   }
-  .link-remover {
-    background: none;
-    border: none;
-    color: var(--color-danger);
-    font-size: var(--font-size-sm);
-    text-align: center;
-    cursor: pointer;
-    padding: var(--space-1);
-  }
+
 </style>

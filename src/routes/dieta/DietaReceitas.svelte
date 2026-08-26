@@ -1,9 +1,13 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
-  import { buscarReceitas, listReceitas, vincularMetaReceita, type ReceitaResumo } from "../../lib/dietaApi";
+  import { buscarReceitas, listReceitas, vincularMetaReceita, vincularMetaReceitaDia, type ReceitaResumo } from "../../lib/dietaApi";
   import { receitaRascunho, limparRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
 
-  let { metaParaModeloId, nomeInicial }: { metaParaModeloId?: string; nomeInicial?: string } = $props();
+  let {
+    metaParaModeloId,
+    nomeInicial,
+    metaParaDiaSemana,
+  }: { metaParaModeloId?: string; nomeInicial?: string; metaParaDiaSemana?: number } = $props();
 
   let receitas = $state<ReceitaResumo[]>([]);
   let loading = $state(true);
@@ -19,7 +23,8 @@
     if (metaParaModeloId && nomeInicial) {
       receitaRascunho.nome = nomeInicial;
     }
-    navigate(metaParaModeloId ? `/dieta/receitas/nova/meta/${metaParaModeloId}` : "/dieta/receitas/nova");
+    const diaSeg = metaParaDiaSemana != null ? `/${metaParaDiaSemana}` : "";
+    navigate(metaParaModeloId ? `/dieta/receitas/nova/meta/${metaParaModeloId}${diaSeg}` : "/dieta/receitas/nova");
   }
 
   async function selecionar(r: ReceitaResumo) {
@@ -29,7 +34,11 @@
     }
     vinculando = r.id;
     try {
-      await vincularMetaReceita(metaParaModeloId, r.id);
+      if (metaParaDiaSemana != null) {
+        await vincularMetaReceitaDia(metaParaModeloId, metaParaDiaSemana, r.id);
+      } else {
+        await vincularMetaReceita(metaParaModeloId, r.id);
+      }
       navigate("/dieta/refeicoes/gerenciar");
     } catch (err) {
       alert("Erro ao vincular refeição: " + (err as Error).message);
