@@ -3,6 +3,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
+  import WheelPickerMacros from "../../components/WheelPickerMacros.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import {
     listRefeicoesModelo,
@@ -78,15 +79,8 @@
   function gKgGrupo(gramas: number): string {
     return pesoAtual > 0 ? (gramas / pesoAtual).toFixed(2) : "0.00";
   }
-  type CampoMacroGrupo =
-    | "calorias"
-    | "proteina"
-    | "gordura"
-    | "carboidrato"
-    | "proteinaGKg"
-    | "gorduraGKg"
-    | "carboidratoGKg";
-  let campoEditandoGrupo = $state<CampoMacroGrupo | null>(null);
+  let campoEditandoGrupo = $state<"calorias" | null>(null);
+  let mostrarMacrosGrupo = $state(false);
 
   /** Calorias só de proteína+gordura — piso do total ao editar calorias manualmente (carboidrato não pode ficar negativo). */
   const caloriasGrupoMin = $derived(Math.round(4 * grupoProteinaG + 9 * grupoGorduraG));
@@ -276,60 +270,29 @@
     mostrarDefinirCalorias = true;
   }
 
-  function infoCampoGrupo(campo: CampoMacroGrupo) {
-    switch (campo) {
-      case "calorias":
-        return {
-          titulo: "Calorias (kcal)",
-          opcoes: opcoesCaloriasGrupo(),
-          valorAtual: caloriasGrupoCalc,
-          onSelecionar: (v: number) => {
-            grupoCarboidratoG = Math.max(0, Math.round((v - 4 * grupoProteinaG - 9 * grupoGorduraG) / 4));
-          },
-        };
-      case "proteina":
-        return {
-          titulo: "Proteína (g)",
-          opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max),
-          valorAtual: grupoProteinaG,
-          onSelecionar: (v: number) => (grupoProteinaG = v),
-        };
-      case "gordura":
-        return {
-          titulo: "Gordura (g)",
-          opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max),
-          valorAtual: grupoGorduraG,
-          onSelecionar: (v: number) => (grupoGorduraG = v),
-        };
-      case "carboidrato":
-        return {
-          titulo: "Carboidrato (g)",
-          opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max),
-          valorAtual: grupoCarboidratoG,
-          onSelecionar: (v: number) => (grupoCarboidratoG = v),
-        };
-      case "proteinaGKg":
-        return {
-          titulo: "Proteína (g/kg)",
-          opcoes: opcoesGKg(parametro("proteina").min, parametro("proteina").max),
-          valorAtual: pesoAtual > 0 ? Math.round((grupoProteinaG / pesoAtual) * 100) / 100 : 0,
-          onSelecionar: (v: number) => (grupoProteinaG = Math.round(v * pesoAtual)),
-        };
-      case "gorduraGKg":
-        return {
-          titulo: "Gordura (g/kg)",
-          opcoes: opcoesGKg(parametro("gordura").min, parametro("gordura").max),
-          valorAtual: pesoAtual > 0 ? Math.round((grupoGorduraG / pesoAtual) * 100) / 100 : 0,
-          onSelecionar: (v: number) => (grupoGorduraG = Math.round(v * pesoAtual)),
-        };
-      case "carboidratoGKg":
-        return {
-          titulo: "Carboidrato (g/kg)",
-          opcoes: opcoesGKg(parametro("carboidrato").min, parametro("carboidrato").max),
-          valorAtual: pesoAtual > 0 ? Math.round((grupoCarboidratoG / pesoAtual) * 100) / 100 : 0,
-          onSelecionar: (v: number) => (grupoCarboidratoG = Math.round(v * pesoAtual)),
-        };
-    }
+  function infoCampoGrupo(campo: "calorias") {
+    return {
+      titulo: "Calorias (kcal)",
+      opcoes: opcoesCaloriasGrupo(),
+      valorAtual: caloriasGrupoCalc,
+      onSelecionar: (v: number) => {
+        grupoCarboidratoG = Math.max(0, Math.round((v - 4 * grupoProteinaG - 9 * grupoGorduraG) / 4));
+      },
+    };
+  }
+
+  function colunasMacrosGrupo() {
+    return [
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: grupoCarboidratoG, kcalPorGrama: 4 },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max), valorAtual: grupoGorduraG, kcalPorGrama: 9 },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max), valorAtual: grupoProteinaG, kcalPorGrama: 4 },
+    ];
+  }
+
+  function confirmarMacrosGrupo(valores: Record<string, number>) {
+    grupoCarboidratoG = valores.carboidratoG;
+    grupoGorduraG = valores.gorduraG;
+    grupoProteinaG = valores.proteinaG;
   }
 
   async function confirmarCaloriasGrupo() {
@@ -379,30 +342,6 @@
     caloriasInput = caloriasCalc;
   }
 
-  function aoEditarProteinaGKg() {
-    proteinaGInput = Math.round(proteinaGKg * pesoAtual);
-    recalcularCaloriasDosMacros();
-  }
-  function aoEditarProteinaGramas() {
-    proteinaGKg = pesoAtual > 0 ? Math.round(((proteinaGInput ?? 0) / pesoAtual) * 100) / 100 : 0;
-    recalcularCaloriasDosMacros();
-  }
-  function aoEditarGorduraGKg() {
-    gorduraGInput = Math.round(gorduraGKg * pesoAtual);
-    recalcularCaloriasDosMacros();
-  }
-  function aoEditarGorduraGramas() {
-    gorduraGKg = pesoAtual > 0 ? Math.round(((gorduraGInput ?? 0) / pesoAtual) * 100) / 100 : 0;
-    recalcularCaloriasDosMacros();
-  }
-  function aoEditarCarboidratoGKg() {
-    carboidratoGInput = Math.round(carboidratoGKg * pesoAtual);
-    recalcularCaloriasDosMacros();
-  }
-  function aoEditarCarboidratoGramas() {
-    carboidratoGKg = pesoAtual > 0 ? Math.round(((carboidratoGInput ?? 0) / pesoAtual) * 100) / 100 : 0;
-    recalcularCaloriasDosMacros();
-  }
   function aoEditarCalorias() {
     if (caloriasInput == null) return;
     const novoCarboG = Math.max(0, Math.round((caloriasInput - 4 * (proteinaGInput ?? 0) - 9 * (gorduraGInput ?? 0)) / 4));
@@ -410,23 +349,25 @@
     carboidratoGKg = pesoAtual > 0 ? Math.round((novoCarboG / pesoAtual) * 100) / 100 : 0;
   }
 
-  type CampoMacro =
-    | "calorias"
-    | "proteinaGKg"
-    | "proteinaG"
-    | "gorduraGKg"
-    | "gorduraG"
-    | "carboidratoGKg"
-    | "carboidratoG";
-  let campoEditando = $state<CampoMacro | null>(null);
+  let campoEditando = $state<"calorias" | null>(null);
+  let mostrarMacros = $state(false);
 
-  function opcoesGKg(min: number, max: number): { valor: number; label: string }[] {
-    const opcoes: { valor: number; label: string }[] = [];
-    for (let v = Math.round(min * 100); v <= Math.round(max * 100); v += 1) {
-      const valor = v / 100;
-      opcoes.push({ valor, label: valor.toFixed(2).replace(".", ",") });
-    }
-    return opcoes;
+  function colunasMacros() {
+    return [
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: carboidratoGInput ?? 0, kcalPorGrama: 4 },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max), valorAtual: gorduraGInput ?? 0, kcalPorGrama: 9 },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max), valorAtual: proteinaGInput ?? 0, kcalPorGrama: 4 },
+    ];
+  }
+
+  function confirmarMacros(valores: Record<string, number>) {
+    carboidratoGInput = valores.carboidratoG;
+    gorduraGInput = valores.gorduraG;
+    proteinaGInput = valores.proteinaG;
+    carboidratoGKg = pesoAtual > 0 ? Math.round((carboidratoGInput / pesoAtual) * 100) / 100 : 0;
+    gorduraGKg = pesoAtual > 0 ? Math.round((gorduraGInput / pesoAtual) * 100) / 100 : 0;
+    proteinaGKg = pesoAtual > 0 ? Math.round((proteinaGInput / pesoAtual) * 100) / 100 : 0;
+    recalcularCaloriasDosMacros();
   }
 
   function opcoesGramas(minGKg: number, maxGKg: number): { valor: number; label: string }[] {
@@ -443,79 +384,16 @@
     return opcoes;
   }
 
-  function infoCampo(campo: CampoMacro) {
-    switch (campo) {
-      case "calorias":
-        return {
-          titulo: "Calorias (kcal)",
-          opcoes: opcoesCalorias(),
-          valorAtual: Math.round((caloriasInput ?? caloriasCalc) / 10) * 10,
-          onSelecionar: (v: number) => {
-            caloriasInput = v;
-            aoEditarCalorias();
-          },
-        };
-      case "proteinaGKg":
-        return {
-          titulo: "Proteína (g/kg)",
-          opcoes: opcoesGKg(parametro("proteina").min, parametro("proteina").max),
-          valorAtual: proteinaGKg,
-          onSelecionar: (v: number) => {
-            proteinaGKg = v;
-            aoEditarProteinaGKg();
-          },
-        };
-      case "proteinaG":
-        return {
-          titulo: "Proteína (g)",
-          opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max),
-          valorAtual: proteinaGInput ?? 0,
-          onSelecionar: (v: number) => {
-            proteinaGInput = v;
-            aoEditarProteinaGramas();
-          },
-        };
-      case "gorduraGKg":
-        return {
-          titulo: "Gordura (g/kg)",
-          opcoes: opcoesGKg(parametro("gordura").min, parametro("gordura").max),
-          valorAtual: gorduraGKg,
-          onSelecionar: (v: number) => {
-            gorduraGKg = v;
-            aoEditarGorduraGKg();
-          },
-        };
-      case "gorduraG":
-        return {
-          titulo: "Gordura (g)",
-          opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max),
-          valorAtual: gorduraGInput ?? 0,
-          onSelecionar: (v: number) => {
-            gorduraGInput = v;
-            aoEditarGorduraGramas();
-          },
-        };
-      case "carboidratoGKg":
-        return {
-          titulo: "Carboidrato (g/kg)",
-          opcoes: opcoesGKg(parametro("carboidrato").min, parametro("carboidrato").max),
-          valorAtual: carboidratoGKg,
-          onSelecionar: (v: number) => {
-            carboidratoGKg = v;
-            aoEditarCarboidratoGKg();
-          },
-        };
-      case "carboidratoG":
-        return {
-          titulo: "Carboidrato (g)",
-          opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max),
-          valorAtual: carboidratoGInput ?? 0,
-          onSelecionar: (v: number) => {
-            carboidratoGInput = v;
-            aoEditarCarboidratoGramas();
-          },
-        };
-    }
+  function infoCampo(campo: "calorias") {
+    return {
+      titulo: "Calorias (kcal)",
+      opcoes: opcoesCalorias(),
+      valorAtual: Math.round((caloriasInput ?? caloriasCalc) / 10) * 10,
+      onSelecionar: (v: number) => {
+        caloriasInput = v;
+        aoEditarCalorias();
+      },
+    };
   }
 
   async function salvarCalorias() {
@@ -898,17 +776,17 @@
           </div>
         </button>
         <div class="resumo-macros">
-          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "carboidratoG")}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
             <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarboidrato.toFixed(0)}%</strong>
             <span class="valor-g">{carboidratoGInput ?? 0} g</span>
             <span class="rotulo-macro">Carb</span>
           </button>
-          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "gorduraG")}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
             <strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong>
             <span class="valor-g">{gorduraGInput ?? 0} g</span>
             <span class="rotulo-macro">Gorduras</span>
           </button>
-          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "proteinaG")}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
             <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
             <span class="valor-g">{proteinaGInput ?? 0} g</span>
             <span class="rotulo-macro">Proteínas</span>
@@ -921,19 +799,19 @@
         <div class="tabela-macros">
           <div class="tabela-linha">
             <span class="tabela-rotulo">Proteína</span>
-            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "proteinaGKg")}>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
               {proteinaGKg.toFixed(2)}
             </button>
           </div>
           <div class="tabela-linha">
             <span class="tabela-rotulo">Gordura</span>
-            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "gorduraGKg")}>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
               {gorduraGKg.toFixed(2)}
             </button>
           </div>
           <div class="tabela-linha">
             <span class="tabela-rotulo">Carboidrato</span>
-            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (campoEditando = "carboidratoGKg")}>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
               {carboidratoGKg.toFixed(2)}
             </button>
           </div>
@@ -948,6 +826,15 @@
           valorAtual={info.valorAtual}
           onSelecionar={info.onSelecionar}
           onFechar={() => (campoEditando = null)}
+        />
+      {/if}
+
+      {#if mostrarMacros}
+        <WheelPickerMacros
+          titulo="Ajustar Macros"
+          colunas={colunasMacros()}
+          onSelecionar={confirmarMacros}
+          onFechar={() => (mostrarMacros = false)}
         />
       {/if}
 
@@ -1222,24 +1109,33 @@
       </div>
       <div class="tabela-linha tabela-linha-3col">
         <span class="tabela-rotulo">Proteína</span>
-        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (campoEditandoGrupo = "proteinaGKg")}>{gKgGrupo(grupoProteinaG)} g/kg</button>
-        <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "proteina")}>{grupoProteinaG} g</button>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (mostrarMacrosGrupo = true)}>{gKgGrupo(grupoProteinaG)} g/kg</button>
+        <button type="button" class="tabela-input" onclick={() => (mostrarMacrosGrupo = true)}>{grupoProteinaG} g</button>
       </div>
       <div class="tabela-linha tabela-linha-3col">
         <span class="tabela-rotulo">Gordura</span>
-        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (campoEditandoGrupo = "gorduraGKg")}>{gKgGrupo(grupoGorduraG)} g/kg</button>
-        <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "gordura")}>{grupoGorduraG} g</button>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (mostrarMacrosGrupo = true)}>{gKgGrupo(grupoGorduraG)} g/kg</button>
+        <button type="button" class="tabela-input" onclick={() => (mostrarMacrosGrupo = true)}>{grupoGorduraG} g</button>
       </div>
       <div class="tabela-linha tabela-linha-3col">
         <span class="tabela-rotulo">Carboidrato</span>
-        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (campoEditandoGrupo = "carboidratoGKg")}>{gKgGrupo(grupoCarboidratoG)} g/kg</button>
-        <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "carboidrato")}>{grupoCarboidratoG} g</button>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (mostrarMacrosGrupo = true)}>{gKgGrupo(grupoCarboidratoG)} g/kg</button>
+        <button type="button" class="tabela-input" onclick={() => (mostrarMacrosGrupo = true)}>{grupoCarboidratoG} g</button>
       </div>
     </div>
     <Button onclick={confirmarCaloriasGrupo} disabled={salvandoDistribuicao || caloriasGrupoCalc <= 0}>
       Salvar
     </Button>
   </Sheet>
+{/if}
+
+{#if mostrarMacrosGrupo}
+  <WheelPickerMacros
+    titulo="Ajustar Macros"
+    colunas={colunasMacrosGrupo()}
+    onSelecionar={confirmarMacrosGrupo}
+    onFechar={() => (mostrarMacrosGrupo = false)}
+  />
 {/if}
 
 {#if mostrarAdicionarDiaGrupo}
