@@ -1193,7 +1193,7 @@
   }
   .separador {
     border-top: 1px solid var(--surface-border);
-    margin: var(--space-2) 0 var(--space-4);
+    margin: 0 0 var(--space-4);
   }
   .nutrientes-titulo {
     font-weight: 600;
@@ -1202,7 +1202,7 @@
   .nutrientes-lista {
     display: flex;
     flex-direction: column;
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-1);
   }
   .nutriente-item {
     display: flex;
