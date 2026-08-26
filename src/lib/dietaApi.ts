@@ -706,25 +706,29 @@ export async function getMetasDiarias(): Promise<MetasDiarias> {
   };
 }
 
-// ---------------- Parâmetros (min/máx por kg de peso, editáveis em Parametrização) ----------------
+// ---------------- Parâmetros (min/máx editáveis em Parametrização, por peso ou por calorias do dia) ----------------
 
 export interface DefinicaoParametro {
   chave: string;
   categoria: string;
   label: string;
   unidade: string;
+  /** peso: valor é por kg de peso corporal. calorias: valor é % das calorias do dia (convertido pra gramas via kcal/g do nutriente). */
+  base: "peso" | "calorias";
+  /** kcal por grama do nutriente — só usado quando base é "calorias", pra converter % em gramas. */
+  kcalPorGrama?: number;
   /** Parâmetro só de piso (ex: calorias mínimas) — sem campo de máximo na tela. */
   somenteMinimo: boolean;
 }
 
 export const DEFINICOES_PARAMETROS: DefinicaoParametro[] = [
-  { chave: "calorias", categoria: "Calorias", label: "Calorias mínimas", unidade: "kcal/kg", somenteMinimo: true },
-  { chave: "proteina", categoria: "Macronutrientes", label: "Proteína", unidade: "g/kg", somenteMinimo: false },
-  { chave: "gordura", categoria: "Macronutrientes", label: "Gordura", unidade: "g/kg", somenteMinimo: false },
-  { chave: "carboidrato", categoria: "Macronutrientes", label: "Carboidrato", unidade: "g/kg", somenteMinimo: false },
-  { chave: "fibras", categoria: "Metas de Consumo", label: "Fibras", unidade: "g/kg", somenteMinimo: false },
-  { chave: "gordura_insaturada", categoria: "Metas de Consumo", label: "Gorduras Insaturadas", unidade: "g/kg", somenteMinimo: false },
-  { chave: "agua", categoria: "Metas de Consumo", label: "Água", unidade: "L/kg", somenteMinimo: false },
+  { chave: "calorias", categoria: "Calorias", label: "Calorias mínimas", unidade: "kcal/kg", base: "peso", somenteMinimo: true },
+  { chave: "proteina", categoria: "Macronutrientes", label: "Proteína", unidade: "g/kg", base: "peso", somenteMinimo: false },
+  { chave: "gordura", categoria: "Macronutrientes", label: "Gordura", unidade: "g/kg", base: "peso", somenteMinimo: false },
+  { chave: "carboidrato", categoria: "Macronutrientes", label: "Carboidrato", unidade: "g/kg", base: "peso", somenteMinimo: false },
+  { chave: "fibras", categoria: "Metas de Consumo", label: "Fibras", unidade: "%", base: "calorias", kcalPorGrama: 4, somenteMinimo: false },
+  { chave: "gordura_insaturada", categoria: "Metas de Consumo", label: "Gorduras Insaturadas", unidade: "%", base: "calorias", kcalPorGrama: 9, somenteMinimo: false },
+  { chave: "agua", categoria: "Metas de Consumo", label: "Água", unidade: "L/kg", base: "peso", somenteMinimo: false },
 ];
 
 export interface LimiteParametro {
@@ -732,16 +736,26 @@ export interface LimiteParametro {
   max: number;
 }
 
-/** Valores de hoje, usados como padrão pra qualquer chave sem linha salva ainda. */
+/**
+ * Valores de hoje, usados como padrão pra qualquer chave sem linha salva ainda. Fibras
+ * (5,6% ≈ 14g a cada 1000 kcal, usando 4 kcal/g) e Gordura Insaturada (20–35% das calorias
+ * do dia, faixa de referência comum) são % das calorias; os demais são por kg de peso.
+ */
 export const PARAMETROS_PADRAO: Record<string, LimiteParametro> = {
   calorias: { min: 20, max: 20 },
   proteina: { min: 1, max: 3 },
   gordura: { min: 0.5, max: 1.5 },
   carboidrato: { min: 1, max: 10 },
-  fibras: { min: 0.37, max: 0.37 },
-  gordura_insaturada: { min: 0.45, max: 0.45 },
+  fibras: { min: 5.6, max: 5.6 },
+  gordura_insaturada: { min: 20, max: 35 },
   agua: { min: 0.05, max: 0.05 },
 };
+
+/** Converte um valor de parâmetro (g/kg, L/kg ou % das calorias, conforme `def.base`) em gramas (ou litros, pra água). */
+export function gramasDoParametro(def: DefinicaoParametro, valor: number, pesoAtual: number, caloriasCalc: number): number {
+  if (def.base === "peso") return valor * pesoAtual;
+  return ((valor / 100) * caloriasCalc) / (def.kcalPorGrama ?? 4);
+}
 
 export async function getParametros(): Promise<Map<string, LimiteParametro>> {
   const { data, error } = await supabase.from("dieta_parametros").select("chave, min_por_kg, max_por_kg");

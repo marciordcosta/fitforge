@@ -13,6 +13,8 @@
     salvarPerfilDieta,
     getParametros,
     PARAMETROS_PADRAO,
+    DEFINICOES_PARAMETROS,
+    gramasDoParametro,
     getModoCalorias,
     getCaloriasDiaManuais,
     resolverDistribuicao,
@@ -52,6 +54,7 @@
   function parametro(chave: string): LimiteParametro {
     return parametros.get(chave) ?? PARAMETROS_PADRAO[chave];
   }
+  const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
   let caloriasInput = $state<number | null>(null);
   let proteinaGKg = $state(2.17);
   let proteinaGInput = $state<number | null>(null);
@@ -106,11 +109,11 @@
     `background: conic-gradient(${COR_CARBO} 0% ${pctCarboidrato}%, ${COR_GORDURA} ${pctCarboidrato}% ${pctCarboidrato + pctGordura}%, ${COR_PROTEINA} ${pctCarboidrato + pctGordura}% 100%);`,
   );
 
-  /** Metas de consumo puramente informativas — calculadas a partir do peso e da faixa parametrizada, sem input manual por enquanto. */
-  const fibrasMinG = $derived(Math.round(parametro("fibras").min * pesoAtual));
-  const fibrasMaxG = $derived(Math.round(parametro("fibras").max * pesoAtual));
-  const gorduraInsaturadaMinG = $derived(Math.round(parametro("gordura_insaturada").min * pesoAtual));
-  const gorduraInsaturadaMaxG = $derived(Math.round(parametro("gordura_insaturada").max * pesoAtual));
+  /** Metas de consumo puramente informativas — Fibras e Gordura Insaturada vêm da faixa parametrizada em % das calorias do dia; Água continua por kg de peso. */
+  const fibrasMinG = $derived(Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").min, pesoAtual, caloriasCalc)));
+  const fibrasMaxG = $derived(Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, caloriasCalc)));
+  const gorduraInsaturadaMinG = $derived(Math.round(gramasDoParametro(defParametro.get("gordura_insaturada")!, parametro("gordura_insaturada").min, pesoAtual, caloriasCalc)));
+  const gorduraInsaturadaMaxG = $derived(Math.round(gramasDoParametro(defParametro.get("gordura_insaturada")!, parametro("gordura_insaturada").max, pesoAtual, caloriasCalc)));
   const aguaMinL = $derived(Math.round(parametro("agua").min * pesoAtual * 10) / 10);
   const aguaMaxL = $derived(Math.round(parametro("agua").max * pesoAtual * 10) / 10);
 

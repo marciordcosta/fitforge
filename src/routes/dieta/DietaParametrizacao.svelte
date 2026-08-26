@@ -7,11 +7,14 @@
     salvarParametro,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
+    gramasDoParametro,
     type LimiteParametro,
+    type DefinicaoParametro,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
 
   let pesoAtual = $state(76);
+  let caloriasCalc = $state(2000);
   let carregando = $state(true);
   let erro = $state<string | null>(null);
   let salvando = $state(false);
@@ -37,8 +40,8 @@
     return "g";
   }
 
-  function valorCalculado(porKg: number): string {
-    return (porKg * pesoAtual).toFixed(0);
+  function valorCalculado(def: DefinicaoParametro, valor: number): string {
+    return gramasDoParametro(def, valor, pesoAtual, caloriasCalc).toFixed(0);
   }
 
   async function carregar() {
@@ -51,6 +54,7 @@
         getParametros(),
       ]);
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
+      caloriasCalc = Math.round(4 * perfil.proteinaGKg * pesoAtual + 9 * perfil.gorduraGKg * pesoAtual + 4 * perfil.carboidratoGKg * pesoAtual);
       const novo: Record<string, LimiteParametro> = { ...PARAMETROS_PADRAO };
       for (const [chave, limite] of parametros) novo[chave] = limite;
       valores = novo;
@@ -102,7 +106,7 @@
   {:else}
     <p class="peso-ref">Com base no peso médio atual: <strong>{pesoAtual.toFixed(1)} kg</strong></p>
     <p class="dica">
-      Cada parâmetro é um mínimo e máximo por kg de peso — usados pelo app pra travar faixas (roletas, piso de calorias) e calcular metas automáticas.
+      Cada parâmetro é um mínimo e máximo, por kg de peso ou por % das calorias do dia (Fibras e Gorduras Insaturadas) — usados pelo app pra travar faixas (roletas, piso de calorias) e calcular metas automáticas.
     </p>
 
     {#each categorias as categoria (categoria)}
@@ -130,8 +134,8 @@
                   {/if}
                 </div>
                 <p class="param-calculado">
-                  ≈ {valorCalculado(valores[def.chave].min)}{#if !def.somenteMinimo && valores[def.chave].max !== valores[def.chave].min} – {valorCalculado(valores[def.chave].max)}{/if}
-                  {unidadeCalculada(def.unidade)} no seu peso
+                  ≈ {valorCalculado(def, valores[def.chave].min)}{#if !def.somenteMinimo && valores[def.chave].max !== valores[def.chave].min} – {valorCalculado(def, valores[def.chave].max)}{/if}
+                  {unidadeCalculada(def.unidade)} {def.base === "peso" ? "no seu peso" : "na sua meta de calorias"}
                 </p>
               </div>
             {/each}
