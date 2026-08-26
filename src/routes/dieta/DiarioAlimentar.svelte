@@ -320,6 +320,9 @@
             {/if}
           </div>
           <p class="preview">{preview(refeicao.id)}</p>
+          {#if temItens}
+            <p class="refeicao-macros">prot {totais.proteinaG.toFixed(0)}g · gord {totais.gorduraG.toFixed(0)}g · carb {totais.carboidratoG.toFixed(0)}g</p>
+          {/if}
           <Button
             onclick={(e) => {
               e.stopPropagation();
@@ -328,9 +331,6 @@
           >
             Adicionar Alimento
           </Button>
-          {#if temItens}
-            <p class="card-macros">prot {totais.proteinaG.toFixed(0)}g · gord {totais.gorduraG.toFixed(0)}g · carb {totais.carboidratoG.toFixed(0)}g</p>
-          {/if}
         </div>
       {/each}
     {/if}
@@ -593,8 +593,8 @@
     font-size: 12px;
     font-weight: 400;
   }
-  .card-macros {
-    margin: var(--space-3) 0 0;
+  .refeicao-macros {
+    margin: var(--space-3) 0;
     padding-top: var(--space-3);
     border-top: 1px solid var(--surface-border);
     font-size: var(--font-size-sm);
