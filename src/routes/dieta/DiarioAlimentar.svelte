@@ -282,13 +282,10 @@
         </div>
       </div>
 
-      <div class="macros-header">
-        <span></span>
+      <div class="card-macros">
         <button class="toggle-btn" onclick={() => (modoRestante = !modoRestante)} aria-label="Alternar exibição">
           {@render iconToggle()}
         </button>
-      </div>
-      <div class="card-macros">
         <div class="macros-grid">
           <div class="macro-col">
             <p class="macro-nome">Carb</p>
@@ -602,15 +599,10 @@
     height: 100%;
     border-radius: 6px;
   }
-  .macros-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
-  }
   .toggle-btn {
-    flex-shrink: 0;
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
     width: 28px;
     height: 28px;
     border-radius: 50%;
@@ -629,6 +621,7 @@
   .macros-grid {
     display: flex;
     gap: var(--space-3);
+    padding-right: 48px;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
