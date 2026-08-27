@@ -147,7 +147,6 @@
   }
   .coluna-pct {
     font-weight: 400;
-    color: var(--surface-muted);
   }
   .coluna-secundario {
     margin: 0 0 var(--space-2);
