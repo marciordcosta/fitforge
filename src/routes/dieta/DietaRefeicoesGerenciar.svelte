@@ -875,7 +875,7 @@
         </div>
         <div class="nutriente-item">
           <span>Gordura Saturada</span>
-          <span>até {gorduraSaturadaMaxG} g</span>
+          <span>{gorduraSaturadaMaxG} g</span>
         </div>
         <div class="nutriente-item">
           <span>Água</span>
