@@ -588,7 +588,7 @@
         <div class="tabela">
           <div class="linha cabecalho">
             <span>Série</span>
-            <span>Meta</span>
+            <span>Reps</span>
             <span>Anterior</span>
             <span>Kg</span>
             <span>Reps</span>
@@ -997,8 +997,8 @@
   }
   .linha {
     display: grid;
-    grid-template-columns: 36px 52px 1fr 64px 56px 36px;
-    gap: var(--space-2);
+    grid-template-columns: 36px 44px 1fr 56px 48px 36px;
+    gap: var(--space-1);
     align-items: center;
     padding: var(--space-1) 0;
     margin: 0;
@@ -1009,6 +1009,9 @@
     text-transform: uppercase;
     margin: 0;
     padding: var(--space-1) 0;
+  }
+  .linha.cabecalho span {
+    text-align: center;
   }
   .linha.concluida {
     background: #1e4a2f;
@@ -1042,6 +1045,7 @@
   .anterior-valor {
     font-size: var(--font-size-base);
     color: var(--surface-muted);
+    white-space: nowrap;
   }
   .meta-cel {
     font-size: var(--font-size-base);
@@ -1051,6 +1055,7 @@
     padding: 0;
     text-align: left;
     font-family: inherit;
+    white-space: nowrap;
     cursor: pointer;
   }
   .meta-cel-vazia {
@@ -1060,7 +1065,7 @@
   .linha input {
     box-sizing: border-box;
     width: 100%;
-    padding: var(--space-2);
+    padding: var(--space-2) var(--space-1);
     border-radius: 6px;
     border: 1px solid var(--surface-border);
     background: var(--surface-bg);
