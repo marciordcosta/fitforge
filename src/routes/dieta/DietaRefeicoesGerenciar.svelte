@@ -1859,12 +1859,13 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    margin: var(--space-5) 0 var(--space-2);
+    margin: var(--space-5) 0 var(--space-4);
   }
   .secao-dias-lista {
     overflow-x: visible;
     flex-wrap: wrap;
     padding-top: 0;
+    padding-bottom: 0;
     margin: 0;
   }
   .secao-dias-lista .dia-card {
