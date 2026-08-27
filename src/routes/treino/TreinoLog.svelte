@@ -946,6 +946,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--surface-fg);
   }
   .menu-exercicio-btn {
     flex-shrink: 0;
