@@ -771,12 +771,13 @@
   }
   .item {
     display: grid;
-    grid-template-columns: 100px 1fr 32px;
+    grid-template-columns: 100px 1fr 52px;
     align-items: center;
     gap: var(--space-3);
   }
   .item .nome {
     font-size: var(--font-size-sm);
+    text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -792,13 +793,13 @@
   .nome-btn {
     font-size: var(--font-size-sm);
     color: var(--surface-fg);
-    text-align: left;
+    text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .valor-btn {
-    text-align: right;
+    text-align: center;
     font-weight: 600;
     font-size: var(--font-size-sm);
   }
@@ -813,7 +814,7 @@
     border-radius: 6px;
   }
   .item .valor {
-    text-align: right;
+    text-align: center;
     font-weight: 600;
     font-size: var(--font-size-sm);
   }
