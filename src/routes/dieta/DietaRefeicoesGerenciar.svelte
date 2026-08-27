@@ -261,8 +261,9 @@
     alterarModoCalorias(modoCalorias === "fixa" ? "ondulatoria" : "fixa");
   }
 
-  /** Seleção sempre manual — tocar um dia (automático ou já num bloco) só alterna ele dentro/fora da seleção atual. */
+  /** Só dias automáticos (sem bloco ainda) entram na seleção — um dia já num bloco só se desvincula pelo "x" do card. */
   function toggleDiaSelecionado(dia: number) {
+    if (nomeDoDia(dia) != null) return;
     const novo = new Set(diasSelecionados);
     if (novo.has(dia)) novo.delete(dia);
     else novo.add(dia);
@@ -1033,6 +1034,7 @@
                   class="dia-card"
                   class:selecionado={diasSelecionados.has(dia.diaSemana)}
                   class:colorido={cor != null}
+                  class:travado={nomeBloco != null}
                   style={cor ? `background:${cor}; border-color:${cor};` : ""}
                   role="button"
                   tabindex="0"
@@ -1042,7 +1044,11 @@
                   }}
                 >
                   <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia.diaSemana]}</span>
-                  <span class="dia-card-cal">{Math.round(dia.calorias)}</span>
+                  {#if nomeBloco}
+                    <span class="dia-card-cal dia-card-cal-nome">{nomeBloco}</span>
+                  {:else}
+                    <span class="dia-card-cal">{Math.round(dia.calorias)}</span>
+                  {/if}
                 </div>
                 {#if dia.manual}
                   <button
@@ -1055,9 +1061,6 @@
                   </button>
                 {/if}
               </div>
-              {#if nomeBloco}
-                <p class="dia-card-bloco">{nomeBloco}</p>
-              {/if}
               {#if treino}
                 <p class="dia-card-treino">{treino}</p>
               {/if}
@@ -1943,6 +1946,9 @@
   .dia-card.colorido {
     color: var(--color-primary-fg);
   }
+  .dia-card.travado {
+    cursor: default;
+  }
   .dia-card.selecionado {
     box-shadow: 0 0 0 2px #ffffff;
   }
@@ -1958,17 +1964,6 @@
     text-align: center;
     font-size: 10px;
     color: var(--surface-muted);
-  }
-  .dia-card-bloco {
-    margin: 0 0 4px;
-    max-width: 72px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: center;
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--color-primary);
   }
   .dia-card-treino-topo {
     margin: 0 0 4px;
@@ -2009,6 +2004,13 @@
   .dia-card-cal {
     font-size: 12px;
     opacity: 0.8;
+  }
+  .dia-card-cal-nome {
+    max-width: 56px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
   }
   .secao-dias-header {
     display: flex;
