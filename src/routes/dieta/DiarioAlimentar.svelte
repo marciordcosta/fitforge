@@ -389,8 +389,8 @@
         >
           <div class="card-header">
             <h2>{refeicao.nome}</h2>
-            {#if temItens}
-              <span class="card-cal">{totais.calorias.toFixed(0)}{metaCal !== undefined ? ` de ${metaCal.toFixed(0)}` : ""} cal</span>
+            {#if metaCal !== undefined}
+              <span class="card-cal">{metaCal.toFixed(0)} cal</span>
             {/if}
           </div>
           {#if temItens && metas}
