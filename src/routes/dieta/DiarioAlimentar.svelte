@@ -142,6 +142,8 @@
   const totalProteina = $derived(itens.reduce((acc, i) => acc + i.proteinaG, 0));
   const totalGordura = $derived(itens.reduce((acc, i) => acc + i.gorduraG, 0));
   const totalCarboidrato = $derived(itens.reduce((acc, i) => acc + i.carboidratoG, 0));
+  const totalFibras = $derived(itens.reduce((acc, i) => acc + i.fibraG, 0));
+  const totalGorduraSaturada = $derived(itens.reduce((acc, i) => acc + i.gorduraSaturadaG, 0));
 
   function pctMeta(valor: number, meta: number): number {
     return meta > 0 ? (valor / meta) * 100 : 0;
@@ -328,26 +330,26 @@
             <p class="macro-nome">Gordura Sat.</p>
             <p class="macro-valor">
               {#if modoRestante}
-                <strong>{restante(0, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                <strong>{restante(totalGorduraSaturada, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
               {:else}
-                <strong>0 g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
+                <strong>{totalGorduraSaturada.toFixed(0)} g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
               {/if}
             </p>
             <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(0, gorduraSaturadaMaxG))}%; background:${COR_GORDURA};`}></div>
+              <div class="barra" style={`width:${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}%; background:${COR_GORDURA};`}></div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Fibras</p>
             <p class="macro-valor">
               {#if modoRestante}
-                <strong>{restante(0, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                <strong>{restante(totalFibras, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
               {:else}
-                <strong>0 g</strong> <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
+                <strong>{totalFibras.toFixed(0)} g</strong> <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
               {/if}
             </p>
             <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(0, fibrasMaxG))}%; background:${COR_CARBO};`}></div>
+              <div class="barra" style={`width:${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}%; background:${COR_CARBO};`}></div>
             </div>
           </div>
         </div>

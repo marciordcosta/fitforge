@@ -90,6 +90,8 @@
           proteinaG: round1(it.alimento.proteinaG * fator),
           gorduraG: round1(it.alimento.gorduraG * fator),
           carboidratoG: round1(it.alimento.carboidratoG * fator),
+          fibraG: round1((it.alimento.fibraG ?? 0) * fator),
+          gorduraSaturadaG: round1((it.alimento.gorduraSaturadaG ?? 0) * fator),
         };
       });
       itensLocais = [...itensSalvos, ...itensNovos];

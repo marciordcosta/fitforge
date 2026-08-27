@@ -563,6 +563,8 @@ export async function copiarItensEntreRefeicoes(origemId: string, destinoId: str
     proteina_g: it.proteinaG,
     gordura_g: it.gorduraG,
     carboidrato_g: it.carboidratoG,
+    fibra_g: it.fibraG,
+    gordura_saturada_g: it.gorduraSaturadaG,
   }));
   const { error } = await supabase.from("diario_alimentos").insert(linhas);
   if (error) throw error;
@@ -584,6 +586,8 @@ export async function copiarItemEntreRefeicoes(itemId: string, destinoRefeicaoId
     proteina_g: item.proteinaG,
     gordura_g: item.gorduraG,
     carboidrato_g: item.carboidratoG,
+    fibra_g: item.fibraG,
+    gordura_saturada_g: item.gorduraSaturadaG,
   });
   if (error) throw error;
 }
@@ -613,6 +617,8 @@ export interface ItemDiario {
   proteinaG: number;
   gorduraG: number;
   carboidratoG: number;
+  fibraG: number;
+  gorduraSaturadaG: number;
 }
 
 function mapItemDiario(l: Record<string, unknown>): ItemDiario {
@@ -627,11 +633,13 @@ function mapItemDiario(l: Record<string, unknown>): ItemDiario {
     proteinaG: l.proteina_g as number,
     gorduraG: l.gordura_g as number,
     carboidratoG: l.carboidrato_g as number,
+    fibraG: (l.fibra_g as number | null) ?? 0,
+    gorduraSaturadaG: (l.gordura_saturada_g as number | null) ?? 0,
   };
 }
 
 const ITEM_DIARIO_SELECT =
-  "id, alimento_id, refeicao_id, quantidade, unidade, calorias, proteina_g, gordura_g, carboidrato_g, created_at, alimento:alimentos(nome)";
+  "id, alimento_id, refeicao_id, quantidade, unidade, calorias, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g, created_at, alimento:alimentos(nome)";
 
 /** Todos os itens logados num dia, de todas as refeições — usado pra montar a prévia dos cards na tela principal. */
 export async function getDiarioDoDia(data: string): Promise<ItemDiario[]> {
@@ -678,6 +686,8 @@ export async function adicionarItemDiario(input: {
     proteina_g: round1(input.alimento.proteinaG * fator),
     gordura_g: round1(input.alimento.gorduraG * fator),
     carboidrato_g: round1(input.alimento.carboidratoG * fator),
+    fibra_g: round1((input.alimento.fibraG ?? 0) * fator),
+    gordura_saturada_g: round1((input.alimento.gorduraSaturadaG ?? 0) * fator),
   });
   if (error) throw error;
 }
@@ -694,6 +704,8 @@ export async function atualizarItemDiario(id: string, alimento: Alimento, quanti
       proteina_g: round1(alimento.proteinaG * fator),
       gordura_g: round1(alimento.gorduraG * fator),
       carboidrato_g: round1(alimento.carboidratoG * fator),
+      fibra_g: round1((alimento.fibraG ?? 0) * fator),
+      gordura_saturada_g: round1((alimento.gorduraSaturadaG ?? 0) * fator),
     })
     .eq("id", id);
   if (error) throw error;
@@ -1112,6 +1124,8 @@ export interface ReceitaItem {
   proteinaG: number;
   gorduraG: number;
   carboidratoG: number;
+  fibraG: number;
+  gorduraSaturadaG: number;
 }
 
 export interface Receita extends ReceitaResumo {
@@ -1133,6 +1147,8 @@ function mapReceitaItem(l: Record<string, unknown>): ReceitaItem {
     proteinaG: round1((a.proteina_g as number) * fator),
     gorduraG: round1((a.gordura_g as number) * fator),
     carboidratoG: round1((a.carboidrato_g as number) * fator),
+    fibraG: round1(((a.fibra_g as number | null) ?? 0) * fator),
+    gorduraSaturadaG: round1(((a.gordura_saturada_g as number | null) ?? 0) * fator),
   };
 }
 
@@ -1162,7 +1178,7 @@ export async function getReceita(id: string): Promise<Receita | null> {
     supabase
       .from("dieta_receita_itens")
       .select(
-        "id, alimento_id, quantidade, ordem, alimento:alimentos(nome, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g)",
+        "id, alimento_id, quantidade, ordem, alimento:alimentos(nome, porcao_padrao_qtd, porcao_padrao_unidade, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g)",
       )
       .eq("receita_id", id)
       .order("ordem", { ascending: true }),
@@ -1261,6 +1277,8 @@ export async function adicionarReceitaAoDiario(receitaId: string, data: string, 
     proteina_g: it.proteinaG,
     gordura_g: it.gorduraG,
     carboidrato_g: it.carboidratoG,
+    fibra_g: it.fibraG,
+    gordura_saturada_g: it.gorduraSaturadaG,
   }));
   const { error } = await supabase.from("diario_alimentos").insert(linhas);
   if (error) throw error;
