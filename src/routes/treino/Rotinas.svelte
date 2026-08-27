@@ -2,10 +2,10 @@
   import { navigate } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
   import { toISODate, hojeISO } from "../../lib/dates";
+  import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import {
     listTreinos,
     listMusculos,
-    getVolumeRealizadoBruto,
     getRegistrosPorTreinoPeriodo,
     DIAS_SEMANA_COMPLETO,
     type TreinoComExercicios,
@@ -16,7 +16,9 @@
   let loading = $state(true);
   let musculos = $state<Musculo[]>([]);
   let seriesPorTreino = $state<Map<string, number>>(new Map());
-  let feitoPorMusculo = $state<Map<string, number>>(new Map());
+  let feitoPorMusculoSalvo = $state<Map<string, number>>(new Map());
+  /** exercicio_id -> ids dos músculos trabalhados — pra cruzar registros salvos e a sessão ao vivo com músculos, sem ponderar (1 série = 1 pra cada músculo do exercício). */
+  let musculosPorExercicio = $state<Map<string, string[]>>(new Map());
   let modoRestante = $state(false);
 
   /** Rotinas com dia informado sobem pro topo, ordenadas pelo dia mais próximo; sem dia, mantém a ordenação manual. */
@@ -38,28 +40,66 @@
 
   async function carregar() {
     loading = true;
-    const [treinosCarregados, musculosCarregados, volumeRealizado, registros] = await Promise.all([
+    const [treinosCarregados, musculosCarregados, registros] = await Promise.all([
       listTreinos(),
       listMusculos(),
-      getVolumeRealizadoBruto(segundaISO(), hojeISO()),
       getRegistrosPorTreinoPeriodo(segundaISO(), hojeISO()),
     ]);
     treinos = ordenarPorDia(treinosCarregados);
     musculos = musculosCarregados;
+
+    const mapaMusculos = new Map<string, string[]>();
+    for (const t of treinosCarregados) {
+      for (const ex of t.exercicios) {
+        if (!mapaMusculos.has(ex.exercicio_id)) {
+          mapaMusculos.set(ex.exercicio_id, (ex.exercicio?.musculos ?? []).map((m) => m.musculo_id));
+        }
+      }
+    }
+    musculosPorExercicio = mapaMusculos;
+
     const mapaSeriesPorTreino = new Map<string, number>();
+    const mapaFeito = new Map<string, number>();
     for (const r of registros) {
       mapaSeriesPorTreino.set(r.treino_id, (mapaSeriesPorTreino.get(r.treino_id) ?? 0) + 1);
+      for (const musculoId of mapaMusculos.get(r.exercicio_id) ?? []) {
+        mapaFeito.set(musculoId, (mapaFeito.get(musculoId) ?? 0) + 1);
+      }
     }
     seriesPorTreino = mapaSeriesPorTreino;
-    const mapaFeito = new Map<string, number>();
-    for (const l of volumeRealizado) {
-      mapaFeito.set(l.musculo_id, (mapaFeito.get(l.musculo_id) ?? 0) + Number(l.series_equivalentes));
-    }
-    feitoPorMusculo = mapaFeito;
+    feitoPorMusculoSalvo = mapaFeito;
     loading = false;
   }
 
   void carregar();
+
+  /** Séries concluídas na sessão ao vivo (ainda não salvas), contadas por músculo — soma em cima do que já está salvo, sem ponderar. */
+  const feitoAoVivoPorMusculo = $derived.by(() => {
+    const mapa = new Map<string, number>();
+    for (const exSessao of treinoLogSessao.atual?.sessao ?? []) {
+      const concluidas = exSessao.sets.filter((s) => s.concluida).length;
+      if (!concluidas) continue;
+      for (const musculoId of musculosPorExercicio.get(exSessao.exercicio_id) ?? []) {
+        mapa.set(musculoId, (mapa.get(musculoId) ?? 0) + concluidas);
+      }
+    }
+    return mapa;
+  });
+
+  /** Total de séries concluídas na sessão ao vivo (ainda não salvas). */
+  const seriesAoVivo = $derived(
+    (treinoLogSessao.atual?.sessao ?? []).reduce((acc, ex) => acc + ex.sets.filter((s) => s.concluida).length, 0),
+  );
+
+  /** Feito por músculo ao vivo: o que já está salvo essa semana + o que está sendo feito agora, se houver sessão ativa. */
+  const feitoPorMusculo = $derived.by(() => {
+    if (!treinoLogSessao.atual) return feitoPorMusculoSalvo;
+    const mapa = new Map(feitoPorMusculoSalvo);
+    for (const [musculoId, valor] of feitoAoVivoPorMusculo) {
+      mapa.set(musculoId, (mapa.get(musculoId) ?? 0) + valor);
+    }
+    return mapa;
+  });
 
   function preview(t: TreinoComExercicios): string {
     const nomes = t.exercicios
@@ -74,10 +114,10 @@
   /** Total de séries programadas em todas as rotinas — meta semanal do card (assume 1 execução de cada rotina na semana). */
   const programado = $derived(treinos.reduce((acc, t) => acc + t.exercicios.reduce((a, ex) => a + ex.series.length, 0), 0));
 
-  /** Total de séries feitas na semana, somando todas as rotinas. */
-  const executado = $derived([...seriesPorTreino.values()].reduce((acc, v) => acc + v, 0));
+  /** Total de séries feitas na semana (salvas + sessão ao vivo em andamento), somando todas as rotinas. */
+  const executado = $derived([...seriesPorTreino.values()].reduce((acc, v) => acc + v, 0) + seriesAoVivo);
 
-  /** Volume planejado por músculo (ponderado por peso_contribuicao) — é a "meta" de cada músculo: as próprias rotinas cadastradas. */
+  /** Volume planejado por músculo — total de séries bruto (1 série conta 1 pra cada músculo do exercício, sem ponderar por peso_contribuicao; a versão ponderada fica só pra grade de Distribuição Semanal). É a "meta" de cada músculo: as próprias rotinas cadastradas. */
   const planejadoPorMusculo = $derived.by(() => {
     const mapa = new Map<string, number>();
     for (const t of treinos) {
@@ -85,7 +125,7 @@
         const numSeries = ex.series.length;
         if (!numSeries) continue;
         for (const m of ex.exercicio?.musculos ?? []) {
-          mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + numSeries * m.peso_contribuicao);
+          mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + numSeries);
         }
       }
     }

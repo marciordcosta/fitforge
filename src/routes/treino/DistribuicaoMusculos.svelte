@@ -9,7 +9,6 @@
     listMusculos,
     listTreinos,
     getVolumeRealizadoBruto,
-    getRegistrosPorTreinoPeriodo,
     DIAS_SEMANA_ABREV,
     type Musculo,
     type TreinoComExercicios,
@@ -23,8 +22,6 @@
   let linhasRealizadoMes = $state<{ data: string; musculo_id: string; series_equivalentes: number }[]>([]);
   let carregandoRealizado = $state(false);
   let feitoPorMusculoSemana = $state<Map<string, number>>(new Map());
-  /** treino_id -> exercicio_id -> quantas séries desse exercício foram registradas essa semana. */
-  let registrosSemanaPorTreino = $state<Map<string, Map<string, number>>>(new Map());
 
   /** Semana ancorada em segunda-feira (exceção proposital, igual à tela inicial de Treino — o resto do app usa terça, ver inicioSemana em dates.ts). Vai virar parametrizável. */
   function segundaISO(): string {
@@ -33,30 +30,27 @@
     return toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - delta));
   }
 
+  /** Rotinas com dia informado sobem pro topo, ordenadas pelo dia mais próximo; sem dia, mantém a ordenação manual (mesma lógica da tela inicial de Treino). */
+  function ordenarPorDia(lista: TreinoComExercicios[]): TreinoComExercicios[] {
+    const hoje = new Date().getDay();
+    const comDia = lista
+      .filter((t) => t.dia_semana != null)
+      .sort((a, b) => ((a.dia_semana! - hoje + 7) % 7) - ((b.dia_semana! - hoje + 7) % 7));
+    const semDia = lista.filter((t) => t.dia_semana == null);
+    return [...comDia, ...semDia];
+  }
+
   async function carregarBase() {
-    [musculos, treinos] = await Promise.all([listMusculos(), listTreinos()]);
+    const [musculosCarregados, treinosCarregados] = await Promise.all([listMusculos(), listTreinos()]);
+    musculos = musculosCarregados;
+    treinos = ordenarPorDia(treinosCarregados);
     const hojeIso = toISODate(new Date());
-    const [, volumeSemana, registros] = await Promise.all([
-      carregarRealizado(),
-      getVolumeRealizadoBruto(segundaISO(), hojeIso),
-      getRegistrosPorTreinoPeriodo(segundaISO(), hojeIso),
-    ]);
+    const [, volumeSemana] = await Promise.all([carregarRealizado(), getVolumeRealizadoBruto(segundaISO(), hojeIso)]);
     const mapa = new Map<string, number>();
     for (const l of volumeSemana) {
       mapa.set(l.musculo_id, (mapa.get(l.musculo_id) ?? 0) + Number(l.series_equivalentes));
     }
     feitoPorMusculoSemana = mapa;
-
-    const mapaRegistros = new Map<string, Map<string, number>>();
-    for (const r of registros) {
-      let porExercicio = mapaRegistros.get(r.treino_id);
-      if (!porExercicio) {
-        porExercicio = new Map();
-        mapaRegistros.set(r.treino_id, porExercicio);
-      }
-      porExercicio.set(r.exercicio_id, (porExercicio.get(r.exercicio_id) ?? 0) + 1);
-    }
-    registrosSemanaPorTreino = mapaRegistros;
   }
 
   void carregarBase();
@@ -74,8 +68,9 @@
     return mapa;
   }
 
+  /** Igual à lista de rotinas, mas com a rotina em sessão ao vivo (se houver) sempre na frente — as demais ficam opacas no card. */
   const distribuicaoPorTreino = $derived.by(() => {
-    return treinos.map((t) => {
+    const base = treinos.map((t) => {
       const mapa = contarSeriesPorMusculo(t);
       const lista = musculos
         .map((m) => ({ musculo: m, valor: mapa.get(m.id) ?? 0 }))
@@ -83,35 +78,45 @@
         .sort((a, b) => b.valor - a.valor);
       return { treino: t, lista };
     });
+    const ativoId = treinoLogSessao.atual?.treinoId;
+    if (!ativoId) return base;
+    const idx = base.findIndex((b) => b.treino.id === ativoId);
+    if (idx <= 0) return base;
+    const copia = base.slice();
+    const [ativo] = copia.splice(idx, 1);
+    copia.unshift(ativo);
+    return copia;
   });
 
-  /** Séries já marcadas como concluídas na sessão ao vivo (treinoLogSessao), contadas por músculo — só faz sentido pra rotina que está em andamento agora. */
-  function contarFeitoAoVivo(treino: TreinoComExercicios): Map<string, number> {
+  /**
+   * Séries já marcadas como concluídas na sessão ao vivo (treinoLogSessao), contadas por músculo.
+   * ponderado=true usa o peso_contribuicao (pra somar junto com o card semanal, que é ponderado);
+   * ponderado=false é a contagem bruta (pra comparar com o volume da própria rotina, também bruto).
+   */
+  function contarFeitoAoVivo(treino: TreinoComExercicios, ponderado: boolean): Map<string, number> {
     const musculosPorExercicio = new Map(treino.exercicios.map((ex) => [ex.exercicio_id, ex.exercicio?.musculos ?? []]));
     const mapa = new Map<string, number>();
     for (const exSessao of treinoLogSessao.atual?.sessao ?? []) {
       const concluidas = exSessao.sets.filter((s) => s.concluida).length;
       if (!concluidas) continue;
       for (const m of musculosPorExercicio.get(exSessao.exercicio_id) ?? []) {
-        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + concluidas);
+        const incremento = ponderado ? concluidas * m.peso_contribuicao : concluidas;
+        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + incremento);
       }
     }
     return mapa;
   }
 
-  /** Séries já registradas (concluídas de verdade, "Concluir treino") dessa rotina essa semana, contadas por músculo — 0 pra tudo assim que a semana reinicia. */
-  function contarFeitoSemana(treino: TreinoComExercicios): Map<string, number> {
-    const musculosPorExercicio = new Map(treino.exercicios.map((ex) => [ex.exercicio_id, ex.exercicio?.musculos ?? []]));
-    const registrosDoTreino = registrosSemanaPorTreino.get(treino.id);
-    const mapa = new Map<string, number>();
-    if (!registrosDoTreino) return mapa;
-    for (const [exercicioId, qtd] of registrosDoTreino) {
-      for (const m of musculosPorExercicio.get(exercicioId) ?? []) {
-        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + qtd);
-      }
+  /** Card semanal ao vivo: soma o que já está salvo (treino_registros dessa semana) com o que ainda está sendo feito agora na sessão ativa, se houver — só reinicia na virada da semana (segunda). */
+  const feitoPorMusculoSemanaAoVivo = $derived.by(() => {
+    const sessaoTreino = treinos.find((t) => t.id === treinoLogSessao.atual?.treinoId);
+    if (!sessaoTreino) return feitoPorMusculoSemana;
+    const mapa = new Map(feitoPorMusculoSemana);
+    for (const [musculoId, valor] of contarFeitoAoVivo(sessaoTreino, true)) {
+      mapa.set(musculoId, (mapa.get(musculoId) ?? 0) + valor);
     }
     return mapa;
-  }
+  });
 
   const totaisSemanais = $derived.by(() => {
     let exercicios = 0;
@@ -403,7 +408,7 @@
           {:else}
             <div class="lista">
               {#each distribuicaoSemanal as item (item.musculo.id)}
-                {@const feito = feitoPorMusculoSemana.get(item.musculo.id) ?? 0}
+                {@const feito = feitoPorMusculoSemanaAoVivo.get(item.musculo.id) ?? 0}
                 <div class="item">
                   <button class="nome-btn" onclick={() => abrirExercicios(treinos, item.musculo)}>{item.musculo.nome}</button>
                   <div class="barra-wrap">
@@ -420,10 +425,10 @@
         </div>
 
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
+          {@const algumaSessaoAtiva = treinoLogSessao.atual != null}
           {@const sessaoAtiva = treinoLogSessao.atual?.treinoId === treino.id}
-          {@const feitoTreino = sessaoAtiva ? contarFeitoAoVivo(treino) : contarFeitoSemana(treino)}
-          {@const corProgresso = sessaoAtiva ? "var(--color-success)" : "var(--color-neutral)"}
-          <div class="rotina-card">
+          {@const feitoTreino = sessaoAtiva ? contarFeitoAoVivo(treino, false) : new Map()}
+          <div class="rotina-card" class:opaco={algumaSessaoAtiva && !sessaoAtiva}>
             <div class="rotina-cabecalho">
               <h2 class="rotina-nome">{treino.nome_treino}</h2>
               {#if sessaoAtiva}
@@ -441,9 +446,9 @@
                   <div class="item">
                     <span class="nome">{item.musculo.nome}</span>
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${Math.min((feito / item.valor) * 100, 100)}%; background: ${corProgresso};`}></div>
+                      <div class="barra" style={`width: ${Math.min((feito / item.valor) * 100, 100)}%; background: ${sessaoAtiva ? "var(--color-success)" : "var(--color-neutral)"};`}></div>
                     </div>
-                    <span class="valor" style={`color: ${corProgresso};`}>{feito} / {item.valor}</span>
+                    <span class="valor" style={`color: ${sessaoAtiva ? "var(--color-success)" : "var(--color-neutral)"};`}>{feito} / {item.valor}</span>
                   </div>
                 {/each}
               </div>
@@ -703,6 +708,10 @@
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     box-shadow: var(--shadow-card);
+    transition: opacity 0.2s;
+  }
+  .rotina-card.opaco {
+    opacity: 0.4;
   }
   .rotina-cabecalho {
     display: flex;
