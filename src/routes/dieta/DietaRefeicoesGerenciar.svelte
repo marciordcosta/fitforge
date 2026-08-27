@@ -382,11 +382,13 @@
 
   function infoCelulaCalorias(idx: number) {
     const bloco = blocosEdicao[idx];
+    const valorAtual = Math.round(bloco.calorias / 10) * 10;
     const teto = tetoRedistribuicao(blocosEdicao, idx, "calorias", minimoCalorias);
+    const piso = Math.min(minimoCalorias, valorAtual);
     return {
       titulo: `Calorias — ${bloco.nome}`,
-      opcoes: opcoesCalorias().filter((o) => o.valor <= teto),
-      valorAtual: Math.round(bloco.calorias / 10) * 10,
+      opcoes: opcoesCalorias().filter((o) => o.valor >= piso && o.valor <= teto),
+      valorAtual,
       onSelecionar: (v: number) => aplicarEdicaoCalorias(idx, v),
     };
   }
@@ -570,7 +572,7 @@
 
   function infoCampo(campo: "calorias") {
     const valorAtual = Math.round((caloriasInput ?? caloriasCalc) / 10) * 10;
-    const piso = Math.min(pisoMediaOndulatoria(), valorAtual);
+    const piso = Math.min(Math.max(pisoMediaOndulatoria(), minimoCalorias), valorAtual);
     return {
       titulo: "Calorias (kcal)",
       opcoes: opcoesCalorias().filter((o) => o.valor >= piso),
