@@ -136,7 +136,7 @@
                     </label>
                   {/if}
                 </div>
-                <p class="param-calculado">
+                <p class="param-calculado" class:destaque={def.chave === "calorias"}>
                   {#if def.somenteMaximo}
                     até {valorCalculado(def, valores[def.chave].max)} {unidadeCalculada(def.unidade)} {def.base === "peso" ? "no seu peso" : "na sua meta de calorias"}
                   {:else}
@@ -280,5 +280,8 @@
     margin: 0;
     font-size: 12px;
     color: var(--surface-muted);
+  }
+  .param-calculado.destaque {
+    color: var(--surface-fg);
   }
 </style>

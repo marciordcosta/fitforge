@@ -65,11 +65,13 @@
   let carboidratoGInput = $state<number | null>(null);
 
   let modoCalorias = $state<"fixa" | "ondulatoria">("fixa");
+  /** Último valor gravado no banco — pra saber se precisa persistir modo/distribuição no "Salvar" principal. */
+  let modoCaloriasOriginal = $state<"fixa" | "ondulatoria">("fixa");
   let manuaisCompletos = $state<Map<number, CaloriasDiaManual>>(new Map());
+  let manuaisOriginal = $state<Map<number, CaloriasDiaManual>>(new Map());
   const manuaisDias = $derived(new Map([...manuaisCompletos].map(([dia, v]) => [dia, v.calorias])));
   let diasSelecionados = $state<Set<number>>(new Set());
   let mostrarDefinirCalorias = $state(false);
-  let salvandoDistribuicao = $state(false);
 
   let grupoProteinaG = $state(0);
   let grupoGorduraG = $state(0);
@@ -203,7 +205,9 @@
       carboidratoGInput = Math.round(carboidratoGKg * pesoAtual);
       caloriasInput = caloriasCalc;
       modoCalorias = modo;
+      modoCaloriasOriginal = modo;
       manuaisCompletos = manuais;
+      manuaisOriginal = new Map(manuais);
       parametros = parametrosCarregados;
       perfilCarregado = true;
     } catch (err) {
@@ -213,10 +217,10 @@
 
   void carregarMetas();
 
+  /** Só muda localmente — persiste no banco junto com o resto ao tocar em "Salvar". */
   function alterarModoCalorias(modo: "fixa" | "ondulatoria") {
     modoCalorias = modo;
     diasSelecionados = new Set();
-    definirModoCalorias(modo).catch((err) => alert("Erro ao salvar o modo: " + (err as Error).message));
   }
 
   function alternarModoToggle() {
@@ -294,47 +298,36 @@
     grupoProteinaG = valores.proteinaG;
   }
 
-  async function confirmarCaloriasGrupo() {
+  /** Só aplica localmente (valida a distribuição antes) — persiste no banco junto com o resto ao tocar em "Salvar" no fim da tela. */
+  function confirmarCaloriasGrupo() {
     if (caloriasGrupoCalc <= 0) return;
-    salvandoDistribuicao = true;
+    const manuaisTeste = new Map(manuaisDias);
+    for (const dia of diasSelecionados) manuaisTeste.set(dia, caloriasGrupoCalc);
     try {
-      await definirCaloriasDias(
-        [...diasSelecionados],
-        grupoProteinaG,
-        grupoGorduraG,
-        grupoCarboidratoG,
-        caloriasCalc,
-        minimoCalorias,
-        manuaisDias,
-      );
-      const novoManual = new Map(manuaisCompletos);
-      for (const dia of diasSelecionados) {
-        novoManual.set(dia, {
-          calorias: caloriasGrupoCalc,
-          proteinaG: grupoProteinaG,
-          gorduraG: grupoGorduraG,
-          carboidratoG: grupoCarboidratoG,
-        });
-      }
-      manuaisCompletos = novoManual;
-      diasSelecionados = new Set();
-      mostrarDefinirCalorias = false;
+      resolverDistribuicao(caloriasCalc, manuaisTeste, minimoCalorias);
     } catch (err) {
-      alert("Erro ao definir calorias: " + (err as Error).message);
-    } finally {
-      salvandoDistribuicao = false;
+      alert((err as Error).message);
+      return;
     }
+    const novoManual = new Map(manuaisCompletos);
+    for (const dia of diasSelecionados) {
+      novoManual.set(dia, {
+        calorias: caloriasGrupoCalc,
+        proteinaG: grupoProteinaG,
+        gorduraG: grupoGorduraG,
+        carboidratoG: grupoCarboidratoG,
+      });
+    }
+    manuaisCompletos = novoManual;
+    diasSelecionados = new Set();
+    mostrarDefinirCalorias = false;
   }
 
-  async function removerAjusteDia(dia: number) {
-    try {
-      await removerCaloriasDia(dia);
-      const novoManual = new Map(manuaisCompletos);
-      novoManual.delete(dia);
-      manuaisCompletos = novoManual;
-    } catch (err) {
-      alert("Erro ao remover ajuste: " + (err as Error).message);
-    }
+  /** Só remove localmente — persiste no banco junto com o resto ao tocar em "Salvar" no fim da tela. */
+  function removerAjusteDia(dia: number) {
+    const novoManual = new Map(manuaisCompletos);
+    novoManual.delete(dia);
+    manuaisCompletos = novoManual;
   }
 
   function recalcularCaloriasDosMacros() {
@@ -437,6 +430,21 @@
         fibrasG: Math.round((fibrasMinG + fibrasMaxG) / 2),
         aguaL: Math.round(((aguaMinL + aguaMaxL) / 2) * 10) / 10,
       });
+
+      if (modoCalorias !== modoCaloriasOriginal) {
+        await definirModoCalorias(modoCalorias);
+      }
+
+      const diasRemovidos = [...manuaisOriginal.keys()].filter((dia) => !manuaisCompletos.has(dia));
+      await Promise.all(diasRemovidos.map((dia) => removerCaloriasDia(dia)));
+      await Promise.all(
+        [...manuaisCompletos].map(([dia, v]) =>
+          definirCaloriasDias([dia], v.proteinaG, v.gorduraG, v.carboidratoG, caloriasCalc, minimoCalorias, manuaisDias),
+        ),
+      );
+
+      modoCaloriasOriginal = modoCalorias;
+      manuaisOriginal = new Map(manuaisCompletos);
     } catch (err) {
       alert("Erro ao salvar metas: " + (err as Error).message);
     } finally {
@@ -1152,8 +1160,9 @@
         <button type="button" class="tabela-input" onclick={() => abrirMacrosGrupo("g")}>{grupoCarboidratoG} g</button>
       </div>
     </div>
-    <Button onclick={confirmarCaloriasGrupo} disabled={salvandoDistribuicao || caloriasGrupoCalc <= 0}>
-      Salvar
+    <p class="dica">Toque em "Aplicar" pra ver o resultado; a mudança só grava de verdade quando você tocar em "Salvar" no fim da tela.</p>
+    <Button onclick={confirmarCaloriasGrupo} disabled={caloriasGrupoCalc <= 0}>
+      Aplicar
     </Button>
   </Sheet>
 {/if}
