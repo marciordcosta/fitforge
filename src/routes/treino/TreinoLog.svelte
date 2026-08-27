@@ -991,7 +991,7 @@
   }
   .linha {
     display: grid;
-    grid-template-columns: 36px 44px 1fr 56px 48px 36px;
+    grid-template-columns: 36px 40px minmax(0, 1fr) 66px 58px 36px;
     gap: var(--space-1);
     align-items: center;
     padding: var(--space-1) 0;
@@ -1040,6 +1040,8 @@
     font-size: var(--font-size-base);
     color: var(--surface-muted);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-align: center;
   }
   .meta-cel {
