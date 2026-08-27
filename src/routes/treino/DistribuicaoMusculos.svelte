@@ -409,12 +409,13 @@
             <div class="lista">
               {#each distribuicaoSemanal as item (item.musculo.id)}
                 {@const feito = feitoPorMusculoSemanaAoVivo.get(item.musculo.id) ?? 0}
+                {@const corSemanal = treinoLogSessao.atual != null ? "var(--color-success)" : corVolume(item.valor)}
                 <div class="item">
                   <button class="nome-btn" onclick={() => abrirExercicios(treinos, item.musculo)}>{item.musculo.nome}</button>
                   <div class="barra-wrap">
-                    <div class="barra" style={`width: ${Math.min((feito / item.valor) * 100, 100)}%; background: ${corVolume(item.valor)};`}></div>
+                    <div class="barra" style={`width: ${Math.min((feito / item.valor) * 100, 100)}%; background: ${corSemanal};`}></div>
                   </div>
-                  <button class="valor-btn" style={`color: ${corVolume(item.valor)};`} onclick={() => abrirGradeSemanal([item.musculo.id])}>{feito.toFixed(0)} / {item.valor}</button>
+                  <button class="valor-btn" style={`color: ${corSemanal};`} onclick={() => abrirGradeSemanal([item.musculo.id])}>{feito.toFixed(0)} / {item.valor}</button>
                 </div>
               {/each}
             </div>
