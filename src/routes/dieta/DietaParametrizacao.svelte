@@ -273,7 +273,7 @@
     border: 1px solid var(--surface-border);
     background: var(--surface-bg);
     color: var(--surface-fg);
-    font-size: var(--font-size-base);
+    font-size: 18px;
     color-scheme: dark;
   }
   .param-calculado {
