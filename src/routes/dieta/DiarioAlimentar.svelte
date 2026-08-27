@@ -393,13 +393,40 @@
               <span class="card-cal">{totais.calorias.toFixed(0)}{metaCal !== undefined ? ` de ${metaCal.toFixed(0)}` : ""} cal</span>
             {/if}
           </div>
-          <p class="preview" class:preview-colado={temItens}>{preview(refeicao.id)}</p>
-          {#if temItens}
-            <p class="refeicao-macros">
-              carb {totais.carboidratoG.toFixed(0)}g ·
-              gord {totais.gorduraG.toFixed(0)}g ·
-              prot {totais.proteinaG.toFixed(0)}g
-            </p>
+          {#if temItens && metas}
+            <p class="pct-titulo">Percentual das suas metas diárias</p>
+            <div class="pct-grid">
+              <div class="pct-col">
+                <p class="pct-nome">Calorias</p>
+                <div class="pct-barra-wrap">
+                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.calorias, metas.calorias))}%; background:var(--color-secondary);`}></div>
+                </div>
+                <p class="pct-valor">{pctMeta(totais.calorias, metas.calorias).toFixed(0)}% · {metas.calorias.toFixed(0)}</p>
+              </div>
+              <div class="pct-col">
+                <p class="pct-nome">Carb</p>
+                <div class="pct-barra-wrap">
+                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.carboidratoG, metas.carboidratoG))}%; background:${COR_CARBO};`}></div>
+                </div>
+                <p class="pct-valor">{pctMeta(totais.carboidratoG, metas.carboidratoG).toFixed(0)}% · {metas.carboidratoG.toFixed(0)}g</p>
+              </div>
+              <div class="pct-col">
+                <p class="pct-nome">Gorduras</p>
+                <div class="pct-barra-wrap">
+                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.gorduraG, metas.gorduraG))}%; background:${COR_GORDURA};`}></div>
+                </div>
+                <p class="pct-valor">{pctMeta(totais.gorduraG, metas.gorduraG).toFixed(0)}% · {metas.gorduraG.toFixed(0)}g</p>
+              </div>
+              <div class="pct-col">
+                <p class="pct-nome">Proteínas</p>
+                <div class="pct-barra-wrap">
+                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.proteinaG, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div>
+                </div>
+                <p class="pct-valor">{pctMeta(totais.proteinaG, metas.proteinaG).toFixed(0)}% · {metas.proteinaG.toFixed(0)}g</p>
+              </div>
+            </div>
+          {:else}
+            <p class="preview">{preview(refeicao.id)}</p>
           {/if}
           <Button
             onclick={(e) => {
@@ -679,11 +706,6 @@
     font-size: 12px;
     font-weight: 400;
   }
-  .refeicao-macros {
-    margin: 0 0 var(--space-3);
-    font-size: var(--font-size-base);
-    color: var(--surface-muted);
-  }
   .preview {
     color: var(--surface-muted);
     font-size: var(--font-size-base);
@@ -695,8 +717,41 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
   }
-  .preview.preview-colado {
-    margin-bottom: 0;
+  .pct-titulo {
+    margin: 0 0 var(--space-2);
+    font-size: 12px;
+    color: var(--surface-muted);
+  }
+  .pct-grid {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .pct-col {
+    flex: 1;
+    min-width: 0;
+  }
+  .pct-nome {
+    margin: 0 0 var(--space-1);
+    font-size: 12px;
+    color: var(--surface-fg);
+  }
+  .pct-barra-wrap {
+    height: 6px;
+    background: var(--surface-border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: var(--space-1);
+  }
+  .pct-barra {
+    height: 100%;
+    border-radius: 4px;
+  }
+  .pct-valor {
+    margin: 0;
+    font-size: 11px;
+    color: var(--surface-muted);
   }
   .muted {
     color: var(--surface-muted);
