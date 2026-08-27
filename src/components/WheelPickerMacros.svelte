@@ -67,6 +67,12 @@
     Math.round(colunas.reduce((acc, c, idx) => acc + c.opcoes[indices[idx]].valor * c.kcalPorGrama, 0)),
   );
 
+  function pctColuna(idx: number): number {
+    if (caloriasTotais <= 0) return 0;
+    const coluna = colunas[idx];
+    return (coluna.opcoes[indices[idx]].valor * coluna.kcalPorGrama * 100) / caloriasTotais;
+  }
+
   function confirmar() {
     const valores: Record<string, number> = {};
     colunas.forEach((c, idx) => (valores[c.chave] = c.opcoes[indices[idx]].valor));
@@ -81,6 +87,7 @@
     {#each colunas as coluna, idx (coluna.chave)}
       <div class="coluna">
         <p class="coluna-titulo" style={`color:${coluna.cor}`}>{coluna.titulo}</p>
+        <p class="coluna-pct">{pctColuna(idx).toFixed(0)}%</p>
         <div class="roda-wrap" style={`height: ${ALTURA_ITEM * ITENS_VISIVEIS}px;`}>
           <div class="roda-marcador" style={`height: ${ALTURA_ITEM}px;`}></div>
           <div
@@ -133,6 +140,12 @@
     text-align: center;
     font-size: var(--font-size-sm);
     font-weight: 600;
+  }
+  .coluna-pct {
+    margin: 0 0 var(--space-2);
+    text-align: center;
+    font-size: 11px;
+    color: var(--surface-muted);
   }
   .roda-wrap {
     position: relative;
