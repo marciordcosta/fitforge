@@ -4,6 +4,7 @@
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import PieChart from "../../components/PieChart.svelte";
+  import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import {
     listMusculos,
     listTreinos,
@@ -65,6 +66,20 @@
       return { treino: t, lista };
     });
   });
+
+  /** Séries já marcadas como concluídas na sessão ao vivo (treinoLogSessao), contadas por músculo — só faz sentido pra rotina que está em andamento agora. */
+  function contarFeitoAoVivo(treino: TreinoComExercicios): Map<string, number> {
+    const musculosPorExercicio = new Map(treino.exercicios.map((ex) => [ex.exercicio_id, ex.exercicio?.musculos ?? []]));
+    const mapa = new Map<string, number>();
+    for (const exSessao of treinoLogSessao.atual?.sessao ?? []) {
+      const concluidas = exSessao.sets.filter((s) => s.concluida).length;
+      if (!concluidas) continue;
+      for (const m of musculosPorExercicio.get(exSessao.exercicio_id) ?? []) {
+        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + concluidas);
+      }
+    }
+    return mapa;
+  }
 
   const totaisSemanais = $derived.by(() => {
     let exercicios = 0;
@@ -370,10 +385,14 @@
         </div>
 
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
+          {@const sessaoAtiva = treinoLogSessao.atual?.treinoId === treino.id}
+          {@const feitoAoVivo = sessaoAtiva ? contarFeitoAoVivo(treino) : null}
           <div class="rotina-card">
             <div class="rotina-cabecalho">
               <h2 class="rotina-nome">{treino.nome_treino}</h2>
-              {#if treino.dia_semana != null}
+              {#if sessaoAtiva}
+                <span class="dia-tag dia-tag-ao-vivo">Ao vivo</span>
+              {:else if treino.dia_semana != null}
                 <span class="dia-tag">{DIAS_SEMANA_ABREV[treino.dia_semana]}</span>
               {/if}
             </div>
@@ -382,12 +401,13 @@
             {:else}
               <div class="lista">
                 {#each lista as item (item.musculo.id)}
+                  {@const feito = feitoAoVivo?.get(item.musculo.id) ?? 0}
                   <div class="item">
                     <span class="nome">{item.musculo.nome}</span>
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${Math.min(item.valor * 8, 100)}%; background: ${corVolume(item.valor)};`}></div>
+                      <div class="barra" style={`width: ${feitoAoVivo ? Math.min((feito / item.valor) * 100, 100) : Math.min(item.valor * 8, 100)}%; background: ${corVolume(item.valor)};`}></div>
                     </div>
-                    <span class="valor" style={`color: ${corVolume(item.valor)};`}>{item.valor}</span>
+                    <span class="valor" style={`color: ${corVolume(item.valor)};`}>{feitoAoVivo ? `${feito} / ${item.valor}` : item.valor}</span>
                   </div>
                 {/each}
               </div>
@@ -656,6 +676,10 @@
   .dia-tag {
     font-size: 11px;
     color: var(--surface-muted);
+  }
+  .dia-tag-ao-vivo {
+    color: var(--color-success);
+    font-weight: 600;
   }
   .icon-btn {
     margin-left: auto;
