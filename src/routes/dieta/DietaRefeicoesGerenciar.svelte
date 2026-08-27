@@ -303,12 +303,26 @@
     if (caloriasGrupoCalc <= 0) return;
     const manuaisTeste = new Map(manuaisDias);
     for (const dia of diasSelecionados) manuaisTeste.set(dia, caloriasGrupoCalc);
+    let resolvido: CaloriasPorDia[];
     try {
-      resolverDistribuicao(caloriasCalc, manuaisTeste, minimoCalorias);
+      resolvido = resolverDistribuicao(caloriasCalc, manuaisTeste, minimoCalorias);
     } catch (err) {
       alert((err as Error).message);
       return;
     }
+
+    /** Só aviso, não trava — bloquear aqui poderia deixar a conta sem solução (calorias fecham, mas nenhum carboidrato possível fecha o mínimo). */
+    const carboMinG = parametro("carboidrato").min * pesoAtual;
+    const diasAbaixoDoMinimo = resolvido.filter(
+      (d) => !d.manual && carboidratoGDoDia(d.calorias, proteinaGInput ?? 0, gorduraGInput ?? 0) < carboMinG,
+    );
+    if (diasAbaixoDoMinimo.length) {
+      const nomes = diasAbaixoDoMinimo.map((d) => DIAS_SEMANA_ABREV[d.diaSemana]).join(", ");
+      alert(
+        `Aviso: o carboidrato calculado pra ${nomes} ficaria abaixo do mínimo parametrizado (${carboMinG.toFixed(0)} g) — aplicando mesmo assim.`,
+      );
+    }
+
     const novoManual = new Map(manuaisCompletos);
     for (const dia of diasSelecionados) {
       novoManual.set(dia, {
