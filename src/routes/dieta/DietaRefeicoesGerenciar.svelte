@@ -999,12 +999,10 @@
             {#each grupo.dias as dia (dia)}
               {@const treino = treinoDoDia(dia)}
               <div class="dia-card-slot">
+                <p class="dia-card-treino-topo">{treino ?? ""}</p>
                 <div class="dia-card" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
                   <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
                 </div>
-                {#if treino}
-                  <p class="dia-card-treino">{treino}</p>
-                {/if}
               </div>
             {/each}
           </div>
@@ -1808,6 +1806,17 @@
   }
   .dia-card-treino {
     margin: 0 0 4px;
+    max-width: 72px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    font-size: 10px;
+    color: var(--surface-muted);
+  }
+  .dia-card-treino-topo {
+    margin: 0 0 4px;
+    min-height: 12px;
     max-width: 72px;
     white-space: nowrap;
     overflow: hidden;
