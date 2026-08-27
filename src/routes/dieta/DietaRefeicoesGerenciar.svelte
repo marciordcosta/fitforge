@@ -1071,10 +1071,6 @@
         </div>
       {/if}
 
-      <p class="dica">
-        Em Fixa, ajustar proteína, gordura ou carboidrato recalcula as calorias; ajustar as calorias reajusta o carboidrato pra fechar a conta. Em Ondulatória, toque nos dias e "Definir bloco" pra nomear um grupo de dias; quando todos os 7 estiverem em algum bloco, "Definir calorias" abre um único modal com todos os blocos lado a lado. Fibras e gordura saturada são calculadas com base nas calorias do dia; água, com base no peso.
-      </p>
-
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
     {/if}
   {:else}
@@ -1650,11 +1646,6 @@
   }
   .nutriente-item span:first-child {
     color: var(--surface-muted);
-  }
-  .dica {
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
-    margin: 0 0 var(--space-4);
   }
   .lista {
     list-style: none;
