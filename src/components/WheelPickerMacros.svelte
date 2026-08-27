@@ -13,6 +13,8 @@
     opcoes: Opcao[];
     valorAtual: number;
     kcalPorGrama: number;
+    /** Texto da unidade oposta à que está sendo editada (ex: g/kg quando o seletor edita em gramas), a partir do valor canônico em gramas. */
+    secundario: (valorGramas: number) => string;
   }
 
   let {
@@ -86,8 +88,10 @@
   <div class="colunas">
     {#each colunas as coluna, idx (coluna.chave)}
       <div class="coluna">
-        <p class="coluna-titulo" style={`color:${coluna.cor}`}>{coluna.titulo}</p>
-        <p class="coluna-pct">{pctColuna(idx).toFixed(0)}%</p>
+        <p class="coluna-titulo" style={`color:${coluna.cor}`}>
+          {coluna.titulo} <span class="coluna-pct">{pctColuna(idx).toFixed(0)}%</span>
+        </p>
+        <p class="coluna-secundario">{coluna.secundario(coluna.opcoes[indices[idx]].valor)}</p>
         <div class="roda-wrap" style={`height: ${ALTURA_ITEM * ITENS_VISIVEIS}px;`}>
           <div class="roda-marcador" style={`height: ${ALTURA_ITEM}px;`}></div>
           <div
@@ -142,6 +146,10 @@
     font-weight: 600;
   }
   .coluna-pct {
+    font-weight: 400;
+    color: var(--surface-muted);
+  }
+  .coluna-secundario {
     margin: 0 0 var(--space-2);
     text-align: center;
     font-size: 11px;
