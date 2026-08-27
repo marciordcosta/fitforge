@@ -374,6 +374,8 @@
       </button>
     </div>
 
+    <p class="diario-titulo">Diário</p>
+
     {#if !refeicoes.length}
       <p class="muted">Nenhuma refeição ainda. Toque em + pra criar.</p>
     {:else}
@@ -703,6 +705,10 @@
     font-size: var(--font-size-lg);
     margin: 0;
     color: var(--surface-fg);
+  }
+  .diario-titulo {
+    font-weight: 600;
+    margin: 0 0 var(--space-3);
   }
   .card-cal {
     flex-shrink: 0;
