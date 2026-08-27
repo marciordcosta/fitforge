@@ -1027,8 +1027,10 @@ export function carboidratoGDoDia(caloriasDoDia: number, proteinaG: number, gord
  * semana dessa data: proteína é sempre o valor global atual (constante, nunca varia por dia,
  * nem em dias travados manualmente); a gordura é redistribuída entre os dias automáticos (dias
  * manuais "gastam" da meta semanal, o resto divide igual entre os automáticos — distribuirValorPorDia);
- * o carboidrato é calculado por cima pra fechar a meta de calorias automática daquele dia — mesma
- * lógica usada em Gerenciar > Refeições.
+ * o carboidrato é sempre calculado por cima pra fechar a meta de calorias daquele dia (automático
+ * ou manual) com a proteína/gordura vigentes — assim, se a proteína global mudar, todo dia manual
+ * recalcula o carboidrato na hora pra manter a calorias travada daquele dia, sem precisar regravar
+ * nada. Mesma lógica usada em Gerenciar > Refeições.
  */
 export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
   const modo = await getModoCalorias();
@@ -1059,7 +1061,14 @@ export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
 
   if (diaResolvido.manual) {
     const dados = manuais.get(diaSemana);
-    if (dados) return { calorias: dados.calorias, proteinaG, gorduraG: dados.gorduraG, carboidratoG: dados.carboidratoG };
+    if (dados) {
+      return {
+        calorias: dados.calorias,
+        proteinaG,
+        gorduraG: dados.gorduraG,
+        carboidratoG: carboidratoGDoDia(dados.calorias, proteinaG, dados.gorduraG),
+      };
+    }
   }
   const manuaisGordura = new Map([...manuais].map(([dia, v]) => [dia, v.gorduraG]));
   const gorduraResolvida = distribuirValorPorDia(gorduraG, manuaisGordura).find((d) => d.diaSemana === diaSemana)!.valor;

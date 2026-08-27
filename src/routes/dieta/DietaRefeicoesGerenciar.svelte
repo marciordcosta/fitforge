@@ -171,6 +171,22 @@
     distribuirValorPorDia(gorduraGInput ?? 0, new Map([...manuaisCompletos].map(([d, v]) => [d, v.gorduraG]))),
   );
 
+  /**
+   * Visão "ao vivo" dos blocos já salvos — como a proteína é global e pode ter mudado desde que
+   * cada bloco foi configurado, o carboidrato de cada um é recalculado aqui pra fechar a calorias
+   * daquele bloco (que fica travada) com a proteína/gordura vigentes. Sempre ler daqui, nunca de
+   * manuaisCompletos diretamente, quando precisar do carboidrato ou proteína efetivos de um bloco.
+   */
+  const manuaisEfetivos = $derived.by(() => {
+    const p = proteinaGInput ?? 0;
+    return new Map(
+      [...manuaisCompletos].map(([dia, v]) => [
+        dia,
+        { calorias: v.calorias, proteinaG: p, gorduraG: v.gorduraG, carboidratoG: carboidratoGDoDia(v.calorias, p, v.gorduraG) },
+      ]),
+    );
+  });
+
   /** Dias com a mesma meta de calorias E as mesmas refeições (na mesma ordem) viram um único bloco — dias diferentes em qualquer um dos dois saem em blocos separados. Ordem preservada pela primeira ocorrência (Dom..Sáb). */
   const gruposDias = $derived.by((): GrupoDias[] => {
     const grupos = new Map<string, GrupoDias>();
@@ -274,7 +290,7 @@
   /** Ao abrir pra um grupo ainda automático (sem override salvo), usa a calorias real que sobrou pra esses dias (diasResolvidos) — não a média semanal fixa (caloriasCalc), senão o carboidrato inicial já abre errado. Proteína nunca é definida aqui — é sempre o global (grupoProteinaG é derived). */
   function abrirDefinirCalorias() {
     const dias = [...diasSelecionados];
-    const existente = dias.length ? manuaisCompletos.get(dias[0]) : undefined;
+    const existente = dias.length ? manuaisEfetivos.get(dias[0]) : undefined;
     if (existente) {
       grupoGorduraG = existente.gorduraG;
       grupoCarboidratoG = existente.carboidratoG;
@@ -301,12 +317,21 @@
     return [
       { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesMacro(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: grupoCarboidratoG, kcalPorGrama: 4 },
       { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesMacro(parametro("gordura").min, parametro("gordura").max), valorAtual: grupoGorduraG, kcalPorGrama: 9 },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesMacro(parametro("proteina").min, parametro("proteina").max), valorAtual: grupoProteinaG, kcalPorGrama: 4 },
     ];
   }
 
+  /**
+   * Proteína aqui é a coluna do valor GLOBAL (grupoProteinaG é só um espelho derivado dele) — mudar
+   * essa coluna muda a proteína de todos os blocos, não só deste. Os outros blocos já salvos
+   * recalculam o carboidrato deles sozinhos (manuaisEfetivos), preservando a calorias de cada um.
+   */
   function confirmarMacrosGrupo(valores: Record<string, number>) {
     grupoCarboidratoG = valores.carboidratoG;
     grupoGorduraG = valores.gorduraG;
+    proteinaGInput = valores.proteinaG;
+    proteinaGKg = pesoAtual > 0 ? Math.round((proteinaGInput / pesoAtual) * 100) / 100 : 0;
+    recalcularCaloriasDosMacros();
   }
 
   /** Só aplica localmente (valida a distribuição antes) — persiste no banco junto com o resto ao tocar em "Salvar" no fim da tela. */
@@ -417,14 +442,17 @@
     return [
       { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesMacro(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: carboidratoGInput ?? 0, kcalPorGrama: 4 },
       { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesMacro(parametro("gordura").min, parametro("gordura").max), valorAtual: gorduraGInput ?? 0, kcalPorGrama: 9 },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesMacro(parametro("proteina").min, parametro("proteina").max), valorAtual: proteinaGInput ?? 0, kcalPorGrama: 4 },
     ];
   }
 
   function confirmarMacros(valores: Record<string, number>) {
     carboidratoGInput = valores.carboidratoG;
     gorduraGInput = valores.gorduraG;
+    proteinaGInput = valores.proteinaG;
     carboidratoGKg = pesoAtual > 0 ? Math.round((carboidratoGInput / pesoAtual) * 100) / 100 : 0;
     gorduraGKg = pesoAtual > 0 ? Math.round((gorduraGInput / pesoAtual) * 100) / 100 : 0;
+    proteinaGKg = pesoAtual > 0 ? Math.round((proteinaGInput / pesoAtual) * 100) / 100 : 0;
     recalcularCaloriasDosMacros();
   }
 
@@ -517,7 +545,7 @@
       const diasRemovidos = [...manuaisOriginal.keys()].filter((dia) => !manuaisCompletos.has(dia));
       await Promise.all(diasRemovidos.map((dia) => removerCaloriasDia(dia)));
       await Promise.all(
-        [...manuaisCompletos].map(([dia, v]) =>
+        [...manuaisEfetivos].map(([dia, v]) =>
           definirCaloriasDias([dia], v.proteinaG, v.gorduraG, v.carboidratoG, caloriasCalc, minimoCalorias, manuaisDias),
         ),
       );
@@ -610,16 +638,17 @@
   }
 
   /**
-   * Meta de macros do dia pra esse grupo: proteína é sempre o global atual (nunca varia por dia,
-   * nem em grupo manual); se é manual, gordura/carboidrato usam a composição salva daquele
-   * ajuste; se é automático, a gordura vem da redistribuição semanal, com o carboidrato
-   * calculado pra fechar a meta de calorias desse dia.
+   * Meta de macros do dia pra esse grupo: proteína é sempre o global atual (nunca varia por dia);
+   * se é manual, gordura vem da composição salva e o carboidrato é recalculado ao vivo pra fechar
+   * a calorias travada desse bloco com a proteína vigente (manuaisEfetivos); se é automático, a
+   * gordura vem da redistribuição semanal, com o carboidrato calculado pra fechar a meta de
+   * calorias desse dia.
    */
   function metaMacrosDoGrupo(grupo: GrupoDias) {
     const proteinaG = proteinaGInput ?? 0;
     if (grupo.manual) {
-      const dados = manuaisCompletos.get(grupo.dias[0]);
-      if (dados) return { ...dados, proteinaG };
+      const dados = manuaisEfetivos.get(grupo.dias[0]);
+      if (dados) return dados;
     }
     const gorduraG = gorduraResolvidaSemana.find((d) => d.diaSemana === grupo.dias[0])?.valor ?? gorduraGInput ?? 0;
     return { calorias: grupo.calorias, proteinaG, gorduraG, carboidratoG: carboidratoGDoDia(grupo.calorias, proteinaG, gorduraG) };
@@ -1334,8 +1363,8 @@
       </div>
       <div class="tabela-linha tabela-linha-3col">
         <span class="tabela-rotulo">Proteína</span>
-        <span class="tabela-input tabela-input-gkg tabela-input-estatico">{gKgGrupo(grupoProteinaG)} g/kg</span>
-        <span class="tabela-input tabela-input-estatico">{grupoProteinaG} g</span>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => abrirMacrosGrupo("gkg")}>{gKgGrupo(grupoProteinaG)} g/kg</button>
+        <button type="button" class="tabela-input" onclick={() => abrirMacrosGrupo("g")}>{grupoProteinaG} g</button>
       </div>
       <div class="tabela-linha tabela-linha-3col">
         <span class="tabela-rotulo">Gordura</span>
@@ -1578,9 +1607,6 @@
   }
   .tabela-input:focus {
     outline: none;
-  }
-  .tabela-input-estatico {
-    cursor: default;
   }
   .tabela-input-gkg {
     color: var(--surface-muted);
