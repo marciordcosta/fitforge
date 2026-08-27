@@ -1512,7 +1512,7 @@
   }
   .lista {
     list-style: none;
-    margin: 0 0 var(--space-4);
+    margin: 0 0 var(--space-6);
     padding: 0 var(--space-3);
     background: var(--surface-card);
     border-radius: var(--radius-lg);
