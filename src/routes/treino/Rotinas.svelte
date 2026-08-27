@@ -6,7 +6,7 @@
     listTreinos,
     listMusculos,
     getVolumeRealizadoBruto,
-    getTotalSeriesExecutadasPeriodo,
+    getSeriesExecutadasPorTreinoPeriodo,
     DIAS_SEMANA_COMPLETO,
     type TreinoComExercicios,
     type Musculo,
@@ -15,7 +15,7 @@
   let treinos = $state<TreinoComExercicios[]>([]);
   let loading = $state(true);
   let musculos = $state<Musculo[]>([]);
-  let executado = $state(0);
+  let seriesPorTreino = $state<Map<string, number>>(new Map());
   let feitoPorMusculo = $state<Map<string, number>>(new Map());
   let modoRestante = $state(false);
 
@@ -38,15 +38,15 @@
 
   async function carregar() {
     loading = true;
-    const [treinosCarregados, musculosCarregados, volumeRealizado, totalExecutado] = await Promise.all([
+    const [treinosCarregados, musculosCarregados, volumeRealizado, seriesPorTreinoCarregado] = await Promise.all([
       listTreinos(),
       listMusculos(),
       getVolumeRealizadoBruto(segundaISO(), hojeISO()),
-      getTotalSeriesExecutadasPeriodo(segundaISO(), hojeISO()),
+      getSeriesExecutadasPorTreinoPeriodo(segundaISO(), hojeISO()),
     ]);
     treinos = ordenarPorDia(treinosCarregados);
     musculos = musculosCarregados;
-    executado = totalExecutado;
+    seriesPorTreino = seriesPorTreinoCarregado;
     const mapaFeito = new Map<string, number>();
     for (const l of volumeRealizado) {
       mapaFeito.set(l.musculo_id, (mapaFeito.get(l.musculo_id) ?? 0) + Number(l.series_equivalentes));
@@ -69,6 +69,9 @@
 
   /** Total de séries programadas em todas as rotinas — meta semanal do card (assume 1 execução de cada rotina na semana). */
   const programado = $derived(treinos.reduce((acc, t) => acc + t.exercicios.reduce((a, ex) => a + ex.series.length, 0), 0));
+
+  /** Total de séries feitas na semana, somando todas as rotinas. */
+  const executado = $derived([...seriesPorTreino.values()].reduce((acc, v) => acc + v, 0));
 
   /** Volume planejado por músculo (ponderado por peso_contribuicao) — é a "meta" de cada músculo: as próprias rotinas cadastradas. */
   const planejadoPorMusculo = $derived.by(() => {
