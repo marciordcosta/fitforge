@@ -705,17 +705,16 @@ export async function getVolumeRealizadoBruto(
   return data ?? [];
 }
 
-/** Séries (linhas de treino_registros) feitas no período, contadas por rotina — Map<treino_id, total>. Somar os valores dá o total geral do período, mesma unidade do "programado" (soma de ex.series.length). */
-export async function getSeriesExecutadasPorTreinoPeriodo(dataInicio: string, dataFim: string): Promise<Map<string, number>> {
+/** Uma linha por série registrada (rotina + exercício) no período — base pra contar tanto o total por rotina quanto o detalhamento por músculo de cada rotina. */
+export async function getRegistrosPorTreinoPeriodo(
+  dataInicio: string,
+  dataFim: string,
+): Promise<{ treino_id: string; exercicio_id: string }[]> {
   const { data, error } = await supabase
     .from("treino_registros")
-    .select("treino_id")
+    .select("treino_id, exercicio_id")
     .gte("data", dataInicio)
     .lte("data", dataFim);
   if (error) throw error;
-  const mapa = new Map<string, number>();
-  for (const r of data ?? []) {
-    mapa.set(r.treino_id, (mapa.get(r.treino_id) ?? 0) + 1);
-  }
-  return mapa;
+  return data ?? [];
 }

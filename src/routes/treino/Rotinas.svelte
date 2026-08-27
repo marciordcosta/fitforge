@@ -6,7 +6,7 @@
     listTreinos,
     listMusculos,
     getVolumeRealizadoBruto,
-    getSeriesExecutadasPorTreinoPeriodo,
+    getRegistrosPorTreinoPeriodo,
     DIAS_SEMANA_COMPLETO,
     type TreinoComExercicios,
     type Musculo,
@@ -38,15 +38,19 @@
 
   async function carregar() {
     loading = true;
-    const [treinosCarregados, musculosCarregados, volumeRealizado, seriesPorTreinoCarregado] = await Promise.all([
+    const [treinosCarregados, musculosCarregados, volumeRealizado, registros] = await Promise.all([
       listTreinos(),
       listMusculos(),
       getVolumeRealizadoBruto(segundaISO(), hojeISO()),
-      getSeriesExecutadasPorTreinoPeriodo(segundaISO(), hojeISO()),
+      getRegistrosPorTreinoPeriodo(segundaISO(), hojeISO()),
     ]);
     treinos = ordenarPorDia(treinosCarregados);
     musculos = musculosCarregados;
-    seriesPorTreino = seriesPorTreinoCarregado;
+    const mapaSeriesPorTreino = new Map<string, number>();
+    for (const r of registros) {
+      mapaSeriesPorTreino.set(r.treino_id, (mapaSeriesPorTreino.get(r.treino_id) ?? 0) + 1);
+    }
+    seriesPorTreino = mapaSeriesPorTreino;
     const mapaFeito = new Map<string, number>();
     for (const l of volumeRealizado) {
       mapaFeito.set(l.musculo_id, (mapaFeito.get(l.musculo_id) ?? 0) + Number(l.series_equivalentes));

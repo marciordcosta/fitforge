@@ -9,6 +9,7 @@
     listMusculos,
     listTreinos,
     getVolumeRealizadoBruto,
+    getRegistrosPorTreinoPeriodo,
     DIAS_SEMANA_ABREV,
     type Musculo,
     type TreinoComExercicios,
@@ -22,8 +23,10 @@
   let linhasRealizadoMes = $state<{ data: string; musculo_id: string; series_equivalentes: number }[]>([]);
   let carregandoRealizado = $state(false);
   let feitoPorMusculoSemana = $state<Map<string, number>>(new Map());
+  /** treino_id -> exercicio_id -> quantas séries desse exercício foram registradas essa semana. */
+  let registrosSemanaPorTreino = $state<Map<string, Map<string, number>>>(new Map());
 
-  /** Semana ancorada em segunda-feira (exceção proposital, igual à tela inicial de Treino — o resto do app usa terça, ver inicioSemana em dates.ts). */
+  /** Semana ancorada em segunda-feira (exceção proposital, igual à tela inicial de Treino — o resto do app usa terça, ver inicioSemana em dates.ts). Vai virar parametrizável. */
   function segundaISO(): string {
     const hoje = new Date();
     const delta = (hoje.getDay() + 6) % 7;
@@ -33,12 +36,27 @@
   async function carregarBase() {
     [musculos, treinos] = await Promise.all([listMusculos(), listTreinos()]);
     const hojeIso = toISODate(new Date());
-    const [, volumeSemana] = await Promise.all([carregarRealizado(), getVolumeRealizadoBruto(segundaISO(), hojeIso)]);
+    const [, volumeSemana, registros] = await Promise.all([
+      carregarRealizado(),
+      getVolumeRealizadoBruto(segundaISO(), hojeIso),
+      getRegistrosPorTreinoPeriodo(segundaISO(), hojeIso),
+    ]);
     const mapa = new Map<string, number>();
     for (const l of volumeSemana) {
       mapa.set(l.musculo_id, (mapa.get(l.musculo_id) ?? 0) + Number(l.series_equivalentes));
     }
     feitoPorMusculoSemana = mapa;
+
+    const mapaRegistros = new Map<string, Map<string, number>>();
+    for (const r of registros) {
+      let porExercicio = mapaRegistros.get(r.treino_id);
+      if (!porExercicio) {
+        porExercicio = new Map();
+        mapaRegistros.set(r.treino_id, porExercicio);
+      }
+      porExercicio.set(r.exercicio_id, (porExercicio.get(r.exercicio_id) ?? 0) + 1);
+    }
+    registrosSemanaPorTreino = mapaRegistros;
   }
 
   void carregarBase();
@@ -76,6 +94,20 @@
       if (!concluidas) continue;
       for (const m of musculosPorExercicio.get(exSessao.exercicio_id) ?? []) {
         mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + concluidas);
+      }
+    }
+    return mapa;
+  }
+
+  /** Séries já registradas (concluídas de verdade, "Concluir treino") dessa rotina essa semana, contadas por músculo — 0 pra tudo assim que a semana reinicia. */
+  function contarFeitoSemana(treino: TreinoComExercicios): Map<string, number> {
+    const musculosPorExercicio = new Map(treino.exercicios.map((ex) => [ex.exercicio_id, ex.exercicio?.musculos ?? []]));
+    const registrosDoTreino = registrosSemanaPorTreino.get(treino.id);
+    const mapa = new Map<string, number>();
+    if (!registrosDoTreino) return mapa;
+    for (const [exercicioId, qtd] of registrosDoTreino) {
+      for (const m of musculosPorExercicio.get(exercicioId) ?? []) {
+        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + qtd);
       }
     }
     return mapa;
@@ -207,6 +239,9 @@
       }),
     ).length;
   });
+
+  /** Meta semanal por músculo (mesmo valor de distribuicaoSemanal, só num Map pra achar rápido) — usada pra comparar com o realizado do mês. */
+  const metaPorMusculo = $derived(new Map(distribuicaoSemanal.map((item) => [item.musculo.id, item.valor])));
 
   /** Distribuição realizada no mês: média semanal (soma do mês ÷ semanas com treino), com o peso de contribuição parametrizado. */
   const listaRealizado = $derived.by(() => {
@@ -386,7 +421,8 @@
 
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
           {@const sessaoAtiva = treinoLogSessao.atual?.treinoId === treino.id}
-          {@const feitoAoVivo = sessaoAtiva ? contarFeitoAoVivo(treino) : null}
+          {@const feitoTreino = sessaoAtiva ? contarFeitoAoVivo(treino) : contarFeitoSemana(treino)}
+          {@const corProgresso = sessaoAtiva ? "var(--color-success)" : "var(--color-neutral)"}
           <div class="rotina-card">
             <div class="rotina-cabecalho">
               <h2 class="rotina-nome">{treino.nome_treino}</h2>
@@ -401,13 +437,13 @@
             {:else}
               <div class="lista">
                 {#each lista as item (item.musculo.id)}
-                  {@const feito = feitoAoVivo?.get(item.musculo.id) ?? 0}
+                  {@const feito = feitoTreino.get(item.musculo.id) ?? 0}
                   <div class="item">
                     <span class="nome">{item.musculo.nome}</span>
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${feitoAoVivo ? Math.min((feito / item.valor) * 100, 100) : Math.min(item.valor * 8, 100)}%; background: ${feitoAoVivo ? "var(--color-success)" : corVolume(item.valor)};`}></div>
+                      <div class="barra" style={`width: ${Math.min((feito / item.valor) * 100, 100)}%; background: ${corProgresso};`}></div>
                     </div>
-                    <span class="valor" style={`color: ${feitoAoVivo ? "var(--color-success)" : corVolume(item.valor)};`}>{feitoAoVivo ? `${feito} / ${item.valor}` : item.valor}</span>
+                    <span class="valor" style={`color: ${corProgresso};`}>{feito} / {item.valor}</span>
                   </div>
                 {/each}
               </div>
@@ -441,12 +477,20 @@
       {:else}
         <div class="lista">
           {#each listaRealizado as item (item.musculo.id)}
+            {@const meta = metaPorMusculo.get(item.musculo.id) ?? 0}
             <div class="item">
               <span class="nome">{item.musculo.nome}</span>
-              <div class="barra-wrap">
-                <div class="barra" style={`width: ${Math.min(item.valor * 8, 100)}%; background: ${corVolume(item.valor)};`}></div>
-              </div>
-              <span class="valor" style={`color: ${corVolume(item.valor)};`}>{item.valor}</span>
+              {#if meta > 0}
+                <div class="barra-wrap">
+                  <div class="barra" style={`width: ${Math.min((item.valor / meta) * 100, 100)}%; background: var(--color-neutral);`}></div>
+                </div>
+                <span class="valor" style="color: var(--color-neutral);">{item.valor} / {meta}</span>
+              {:else}
+                <div class="barra-wrap">
+                  <div class="barra" style={`width: ${Math.min(item.valor * 8, 100)}%; background: ${corVolume(item.valor)};`}></div>
+                </div>
+                <span class="valor" style={`color: ${corVolume(item.valor)};`}>{item.valor}</span>
+              {/if}
             </div>
           {/each}
         </div>
