@@ -331,6 +331,17 @@ export async function vincularMetaReceita(modeloId: string, receitaId: string): 
   if (error) throw error;
 }
 
+/** Se essa receita é o prato padrão de alguma refeição do catálogo (global ou por dia) — usado pra esconder "Adicionar à refeição" ao visualizá-la nesse papel. */
+export async function receitaEhMetaDeRefeicao(receitaId: string): Promise<boolean> {
+  const [global, porDia] = await Promise.all([
+    supabase.from("dieta_refeicoes_modelo").select("id").eq("meta_receita_id", receitaId).limit(1),
+    supabase.from("dieta_refeicoes_modelo_meta_dia").select("modelo_id").eq("meta_receita_id", receitaId).limit(1),
+  ]);
+  if (global.error) throw global.error;
+  if (porDia.error) throw porDia.error;
+  return (global.data?.length ?? 0) > 0 || (porDia.data?.length ?? 0) > 0;
+}
+
 /** Meta de macros/calorias de uma refeição do catálogo específica de um dia da semana (modo Ondulatória). */
 export interface MetaDiaModelo {
   modeloId: string;

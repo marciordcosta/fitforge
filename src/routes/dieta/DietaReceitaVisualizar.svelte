@@ -11,6 +11,7 @@
     garantirRefeicoesPadraoDoDia,
     getRefeicoesDoDia,
     getMetasDiarias,
+    receitaEhMetaDeRefeicao,
     adicionarReceitaAoDiario,
     atualizarReceita,
     atualizarItemReceita,
@@ -34,6 +35,7 @@
 
   let receita = $state<Receita | null>(null);
   let metas = $state<MetasDiarias | null>(null);
+  let ehMetaPadrao = $state(false);
   let refeicao = $state<RefeicaoDia | null>(null);
   let opcoesRefeicao = $state<RefeicaoDia[]>([]);
   let loading = $state(true);
@@ -60,14 +62,16 @@
     loading = true;
     erro = null;
     try {
-      const [receitaRes, metasRes, refeicoesHoje] = await Promise.all([
+      const [receitaRes, metasRes, refeicoesHoje, ehMeta] = await Promise.all([
         getReceita(receitaId),
         getMetasDiarias(),
         garantirRefeicoesPadraoDoDia(hojeISO()),
+        receitaEhMetaDeRefeicao(receitaId),
       ]);
       receita = receitaRes;
       metas = metasRes;
       refeicao = refeicoesHoje[0] ?? null;
+      ehMetaPadrao = ehMeta;
       nomeEditavel = receitaRes?.nome ?? "";
       idsParaRemover = [];
 
@@ -245,16 +249,18 @@
   {:else if !receita}
     <p class="muted">Refeição não encontrada.</p>
   {:else}
-    <div
-      class="linha"
-      role="button"
-      tabindex="0"
-      onclick={() => abrirEscolhaRefeicao()}
-      onkeydown={(e) => e.key === "Enter" && abrirEscolhaRefeicao()}
-    >
-      <span>Adicionar à refeição</span>
-      <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Selecione uma refeição"}</span>
-    </div>
+    {#if !ehMetaPadrao}
+      <div
+        class="linha"
+        role="button"
+        tabindex="0"
+        onclick={() => abrirEscolhaRefeicao()}
+        onkeydown={(e) => e.key === "Enter" && abrirEscolhaRefeicao()}
+      >
+        <span>Adicionar à refeição</span>
+        <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Selecione uma refeição"}</span>
+      </div>
+    {/if}
 
     {#if itensLocais.length}
       <div class="resumo">
