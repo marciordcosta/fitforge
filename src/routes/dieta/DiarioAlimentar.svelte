@@ -621,7 +621,7 @@
   .macros-grid {
     display: flex;
     gap: var(--space-3);
-    padding-right: 48px;
+    width: calc(100% - 40px);
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
