@@ -618,7 +618,7 @@
               {/if}
               <span class="anterior-valor">
                 {serieItem.anteriorPeso != null && serieItem.anteriorReps != null
-                  ? `${serieItem.anteriorPeso}kg x ${serieItem.anteriorReps}`
+                  ? `${serieItem.anteriorPeso} x ${serieItem.anteriorReps}`
                   : "—"}
               </span>
               <input
@@ -1045,7 +1045,7 @@
   }
   .meta-cel {
     font-size: var(--font-size-base);
-    color: var(--surface-fg);
+    color: var(--surface-muted);
     background: none;
     border: none;
     padding: 0;
