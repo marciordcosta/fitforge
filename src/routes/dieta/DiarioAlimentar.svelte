@@ -702,7 +702,7 @@
     flex-shrink: 0;
     font-size: var(--font-size-lg);
     margin: 0;
-    color: var(--color-primary);
+    color: var(--surface-fg);
   }
   .card-cal {
     flex-shrink: 0;
