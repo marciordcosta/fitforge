@@ -405,9 +405,9 @@
                   <div class="item">
                     <span class="nome">{item.musculo.nome}</span>
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${feitoAoVivo ? Math.min((feito / item.valor) * 100, 100) : Math.min(item.valor * 8, 100)}%; background: ${corVolume(item.valor)};`}></div>
+                      <div class="barra" style={`width: ${feitoAoVivo ? Math.min((feito / item.valor) * 100, 100) : Math.min(item.valor * 8, 100)}%; background: ${feitoAoVivo ? "var(--color-success)" : corVolume(item.valor)};`}></div>
                     </div>
-                    <span class="valor" style={`color: ${corVolume(item.valor)};`}>{feitoAoVivo ? `${feito} / ${item.valor}` : item.valor}</span>
+                    <span class="valor" style={`color: ${feitoAoVivo ? "var(--color-success)" : corVolume(item.valor)};`}>{feitoAoVivo ? `${feito} / ${item.valor}` : item.valor}</span>
                   </div>
                 {/each}
               </div>
