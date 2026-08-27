@@ -19,6 +19,8 @@
     removerItensDaRefeicao,
     getAlimento,
     atualizarItemDiario,
+    getRefeicoesDoDia,
+    moverItemDiario,
     type RefeicaoDia,
     type ItemDiario,
     type MetasDiarias,
@@ -51,6 +53,9 @@
   let mostrarOpcoesRefPadrao = $state(false);
   let itemEditando = $state<ItemDiario | null>(null);
   let alimentoEditando = $state<Alimento | null>(null);
+  let itemParaMover = $state<ItemDiario | null>(null);
+  let refeicoesParaMover = $state<RefeicaoDia[]>([]);
+  let mostrarMoverItem = $state(false);
 
   async function carregar() {
     loading = true;
@@ -123,6 +128,84 @@
       await carregar();
     } catch (err) {
       alert("Erro ao atualizar item: " + (err as Error).message);
+    } finally {
+      processando = false;
+    }
+  }
+
+  /** Tempo segurando o card parado antes do toque virar "pressionar" (mover pra outra refeição) — evita disparar sem querer num toque rápido/rolagem. */
+  const ATRASO_PRESSIONAR_MS = 500;
+  const TOLERANCIA_MOVIMENTO_PX = 8;
+  let timeoutPressionar: ReturnType<typeof setTimeout> | undefined;
+  let pressionarX = 0;
+  let pressionarY = 0;
+  let pressionouLongo = false;
+
+  function aoPointerDownItem(e: PointerEvent, item: ItemDiario) {
+    pressionarX = e.clientX;
+    pressionarY = e.clientY;
+    pressionouLongo = false;
+    window.addEventListener("pointermove", aoPointerMovePressionar);
+    window.addEventListener("pointerup", aoPointerUpPressionar);
+    timeoutPressionar = setTimeout(() => {
+      pressionouLongo = true;
+      cancelarPressionar();
+      if (navigator.vibrate) navigator.vibrate(10);
+      void abrirMoverItem(item);
+    }, ATRASO_PRESSIONAR_MS);
+  }
+
+  function cancelarPressionar() {
+    clearTimeout(timeoutPressionar);
+    timeoutPressionar = undefined;
+    window.removeEventListener("pointermove", aoPointerMovePressionar);
+    window.removeEventListener("pointerup", aoPointerUpPressionar);
+  }
+
+  function aoPointerMovePressionar(e: PointerEvent) {
+    if (Math.hypot(e.clientX - pressionarX, e.clientY - pressionarY) > TOLERANCIA_MOVIMENTO_PX) {
+      cancelarPressionar();
+    }
+  }
+
+  function aoPointerUpPressionar() {
+    cancelarPressionar();
+  }
+
+  function aoClickItem(item: ItemDiario) {
+    if (pressionouLongo) {
+      pressionouLongo = false;
+      return;
+    }
+    void abrirItem(item);
+  }
+
+  async function abrirMoverItem(item: ItemDiario) {
+    if (!refeicao) return;
+    try {
+      const todas = await getRefeicoesDoDia(refeicao.data);
+      refeicoesParaMover = todas.filter((r) => r.id !== refeicaoId);
+      if (!refeicoesParaMover.length) {
+        alert("Não há outra refeição nesse dia pra mover o alimento.");
+        return;
+      }
+      itemParaMover = item;
+      mostrarMoverItem = true;
+    } catch (err) {
+      alert("Erro ao carregar refeições: " + (err as Error).message);
+    }
+  }
+
+  async function moverItemPara(destino: RefeicaoDia) {
+    if (!itemParaMover) return;
+    mostrarMoverItem = false;
+    processando = true;
+    try {
+      await moverItemDiario(itemParaMover.id, destino.id);
+      itemParaMover = null;
+      await carregar();
+    } catch (err) {
+      alert("Erro ao mover alimento: " + (err as Error).message);
     } finally {
       processando = false;
     }
@@ -312,7 +395,7 @@
       <p class="muted">Nenhum alimento adicionado ainda.</p>
     {:else}
       {#each itens as item (item.id)}
-        <button class="item-card" onclick={() => abrirItem(item)}>
+        <button class="item-card" onpointerdown={(e) => aoPointerDownItem(e, item)} onclick={() => aoClickItem(item)}>
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
             <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal</p>
@@ -390,6 +473,14 @@
     porcaoPadraoUnidade={itemEditando.unidade}
     onSalvar={aoSalvarQuantidadeItem}
     onFechar={() => { itemEditando = null; alimentoEditando = null; }}
+  />
+{/if}
+
+{#if mostrarMoverItem && itemParaMover}
+  <ActionSheet
+    titulo={`Mover "${itemParaMover.nome}" para`}
+    onFechar={() => { mostrarMoverItem = false; itemParaMover = null; }}
+    opcoes={refeicoesParaMover.map((r) => ({ label: r.nome, onSelect: () => moverItemPara(r) }))}
   />
 {/if}
 

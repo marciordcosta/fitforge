@@ -668,6 +668,12 @@ export async function atualizarItemDiario(id: string, alimento: Alimento, quanti
   if (error) throw error;
 }
 
+/** Move um item já lançado pra outra refeição do mesmo dia, sem mexer em quantidade/macros. */
+export async function moverItemDiario(id: string, novaRefeicaoId: string): Promise<void> {
+  const { error } = await supabase.from("diario_alimentos").update({ refeicao_id: novaRefeicaoId }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function removerItemDiario(id: string): Promise<void> {
   const { error } = await supabase.from("diario_alimentos").delete().eq("id", id);
   if (error) throw error;
