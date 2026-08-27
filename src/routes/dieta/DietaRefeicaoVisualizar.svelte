@@ -214,6 +214,19 @@
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 {/snippet}
+{#snippet iconAdicionarPrato()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+{/snippet}
+{#snippet iconSubstituirPrato()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 3L4 7l4 4" />
+    <path d="M4 7h16" />
+    <path d="M16 21l4-4-4-4" />
+    <path d="M20 17H4" />
+  </svg>
+{/snippet}
 
 <div class="header-fixo">
   <div class="header-fixo-inner">
@@ -336,9 +349,9 @@
     titulo="Ref padrão"
     onFechar={() => (mostrarOpcoesRefPadrao = false)}
     opcoes={[
-      { label: "Adicionar à refeição", onSelect: () => aplicarRefPadrao(false) },
-      { label: "Substituir refeição", onSelect: () => aplicarRefPadrao(true) },
-      { label: "Cancelar", onSelect: () => {} },
+      { label: "Adicionar à refeição", icon: iconAdicionarPrato, onSelect: () => aplicarRefPadrao(false) },
+      { label: "Substituir refeição", icon: iconSubstituirPrato, onSelect: () => aplicarRefPadrao(true) },
+      { label: "Cancelar", icon: iconExcluir, onSelect: () => {} },
     ]}
   />
 {/if}
