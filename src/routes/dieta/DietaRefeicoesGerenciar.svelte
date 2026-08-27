@@ -1008,7 +1008,7 @@
             <span>Cal</span>
           </div>
         </button>
-        <div class="resumo-macros">
+        <div class="resumo-macros" class:opaco={modoCalorias === "ondulatoria"}>
           <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => abrirMacros("g")}>
             <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarboidrato.toFixed(0)}%</strong>
             <span class="valor-g">{carboidratoGInput ?? 0} g</span>
@@ -1027,7 +1027,7 @@
         </div>
       </div>
 
-      <div class="card-proporcao">
+      <div class="card-proporcao" class:opaco={modoCalorias === "ondulatoria"}>
         <p class="secao-titulo">Proporção por peso (g/kg)</p>
         <div class="tabela-macros">
           <div class="tabela-linha">
@@ -1634,6 +1634,10 @@
     display: flex;
     justify-content: space-between;
     gap: var(--space-2);
+  }
+  .resumo-macros.opaco,
+  .card-proporcao.opaco {
+    opacity: 0.4;
   }
   .macro-col {
     display: flex;
