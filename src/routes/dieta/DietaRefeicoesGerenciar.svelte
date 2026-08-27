@@ -331,15 +331,22 @@
 
   /**
    * Proteína aqui é a coluna do valor GLOBAL (grupoProteinaG é só um espelho derivado dele) — mudar
-   * essa coluna muda a proteína de todos os blocos, não só deste. Os outros blocos já salvos
-   * recalculam o carboidrato deles sozinhos (manuaisEfetivos), preservando a calorias de cada um.
+   * essa coluna muda a proteína de todos os blocos, não só deste. A calorias média da semana é a
+   * variável travada nessa edição (só o donut de Calorias mexe nela) — o ajuste de proteína é
+   * absorvido pelo carboidrato médio global, preservando a calorias média. Os outros blocos já
+   * salvos recalculam o carboidrato deles sozinhos (manuaisEfetivos), preservando a calorias de
+   * cada um.
    */
   function confirmarMacrosGrupo(valores: Record<string, number>) {
     grupoCarboidratoG = valores.carboidratoG;
     grupoGorduraG = valores.gorduraG;
-    proteinaGInput = valores.proteinaG;
-    proteinaGKg = pesoAtual > 0 ? Math.round((proteinaGInput / pesoAtual) * 100) / 100 : 0;
-    recalcularCaloriasDosMacros();
+    if (valores.proteinaG !== proteinaGInput) {
+      const caloriasAlvo = caloriasCalc;
+      proteinaGInput = valores.proteinaG;
+      proteinaGKg = pesoAtual > 0 ? Math.round((proteinaGInput / pesoAtual) * 100) / 100 : 0;
+      carboidratoGInput = Math.max(0, Math.round((caloriasAlvo - 4 * proteinaGInput - 9 * (gorduraGInput ?? 0)) / 4));
+      carboidratoGKg = pesoAtual > 0 ? Math.round((carboidratoGInput / pesoAtual) * 100) / 100 : 0;
+    }
   }
 
   /** Só aplica localmente (valida a distribuição antes) — persiste no banco junto com o resto ao tocar em "Salvar" no fim da tela. */
@@ -413,17 +420,7 @@
     carboidratoGKg = pesoAtual > 0 ? Math.round((novoCarboG / pesoAtual) * 100) / 100 : 0;
   }
 
-  /** Proteína é constante — editar recalcula as calorias totais (não desconta do carboidrato, diferente de editar calorias). */
-  function aoEditarProteinaGKg() {
-    proteinaGInput = Math.round(proteinaGKg * pesoAtual);
-    recalcularCaloriasDosMacros();
-  }
-  function aoEditarProteinaGramas() {
-    proteinaGKg = pesoAtual > 0 ? Math.round(((proteinaGInput ?? 0) / pesoAtual) * 100) / 100 : 0;
-    recalcularCaloriasDosMacros();
-  }
-
-  let campoEditando = $state<"calorias" | "proteinaG" | "proteinaGKg" | null>(null);
+  let campoEditando = $state<"calorias" | null>(null);
   let mostrarMacros = $state(false);
   /** Qual unidade o modal de 3 colunas mostra — decidido por qual campo foi tocado pra abri-lo (gramas ou g/kg), o valor salvo é sempre em gramas. */
   let unidadeMacros = $state<"g" | "gkg">("g");
@@ -435,19 +432,6 @@
   function abrirMacros(unidade: "g" | "gkg") {
     unidadeMacros = unidade;
     mostrarMacros = true;
-  }
-
-  /**
-   * Em Fixa, os 3 macros globais (Carb/Gordura/Proteína) são editados juntos no mesmo seletor de
-   * 3 colunas. Em Ondulatória, Carb/Gordura globais ficam travados (geridos por bloco de dias) —
-   * só a Proteína continua editável ali, então usa o editor de valor único.
-   */
-  function aoTocarProteina(unidade: "g" | "gkg") {
-    if (modoCalorias === "ondulatoria") {
-      campoEditando = unidade === "g" ? "proteinaG" : "proteinaGKg";
-    } else {
-      abrirMacros(unidade);
-    }
   }
 
   function abrirMacrosGrupo(unidade: "g" | "gkg") {
@@ -493,16 +477,6 @@
     return opcoes;
   }
 
-  /** Grade de g/kg com o próprio número de g/kg como valor — usada só pelo editor de valor único da Proteína (não é canônico em gramas como o modal de macros). */
-  function opcoesGKg(min: number, max: number): { valor: number; label: string }[] {
-    const opcoes: { valor: number; label: string }[] = [];
-    for (let v = Math.round(min * 100); v <= Math.round(max * 100); v += 1) {
-      const valor = v / 100;
-      opcoes.push({ valor, label: valor.toFixed(2).replace(".", ",") });
-    }
-    return opcoes;
-  }
-
   function opcoesGramas(minGKg: number, maxGKg: number): { valor: number; label: string }[] {
     const minG = Math.round(minGKg * pesoAtual);
     const maxG = Math.round(maxGKg * pesoAtual);
@@ -517,39 +491,16 @@
     return opcoes;
   }
 
-  function infoCampo(campo: "calorias" | "proteinaG" | "proteinaGKg") {
-    switch (campo) {
-      case "calorias":
-        return {
-          titulo: "Calorias (kcal)",
-          opcoes: opcoesCalorias(),
-          valorAtual: Math.round((caloriasInput ?? caloriasCalc) / 10) * 10,
-          onSelecionar: (v: number) => {
-            caloriasInput = v;
-            aoEditarCalorias();
-          },
-        };
-      case "proteinaG":
-        return {
-          titulo: "Proteína (g)",
-          opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max),
-          valorAtual: proteinaGInput ?? 0,
-          onSelecionar: (v: number) => {
-            proteinaGInput = v;
-            aoEditarProteinaGramas();
-          },
-        };
-      case "proteinaGKg":
-        return {
-          titulo: "Proteína (g/kg)",
-          opcoes: opcoesGKg(parametro("proteina").min, parametro("proteina").max),
-          valorAtual: proteinaGKg,
-          onSelecionar: (v: number) => {
-            proteinaGKg = v;
-            aoEditarProteinaGKg();
-          },
-        };
-    }
+  function infoCampo(campo: "calorias") {
+    return {
+      titulo: "Calorias (kcal)",
+      opcoes: opcoesCalorias(),
+      valorAtual: Math.round((caloriasInput ?? caloriasCalc) / 10) * 10,
+      onSelecionar: (v: number) => {
+        caloriasInput = v;
+        aoEditarCalorias();
+      },
+    };
   }
 
   async function salvarCalorias() {
@@ -987,7 +938,7 @@
             <span class="valor-g">{gorduraGInput ?? 0} g</span>
             <span class="rotulo-macro">Gorduras</span>
           </button>
-          <button type="button" class="macro-col" onclick={() => aoTocarProteina("g")}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => abrirMacros("g")}>
             <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
             <span class="valor-g">{proteinaGInput ?? 0} g</span>
             <span class="rotulo-macro">Proteínas</span>
@@ -1000,7 +951,7 @@
         <div class="tabela-macros">
           <div class="tabela-linha">
             <span class="tabela-rotulo">Proteína</span>
-            <button type="button" class="tabela-input" onclick={() => aoTocarProteina("gkg")}>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => abrirMacros("gkg")}>
               {proteinaGKg.toFixed(2)}
             </button>
           </div>
@@ -1113,7 +1064,7 @@
       {/if}
 
       <p class="dica">
-        Ajustar proteína ou gordura (g/kg ou gramas) recalcula as calorias. Ajustar as calorias reajusta o carboidrato pra fechar a conta. Fibras e gordura saturada são calculadas com base nas calorias do dia; água, com base no peso.
+        Em Fixa, ajustar proteína, gordura ou carboidrato recalcula as calorias; ajustar as calorias reajusta o carboidrato pra fechar a conta. Em Ondulatória, a calorias média da semana só muda pelo donut — mudar a proteína dentro de um bloco de dias reajusta o carboidrato médio (e o dos demais blocos automáticos) pra manter essa média fixa. Fibras e gordura saturada são calculadas com base nas calorias do dia; água, com base no peso.
       </p>
 
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
