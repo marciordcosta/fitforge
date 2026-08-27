@@ -339,6 +339,11 @@
     if (!todosExercicios.length) todosExercicios = await listExercicios();
   }
 
+  function fecharSubstituir() {
+    substituindoExIdx = null;
+    buscaSubstituir = "";
+  }
+
   const opcoesSubstituir = $derived(
     todosExercicios.filter((e) => e.nome.toLowerCase().includes(buscaSubstituir.trim().toLowerCase())),
   );
@@ -721,17 +726,22 @@
 {/if}
 
 {#if substituindoExIdx !== null}
-  <Sheet titulo="Substituir por" onFechar={() => (substituindoExIdx = null)}>
-    <input class="sheet-busca" type="text" placeholder="Procurar exercício" bind:value={buscaSubstituir} />
-    <ul class="sheet-itens">
+  <div class="tela-picker">
+    <div class="picker-header">
+      <button class="cancelar" onclick={fecharSubstituir}>Cancelar</button>
+      <h1>Substituir por</h1>
+      <span class="header-spacer"></span>
+    </div>
+    <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaSubstituir} />
+    <ul class="picker-lista">
       {#each opcoesSubstituir as ex (ex.id)}
-        <li><button onclick={() => substituirExercicio(ex)}>{ex.nome}</button></li>
+        <li><button class="picker-item-full" onclick={() => substituirExercicio(ex)}>{ex.nome}</button></li>
       {/each}
       {#if !opcoesSubstituir.length}
-        <li class="sheet-vazio">Nenhum exercício encontrado.</li>
+        <li class="muted-item">Nenhum exercício encontrado.</li>
       {/if}
     </ul>
-  </Sheet>
+  </div>
 {/if}
 
 {#if mostrarPicker}
@@ -1318,38 +1328,16 @@
     font-weight: 600;
     cursor: pointer;
   }
-  .sheet-busca {
-    box-sizing: border-box;
-    width: 100%;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    margin-bottom: var(--space-3);
-  }
-  .sheet-itens {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    overflow-y: auto;
-  }
-  .sheet-itens button {
+  .picker-item-full {
     width: 100%;
     text-align: left;
-    padding: var(--space-3);
+    padding: var(--space-3) 0;
     background: none;
     border: none;
     border-bottom: 1px solid var(--surface-border);
     color: var(--surface-fg);
     font-size: var(--font-size-base);
     cursor: pointer;
-  }
-  .sheet-vazio {
-    color: var(--surface-muted);
-    padding: var(--space-3);
-    font-size: var(--font-size-sm);
   }
   .reorder-item {
     display: flex;
