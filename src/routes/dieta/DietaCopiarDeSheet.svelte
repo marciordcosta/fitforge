@@ -34,6 +34,8 @@
   let opcoesAlimento = $state<{ valor: string; label: string }[]>([]);
   let alimentoSelecionado = $state("");
   let salvando = $state(false);
+  let carregandoRefeicao = $state(false);
+  let carregandoAlimento = $state(false);
 
   async function carregarAlimentos(refeicaoId: string) {
     if (!refeicaoId) {
@@ -41,15 +43,28 @@
       alimentoSelecionado = "";
       return;
     }
-    const itens = await getItensDaRefeicao(refeicaoId);
-    opcoesAlimento = [{ valor: "TUDO", label: "Tudo" }, ...itens.map((it) => ({ valor: it.id, label: it.nome }))];
-    alimentoSelecionado = "TUDO";
+    carregandoAlimento = true;
+    opcoesAlimento = [];
+    try {
+      const itens = await getItensDaRefeicao(refeicaoId);
+      opcoesAlimento = [{ valor: "TUDO", label: "Tudo" }, ...itens.map((it) => ({ valor: it.id, label: it.nome }))];
+      alimentoSelecionado = "TUDO";
+    } finally {
+      carregandoAlimento = false;
+    }
   }
 
   async function carregarRefeicoes(dia: string) {
-    const todas = await getRefeicoesDoDia(dia);
-    opcoesRefeicao = todas.filter((r) => r.id !== refeicaoDestinoId).map((r) => ({ valor: r.id, label: r.nome }));
-    refeicaoSelecionada = opcoesRefeicao[0]?.valor ?? "";
+    carregandoRefeicao = true;
+    opcoesRefeicao = [];
+    refeicaoSelecionada = "";
+    try {
+      const todas = await getRefeicoesDoDia(dia);
+      opcoesRefeicao = todas.filter((r) => r.id !== refeicaoDestinoId).map((r) => ({ valor: r.id, label: r.nome }));
+      refeicaoSelecionada = opcoesRefeicao[0]?.valor ?? "";
+    } finally {
+      carregandoRefeicao = false;
+    }
     await carregarAlimentos(refeicaoSelecionada);
   }
 
@@ -94,11 +109,21 @@
     </div>
     <div class="coluna">
       <p class="coluna-titulo">Refeição</p>
-      <WheelColuna opcoes={opcoesRefeicao} valorAtual={refeicaoSelecionada} onMudar={aoMudarRefeicao} vazio="Nenhuma outra refeição nesse dia" />
+      <WheelColuna
+        opcoes={opcoesRefeicao}
+        valorAtual={refeicaoSelecionada}
+        onMudar={aoMudarRefeicao}
+        vazio={carregandoRefeicao ? "Carregando…" : "Nenhuma outra refeição nesse dia"}
+      />
     </div>
     <div class="coluna">
       <p class="coluna-titulo">Alimento</p>
-      <WheelColuna opcoes={opcoesAlimento} valorAtual={alimentoSelecionado} onMudar={aoMudarAlimento} vazio="Refeição vazia" />
+      <WheelColuna
+        opcoes={opcoesAlimento}
+        valorAtual={alimentoSelecionado}
+        onMudar={aoMudarAlimento}
+        vazio={carregandoAlimento ? "Carregando…" : "Refeição vazia"}
+      />
     </div>
   </div>
   <Button onclick={copiar} disabled={salvando || !refeicaoSelecionada}>Copiar</Button>
