@@ -2010,7 +2010,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-weight: 600;
+    font-weight: 400;
   }
   .secao-dias-header {
     display: flex;
