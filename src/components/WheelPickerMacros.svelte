@@ -84,7 +84,6 @@
 </script>
 
 <Sheet {titulo} {onFechar}>
-  <p class="total-cal">≈ <strong>{caloriasTotais}</strong> kcal</p>
   <div class="colunas">
     {#each colunas as coluna, idx (coluna.chave)}
       <div class="coluna">
@@ -116,12 +115,24 @@
       </div>
     {/each}
   </div>
-  <button class="feito" onclick={confirmar}>Feito</button>
+  <div class="rodape">
+    <p class="total-cal">≈ <strong>{caloriasTotais}</strong> kcal</p>
+    <button class="feito" onclick={confirmar}>Feito</button>
+  </div>
 </Sheet>
 
 <style>
+  .rodape {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
   .total-cal {
-    margin: 0 0 var(--space-3);
+    flex: 1;
+    margin: 0;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface-bg);
     text-align: center;
     color: var(--surface-muted);
     font-size: var(--font-size-sm);
@@ -198,7 +209,7 @@
     font-weight: 700;
   }
   .feito {
-    width: 100%;
+    flex: 1;
     padding: var(--space-3);
     border-radius: var(--radius-md);
     border: none;
