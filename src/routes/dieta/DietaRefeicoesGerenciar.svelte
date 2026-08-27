@@ -111,6 +111,14 @@
   const fibrasMinG = $derived(Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").min, pesoAtual, caloriasCalc)));
   const fibrasMaxG = $derived(Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, caloriasCalc)));
   const gorduraSaturadaMaxG = $derived(Math.round(gramasDoParametro(defParametro.get("gordura_saturada")!, parametro("gordura_saturada").max, pesoAtual, caloriasCalc)));
+
+  /** Mesmas faixas de cima, mas pra calorias de um bloco de dias específico (Ondulatória) — o bloco pode ter uma meta diferente da média semanal. */
+  function fibrasMaxDoGrupo(calorias: number): number {
+    return Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, calorias));
+  }
+  function gorduraSaturadaMaxDoGrupo(calorias: number): number {
+    return Math.round(gramasDoParametro(defParametro.get("gordura_saturada")!, parametro("gordura_saturada").max, pesoAtual, calorias));
+  }
   const aguaMinL = $derived(Math.round(parametro("agua").min * pesoAtual * 10) / 10);
   const aguaMaxL = $derived(Math.round(parametro("agua").max * pesoAtual * 10) / 10);
 
@@ -427,6 +435,19 @@
   function abrirMacros(unidade: "g" | "gkg") {
     unidadeMacros = unidade;
     mostrarMacros = true;
+  }
+
+  /**
+   * Em Fixa, os 3 macros globais (Carb/Gordura/Proteína) são editados juntos no mesmo seletor de
+   * 3 colunas. Em Ondulatória, Carb/Gordura globais ficam travados (geridos por bloco de dias) —
+   * só a Proteína continua editável ali, então usa o editor de valor único.
+   */
+  function aoTocarProteina(unidade: "g" | "gkg") {
+    if (modoCalorias === "ondulatoria") {
+      campoEditando = unidade === "g" ? "proteinaG" : "proteinaGKg";
+    } else {
+      abrirMacros(unidade);
+    }
   }
 
   function abrirMacrosGrupo(unidade: "g" | "gkg") {
@@ -941,7 +962,6 @@
           type="button"
           class="donut"
           style={donutStyle}
-          disabled={modoCalorias === "ondulatoria"}
           onclick={() => (campoEditando = "calorias")}
           aria-label="Ajustar calorias"
         >
@@ -961,7 +981,7 @@
             <span class="valor-g">{gorduraGInput ?? 0} g</span>
             <span class="rotulo-macro">Gorduras</span>
           </button>
-          <button type="button" class="macro-col" onclick={() => (campoEditando = "proteinaG")}>
+          <button type="button" class="macro-col" onclick={() => aoTocarProteina("g")}>
             <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
             <span class="valor-g">{proteinaGInput ?? 0} g</span>
             <span class="rotulo-macro">Proteínas</span>
@@ -974,7 +994,7 @@
         <div class="tabela-macros">
           <div class="tabela-linha">
             <span class="tabela-rotulo">Proteína</span>
-            <button type="button" class="tabela-input" onclick={() => (campoEditando = "proteinaGKg")}>
+            <button type="button" class="tabela-input" onclick={() => aoTocarProteina("gkg")}>
               {proteinaGKg.toFixed(2)}
             </button>
           </div>
@@ -1103,6 +1123,8 @@
       {#each gruposDias as grupo (grupo.dias[0])}
         {@const somaGrupo = somaMacrosInformados(grupo.dias[0])}
         {@const metaGrupo = metaMacrosDoGrupo(grupo)}
+        {@const fibrasMaxGrupo = fibrasMaxDoGrupo(metaGrupo.calorias)}
+        {@const gorduraSaturadaMaxGrupo = gorduraSaturadaMaxDoGrupo(metaGrupo.calorias)}
         <div class="secao-dias-header">
           <div class="dias-lista secao-dias-lista">
             {#each grupo.dias as dia (dia)}
@@ -1115,6 +1137,9 @@
               </div>
             {/each}
           </div>
+        </div>
+
+        <div class="card-macros">
           <button
             type="button"
             class="toggle-btn"
@@ -1123,10 +1148,7 @@
           >
             {@render iconToggle()}
           </button>
-        </div>
-
-        <div class="card-macros">
-          <div class="macros-grid macros-grid-4">
+          <div class="macros-grid">
             <div class="macro-col">
               <p class="macro-nome">Calorias</p>
               <p class="macro-valor">
@@ -1179,6 +1201,32 @@
                 <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG))}%; background:${COR_PROTEINA};`}></div>
               </div>
             </div>
+            <div class="macro-col">
+              <p class="macro-nome">Gordura Sat.</p>
+              <p class="macro-valor">
+                {#if modoRestanteRefeicoes}
+                  <strong>{restante(0, gorduraSaturadaMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                {:else}
+                  <strong>0 g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxGrupo.toFixed(0)}</span>
+                {/if}
+              </p>
+              <div class="barra-wrap">
+                <div class="barra" style={`width:${larguraBarra(pctMeta(0, gorduraSaturadaMaxGrupo))}%; background:${COR_GORDURA};`}></div>
+              </div>
+            </div>
+            <div class="macro-col">
+              <p class="macro-nome">Fibras</p>
+              <p class="macro-valor">
+                {#if modoRestanteRefeicoes}
+                  <strong>{restante(0, fibrasMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                {:else}
+                  <strong>0 g</strong> <span class="macro-meta">/ {fibrasMaxGrupo.toFixed(0)}</span>
+                {/if}
+              </p>
+              <div class="barra-wrap">
+                <div class="barra" style={`width:${larguraBarra(pctMeta(0, fibrasMaxGrupo))}%; background:${COR_CARBO};`}></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1215,8 +1263,8 @@
     {:else}
       {@const somaGlobal = somaMacrosGlobal()}
       {@const metaGlobal = { calorias: caloriasCalc, proteinaG: proteinaGInput ?? 0, gorduraG: gorduraGInput ?? 0, carboidratoG: carboidratoGInput ?? 0 }}
-      <div class="secao-dias-header">
-        <span></span>
+
+      <div class="card-macros">
         <button
           type="button"
           class="toggle-btn"
@@ -1225,10 +1273,7 @@
         >
           {@render iconToggle()}
         </button>
-      </div>
-
-      <div class="card-macros">
-        <div class="macros-grid macros-grid-4">
+        <div class="macros-grid">
           <div class="macro-col">
             <p class="macro-nome">Calorias</p>
             <p class="macro-valor">
@@ -1279,6 +1324,32 @@
             </p>
             <div class="barra-wrap">
               <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.proteinaG, metaGlobal.proteinaG))}%; background:${COR_PROTEINA};`}></div>
+            </div>
+          </div>
+          <div class="macro-col">
+            <p class="macro-nome">Gordura Sat.</p>
+            <p class="macro-valor">
+              {#if modoRestanteRefeicoes}
+                <strong>{restante(0, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+              {:else}
+                <strong>0 g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${larguraBarra(pctMeta(0, gorduraSaturadaMaxG))}%; background:${COR_GORDURA};`}></div>
+            </div>
+          </div>
+          <div class="macro-col">
+            <p class="macro-nome">Fibras</p>
+            <p class="macro-valor">
+              {#if modoRestanteRefeicoes}
+                <strong>{restante(0, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+              {:else}
+                <strong>0 g</strong> <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${larguraBarra(pctMeta(0, fibrasMaxG))}%; background:${COR_CARBO};`}></div>
             </div>
           </div>
         </div>
@@ -1828,6 +1899,7 @@
     height: 20px;
   }
   .card-macros {
+    position: relative;
     background: var(--surface-card);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
@@ -1835,7 +1907,9 @@
     margin-bottom: var(--space-4);
   }
   .toggle-btn {
-    flex-shrink: 0;
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
     width: 28px;
     height: 28px;
     border-radius: 50%;
@@ -1852,12 +1926,20 @@
     height: 16px;
   }
   .macros-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
     gap: var(--space-3);
+    width: calc(100% - 40px);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
   }
-  .macros-grid-4 {
-    grid-template-columns: repeat(4, 1fr);
+  .macros-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .macros-grid .macro-col {
+    flex: 0 0 calc((100% - 3 * var(--space-3)) / 4);
+    min-width: 0;
+    scroll-snap-align: start;
   }
   .macro-nome {
     margin: 0 0 var(--space-1);
