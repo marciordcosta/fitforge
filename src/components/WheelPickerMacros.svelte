@@ -31,14 +31,20 @@
   const ITENS_VISIVEIS = 3;
   const PADDING_VERTICAL = (ALTURA_ITEM * (ITENS_VISIVEIS - 1)) / 2;
 
-  let indices = $state(
-    untrack(() =>
-      colunas.map((c) => {
-        const i = c.opcoes.findIndex((o) => o.valor === c.valorAtual);
-        return i < 0 ? 0 : i;
-      }),
-    ),
-  );
+  function indiceMaisProximo(opcoes: Opcao[], valor: number): number {
+    let melhor = 0;
+    let menorDist = Infinity;
+    opcoes.forEach((o, i) => {
+      const dist = Math.abs(o.valor - valor);
+      if (dist < menorDist) {
+        menorDist = dist;
+        melhor = i;
+      }
+    });
+    return melhor;
+  }
+
+  let indices = $state(untrack(() => colunas.map((c) => indiceMaisProximo(c.opcoes, c.valorAtual))));
   let listaEls: (HTMLDivElement | undefined)[] = [];
 
   function posicionarInicial(el: HTMLDivElement, idx: number) {

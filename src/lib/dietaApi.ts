@@ -719,6 +719,8 @@ export interface DefinicaoParametro {
   kcalPorGrama?: number;
   /** Parâmetro só de piso (ex: calorias mínimas) — sem campo de máximo na tela. */
   somenteMinimo: boolean;
+  /** Parâmetro só de teto (ex: gordura saturada) — sem campo de mínimo na tela, mínimo fica travado em 0. */
+  somenteMaximo?: boolean;
 }
 
 export const DEFINICOES_PARAMETROS: DefinicaoParametro[] = [
@@ -727,7 +729,7 @@ export const DEFINICOES_PARAMETROS: DefinicaoParametro[] = [
   { chave: "gordura", categoria: "Macronutrientes", label: "Gordura", unidade: "g/kg", base: "peso", somenteMinimo: false },
   { chave: "carboidrato", categoria: "Macronutrientes", label: "Carboidrato", unidade: "g/kg", base: "peso", somenteMinimo: false },
   { chave: "fibras", categoria: "Metas de Consumo", label: "Fibras", unidade: "%", base: "calorias", kcalPorGrama: 4, somenteMinimo: false },
-  { chave: "gordura_insaturada", categoria: "Metas de Consumo", label: "Gorduras Insaturadas", unidade: "%", base: "calorias", kcalPorGrama: 9, somenteMinimo: false },
+  { chave: "gordura_saturada", categoria: "Metas de Consumo", label: "Gordura Saturada", unidade: "%", base: "calorias", kcalPorGrama: 9, somenteMinimo: false, somenteMaximo: true },
   { chave: "agua", categoria: "Metas de Consumo", label: "Água", unidade: "L/kg", base: "peso", somenteMinimo: false },
 ];
 
@@ -738,8 +740,8 @@ export interface LimiteParametro {
 
 /**
  * Valores de hoje, usados como padrão pra qualquer chave sem linha salva ainda. Fibras
- * (5,6% ≈ 14g a cada 1000 kcal, usando 4 kcal/g) e Gordura Insaturada (20–35% das calorias
- * do dia, faixa de referência comum) são % das calorias; os demais são por kg de peso.
+ * (5,6% ≈ 14g a cada 1000 kcal, usando 4 kcal/g) e Gordura Saturada (teto de 10% das
+ * calorias do dia, diretriz comum de OMS/AHA) são % das calorias; os demais são por kg de peso.
  */
 export const PARAMETROS_PADRAO: Record<string, LimiteParametro> = {
   calorias: { min: 20, max: 20 },
@@ -747,7 +749,7 @@ export const PARAMETROS_PADRAO: Record<string, LimiteParametro> = {
   gordura: { min: 0.5, max: 1.5 },
   carboidrato: { min: 1, max: 10 },
   fibras: { min: 5.6, max: 5.6 },
-  gordura_insaturada: { min: 20, max: 35 },
+  gordura_saturada: { min: 0, max: 10 },
   agua: { min: 0.05, max: 0.05 },
 };
 

@@ -73,8 +73,9 @@
       await Promise.all(
         DEFINICOES_PARAMETROS.map((def) => {
           const v = valores[def.chave];
+          const min = def.somenteMaximo ? 0 : v.min;
           const max = def.somenteMinimo ? v.min : v.max;
-          return salvarParametro(def.chave, v.min, max);
+          return salvarParametro(def.chave, min, max);
         }),
       );
       navigate("/dieta");
@@ -106,7 +107,7 @@
   {:else}
     <p class="peso-ref">Com base no peso médio atual: <strong>{pesoAtual.toFixed(1)} kg</strong></p>
     <p class="dica">
-      Cada parâmetro é um mínimo e máximo, por kg de peso ou por % das calorias do dia (Fibras e Gorduras Insaturadas) — usados pelo app pra travar faixas (roletas, piso de calorias) e calcular metas automáticas.
+      Cada parâmetro é um mínimo e máximo, por kg de peso ou por % das calorias do dia (Fibras e Gordura Saturada) — usados pelo app pra travar faixas (roletas, piso de calorias) e calcular metas automáticas.
     </p>
 
     {#each categorias as categoria (categoria)}
@@ -122,10 +123,12 @@
               <div class="param-linha">
                 <p class="param-nome">{def.label} <span class="param-unidade">({def.unidade})</span></p>
                 <div class="param-campos">
-                  <label class="param-campo">
-                    <span>Mínimo</span>
-                    <input type="number" inputmode="decimal" step="0.01" min="0" bind:value={valores[def.chave].min} />
-                  </label>
+                  {#if !def.somenteMaximo}
+                    <label class="param-campo">
+                      <span>Mínimo</span>
+                      <input type="number" inputmode="decimal" step="0.01" min="0" bind:value={valores[def.chave].min} />
+                    </label>
+                  {/if}
                   {#if !def.somenteMinimo}
                     <label class="param-campo">
                       <span>Máximo</span>
@@ -134,8 +137,12 @@
                   {/if}
                 </div>
                 <p class="param-calculado">
-                  ≈ {valorCalculado(def, valores[def.chave].min)}{#if !def.somenteMinimo && valores[def.chave].max !== valores[def.chave].min} – {valorCalculado(def, valores[def.chave].max)}{/if}
-                  {unidadeCalculada(def.unidade)} {def.base === "peso" ? "no seu peso" : "na sua meta de calorias"}
+                  {#if def.somenteMaximo}
+                    até {valorCalculado(def, valores[def.chave].max)} {unidadeCalculada(def.unidade)} {def.base === "peso" ? "no seu peso" : "na sua meta de calorias"}
+                  {:else}
+                    ≈ {valorCalculado(def, valores[def.chave].min)}{#if !def.somenteMinimo && valores[def.chave].max !== valores[def.chave].min} – {valorCalculado(def, valores[def.chave].max)}{/if}
+                    {unidadeCalculada(def.unidade)} {def.base === "peso" ? "no seu peso" : "na sua meta de calorias"}
+                  {/if}
                 </p>
               </div>
             {/each}

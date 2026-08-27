@@ -103,11 +103,10 @@
     `background: conic-gradient(${COR_CARBO} 0% ${pctCarboidrato}%, ${COR_GORDURA} ${pctCarboidrato}% ${pctCarboidrato + pctGordura}%, ${COR_PROTEINA} ${pctCarboidrato + pctGordura}% 100%);`,
   );
 
-  /** Metas de consumo puramente informativas — Fibras e Gordura Insaturada vêm da faixa parametrizada em % das calorias do dia; Água continua por kg de peso. */
+  /** Metas de consumo puramente informativas — Fibras e Gordura Saturada vêm da faixa parametrizada em % das calorias do dia; Água continua por kg de peso. */
   const fibrasMinG = $derived(Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").min, pesoAtual, caloriasCalc)));
   const fibrasMaxG = $derived(Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, caloriasCalc)));
-  const gorduraInsaturadaMinG = $derived(Math.round(gramasDoParametro(defParametro.get("gordura_insaturada")!, parametro("gordura_insaturada").min, pesoAtual, caloriasCalc)));
-  const gorduraInsaturadaMaxG = $derived(Math.round(gramasDoParametro(defParametro.get("gordura_insaturada")!, parametro("gordura_insaturada").max, pesoAtual, caloriasCalc)));
+  const gorduraSaturadaMaxG = $derived(Math.round(gramasDoParametro(defParametro.get("gordura_saturada")!, parametro("gordura_saturada").max, pesoAtual, caloriasCalc)));
   const aguaMinL = $derived(Math.round(parametro("agua").min * pesoAtual * 10) / 10);
   const aguaMaxL = $derived(Math.round(parametro("agua").max * pesoAtual * 10) / 10);
 
@@ -283,9 +282,9 @@
 
   function colunasMacrosGrupo() {
     return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: grupoCarboidratoG, kcalPorGrama: 4 },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max), valorAtual: grupoGorduraG, kcalPorGrama: 9 },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max), valorAtual: grupoProteinaG, kcalPorGrama: 4 },
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesMacro(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: grupoCarboidratoG, kcalPorGrama: 4 },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesMacro(parametro("gordura").min, parametro("gordura").max), valorAtual: grupoGorduraG, kcalPorGrama: 9 },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesMacro(parametro("proteina").min, parametro("proteina").max), valorAtual: grupoProteinaG, kcalPorGrama: 4 },
     ];
   }
 
@@ -351,12 +350,32 @@
 
   let campoEditando = $state<"calorias" | null>(null);
   let mostrarMacros = $state(false);
+  /** Qual unidade o modal de 3 colunas mostra — decidido por qual campo foi tocado pra abri-lo (gramas ou g/kg), o valor salvo é sempre em gramas. */
+  let unidadeMacros = $state<"g" | "gkg">("g");
+
+  function tituloMacros(): string {
+    return unidadeMacros === "gkg" ? "Ajustar Macros (g/kg)" : "Ajustar Macros (g)";
+  }
+
+  function abrirMacros(unidade: "g" | "gkg") {
+    unidadeMacros = unidade;
+    mostrarMacros = true;
+  }
+
+  function abrirMacrosGrupo(unidade: "g" | "gkg") {
+    unidadeMacros = unidade;
+    mostrarMacrosGrupo = true;
+  }
+
+  function opcoesMacro(minGKg: number, maxGKg: number): { valor: number; label: string }[] {
+    return unidadeMacros === "gkg" ? opcoesGKgComoGramas(minGKg, maxGKg) : opcoesGramas(minGKg, maxGKg);
+  }
 
   function colunasMacros() {
     return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: carboidratoGInput ?? 0, kcalPorGrama: 4 },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max), valorAtual: gorduraGInput ?? 0, kcalPorGrama: 9 },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max), valorAtual: proteinaGInput ?? 0, kcalPorGrama: 4 },
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesMacro(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: carboidratoGInput ?? 0, kcalPorGrama: 4 },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesMacro(parametro("gordura").min, parametro("gordura").max), valorAtual: gorduraGInput ?? 0, kcalPorGrama: 9 },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesMacro(parametro("proteina").min, parametro("proteina").max), valorAtual: proteinaGInput ?? 0, kcalPorGrama: 4 },
     ];
   }
 
@@ -368,6 +387,16 @@
     gorduraGKg = pesoAtual > 0 ? Math.round((gorduraGInput / pesoAtual) * 100) / 100 : 0;
     proteinaGKg = pesoAtual > 0 ? Math.round((proteinaGInput / pesoAtual) * 100) / 100 : 0;
     recalcularCaloriasDosMacros();
+  }
+
+  /** Grade de g/kg convertida pra gramas (peso atual) — o valor canônico das colunas do modal é sempre gramas; só o rótulo mostra g/kg. */
+  function opcoesGKgComoGramas(minGKg: number, maxGKg: number): { valor: number; label: string }[] {
+    const opcoes: { valor: number; label: string }[] = [];
+    for (let v = Math.round(minGKg * 100); v <= Math.round(maxGKg * 100); v++) {
+      const gkg = v / 100;
+      opcoes.push({ valor: Math.round(gkg * pesoAtual), label: gkg.toFixed(2).replace(".", ",") });
+    }
+    return opcoes;
   }
 
   function opcoesGramas(minGKg: number, maxGKg: number): { valor: number; label: string }[] {
@@ -776,17 +805,17 @@
           </div>
         </button>
         <div class="resumo-macros">
-          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => abrirMacros("g")}>
             <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarboidrato.toFixed(0)}%</strong>
             <span class="valor-g">{carboidratoGInput ?? 0} g</span>
             <span class="rotulo-macro">Carb</span>
           </button>
-          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => abrirMacros("g")}>
             <strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong>
             <span class="valor-g">{gorduraGInput ?? 0} g</span>
             <span class="rotulo-macro">Gorduras</span>
           </button>
-          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
+          <button type="button" class="macro-col" disabled={modoCalorias === "ondulatoria"} onclick={() => abrirMacros("g")}>
             <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
             <span class="valor-g">{proteinaGInput ?? 0} g</span>
             <span class="rotulo-macro">Proteínas</span>
@@ -799,19 +828,19 @@
         <div class="tabela-macros">
           <div class="tabela-linha">
             <span class="tabela-rotulo">Proteína</span>
-            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => abrirMacros("gkg")}>
               {proteinaGKg.toFixed(2)}
             </button>
           </div>
           <div class="tabela-linha">
             <span class="tabela-rotulo">Gordura</span>
-            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => abrirMacros("gkg")}>
               {gorduraGKg.toFixed(2)}
             </button>
           </div>
           <div class="tabela-linha">
             <span class="tabela-rotulo">Carboidrato</span>
-            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => (mostrarMacros = true)}>
+            <button type="button" class="tabela-input" disabled={modoCalorias === "ondulatoria"} onclick={() => abrirMacros("gkg")}>
               {carboidratoGKg.toFixed(2)}
             </button>
           </div>
@@ -831,7 +860,7 @@
 
       {#if mostrarMacros}
         <WheelPickerMacros
-          titulo="Ajustar Macros"
+          titulo={tituloMacros()}
           colunas={colunasMacros()}
           onSelecionar={confirmarMacros}
           onFechar={() => (mostrarMacros = false)}
@@ -845,8 +874,8 @@
           <span>{formatarFaixa(fibrasMinG, fibrasMaxG, 0)} g</span>
         </div>
         <div class="nutriente-item">
-          <span>Gorduras Insaturadas</span>
-          <span>{formatarFaixa(gorduraInsaturadaMinG, gorduraInsaturadaMaxG, 0)} g</span>
+          <span>Gordura Saturada</span>
+          <span>até {gorduraSaturadaMaxG} g</span>
         </div>
         <div class="nutriente-item">
           <span>Água</span>
@@ -906,7 +935,7 @@
       {/if}
 
       <p class="dica">
-        Ajustar proteína ou gordura (g/kg ou gramas) recalcula as calorias. Ajustar as calorias reajusta o carboidrato pra fechar a conta. Fibras, gorduras insaturadas e água são calculadas automaticamente com base no peso.
+        Ajustar proteína ou gordura (g/kg ou gramas) recalcula as calorias. Ajustar as calorias reajusta o carboidrato pra fechar a conta. Fibras e gordura saturada são calculadas com base nas calorias do dia; água, com base no peso.
       </p>
 
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
@@ -1109,18 +1138,18 @@
       </div>
       <div class="tabela-linha tabela-linha-3col">
         <span class="tabela-rotulo">Proteína</span>
-        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (mostrarMacrosGrupo = true)}>{gKgGrupo(grupoProteinaG)} g/kg</button>
-        <button type="button" class="tabela-input" onclick={() => (mostrarMacrosGrupo = true)}>{grupoProteinaG} g</button>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => abrirMacrosGrupo("gkg")}>{gKgGrupo(grupoProteinaG)} g/kg</button>
+        <button type="button" class="tabela-input" onclick={() => abrirMacrosGrupo("g")}>{grupoProteinaG} g</button>
       </div>
       <div class="tabela-linha tabela-linha-3col">
         <span class="tabela-rotulo">Gordura</span>
-        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (mostrarMacrosGrupo = true)}>{gKgGrupo(grupoGorduraG)} g/kg</button>
-        <button type="button" class="tabela-input" onclick={() => (mostrarMacrosGrupo = true)}>{grupoGorduraG} g</button>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => abrirMacrosGrupo("gkg")}>{gKgGrupo(grupoGorduraG)} g/kg</button>
+        <button type="button" class="tabela-input" onclick={() => abrirMacrosGrupo("g")}>{grupoGorduraG} g</button>
       </div>
       <div class="tabela-linha tabela-linha-3col">
         <span class="tabela-rotulo">Carboidrato</span>
-        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => (mostrarMacrosGrupo = true)}>{gKgGrupo(grupoCarboidratoG)} g/kg</button>
-        <button type="button" class="tabela-input" onclick={() => (mostrarMacrosGrupo = true)}>{grupoCarboidratoG} g</button>
+        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => abrirMacrosGrupo("gkg")}>{gKgGrupo(grupoCarboidratoG)} g/kg</button>
+        <button type="button" class="tabela-input" onclick={() => abrirMacrosGrupo("g")}>{grupoCarboidratoG} g</button>
       </div>
     </div>
     <Button onclick={confirmarCaloriasGrupo} disabled={salvandoDistribuicao || caloriasGrupoCalc <= 0}>
@@ -1131,7 +1160,7 @@
 
 {#if mostrarMacrosGrupo}
   <WheelPickerMacros
-    titulo="Ajustar Macros"
+    titulo={tituloMacros()}
     colunas={colunasMacrosGrupo()}
     onSelecionar={confirmarMacrosGrupo}
     onFechar={() => (mostrarMacrosGrupo = false)}
