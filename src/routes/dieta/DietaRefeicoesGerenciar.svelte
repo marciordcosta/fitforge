@@ -458,6 +458,37 @@
     const novoCarboG = Math.max(0, Math.round((caloriasInput - 4 * (proteinaGInput ?? 0) - 9 * (gorduraGInput ?? 0)) / 4));
     carboidratoGInput = novoCarboG;
     carboidratoGKg = pesoAtual > 0 ? Math.round((novoCarboG / pesoAtual) * 100) / 100 : 0;
+    if (modoCalorias === "ondulatoria" && todosOsDiasNomeados) {
+      reescalarBlocosParaMedia(caloriasInput);
+    }
+  }
+
+  /**
+   * Com todos os 7 dias já em blocos nomeados, resolverDistribuicao não tem mais dia automático
+   * pra absorver a meta semanal — editar a média aqui direto no donut, então, precisa reescalar
+   * cada dia proporcionalmente (mesma % pra todos) até a soma bater a nova média × 7. Proteína
+   * continua o global constante; o carboidrato de cada dia recalcula pra fechar a conta com a
+   * calorias nova e a gordura que já tinha.
+   */
+  function reescalarBlocosParaMedia(novaMedia: number) {
+    const valores = [...manuaisCompletos.values()];
+    if (!valores.length) return;
+    const mediaAtual = valores.reduce((acc, v) => acc + v.calorias, 0) / 7;
+    if (mediaAtual <= 0) return;
+    const fator = novaMedia / mediaAtual;
+    const proteina = proteinaGInput ?? 0;
+    const novoManual = new Map(manuaisCompletos);
+    for (const [dia, v] of manuaisCompletos) {
+      const novaCalorias = Math.round(v.calorias * fator);
+      novoManual.set(dia, {
+        calorias: novaCalorias,
+        proteinaG: proteina,
+        gorduraG: v.gorduraG,
+        carboidratoG: carboidratoGDoDia(novaCalorias, proteina, v.gorduraG),
+        nomeBloco: v.nomeBloco,
+      });
+    }
+    manuaisCompletos = novoManual;
   }
 
   let campoEditando = $state<"calorias" | null>(null);
