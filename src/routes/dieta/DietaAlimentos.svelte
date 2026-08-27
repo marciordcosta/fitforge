@@ -231,7 +231,7 @@
               <span class="avatar">{iniciais(receita.nome)}</span>
               <span class="info">
                 <span class="nome">{receita.nome}</span>
-                <span class="sub">Refeição salva</span>
+                <span class="sub">{receita.calorias.toFixed(0)} kcal</span>
               </span>
             </button>
             <button class="add-btn" onclick={() => selecionarReceita(receita)} disabled={adicionandoId === receita.id} aria-label="Adicionar">
