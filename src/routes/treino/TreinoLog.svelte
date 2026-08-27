@@ -389,7 +389,7 @@
 
   let mostrarPicker = $state(false);
   let buscaPicker = $state("");
-  let selecionadosPicker = $state<Set<string>>(new Set());
+  let adicionandoId = $state<string | null>(null);
 
   async function abrirPicker() {
     if (!todosExercicios.length) todosExercicios = await listExercicios();
@@ -404,17 +404,9 @@
     ),
   );
 
-  function toggleSelecaoPicker(exercicioId: string) {
-    const novo = new Set(selecionadosPicker);
-    if (novo.has(exercicioId)) novo.delete(exercicioId);
-    else novo.add(exercicioId);
-    selecionadosPicker = novo;
-  }
-
   function fecharPicker() {
     mostrarPicker = false;
     buscaPicker = "";
-    selecionadosPicker = new Set();
   }
 
   async function construirExercicioSessao(ex: Exercicio): Promise<ExercicioSessao> {
@@ -458,12 +450,15 @@
     };
   }
 
-  async function confirmarSelecaoPicker() {
-    const escolhidos = todosExercicios.filter((ex) => selecionadosPicker.has(ex.id));
-    const novos = await Promise.all(escolhidos.map(construirExercicioSessao));
-    sessao = [...sessao, ...novos];
-    houveAlteracaoEstrutura = true;
-    fecharPicker();
+  async function adicionarRapido(ex: Exercicio) {
+    adicionandoId = ex.id;
+    try {
+      const novo = await construirExercicioSessao(ex);
+      sessao = [...sessao, novo];
+      houveAlteracaoEstrutura = true;
+    } finally {
+      adicionandoId = null;
+    }
   }
 
   function moverExercicio(idx: number, direcao: -1 | 1) {
@@ -672,6 +667,12 @@
     <path d="M4 11h16" />
   </svg>
 {/snippet}
+{#snippet iconMais()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+{/snippet}
 {#snippet iconSubstituir()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M17 2l4 4-4 4" />
@@ -743,12 +744,10 @@
     <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
     <ul class="picker-lista">
       {#each disponiveisPicker as ex (ex.id)}
-        <li>
-          <button class="picker-item" onclick={() => toggleSelecaoPicker(ex.id)}>
-            <span class="picker-item-nome">{ex.nome}</span>
-            <span class="check-circulo" class:ativo={selecionadosPicker.has(ex.id)}>
-              {#if selecionadosPicker.has(ex.id)}✓{/if}
-            </span>
+        <li class="picker-item">
+          <span class="picker-item-nome">{ex.nome}</span>
+          <button class="add-btn" onclick={() => adicionarRapido(ex)} disabled={adicionandoId === ex.id} aria-label={`Adicionar ${ex.nome}`}>
+            {#if adicionandoId === ex.id}…{:else}{@render iconMais()}{/if}
           </button>
         </li>
       {/each}
@@ -756,11 +755,6 @@
         <li class="muted-item">Nenhum exercício encontrado.</li>
       {/if}
     </ul>
-    {#if selecionadosPicker.size > 0}
-      <button class="adicionar-flutuante" onclick={confirmarSelecaoPicker}>
-        Adicionar {selecionadosPicker.size} {selecionadosPicker.size === 1 ? "exercício" : "exercícios"}
-      </button>
-    {/if}
   </div>
 {/if}
 
@@ -1046,6 +1040,7 @@
     font-size: var(--font-size-base);
     color: var(--surface-muted);
     white-space: nowrap;
+    text-align: center;
   }
   .meta-cel {
     font-size: var(--font-size-base);
@@ -1053,7 +1048,7 @@
     background: none;
     border: none;
     padding: 0;
-    text-align: left;
+    text-align: center;
     font-family: inherit;
     white-space: nowrap;
     cursor: pointer;
@@ -1219,54 +1214,39 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    width: 100%;
-    text-align: left;
     padding: var(--space-3) 0;
-    background: none;
-    border: none;
     border-bottom: 1px solid var(--surface-border);
     color: var(--surface-fg);
     font-size: var(--font-size-base);
-    cursor: pointer;
   }
   .picker-item-nome {
     flex: 1;
     min-width: 0;
   }
-  .check-circulo {
-    width: 24px;
-    height: 24px;
+  .add-btn {
     flex-shrink: 0;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
-    border: 1px solid var(--surface-border);
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
-    color: transparent;
+    cursor: pointer;
   }
-  .check-circulo.ativo {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: var(--color-primary-fg);
+  .add-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .add-btn:disabled {
+    opacity: 0.6;
   }
   .muted-item {
     color: var(--surface-muted);
     padding: var(--space-2);
     font-size: var(--font-size-sm);
-  }
-  .adicionar-flutuante {
-    flex-shrink: 0;
-    margin-top: var(--space-3);
-    width: 100%;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: none;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    cursor: pointer;
   }
   .descartar {
     width: 100%;
