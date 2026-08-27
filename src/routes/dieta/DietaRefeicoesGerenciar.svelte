@@ -517,6 +517,19 @@
     );
   }
 
+  /** Mesma soma, mas sobre todo o catálogo — usada no topo da aba Refeições em Fixa (não há grupos de dias pra separar). */
+  function somaMacrosGlobal() {
+    return modelos.reduce(
+      (acc, m) => ({
+        calorias: acc.calorias + (m.metaCalorias ?? 0),
+        proteinaG: acc.proteinaG + (m.metaProteinaG ?? 0),
+        gorduraG: acc.gorduraG + (m.metaGorduraG ?? 0),
+        carboidratoG: acc.carboidratoG + (m.metaCarboidratoG ?? 0),
+      }),
+      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+    );
+  }
+
   /**
    * Meta de macros do dia pra esse grupo: se é manual, usa a composição salva (proteína/gordura/
    * carboidrato explícitos daquele ajuste); se é automático, usa os padrões globais de proteína/
@@ -1069,6 +1082,77 @@
         {/if}
       {/each}
     {:else}
+      {@const somaGlobal = somaMacrosGlobal()}
+      {@const metaGlobal = { calorias: caloriasCalc, proteinaG: proteinaGInput ?? 0, gorduraG: gorduraGInput ?? 0, carboidratoG: carboidratoGInput ?? 0 }}
+      <div class="secao-dias-header">
+        <span></span>
+        <button
+          type="button"
+          class="toggle-btn"
+          onclick={() => (modoRestanteRefeicoes = !modoRestanteRefeicoes)}
+          aria-label="Alternar exibição"
+        >
+          {@render iconToggle()}
+        </button>
+      </div>
+
+      <div class="card-macros">
+        <div class="macros-grid macros-grid-4">
+          <div class="macro-col">
+            <p class="macro-nome">Calorias</p>
+            <p class="macro-valor">
+              {#if modoRestanteRefeicoes}
+                <strong>{restante(somaGlobal.calorias, metaGlobal.calorias).toFixed(0)}</strong> <span class="macro-meta">restantes</span>
+              {:else}
+                <strong>{somaGlobal.calorias.toFixed(0)}</strong> <span class="macro-meta">/ {metaGlobal.calorias.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.calorias, metaGlobal.calorias))}%; background:var(--color-secondary);`}></div>
+            </div>
+          </div>
+          <div class="macro-col">
+            <p class="macro-nome">Carb</p>
+            <p class="macro-valor">
+              {#if modoRestanteRefeicoes}
+                <strong>{restante(somaGlobal.carboidratoG, metaGlobal.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+              {:else}
+                <strong>{somaGlobal.carboidratoG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGlobal.carboidratoG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG))}%; background:${COR_CARBO};`}></div>
+            </div>
+          </div>
+          <div class="macro-col">
+            <p class="macro-nome">Gorduras</p>
+            <p class="macro-valor">
+              {#if modoRestanteRefeicoes}
+                <strong>{restante(somaGlobal.gorduraG, metaGlobal.gorduraG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+              {:else}
+                <strong>{somaGlobal.gorduraG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGlobal.gorduraG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.gorduraG, metaGlobal.gorduraG))}%; background:${COR_GORDURA};`}></div>
+            </div>
+          </div>
+          <div class="macro-col">
+            <p class="macro-nome">Proteínas</p>
+            <p class="macro-valor">
+              {#if modoRestanteRefeicoes}
+                <strong>{restante(somaGlobal.proteinaG, metaGlobal.proteinaG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+              {:else}
+                <strong>{somaGlobal.proteinaG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGlobal.proteinaG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.proteinaG, metaGlobal.proteinaG))}%; background:${COR_PROTEINA};`}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <ul class="lista">
         {#each modelos as m, i (m.id)}
           <li
@@ -1432,8 +1516,11 @@
   }
   .lista {
     list-style: none;
-    margin: 0;
-    padding: 0;
+    margin: 0 0 var(--space-4);
+    padding: 0 var(--space-3);
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
   }
   .add-refeicao-btn {
     width: 100%;
@@ -1452,15 +1539,20 @@
     display: flex;
     align-items: center;
     gap: var(--space-1);
-    background: var(--surface-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    padding: 0 var(--space-3);
-    margin-bottom: var(--space-2);
+    border-bottom: 1px solid var(--surface-border);
     position: relative;
+  }
+  .linha:last-child {
+    border-bottom: none;
   }
   .linha.arrastando {
     z-index: 10;
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    border-bottom-color: transparent;
+    margin: 0 calc(var(--space-3) * -1);
+    padding: 0 var(--space-3);
   }
   .handle {
     flex-shrink: 0;
