@@ -29,7 +29,7 @@
     try {
       const reader = new BrowserMultiFormatReader();
       controls = await reader.decodeFromConstraints(
-        { video: { facingMode: "environment" } },
+        { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },
         el,
         (result, _err, ctrl) => {
           if (result) {
@@ -39,10 +39,28 @@
           }
         },
       );
+      ajustarFoco(el);
     } catch (err) {
       fase = "erro";
       mensagemErro = "Não foi possível acessar a câmera: " + (err as Error).message;
     }
+  }
+
+  /**
+   * Pede foco contínuo (ajuda a mirar de perto num código de barras) — focusMode não faz parte
+   * do MediaTrackConstraintSet padrão do TS, só existe em navegadores que suportam a Image
+   * Capture API (Chrome Android). No iOS Safari `getCapabilities` nem lista "focusMode", então
+   * a checagem abaixo já ignora silenciosamente sem tentar aplicar nada.
+   */
+  function ajustarFoco(el: HTMLVideoElement) {
+    const stream = el.srcObject;
+    if (!(stream instanceof MediaStream)) return;
+    const track = stream.getVideoTracks()[0];
+    if (!track?.getCapabilities) return;
+    const capacidades = track.getCapabilities() as MediaTrackCapabilities & { focusMode?: string[] };
+    if (!capacidades.focusMode?.includes("continuous")) return;
+    const constraintsFoco = { advanced: [{ focusMode: "continuous" }] } as unknown as MediaTrackConstraints;
+    track.applyConstraints(constraintsFoco).catch(() => {});
   }
 
   $effect(() => {
