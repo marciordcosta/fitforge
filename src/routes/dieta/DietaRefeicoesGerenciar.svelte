@@ -264,12 +264,20 @@
     diasSelecionados = new Set([...diasSelecionados, dia]);
   }
 
+  /** Ao abrir pra um grupo ainda automático (sem override salvo), usa a calorias real que sobrou pra esses dias (diasResolvidos) — não a média semanal fixa (caloriasCalc), senão o carboidrato inicial já abre errado. */
   function abrirDefinirCalorias() {
     const dias = [...diasSelecionados];
     const existente = dias.length ? manuaisCompletos.get(dias[0]) : undefined;
-    grupoProteinaG = existente?.proteinaG ?? proteinaGInput ?? 0;
-    grupoGorduraG = existente?.gorduraG ?? gorduraGInput ?? 0;
-    grupoCarboidratoG = existente?.carboidratoG ?? carboidratoGInput ?? 0;
+    if (existente) {
+      grupoProteinaG = existente.proteinaG;
+      grupoGorduraG = existente.gorduraG;
+      grupoCarboidratoG = existente.carboidratoG;
+    } else {
+      const info = dias.length ? diasResolvidos.find((d) => d.diaSemana === dias[0]) : undefined;
+      grupoProteinaG = proteinaGInput ?? 0;
+      grupoGorduraG = gorduraGInput ?? 0;
+      grupoCarboidratoG = carboidratoGDoDia(info?.calorias ?? caloriasCalc, grupoProteinaG, grupoGorduraG);
+    }
     mostrarDefinirCalorias = true;
   }
 
