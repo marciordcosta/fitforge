@@ -130,9 +130,6 @@
   .total-cal {
     flex: 1;
     margin: 0;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--surface-bg);
     text-align: center;
     color: var(--surface-muted);
     font-size: var(--font-size-sm);
