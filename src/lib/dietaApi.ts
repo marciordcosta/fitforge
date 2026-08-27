@@ -557,6 +557,26 @@ export async function copiarItensEntreRefeicoes(origemId: string, destinoId: str
   if (error) throw error;
 }
 
+/** Copia um único item lançado pra outra refeição (mesma quantidade/macros congelados), sem mexer no item de origem. */
+export async function copiarItemEntreRefeicoes(itemId: string, destinoRefeicaoId: string): Promise<void> {
+  const [item, destino] = await Promise.all([getItemDiario(itemId), getRefeicaoDia(destinoRefeicaoId)]);
+  if (!item) throw new Error("Item não encontrado.");
+  if (!destino) throw new Error("Refeição de destino não encontrada.");
+  const { error } = await supabase.from("diario_alimentos").insert({
+    user_id: uid(),
+    alimento_id: item.alimentoId,
+    data: destino.data,
+    refeicao_id: destinoRefeicaoId,
+    quantidade: item.quantidade,
+    unidade: item.unidade,
+    calorias: item.calorias,
+    proteina_g: item.proteinaG,
+    gordura_g: item.gorduraG,
+    carboidrato_g: item.carboidratoG,
+  });
+  if (error) throw error;
+}
+
 /** Guarda a composição atual da refeição como uma Receita reutilizável e buscável (mesmo nome da refeição). */
 export async function salvarRefeicaoComoReceita(id: string): Promise<void> {
   const refeicao = await getRefeicaoDia(id);

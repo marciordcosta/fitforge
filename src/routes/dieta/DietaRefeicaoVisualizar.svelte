@@ -452,7 +452,6 @@
   <DietaCopiarParaSheet
     refeicaoOrigemId={refeicaoId}
     nomeAtual={refeicao.nome}
-    dataAtual={refeicao.data}
     onFechar={() => (mostrarCopiarPara = false)}
     onCopiado={aoCopiarPara}
   />
@@ -461,7 +460,6 @@
 {#if mostrarCopiarDe && refeicao}
   <DietaCopiarDeSheet
     refeicaoDestinoId={refeicaoId}
-    dataAtual={refeicao.data}
     onFechar={() => (mostrarCopiarDe = false)}
     onCopiado={aoCopiarDe}
   />

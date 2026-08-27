@@ -2,100 +2,123 @@
   import { untrack } from "svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
-  import { getRefeicoesDoDia, copiarItensEntreRefeicoes, type RefeicaoDia } from "../../lib/dietaApi";
+  import WheelColuna from "../../components/WheelColuna.svelte";
+  import { hojeISO, somarDias, parseISODate } from "../../lib/dates";
+  import { getRefeicoesDoDia, getItensDaRefeicao, copiarItensEntreRefeicoes, copiarItemEntreRefeicoes } from "../../lib/dietaApi";
 
   let {
     refeicaoDestinoId,
-    dataAtual,
     onFechar,
     onCopiado,
   }: {
     refeicaoDestinoId: string;
-    dataAtual: string;
     onFechar: () => void;
     onCopiado: () => void;
   } = $props();
 
-  let dia = $state(untrack(() => dataAtual));
-  let opcoes = $state<RefeicaoDia[]>([]);
-  let origemId = $state("");
-  let carregandoOpcoes = $state(true);
+  const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+  const hoje = untrack(() => hojeISO());
+  const ontem = somarDias(hoje, -1);
+  const anteontem = somarDias(hoje, -2);
+
+  const opcoesDia = [
+    { valor: hoje, label: "Hoje" },
+    { valor: ontem, label: "Ontem" },
+    { valor: anteontem, label: DIAS_SEMANA[parseISODate(anteontem).getDay()] },
+  ];
+
+  let diaSelecionado = $state(hoje);
+  let opcoesRefeicao = $state<{ valor: string; label: string }[]>([]);
+  let refeicaoSelecionada = $state("");
+  let opcoesAlimento = $state<{ valor: string; label: string }[]>([]);
+  let alimentoSelecionado = $state("");
   let salvando = $state(false);
 
-  async function carregarOpcoes() {
-    carregandoOpcoes = true;
-    const todas = await getRefeicoesDoDia(dia);
-    opcoes = todas.filter((r) => r.id !== refeicaoDestinoId);
-    origemId = opcoes[0]?.id ?? "";
-    carregandoOpcoes = false;
+  async function carregarAlimentos(refeicaoId: string) {
+    if (!refeicaoId) {
+      opcoesAlimento = [];
+      alimentoSelecionado = "";
+      return;
+    }
+    const itens = await getItensDaRefeicao(refeicaoId);
+    opcoesAlimento = [{ valor: "TUDO", label: "Tudo" }, ...itens.map((it) => ({ valor: it.id, label: it.nome }))];
+    alimentoSelecionado = "TUDO";
   }
 
-  void carregarOpcoes();
+  async function carregarRefeicoes(dia: string) {
+    const todas = await getRefeicoesDoDia(dia);
+    opcoesRefeicao = todas.filter((r) => r.id !== refeicaoDestinoId).map((r) => ({ valor: r.id, label: r.nome }));
+    refeicaoSelecionada = opcoesRefeicao[0]?.valor ?? "";
+    await carregarAlimentos(refeicaoSelecionada);
+  }
 
-  function aoMudarDia(novoDia: string) {
-    dia = novoDia;
-    void carregarOpcoes();
+  void carregarRefeicoes(untrack(() => diaSelecionado));
+
+  function aoMudarDia(valor: string) {
+    diaSelecionado = valor;
+    void carregarRefeicoes(valor);
+  }
+
+  function aoMudarRefeicao(valor: string) {
+    refeicaoSelecionada = valor;
+    void carregarAlimentos(valor);
+  }
+
+  function aoMudarAlimento(valor: string) {
+    alimentoSelecionado = valor;
   }
 
   async function copiar() {
-    if (!origemId) return;
+    if (!refeicaoSelecionada) return;
     salvando = true;
     try {
-      await copiarItensEntreRefeicoes(origemId, refeicaoDestinoId);
+      if (alimentoSelecionado === "TUDO") {
+        await copiarItensEntreRefeicoes(refeicaoSelecionada, refeicaoDestinoId);
+      } else {
+        await copiarItemEntreRefeicoes(alimentoSelecionado, refeicaoDestinoId);
+      }
       onCopiado();
     } catch (err) {
-      alert("Erro ao copiar refeição: " + (err as Error).message);
+      alert("Erro ao copiar: " + (err as Error).message);
       salvando = false;
     }
   }
 </script>
 
 <Sheet titulo="Copiar de" {onFechar}>
-  <div class="campo">
-    <label for="cd-dia">Dia</label>
-    <input id="cd-dia" type="date" value={dia} onchange={(e) => aoMudarDia(e.currentTarget.value)} />
+  <div class="colunas">
+    <div class="coluna">
+      <p class="coluna-titulo">Dia</p>
+      <WheelColuna opcoes={opcoesDia} valorAtual={diaSelecionado} onMudar={aoMudarDia} />
+    </div>
+    <div class="coluna">
+      <p class="coluna-titulo">Refeição</p>
+      <WheelColuna opcoes={opcoesRefeicao} valorAtual={refeicaoSelecionada} onMudar={aoMudarRefeicao} vazio="Nenhuma outra refeição nesse dia" />
+    </div>
+    <div class="coluna">
+      <p class="coluna-titulo">Alimento</p>
+      <WheelColuna opcoes={opcoesAlimento} valorAtual={alimentoSelecionado} onMudar={aoMudarAlimento} vazio="Refeição vazia" />
+    </div>
   </div>
-  <div class="campo">
-    <label for="cd-refeicao">Refeição</label>
-    {#if carregandoOpcoes}
-      <p class="muted">Carregando…</p>
-    {:else if !opcoes.length}
-      <p class="muted">Nenhuma outra refeição nesse dia.</p>
-    {:else}
-      <select id="cd-refeicao" bind:value={origemId}>
-        {#each opcoes as r (r.id)}
-          <option value={r.id}>{r.nome}</option>
-        {/each}
-      </select>
-    {/if}
-  </div>
-  <Button onclick={copiar} disabled={salvando || !origemId}>Copiar</Button>
+  <Button onclick={copiar} disabled={salvando || !refeicaoSelecionada}>Copiar</Button>
 </Sheet>
 
 <style>
-  .campo {
+  .colunas {
     display: flex;
-    flex-direction: column;
     gap: var(--space-2);
     margin-bottom: var(--space-4);
   }
-  .campo label {
+  .coluna {
+    flex: 1;
+    min-width: 0;
+  }
+  .coluna-titulo {
+    margin: 0 0 var(--space-1);
+    text-align: center;
     font-size: var(--font-size-sm);
-    color: var(--surface-muted);
-  }
-  .campo input,
-  .campo select {
-    box-sizing: border-box;
-    width: 100%;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    color-scheme: dark;
-  }
-  .muted {
+    font-weight: 600;
     color: var(--surface-muted);
   }
 </style>

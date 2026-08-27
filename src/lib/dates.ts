@@ -30,3 +30,9 @@ export function chaveSemana(date: Date): string {
 export function hojeISO(): string {
   return toISODate(new Date());
 }
+
+/** Soma (ou subtrai, com dias negativo) dias a uma data ISO. */
+export function somarDias(iso: string, dias: number): string {
+  const d = parseISODate(iso);
+  return toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + dias));
+}
