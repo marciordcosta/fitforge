@@ -27,6 +27,10 @@
 
   async function iniciarCamera(el: HTMLVideoElement) {
     try {
+      // Garante que uma câmera de uma visita anterior (ainda não totalmente liberada pelo navegador) não fique
+      // disputando o dispositivo com essa nova tentativa — sem isso, às vezes o getUserMedia trava em silêncio.
+      controls?.stop();
+      controls = null;
       const reader = new BrowserMultiFormatReader();
       controls = await reader.decodeFromConstraints(
         { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },

@@ -45,7 +45,6 @@
   let rotinaHoje = $state<Treino | null>(null);
   let progressoPeso = $state<ProgressoMetaPeso | null>(null);
   let metasCaloriasPorRefeicao = $state<Map<string, number>>(new Map());
-  let expandidoMacros = $state(false);
   let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
   let pesoAtual = $state(76);
   const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
@@ -156,15 +155,10 @@
     return Math.max(0, meta - valor);
   }
 
-  const fibrasMinG = $derived(metas ? Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").min, pesoAtual, metas.calorias)) : 0);
   const fibrasMaxG = $derived(metas ? Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, metas.calorias)) : 0);
   const gorduraSaturadaMaxG = $derived(
     metas ? Math.round(gramasDoParametro(defParametro.get("gordura_saturada")!, parametro("gordura_saturada").max, pesoAtual, metas.calorias)) : 0,
   );
-
-  function formatarFaixa(min: number, max: number): string {
-    return min === max ? `${min} g` : `${min}–${max} g`;
-  }
 </script>
 
 {#snippet iconChevron()}
@@ -288,14 +282,8 @@
         </div>
       </div>
 
-      <div
-        class="card-macros"
-        role="button"
-        tabindex="0"
-        onclick={() => (expandidoMacros = !expandidoMacros)}
-        onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") expandidoMacros = !expandidoMacros; }}
-      >
-        <button class="toggle-btn" onclick={(e) => { e.stopPropagation(); modoRestante = !modoRestante; }} aria-label="Alternar exibição">
+      <div class="card-macros">
+        <button class="toggle-btn" onclick={() => (modoRestante = !modoRestante)} aria-label="Alternar exibição">
           {@render iconToggle()}
         </button>
         <div class="macros-grid">
@@ -338,23 +326,32 @@
               <div class="barra" style={`width:${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div>
             </div>
           </div>
-        </div>
-
-        {#if expandidoMacros}
-          <div class="macros-extra">
-            <div class="macro-extra-item">
-              <span>Gordura Saturada</span>
-              <span>{gorduraSaturadaMaxG} g</span>
-            </div>
-            <div class="macro-extra-item">
-              <span>Fibras</span>
-              <span>{formatarFaixa(fibrasMinG, fibrasMaxG)}</span>
+          <div class="macro-col">
+            <p class="macro-nome">Gordura Sat.</p>
+            <p class="macro-valor">
+              {#if modoRestante}
+                <strong>{restante(0, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+              {:else}
+                <strong>0 g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${larguraBarra(pctMeta(0, gorduraSaturadaMaxG))}%; background:${COR_GORDURA};`}></div>
             </div>
           </div>
-        {/if}
-
-        <div class="expandir-chevron" class:aberto={expandidoMacros}>
-          {@render iconChevron()}
+          <div class="macro-col">
+            <p class="macro-nome">Fibras</p>
+            <p class="macro-valor">
+              {#if modoRestante}
+                <strong>{restante(0, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+              {:else}
+                <strong>0 g</strong> <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
+              {/if}
+            </p>
+            <div class="barra-wrap">
+              <div class="barra" style={`width:${larguraBarra(pctMeta(0, fibrasMaxG))}%; background:${COR_CARBO};`}></div>
+            </div>
+          </div>
         </div>
       </div>
     {/if}
@@ -567,9 +564,6 @@
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
   }
-  .card-macros {
-    cursor: pointer;
-  }
   .card-titulo {
     margin: 0 0 var(--space-2);
     font-size: var(--font-size-base);
@@ -625,15 +619,26 @@
     height: 16px;
   }
   .macros-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
     gap: var(--space-3);
     padding-right: 32px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .macros-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .macro-col {
+    flex: 0 0 calc((100% - 2 * var(--space-3)) / 3);
+    min-width: 0;
+    scroll-snap-align: start;
   }
   .macro-nome {
     margin: 0 0 var(--space-1);
     font-size: var(--font-size-base);
     color: var(--surface-fg);
+    white-space: nowrap;
   }
   .macro-valor {
     margin: 0 0 var(--space-2);
@@ -654,37 +659,6 @@
   .barra {
     height: 100%;
     border-radius: 5px;
-  }
-  .macros-extra {
-    margin-top: var(--space-4);
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--surface-border);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  .macro-extra-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: var(--font-size-sm);
-  }
-  .macro-extra-item span:first-child {
-    color: var(--surface-muted);
-  }
-  .expandir-chevron {
-    display: flex;
-    justify-content: center;
-    margin-top: var(--space-2);
-    color: var(--surface-muted);
-    transition: transform 0.15s ease;
-  }
-  .expandir-chevron.aberto {
-    transform: rotate(180deg);
-  }
-  .expandir-chevron svg {
-    width: 16px;
-    height: 16px;
   }
   .refeicao-item {
     cursor: pointer;
