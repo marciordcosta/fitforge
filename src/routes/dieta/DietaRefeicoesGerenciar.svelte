@@ -2018,8 +2018,8 @@
     margin-bottom: var(--space-5);
   }
   .dia-card {
-    flex: 0 0 auto;
-    min-width: 60px;
+    flex: 0 0 68px;
+    width: 68px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2095,7 +2095,8 @@
     opacity: 0.8;
   }
   .dia-card-cal-nome {
-    max-width: 56px;
+    display: block;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
