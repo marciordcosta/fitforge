@@ -914,6 +914,29 @@ export function resolverDistribuicao(metaCalorias: number, manuais: Map<number, 
   );
 }
 
+export interface DistribuicaoValorDia {
+  diaSemana: number;
+  valor: number;
+  manual: boolean;
+}
+
+/**
+ * Mesma ideia de resolverDistribuicao, generalizada pra qualquer valor por dia (proteína,
+ * gordura em gramas): dias manuais usam o valor travado; dias automáticos dividem igualmente
+ * o que sobra da meta semanal (metaPorDia × 7 − soma dos manuais). Não valida mínimo/máximo —
+ * quem chama decide se avisa ou bloqueia (nunca deixa a conta sem solução).
+ */
+export function distribuirValorPorDia(metaPorDia: number, manuais: Map<number, number>): DistribuicaoValorDia[] {
+  const todosOsDias = [0, 1, 2, 3, 4, 5, 6];
+  const diasAuto = todosOsDias.filter((d) => !manuais.has(d));
+  const somaManual = [...manuais.values()].reduce((acc, v) => acc + v, 0);
+  const restante = metaPorDia * 7 - somaManual;
+  const valorAuto = diasAuto.length > 0 ? Math.max(0, restante / diasAuto.length) : 0;
+  return todosOsDias.map((dia) =>
+    manuais.has(dia) ? { diaSemana: dia, valor: manuais.get(dia)!, manual: true } : { diaSemana: dia, valor: valorAuto, manual: false },
+  );
+}
+
 export async function getModoCalorias(): Promise<"fixa" | "ondulatoria"> {
   const { data, error } = await supabase.from("dieta_perfil").select("modo_calorias").maybeSingle();
   if (error) throw error;
@@ -1002,8 +1025,10 @@ export function carboidratoGDoDia(caloriasDoDia: number, proteinaG: number, gord
  * Meta de macros/calorias efetiva pra uma data específica — respeita o modo Fixa/Ondulatória.
  * Em Fixa, é a mesma meta global de sempre (getMetasDiarias). Em Ondulatória, resolve o dia da
  * semana dessa data: se estiver travado manualmente, usa a composição salva daquele ajuste;
- * senão usa os padrões globais de proteína/gordura com o carboidrato calculado pra fechar a
- * meta de calorias automática daquele dia — mesma lógica usada em Gerenciar > Refeições.
+ * senão a proteína e a gordura também são redistribuídas entre os dias automáticos (mesma
+ * lógica de resolverDistribuicao, mas pra gramas — dias manuais "gastam" da meta semanal,
+ * o resto divide igual entre os automáticos), com o carboidrato calculado por cima pra fechar
+ * a meta de calorias automática daquele dia — mesma lógica usada em Gerenciar > Refeições.
  */
 export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
   const modo = await getModoCalorias();
@@ -1036,11 +1061,15 @@ export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
     const dados = manuais.get(diaSemana);
     if (dados) return { calorias: dados.calorias, proteinaG: dados.proteinaG, gorduraG: dados.gorduraG, carboidratoG: dados.carboidratoG };
   }
+  const manuaisProteina = new Map([...manuais].map(([dia, v]) => [dia, v.proteinaG]));
+  const manuaisGordura = new Map([...manuais].map(([dia, v]) => [dia, v.gorduraG]));
+  const proteinaResolvida = distribuirValorPorDia(proteinaG, manuaisProteina).find((d) => d.diaSemana === diaSemana)!.valor;
+  const gorduraResolvida = distribuirValorPorDia(gorduraG, manuaisGordura).find((d) => d.diaSemana === diaSemana)!.valor;
   return {
     calorias: diaResolvido.calorias,
-    proteinaG,
-    gorduraG,
-    carboidratoG: carboidratoGDoDia(diaResolvido.calorias, proteinaG, gorduraG),
+    proteinaG: proteinaResolvida,
+    gorduraG: gorduraResolvida,
+    carboidratoG: carboidratoGDoDia(diaResolvido.calorias, proteinaResolvida, gorduraResolvida),
   };
 }
 

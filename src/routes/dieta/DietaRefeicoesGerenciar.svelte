@@ -19,6 +19,7 @@
     getModoCalorias,
     getCaloriasDiaManuais,
     resolverDistribuicao,
+    distribuirValorPorDia,
     definirModoCalorias,
     definirCaloriasDias,
     removerCaloriasDia,
@@ -164,6 +165,14 @@
       .filter((m): m is RefeicaoModelo => m != null);
   }
 
+  /** Proteína/gordura dos dias automáticos também são redistribuídas pela semana — dias manuais "gastam" da meta semanal, o resto divide igual entre os automáticos (mesma lógica de calorias, generalizada em distribuirValorPorDia). */
+  const proteinaResolvidaSemana = $derived.by(() =>
+    distribuirValorPorDia(proteinaGInput ?? 0, new Map([...manuaisCompletos].map(([d, v]) => [d, v.proteinaG]))),
+  );
+  const gorduraResolvidaSemana = $derived.by(() =>
+    distribuirValorPorDia(gorduraGInput ?? 0, new Map([...manuaisCompletos].map(([d, v]) => [d, v.gorduraG]))),
+  );
+
   /** Dias com a mesma meta de calorias E as mesmas refeições (na mesma ordem) viram um único bloco — dias diferentes em qualquer um dos dois saem em blocos separados. Ordem preservada pela primeira ocorrência (Dom..Sáb). */
   const gruposDias = $derived.by((): GrupoDias[] => {
     const grupos = new Map<string, GrupoDias>();
@@ -274,8 +283,8 @@
       grupoCarboidratoG = existente.carboidratoG;
     } else {
       const info = dias.length ? diasResolvidos.find((d) => d.diaSemana === dias[0]) : undefined;
-      grupoProteinaG = proteinaGInput ?? 0;
-      grupoGorduraG = gorduraGInput ?? 0;
+      grupoProteinaG = (dias.length ? proteinaResolvidaSemana.find((d) => d.diaSemana === dias[0])?.valor : undefined) ?? proteinaGInput ?? 0;
+      grupoGorduraG = (dias.length ? gorduraResolvidaSemana.find((d) => d.diaSemana === dias[0])?.valor : undefined) ?? gorduraGInput ?? 0;
       grupoCarboidratoG = carboidratoGDoDia(info?.calorias ?? caloriasCalc, grupoProteinaG, grupoGorduraG);
     }
     mostrarDefinirCalorias = true;
@@ -319,16 +328,37 @@
       return;
     }
 
-    /** Só aviso, não trava — bloquear aqui poderia deixar a conta sem solução (calorias fecham, mas nenhum carboidrato possível fecha o mínimo). */
+    /**
+     * Só aviso, não trava — bloquear aqui poderia deixar a conta sem solução (calorias fecham,
+     * mas nenhuma combinação de proteína/gordura/carboidrato possível fecha os mínimos). Simula
+     * a distribuição de proteína/gordura da semana com essa edição já aplicada, e confere cada
+     * dia automático resultante contra os 3 mínimos parametrizados.
+     */
+    const manuaisProteinaTeste = new Map([...manuaisCompletos].map(([dia, v]) => [dia, v.proteinaG]));
+    const manuaisGorduraTeste = new Map([...manuaisCompletos].map(([dia, v]) => [dia, v.gorduraG]));
+    for (const dia of diasSelecionados) {
+      manuaisProteinaTeste.set(dia, grupoProteinaG);
+      manuaisGorduraTeste.set(dia, grupoGorduraG);
+    }
+    const proteinaResolvidaTeste = distribuirValorPorDia(proteinaGInput ?? 0, manuaisProteinaTeste);
+    const gorduraResolvidaTeste = distribuirValorPorDia(gorduraGInput ?? 0, manuaisGorduraTeste);
+
+    const proteinaMinG = parametro("proteina").min * pesoAtual;
+    const gorduraMinG = parametro("gordura").min * pesoAtual;
     const carboMinG = parametro("carboidrato").min * pesoAtual;
-    const diasAbaixoDoMinimo = resolvido.filter(
-      (d) => !d.manual && carboidratoGDoDia(d.calorias, proteinaGInput ?? 0, gorduraGInput ?? 0) < carboMinG,
-    );
-    if (diasAbaixoDoMinimo.length) {
-      const nomes = diasAbaixoDoMinimo.map((d) => DIAS_SEMANA_ABREV[d.diaSemana]).join(", ");
-      alert(
-        `Aviso: o carboidrato calculado pra ${nomes} ficaria abaixo do mínimo parametrizado (${carboMinG.toFixed(0)} g) — aplicando mesmo assim.`,
-      );
+
+    const avisos: string[] = [];
+    for (const d of resolvido.filter((d) => !d.manual)) {
+      const nome = DIAS_SEMANA_ABREV[d.diaSemana];
+      const p = proteinaResolvidaTeste.find((x) => x.diaSemana === d.diaSemana)?.valor ?? 0;
+      const g = gorduraResolvidaTeste.find((x) => x.diaSemana === d.diaSemana)?.valor ?? 0;
+      const c = carboidratoGDoDia(d.calorias, p, g);
+      if (p < proteinaMinG) avisos.push(`${nome}: proteína ${p.toFixed(0)} g (mínimo ${proteinaMinG.toFixed(0)} g)`);
+      if (g < gorduraMinG) avisos.push(`${nome}: gordura ${g.toFixed(0)} g (mínimo ${gorduraMinG.toFixed(0)} g)`);
+      if (c < carboMinG) avisos.push(`${nome}: carboidrato ${c.toFixed(0)} g (mínimo ${carboMinG.toFixed(0)} g)`);
+    }
+    if (avisos.length) {
+      alert(`Aviso — abaixo do mínimo parametrizado (aplicando mesmo assim):\n${avisos.join("\n")}`);
     }
 
     const novoManual = new Map(manuaisCompletos);
@@ -562,8 +592,8 @@
       const dados = manuaisCompletos.get(grupo.dias[0]);
       if (dados) return dados;
     }
-    const proteinaG = proteinaGInput ?? 0;
-    const gorduraG = gorduraGInput ?? 0;
+    const proteinaG = proteinaResolvidaSemana.find((d) => d.diaSemana === grupo.dias[0])?.valor ?? proteinaGInput ?? 0;
+    const gorduraG = gorduraResolvidaSemana.find((d) => d.diaSemana === grupo.dias[0])?.valor ?? gorduraGInput ?? 0;
     return { calorias: grupo.calorias, proteinaG, gorduraG, carboidratoG: carboidratoGDoDia(grupo.calorias, proteinaG, gorduraG) };
   }
 
