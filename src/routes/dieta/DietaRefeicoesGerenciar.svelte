@@ -1188,7 +1188,7 @@
           </button>
           <div class="macros-grid">
             <div class="macro-col">
-              <p class="macro-nome">Calorias</p>
+              <p class="macro-nome">Cal</p>
               <p class="macro-valor">
                 {#if modoRestanteRefeicoes}
                   <strong>{restante(somaGrupo.calorias, metaGrupo.calorias).toFixed(0)}</strong> <span class="macro-meta">restantes</span>
@@ -1214,7 +1214,7 @@
               </div>
             </div>
             <div class="macro-col">
-              <p class="macro-nome">Gorduras</p>
+              <p class="macro-nome">Gord</p>
               <p class="macro-valor">
                 {#if modoRestanteRefeicoes}
                   <strong>{restante(somaGrupo.gorduraG, metaGrupo.gorduraG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
@@ -1227,7 +1227,7 @@
               </div>
             </div>
             <div class="macro-col">
-              <p class="macro-nome">Proteínas</p>
+              <p class="macro-nome">Prot</p>
               <p class="macro-valor">
                 {#if modoRestanteRefeicoes}
                   <strong>{restante(somaGrupo.proteinaG, metaGrupo.proteinaG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
@@ -1240,7 +1240,7 @@
               </div>
             </div>
             <div class="macro-col">
-              <p class="macro-nome">Gordura Sat.</p>
+              <p class="macro-nome">G.sat</p>
               <p class="macro-valor">
                 {#if modoRestanteRefeicoes}
                   <strong>{restante(0, gorduraSaturadaMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
@@ -1253,7 +1253,7 @@
               </div>
             </div>
             <div class="macro-col">
-              <p class="macro-nome">Fibras</p>
+              <p class="macro-nome">Fibr</p>
               <p class="macro-valor">
                 {#if modoRestanteRefeicoes}
                   <strong>{restante(0, fibrasMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
@@ -1313,7 +1313,7 @@
         </button>
         <div class="macros-grid">
           <div class="macro-col">
-            <p class="macro-nome">Calorias</p>
+            <p class="macro-nome">Cal</p>
             <p class="macro-valor">
               {#if modoRestanteRefeicoes}
                 <strong>{restante(somaGlobal.calorias, metaGlobal.calorias).toFixed(0)}</strong> <span class="macro-meta">restantes</span>
@@ -1339,7 +1339,7 @@
             </div>
           </div>
           <div class="macro-col">
-            <p class="macro-nome">Gorduras</p>
+            <p class="macro-nome">Gord</p>
             <p class="macro-valor">
               {#if modoRestanteRefeicoes}
                 <strong>{restante(somaGlobal.gorduraG, metaGlobal.gorduraG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
@@ -1352,7 +1352,7 @@
             </div>
           </div>
           <div class="macro-col">
-            <p class="macro-nome">Proteínas</p>
+            <p class="macro-nome">Prot</p>
             <p class="macro-valor">
               {#if modoRestanteRefeicoes}
                 <strong>{restante(somaGlobal.proteinaG, metaGlobal.proteinaG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
@@ -1365,7 +1365,7 @@
             </div>
           </div>
           <div class="macro-col">
-            <p class="macro-nome">Gordura Sat.</p>
+            <p class="macro-nome">G.sat</p>
             <p class="macro-valor">
               {#if modoRestanteRefeicoes}
                 <strong>{restante(0, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
@@ -1378,7 +1378,7 @@
             </div>
           </div>
           <div class="macro-col">
-            <p class="macro-nome">Fibras</p>
+            <p class="macro-nome">Fibr</p>
             <p class="macro-valor">
               {#if modoRestanteRefeicoes}
                 <strong>{restante(0, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
@@ -1982,7 +1982,7 @@
     display: none;
   }
   .macros-grid .macro-col {
-    flex: 0 0 calc((100% - 3 * var(--space-3)) / 4);
+    flex: 0 0 calc((100% - 2 * var(--space-3)) / 3);
     min-width: 0;
     scroll-snap-align: start;
   }
@@ -1990,6 +1990,7 @@
     margin: 0 0 var(--space-1);
     font-size: var(--font-size-sm);
     color: var(--surface-fg);
+    white-space: nowrap;
   }
   .macro-valor {
     margin: 0 0 var(--space-2);
