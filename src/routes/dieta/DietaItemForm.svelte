@@ -209,7 +209,11 @@
       navigate(destinoVoltar());
       return;
     }
-    if (!refeicao) return;
+    if (!refeicao) {
+      // Sem refeição escolhida não há o que lançar no diário — o alimento já foi criado/salvo no catálogo antes de chegar aqui.
+      navigate(destinoVoltar());
+      return;
+    }
     salvando = true;
     try {
       if (editandoItem) {
@@ -260,7 +264,7 @@
           {@render iconMenu()}
         </button>
       {/if}
-      <button class="salvar" onclick={salvar} disabled={salvando || (!modoReceita && !refeicao) || loading} aria-label="Salvar">✓</button>
+      <button class="salvar" onclick={salvar} disabled={salvando || loading} aria-label="Salvar">✓</button>
     </div>
   </div>
 
@@ -285,7 +289,7 @@
         onkeydown={(e) => e.key === "Enter" && abrirEscolhaRefeicao()}
       >
         <span>Refeição</span>
-        <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Selecione uma refeição"}</span>
+        <span class:placeholder={!refeicao}>{refeicao ? refeicao.nome : "Nenhuma (opcional)"}</span>
       </div>
     {/if}
 
@@ -500,7 +504,7 @@
     color: var(--surface-fg);
   }
   .linha span.placeholder {
-    color: var(--color-danger);
+    color: var(--surface-muted);
   }
   .resumo {
     display: flex;
