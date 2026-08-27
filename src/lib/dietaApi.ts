@@ -1024,11 +1024,11 @@ export function carboidratoGDoDia(caloriasDoDia: number, proteinaG: number, gord
 /**
  * Meta de macros/calorias efetiva pra uma data específica — respeita o modo Fixa/Ondulatória.
  * Em Fixa, é a mesma meta global de sempre (getMetasDiarias). Em Ondulatória, resolve o dia da
- * semana dessa data: se estiver travado manualmente, usa a composição salva daquele ajuste;
- * senão a proteína e a gordura também são redistribuídas entre os dias automáticos (mesma
- * lógica de resolverDistribuicao, mas pra gramas — dias manuais "gastam" da meta semanal,
- * o resto divide igual entre os automáticos), com o carboidrato calculado por cima pra fechar
- * a meta de calorias automática daquele dia — mesma lógica usada em Gerenciar > Refeições.
+ * semana dessa data: proteína é sempre o valor global atual (constante, nunca varia por dia,
+ * nem em dias travados manualmente); a gordura é redistribuída entre os dias automáticos (dias
+ * manuais "gastam" da meta semanal, o resto divide igual entre os automáticos — distribuirValorPorDia);
+ * o carboidrato é calculado por cima pra fechar a meta de calorias automática daquele dia — mesma
+ * lógica usada em Gerenciar > Refeições.
  */
 export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
   const modo = await getModoCalorias();
@@ -1059,17 +1059,15 @@ export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
 
   if (diaResolvido.manual) {
     const dados = manuais.get(diaSemana);
-    if (dados) return { calorias: dados.calorias, proteinaG: dados.proteinaG, gorduraG: dados.gorduraG, carboidratoG: dados.carboidratoG };
+    if (dados) return { calorias: dados.calorias, proteinaG, gorduraG: dados.gorduraG, carboidratoG: dados.carboidratoG };
   }
-  const manuaisProteina = new Map([...manuais].map(([dia, v]) => [dia, v.proteinaG]));
   const manuaisGordura = new Map([...manuais].map(([dia, v]) => [dia, v.gorduraG]));
-  const proteinaResolvida = distribuirValorPorDia(proteinaG, manuaisProteina).find((d) => d.diaSemana === diaSemana)!.valor;
   const gorduraResolvida = distribuirValorPorDia(gorduraG, manuaisGordura).find((d) => d.diaSemana === diaSemana)!.valor;
   return {
     calorias: diaResolvido.calorias,
-    proteinaG: proteinaResolvida,
+    proteinaG,
     gorduraG: gorduraResolvida,
-    carboidratoG: carboidratoGDoDia(diaResolvido.calorias, proteinaResolvida, gorduraResolvida),
+    carboidratoG: carboidratoGDoDia(diaResolvido.calorias, proteinaG, gorduraResolvida),
   };
 }
 
