@@ -34,7 +34,7 @@
     type LimiteParametro,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
-  import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
+  import { DIAS_SEMANA_ABREV, listTreinos, type Treino } from "../../lib/treinoApi";
   import { navigate, voltar } from "../../lib/router.svelte";
 
   const COR_CARBO = "#5eead4";
@@ -573,6 +573,22 @@
 
   void carregar();
 
+  let treinos = $state<Treino[]>([]);
+
+  async function carregarTreinos() {
+    try {
+      treinos = await listTreinos();
+    } catch {
+      // informativo — só usado pra mostrar o nome do treino em cima dos cards de dia
+    }
+  }
+
+  void carregarTreinos();
+
+  function treinoDoDia(dia: number): string | null {
+    return treinos.find((t) => t.dia_semana === dia)?.nome_treino ?? null;
+  }
+
   function abrirNovo() {
     nome = "";
     mostrarForm = true;
@@ -917,32 +933,38 @@
         <div class="dias-lista">
           {#each diasResolvidos as dia (dia.diaSemana)}
             {@const cor = corDoDia(dia)}
+            {@const treino = treinoDoDia(dia.diaSemana)}
             <div class="dia-card-slot">
-              <div
-                class="dia-card"
-                class:selecionado={diasSelecionados.has(dia.diaSemana)}
-                class:colorido={cor != null}
-                style={cor ? `background:${cor}; border-color:${cor};` : ""}
-                role="button"
-                tabindex="0"
-                onclick={() => toggleDiaSelecionado(dia.diaSemana)}
-                onkeydown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") toggleDiaSelecionado(dia.diaSemana);
-                }}
-              >
-                <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia.diaSemana]}</span>
-                <span class="dia-card-cal">{Math.round(dia.calorias)}</span>
-              </div>
-              {#if dia.manual}
-                <button
-                  type="button"
-                  class="dia-card-x"
-                  onclick={() => removerAjusteDia(dia.diaSemana)}
-                  aria-label={`Remover ajuste de ${DIAS_SEMANA_ABREV[dia.diaSemana]}`}
-                >
-                  ✕
-                </button>
+              {#if treino}
+                <p class="dia-card-treino">{treino}</p>
               {/if}
+              <div class="dia-card-pill-wrap">
+                <div
+                  class="dia-card"
+                  class:selecionado={diasSelecionados.has(dia.diaSemana)}
+                  class:colorido={cor != null}
+                  style={cor ? `background:${cor}; border-color:${cor};` : ""}
+                  role="button"
+                  tabindex="0"
+                  onclick={() => toggleDiaSelecionado(dia.diaSemana)}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") toggleDiaSelecionado(dia.diaSemana);
+                  }}
+                >
+                  <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia.diaSemana]}</span>
+                  <span class="dia-card-cal">{Math.round(dia.calorias)}</span>
+                </div>
+                {#if dia.manual}
+                  <button
+                    type="button"
+                    class="dia-card-x"
+                    onclick={() => removerAjusteDia(dia.diaSemana)}
+                    aria-label={`Remover ajuste de ${DIAS_SEMANA_ABREV[dia.diaSemana]}`}
+                  >
+                    ✕
+                  </button>
+                {/if}
+              </div>
             </div>
           {/each}
         </div>
@@ -975,8 +997,14 @@
         <div class="secao-dias-header">
           <div class="dias-lista secao-dias-lista">
             {#each grupo.dias as dia (dia)}
-              <div class="dia-card" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
-                <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
+              {@const treino = treinoDoDia(dia)}
+              <div class="dia-card-slot">
+                {#if treino}
+                  <p class="dia-card-treino">{treino}</p>
+                {/if}
+                <div class="dia-card" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
+                  <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
+                </div>
               </div>
             {/each}
           </div>
@@ -1776,8 +1804,20 @@
     box-shadow: 0 0 0 2px #ffffff;
   }
   .dia-card-slot {
-    position: relative;
     flex: 0 0 auto;
+  }
+  .dia-card-treino {
+    margin: 0 0 4px;
+    max-width: 72px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    font-size: 10px;
+    color: var(--surface-muted);
+  }
+  .dia-card-pill-wrap {
+    position: relative;
   }
   .dia-card-x {
     position: absolute;
