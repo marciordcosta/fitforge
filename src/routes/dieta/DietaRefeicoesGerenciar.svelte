@@ -1889,8 +1889,10 @@
   .grade-tabela tbody tr:not(:last-child) td {
     border-bottom: 1px solid var(--surface-border);
   }
-  .grade-col-rotulo {
+  .grade-tabela .grade-col-rotulo {
     text-align: left;
+  }
+  .grade-col-rotulo {
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
     position: sticky;
