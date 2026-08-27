@@ -1,7 +1,6 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
   import { parseISODate, toISODate, hojeISO } from "../../lib/dates";
-  import Button from "../../components/Button.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
@@ -430,14 +429,16 @@
           {:else}
             <p class="preview">{preview(refeicao.id)}</p>
           {/if}
-          <Button
+          <button
+            type="button"
+            class="acao-adicionar"
             onclick={(e) => {
               e.stopPropagation();
               navigate(`/dieta/alimentos/refeicao/${refeicao.id}`);
             }}
           >
             Adicionar Alimento
-          </Button>
+          </button>
         </div>
       {/each}
     {/if}
@@ -701,6 +702,7 @@
     flex-shrink: 0;
     font-size: var(--font-size-lg);
     margin: 0;
+    color: var(--color-primary);
   }
   .card-cal {
     flex-shrink: 0;
@@ -718,6 +720,18 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
+  }
+  .acao-adicionar {
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--surface-border);
+    background: none;
+    color: var(--color-primary);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    cursor: pointer;
   }
   .pct-titulo {
     margin: 0 0 var(--space-2);
