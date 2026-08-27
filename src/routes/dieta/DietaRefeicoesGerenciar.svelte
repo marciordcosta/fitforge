@@ -1901,8 +1901,8 @@
   }
   .toggle-btn {
     position: absolute;
-    top: var(--space-3);
-    right: var(--space-3);
+    top: var(--space-4);
+    right: var(--space-4);
     width: 28px;
     height: 28px;
     border-radius: 50%;
@@ -1921,7 +1921,7 @@
   .macros-grid {
     display: flex;
     gap: var(--space-3);
-    width: calc(100% - 40px);
+    width: calc(100% - 48px);
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
