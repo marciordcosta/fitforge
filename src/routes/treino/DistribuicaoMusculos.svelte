@@ -20,10 +20,24 @@
   let mesBase = $state(new Date());
   let linhasRealizadoMes = $state<{ data: string; musculo_id: string; series_equivalentes: number }[]>([]);
   let carregandoRealizado = $state(false);
+  let feitoPorMusculoSemana = $state<Map<string, number>>(new Map());
+
+  /** Semana ancorada em segunda-feira (exceção proposital, igual à tela inicial de Treino — o resto do app usa terça, ver inicioSemana em dates.ts). */
+  function segundaISO(): string {
+    const hoje = new Date();
+    const delta = (hoje.getDay() + 6) % 7;
+    return toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - delta));
+  }
 
   async function carregarBase() {
     [musculos, treinos] = await Promise.all([listMusculos(), listTreinos()]);
-    await carregarRealizado();
+    const hojeIso = toISODate(new Date());
+    const [, volumeSemana] = await Promise.all([carregarRealizado(), getVolumeRealizadoBruto(segundaISO(), hojeIso)]);
+    const mapa = new Map<string, number>();
+    for (const l of volumeSemana) {
+      mapa.set(l.musculo_id, (mapa.get(l.musculo_id) ?? 0) + Number(l.series_equivalentes));
+    }
+    feitoPorMusculoSemana = mapa;
   }
 
   void carregarBase();
@@ -339,12 +353,13 @@
           {:else}
             <div class="lista">
               {#each distribuicaoSemanal as item (item.musculo.id)}
+                {@const feito = feitoPorMusculoSemana.get(item.musculo.id) ?? 0}
                 <div class="item">
                   <button class="nome-btn" onclick={() => abrirExercicios(treinos, item.musculo)}>{item.musculo.nome}</button>
                   <div class="barra-wrap">
-                    <div class="barra" style={`width: ${Math.min(item.valor * 8, 100)}%; background: ${corVolume(item.valor)};`}></div>
+                    <div class="barra" style={`width: ${Math.min((feito / item.valor) * 100, 100)}%; background: ${corVolume(item.valor)};`}></div>
                   </div>
-                  <button class="valor-btn" style={`color: ${corVolume(item.valor)};`} onclick={() => abrirGradeSemanal([item.musculo.id])}>{item.valor}</button>
+                  <button class="valor-btn" style={`color: ${corVolume(item.valor)};`} onclick={() => abrirGradeSemanal([item.musculo.id])}>{feito.toFixed(0)} / {item.valor}</button>
                 </div>
               {/each}
             </div>
