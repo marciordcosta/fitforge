@@ -557,11 +557,24 @@
     return opcoes;
   }
 
+  /** Menor média semanal que dá pra colocar sem que a reescala proporcional (reescalarBlocosParaMedia) jogue algum bloco abaixo do mínimo parametrizado — só relevante quando os 7 dias já estão todos em blocos nomeados. */
+  function pisoMediaOndulatoria(): number {
+    if (!(modoCalorias === "ondulatoria" && todosOsDiasNomeados)) return 0;
+    const valores = [...manuaisCompletos.values()].map((v) => v.calorias);
+    if (!valores.length) return 0;
+    const mediaAtual = valores.reduce((acc, v) => acc + v, 0) / 7;
+    const minValorAtual = Math.min(...valores);
+    if (minValorAtual <= 0) return 0;
+    return (mediaAtual * minimoCalorias) / minValorAtual;
+  }
+
   function infoCampo(campo: "calorias") {
+    const valorAtual = Math.round((caloriasInput ?? caloriasCalc) / 10) * 10;
+    const piso = Math.min(pisoMediaOndulatoria(), valorAtual);
     return {
       titulo: "Calorias (kcal)",
-      opcoes: opcoesCalorias(),
-      valorAtual: Math.round((caloriasInput ?? caloriasCalc) / 10) * 10,
+      opcoes: opcoesCalorias().filter((o) => o.valor >= piso),
+      valorAtual,
       onSelecionar: (v: number) => {
         caloriasInput = v;
         aoEditarCalorias();
