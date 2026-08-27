@@ -316,7 +316,10 @@
 
   let mostrarCaloriasBlocos = $state(false);
   let blocosEdicao = $state<BlocoEdicao[]>([]);
-  let celulaEditando = $state<{ idx: number; campo: "calorias" | "proteinaG" | "gorduraG" | "carboidratoG" } | null>(null);
+  /** Índice do bloco cuja Calorias está sendo editada (WheelPicker de valor único). */
+  let blocoCaloriasEditando = $state<number | null>(null);
+  /** Índice do bloco cujo Proteína/Gordura/Carboidrato está sendo editado (seletor de 3 colunas, com % e g/peso ao vivo). */
+  let blocoMacrosEditando = $state<number | null>(null);
 
   function abrirCaloriasBlocos() {
     blocosEdicao = blocosNomeados.map((b) => {
@@ -350,55 +353,80 @@
     return blocos.map((b, i) => (i === idxEditado ? { ...b, [campo]: novoValor } : { ...b, [campo]: Math.max(0, b[campo] + deltaPorDia) }));
   }
 
-  function aplicarEdicaoCelula(idx: number, campo: "calorias" | "proteinaG" | "gorduraG" | "carboidratoG", valor: number) {
-    if (campo === "proteinaG") {
-      proteinaGInput = valor;
-      proteinaGKg = pesoAtual > 0 ? Math.round((valor / pesoAtual) * 100) / 100 : 0;
-      blocosEdicao = blocosEdicao.map((b) => ({ ...b, carboidratoG: carboidratoGDoDia(b.calorias, valor, b.gorduraG) }));
-      return;
-    }
-    if (campo === "carboidratoG") {
-      blocosEdicao = blocosEdicao.map((b, i) => (i === idx ? { ...b, carboidratoG: valor } : b));
-      return;
-    }
-    const metaPorDia = campo === "calorias" ? caloriasCalc : (gorduraGInput ?? 0);
-    blocosEdicao = redistribuirEntreBlocos(metaPorDia, blocosEdicao, idx, valor, campo);
+  function aplicarEdicaoCalorias(idx: number, valor: number) {
+    blocosEdicao = redistribuirEntreBlocos(caloriasCalc, blocosEdicao, idx, valor, "calorias");
     const proteina = proteinaGInput ?? 0;
     blocosEdicao = blocosEdicao.map((b) => ({ ...b, carboidratoG: carboidratoGDoDia(b.calorias, proteina, b.gorduraG) }));
   }
 
-  function infoCelula(sel: { idx: number; campo: "calorias" | "proteinaG" | "gorduraG" | "carboidratoG" }) {
-    const bloco = blocosEdicao[sel.idx];
-    switch (sel.campo) {
-      case "calorias":
-        return {
-          titulo: `Calorias — ${bloco.nome}`,
-          opcoes: opcoesCalorias(),
-          valorAtual: Math.round(bloco.calorias / 10) * 10,
-          onSelecionar: (v: number) => aplicarEdicaoCelula(sel.idx, "calorias", v),
-        };
-      case "proteinaG":
-        return {
-          titulo: "Proteína (g)",
-          opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max),
-          valorAtual: proteinaGInput ?? 0,
-          onSelecionar: (v: number) => aplicarEdicaoCelula(sel.idx, "proteinaG", v),
-        };
-      case "gorduraG":
-        return {
-          titulo: `Gordura — ${bloco.nome}`,
-          opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max),
-          valorAtual: bloco.gorduraG,
-          onSelecionar: (v: number) => aplicarEdicaoCelula(sel.idx, "gorduraG", v),
-        };
-      case "carboidratoG":
-        return {
-          titulo: `Carboidrato — ${bloco.nome}`,
-          opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max),
-          valorAtual: bloco.carboidratoG,
-          onSelecionar: (v: number) => aplicarEdicaoCelula(sel.idx, "carboidratoG", v),
-        };
+  /**
+   * Maior valor de calorias/gordura que dá pra colocar nesse bloco sem empurrar NENHUM outro bloco
+   * abaixo do mínimo parametrizado — redistribuirEntreBlocos desloca a diferença igualmente por dia
+   * entre os outros, então quem primeiro bate no piso é o bloco com o menor valor atual entre eles.
+   */
+  function tetoRedistribuicao(blocos: BlocoEdicao[], idxEditado: number, campo: "calorias" | "gorduraG", minimo: number): number {
+    const diasEditado = blocos[idxEditado].dias.length;
+    const diasOutrosTotal = 7 - diasEditado;
+    const valorAntigo = blocos[idxEditado][campo];
+    if (diasOutrosTotal === 0) return Infinity;
+    const minOutros = Math.min(...blocos.filter((_, i) => i !== idxEditado).map((b) => b[campo]));
+    const teto = valorAntigo + ((minOutros - minimo) * diasOutrosTotal) / diasEditado;
+    return Math.max(teto, valorAntigo);
+  }
+
+  /** Maior proteína que dá pra colocar sem que o carboidrato recalculado de nenhum bloco (fecha calorias−proteína−gordura) fique abaixo do mínimo parametrizado. */
+  function tetoProteina(blocos: BlocoEdicao[], carboMinG: number): number {
+    const tetos = blocos.map((b) => (b.calorias - 4 * carboMinG - 9 * b.gorduraG) / 4);
+    return Math.max(Math.min(...tetos), proteinaGInput ?? 0);
+  }
+
+  function infoCelulaCalorias(idx: number) {
+    const bloco = blocosEdicao[idx];
+    const teto = tetoRedistribuicao(blocosEdicao, idx, "calorias", minimoCalorias);
+    return {
+      titulo: `Calorias — ${bloco.nome}`,
+      opcoes: opcoesCalorias().filter((o) => o.valor <= teto),
+      valorAtual: Math.round(bloco.calorias / 10) * 10,
+      onSelecionar: (v: number) => aplicarEdicaoCalorias(idx, v),
+    };
+  }
+
+  /** 3 colunas de um bloco — Proteína é a coluna do valor GLOBAL, igual ao seletor de macros de fora do modal. Gordura e Proteína têm o teto limitado pra não empurrar nenhum bloco (esse ou os outros) abaixo do mínimo parametrizado. */
+  function colunasBloco(idx: number) {
+    const bloco = blocosEdicao[idx];
+    const gorduraMinG = parametro("gordura").min * pesoAtual;
+    const carboMinG = parametro("carboidrato").min * pesoAtual;
+    const tetoGordura = tetoRedistribuicao(blocosEdicao, idx, "gorduraG", gorduraMinG);
+    const tetoProt = tetoProteina(blocosEdicao, carboMinG);
+    return [
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesMacro(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: bloco.carboidratoG, kcalPorGrama: 4, secundario: secundarioMacro },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesMacro(parametro("gordura").min, parametro("gordura").max).filter((o) => o.valor <= tetoGordura), valorAtual: bloco.gorduraG, kcalPorGrama: 9, secundario: secundarioMacro },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesMacro(parametro("proteina").min, parametro("proteina").max).filter((o) => o.valor <= tetoProt), valorAtual: proteinaGInput ?? 0, kcalPorGrama: 4, secundario: secundarioMacro },
+    ];
+  }
+
+  function abrirMacrosBloco(idx: number) {
+    unidadeMacros = "g";
+    blocoMacrosEditando = idx;
+  }
+
+  /**
+   * Gordura editada nesse bloco redistribui entre os outros (preserva a meta semanal); proteína
+   * editada aqui é global (atualiza todos); carboidrato desse bloco vira o valor escolhido direto —
+   * os demais blocos recalculam o carboidrato deles pra fechar a conta com a proteína/gordura atuais.
+   */
+  function confirmarMacrosBloco(idx: number, valores: Record<string, number>) {
+    if (valores.proteinaG !== proteinaGInput) {
+      proteinaGInput = valores.proteinaG;
+      proteinaGKg = pesoAtual > 0 ? Math.round((valores.proteinaG / pesoAtual) * 100) / 100 : 0;
     }
+    if (valores.gorduraG !== blocosEdicao[idx].gorduraG) {
+      blocosEdicao = redistribuirEntreBlocos(gorduraGInput ?? 0, blocosEdicao, idx, valores.gorduraG, "gorduraG");
+    }
+    const proteina = proteinaGInput ?? 0;
+    blocosEdicao = blocosEdicao.map((b, i) =>
+      i === idx ? { ...b, carboidratoG: valores.carboidratoG } : { ...b, carboidratoG: carboidratoGDoDia(b.calorias, proteina, b.gorduraG) },
+    );
   }
 
   /** Só aplica localmente — persiste no banco junto com o resto ao tocar em "Salvar" no fim da tela. */
@@ -1388,7 +1416,7 @@
             <td class="grade-col-rotulo">Calorias (kcal)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => (celulaEditando = { idx, campo: "calorias" })}>{Math.round(bloco.calorias)}</button>
+                <button type="button" class="grade-valor-btn" onclick={() => (blocoCaloriasEditando = idx)}>{Math.round(bloco.calorias)}</button>
               </td>
             {/each}
           </tr>
@@ -1396,7 +1424,7 @@
             <td class="grade-col-rotulo">Proteína (g)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => (celulaEditando = { idx, campo: "proteinaG" })}>{proteinaGInput ?? 0}</button>
+                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>{proteinaGInput ?? 0}</button>
               </td>
             {/each}
           </tr>
@@ -1404,7 +1432,7 @@
             <td class="grade-col-rotulo">Gordura (g)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => (celulaEditando = { idx, campo: "gorduraG" })}>{Math.round(bloco.gorduraG)}</button>
+                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>{Math.round(bloco.gorduraG)}</button>
               </td>
             {/each}
           </tr>
@@ -1412,7 +1440,7 @@
             <td class="grade-col-rotulo">Carboidrato (g)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => (celulaEditando = { idx, campo: "carboidratoG" })}>{Math.round(bloco.carboidratoG)}</button>
+                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>{Math.round(bloco.carboidratoG)}</button>
               </td>
             {/each}
           </tr>
@@ -1423,14 +1451,23 @@
   </Sheet>
 {/if}
 
-{#if celulaEditando}
-  {@const infoCel = infoCelula(celulaEditando)}
+{#if blocoCaloriasEditando !== null}
+  {@const infoCel = infoCelulaCalorias(blocoCaloriasEditando)}
   <WheelPicker
     titulo={infoCel.titulo}
     opcoes={infoCel.opcoes}
     valorAtual={infoCel.valorAtual}
     onSelecionar={infoCel.onSelecionar}
-    onFechar={() => (celulaEditando = null)}
+    onFechar={() => (blocoCaloriasEditando = null)}
+  />
+{/if}
+
+{#if blocoMacrosEditando !== null}
+  <WheelPickerMacros
+    titulo={tituloMacros()}
+    colunas={colunasBloco(blocoMacrosEditando)}
+    onSelecionar={(valores) => confirmarMacrosBloco(blocoMacrosEditando!, valores)}
+    onFechar={() => (blocoMacrosEditando = null)}
   />
 {/if}
 
