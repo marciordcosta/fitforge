@@ -279,22 +279,11 @@
     return serieItem.concluida ? "concluida" : "";
   }
 
-  /** Antes de concluir mostra a meta; depois, some se ficou dentro da faixa, ou avisa se ficou fora. */
+  /** Faixa alvo de repetições, sempre no mesmo formato — a coluna Meta mostra isso direto, sem variar conforme a série foi concluída ou não. */
   function faixaMeta(serieItem: SetSessao): string {
     return serieItem.repMin != null && serieItem.repMax != null
       ? `${serieItem.repMin} a ${serieItem.repMax}`
       : String(serieItem.repMin ?? serieItem.repMax);
-  }
-
-  function textoMeta(serieItem: SetSessao): string | null {
-    if (serieItem.repMin == null && serieItem.repMax == null) return null;
-    if (!serieItem.concluida) {
-      return `Meta: ${faixaMeta(serieItem)}`;
-    }
-    if (serieItem.repeticoes == null) return null;
-    if (serieItem.repMin != null && serieItem.repeticoes < serieItem.repMin) return `Abaixo da meta (${faixaMeta(serieItem)})`;
-    if (serieItem.repMax != null && serieItem.repeticoes > serieItem.repMax) return `Acima da meta (${faixaMeta(serieItem)})`;
-    return null;
   }
 
   function descansoLabel(ex: ExercicioSessao): string {
@@ -599,6 +588,7 @@
         <div class="tabela">
           <div class="linha cabecalho">
             <span>Série</span>
+            <span>Meta</span>
             <span>Anterior</span>
             <span>Kg</span>
             <span>Reps</span>
@@ -619,21 +609,17 @@
                   {serieItem.serie}
                 </button>
               {/if}
-              <span class="anterior">
-                <span class="anterior-valor">
-                  {serieItem.anteriorPeso != null && serieItem.anteriorReps != null
-                    ? `${serieItem.anteriorPeso}kg x ${serieItem.anteriorReps}`
-                    : "—"}
-                </span>
-                {#if textoMeta(serieItem)}
-                  {#if !serieItem.concluida}
-                    <button class="anterior-meta anterior-meta-link" onclick={() => navigate(`/treino/rotina/${treinoId}`)}>
-                      {textoMeta(serieItem)}
-                    </button>
-                  {:else}
-                    <span class="anterior-meta">{textoMeta(serieItem)}</span>
-                  {/if}
-                {/if}
+              {#if serieItem.repMin != null || serieItem.repMax != null}
+                <button class="meta-cel" onclick={() => navigate(`/treino/rotina/${treinoId}`)}>
+                  {faixaMeta(serieItem)}
+                </button>
+              {:else}
+                <span class="meta-cel meta-cel-vazia">—</span>
+              {/if}
+              <span class="anterior-valor">
+                {serieItem.anteriorPeso != null && serieItem.anteriorReps != null
+                  ? `${serieItem.anteriorPeso}kg x ${serieItem.anteriorReps}`
+                  : "—"}
               </span>
               <input
                 type="number"
@@ -1011,7 +997,7 @@
   }
   .linha {
     display: grid;
-    grid-template-columns: 36px 1fr 64px 56px 36px;
+    grid-template-columns: 36px 52px 1fr 64px 56px 36px;
     gap: var(--space-2);
     align-items: center;
     padding: var(--space-1) 0;
@@ -1053,26 +1039,23 @@
     width: 26px;
     height: 26px;
   }
-  .anterior {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    font-size: var(--font-size-sm);
+  .anterior-valor {
+    font-size: var(--font-size-base);
     color: var(--surface-muted);
   }
-  .anterior-meta {
-    display: block;
-    font-size: 11px;
-    color: var(--surface-muted);
-  }
-  .anterior-meta-link {
+  .meta-cel {
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
     background: none;
     border: none;
     padding: 0;
     text-align: left;
-    text-decoration: none;
     font-family: inherit;
     cursor: pointer;
+  }
+  .meta-cel-vazia {
+    color: var(--surface-muted);
+    cursor: default;
   }
   .linha input {
     box-sizing: border-box;
