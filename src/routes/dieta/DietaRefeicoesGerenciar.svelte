@@ -962,10 +962,6 @@
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
     {/if}
   {:else}
-    <p class="dica">
-      Essas refeições são criadas automaticamente em todo dia que você abrir. Editar ou excluir aqui não afeta as refeições já lançadas em dias passados.
-    </p>
-
     {#if loading}
       <p class="muted">Carregando…</p>
     {:else if erro}
