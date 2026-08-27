@@ -1163,19 +1163,21 @@
         {@const metaGrupo = metaMacrosDoGrupo(grupo)}
         {@const fibrasMaxGrupo = fibrasMaxDoGrupo(metaGrupo.calorias)}
         {@const gorduraSaturadaMaxGrupo = gorduraSaturadaMaxDoGrupo(metaGrupo.calorias)}
-        <div class="secao-dias-header">
-          <div class="dias-lista secao-dias-lista">
-            {#each grupo.dias as dia (dia)}
-              {@const treino = treinoDoDia(dia)}
-              <div class="dia-card-slot">
-                <p class="dia-card-treino-topo">{treino ?? ""}</p>
-                <div class="dia-card" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
-                  <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
+        {#if gruposDias.length > 1}
+          <div class="secao-dias-header">
+            <div class="dias-lista secao-dias-lista">
+              {#each grupo.dias as dia (dia)}
+                {@const treino = treinoDoDia(dia)}
+                <div class="dia-card-slot">
+                  <p class="dia-card-treino-topo">{treino ?? ""}</p>
+                  <div class="dia-card" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
+                    <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
+                  </div>
                 </div>
-              </div>
-            {/each}
+              {/each}
+            </div>
           </div>
-        </div>
+        {/if}
 
         <div class="card-macros">
           <button
