@@ -704,3 +704,14 @@ export async function getVolumeRealizadoBruto(
   if (error) throw error;
   return data ?? [];
 }
+
+/** Total de séries (linhas de treino_registros) feitas no período — contagem bruta, mesma unidade do "programado" (soma de ex.series.length). */
+export async function getTotalSeriesExecutadasPeriodo(dataInicio: string, dataFim: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("treino_registros")
+    .select("id", { count: "exact", head: true })
+    .gte("data", dataInicio)
+    .lte("data", dataFim);
+  if (error) throw error;
+  return count ?? 0;
+}
