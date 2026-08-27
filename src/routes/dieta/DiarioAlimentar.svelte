@@ -255,9 +255,7 @@
         {#if progressoPeso}
           <button class="chip-info" onclick={() => navigate("/peso")}>
             {@render iconPesoMeta()}
-            <span class="chip-texto" class:negativo={progressoPeso.faltamG < 0}>
-              {progressoPeso.faltamG > 0 ? "+" : ""}{progressoPeso.faltamG}g
-            </span>
+            <span class="chip-texto">{progressoPeso.pesoAlvo.toFixed(1)} / {progressoPeso.pesoAtual.toFixed(1)} kg</span>
           </button>
         {/if}
       </div>
@@ -510,9 +508,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .chip-texto.negativo {
-    color: var(--color-danger);
   }
   .icon-btn {
     flex-shrink: 0;
