@@ -10,12 +10,18 @@
     getDiarioDoDia,
     getMetasDoDia,
     listRefeicoesModelo,
+    getParametros,
+    getPerfilDietaEditavel,
+    DEFINICOES_PARAMETROS,
+    PARAMETROS_PADRAO,
+    gramasDoParametro,
     type RefeicaoDia,
     type ItemDiario,
     type MetasDiarias,
+    type LimiteParametro,
   } from "../../lib/dietaApi";
   import { listTreinos, type Treino } from "../../lib/treinoApi";
-  import { getProgressoMetaHoje, type ProgressoMetaPeso } from "../../lib/pesoApi";
+  import { getProgressoMetaHoje, getPesoMedioAtual, type ProgressoMetaPeso } from "../../lib/pesoApi";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -39,6 +45,14 @@
   let rotinaHoje = $state<Treino | null>(null);
   let progressoPeso = $state<ProgressoMetaPeso | null>(null);
   let metasCaloriasPorRefeicao = $state<Map<string, number>>(new Map());
+  let expandidoMacros = $state(false);
+  let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
+  let pesoAtual = $state(76);
+  const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
+
+  function parametro(chave: string): LimiteParametro {
+    return parametros.get(chave) ?? PARAMETROS_PADRAO[chave];
+  }
 
   async function carregarMetasRefeicoes() {
     try {
@@ -52,6 +66,18 @@
   }
 
   void carregarMetasRefeicoes();
+
+  async function carregarParametros() {
+    try {
+      const [params, pesoMedio, perfil] = await Promise.all([getParametros(), getPesoMedioAtual(), getPerfilDietaEditavel()]);
+      parametros = params;
+      pesoAtual = pesoMedio ?? perfil.pesoAtual;
+    } catch {
+      // informativo — Gordura Saturada/Fibras seguem com os padrões se falhar
+    }
+  }
+
+  void carregarParametros();
 
   async function carregarInfoTopo() {
     try {
@@ -128,6 +154,16 @@
 
   function restante(valor: number, meta: number): number {
     return Math.max(0, meta - valor);
+  }
+
+  const fibrasMinG = $derived(metas ? Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").min, pesoAtual, metas.calorias)) : 0);
+  const fibrasMaxG = $derived(metas ? Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, metas.calorias)) : 0);
+  const gorduraSaturadaMaxG = $derived(
+    metas ? Math.round(gramasDoParametro(defParametro.get("gordura_saturada")!, parametro("gordura_saturada").max, pesoAtual, metas.calorias)) : 0,
+  );
+
+  function formatarFaixa(min: number, max: number): string {
+    return min === max ? `${min} g` : `${min}–${max} g`;
   }
 </script>
 
@@ -252,8 +288,14 @@
         </div>
       </div>
 
-      <div class="card-macros">
-        <button class="toggle-btn" onclick={() => (modoRestante = !modoRestante)} aria-label="Alternar exibição">
+      <div
+        class="card-macros"
+        role="button"
+        tabindex="0"
+        onclick={() => (expandidoMacros = !expandidoMacros)}
+        onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") expandidoMacros = !expandidoMacros; }}
+      >
+        <button class="toggle-btn" onclick={(e) => { e.stopPropagation(); modoRestante = !modoRestante; }} aria-label="Alternar exibição">
           {@render iconToggle()}
         </button>
         <div class="macros-grid">
@@ -296,6 +338,23 @@
               <div class="barra" style={`width:${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div>
             </div>
           </div>
+        </div>
+
+        {#if expandidoMacros}
+          <div class="macros-extra">
+            <div class="macro-extra-item">
+              <span>Gordura Saturada</span>
+              <span>{gorduraSaturadaMaxG} g</span>
+            </div>
+            <div class="macro-extra-item">
+              <span>Fibras</span>
+              <span>{formatarFaixa(fibrasMinG, fibrasMaxG)}</span>
+            </div>
+          </div>
+        {/if}
+
+        <div class="expandir-chevron" class:aberto={expandidoMacros}>
+          {@render iconChevron()}
         </div>
       </div>
     {/if}
@@ -508,6 +567,9 @@
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
   }
+  .card-macros {
+    cursor: pointer;
+  }
   .card-titulo {
     margin: 0 0 var(--space-2);
     font-size: var(--font-size-base);
@@ -576,6 +638,8 @@
   .macro-valor {
     margin: 0 0 var(--space-2);
     font-size: 13px;
+    line-height: 1.4;
+    min-height: calc(1.4em * 2);
     color: var(--surface-fg);
   }
   .macro-meta {
@@ -590,6 +654,37 @@
   .barra {
     height: 100%;
     border-radius: 5px;
+  }
+  .macros-extra {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--surface-border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .macro-extra-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--font-size-sm);
+  }
+  .macro-extra-item span:first-child {
+    color: var(--surface-muted);
+  }
+  .expandir-chevron {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--space-2);
+    color: var(--surface-muted);
+    transition: transform 0.15s ease;
+  }
+  .expandir-chevron.aberto {
+    transform: rotate(180deg);
+  }
+  .expandir-chevron svg {
+    width: 16px;
+    height: 16px;
   }
   .refeicao-item {
     cursor: pointer;
