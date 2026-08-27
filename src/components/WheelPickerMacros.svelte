@@ -28,31 +28,18 @@
   } = $props();
 
   const ALTURA_ITEM = 40;
-  /** Usada só como altura mínima (3 itens visíveis) antes de medir o wrap de verdade — a roda cresce com o modal esticado. */
-  const ALTURA_MINIMA = ALTURA_ITEM * 3;
+  const ITENS_VISIVEIS = 3;
+  const PADDING_VERTICAL = (ALTURA_ITEM * (ITENS_VISIVEIS - 1)) / 2;
 
-  function indiceMaisProximo(opcoes: Opcao[], valor: number): number {
-    let melhor = 0;
-    let menorDist = Infinity;
-    opcoes.forEach((o, i) => {
-      const dist = Math.abs(o.valor - valor);
-      if (dist < menorDist) {
-        menorDist = dist;
-        melhor = i;
-      }
-    });
-    return melhor;
-  }
-
-  let indices = $state(untrack(() => colunas.map((c) => indiceMaisProximo(c.opcoes, c.valorAtual))));
+  let indices = $state(
+    untrack(() =>
+      colunas.map((c) => {
+        const i = c.opcoes.findIndex((o) => o.valor === c.valorAtual);
+        return i < 0 ? 0 : i;
+      }),
+    ),
+  );
   let listaEls: (HTMLDivElement | undefined)[] = [];
-  /** Altura real de cada roda, medida via bind:clientHeight — o padding vertical da lista é recalculado a partir dela, pra centralizar o item selecionado não importa a altura do modal. */
-  let alturasWrap = $state<number[]>([]);
-
-  function paddingVertical(idx: number): number {
-    const altura = alturasWrap[idx] ?? ALTURA_MINIMA;
-    return Math.max(0, (altura - ALTURA_ITEM) / 2);
-  }
 
   function posicionarInicial(el: HTMLDivElement, idx: number) {
     el.scrollTop = indices[idx] * ALTURA_ITEM;
@@ -89,48 +76,40 @@
 </script>
 
 <Sheet {titulo} {onFechar}>
-  <div class="wrapper">
-    <p class="total-cal">≈ <strong>{caloriasTotais}</strong> kcal</p>
-    <div class="colunas">
-      {#each colunas as coluna, idx (coluna.chave)}
-        <div class="coluna">
-          <p class="coluna-titulo" style={`color:${coluna.cor}`}>{coluna.titulo}</p>
-          <div class="roda-wrap" bind:clientHeight={alturasWrap[idx]} style={`min-height: ${ALTURA_MINIMA}px;`}>
-            <div class="roda-marcador" style={`height: ${ALTURA_ITEM}px;`}></div>
-            <div
-              class="roda-lista"
-              bind:this={listaEls[idx]}
-              onscroll={() => aoRolar(idx)}
-              use:posicionarInicial={idx}
-              style={`padding: ${paddingVertical(idx)}px 0;`}
-            >
-              {#each coluna.opcoes as opcao, i (i)}
-                <button
-                  class="roda-item"
-                  class:ativo={i === indices[idx]}
-                  style={`height: ${ALTURA_ITEM}px; opacity: ${opacidade(idx, i)};`}
-                  onclick={() => selecionarIndice(idx, i)}
-                >
-                  {opcao.label}
-                </button>
-              {/each}
-            </div>
+  <p class="total-cal">≈ <strong>{caloriasTotais}</strong> kcal</p>
+  <div class="colunas">
+    {#each colunas as coluna, idx (coluna.chave)}
+      <div class="coluna">
+        <p class="coluna-titulo" style={`color:${coluna.cor}`}>{coluna.titulo}</p>
+        <div class="roda-wrap" style={`height: ${ALTURA_ITEM * ITENS_VISIVEIS}px;`}>
+          <div class="roda-marcador" style={`height: ${ALTURA_ITEM}px;`}></div>
+          <div
+            class="roda-lista"
+            bind:this={listaEls[idx]}
+            onscroll={() => aoRolar(idx)}
+            use:posicionarInicial={idx}
+            style={`padding: ${PADDING_VERTICAL}px 0;`}
+          >
+            {#each coluna.opcoes as opcao, i (i)}
+              <button
+                class="roda-item"
+                class:ativo={i === indices[idx]}
+                style={`height: ${ALTURA_ITEM}px; opacity: ${opacidade(idx, i)};`}
+                onclick={() => selecionarIndice(idx, i)}
+              >
+                {opcao.label}
+              </button>
+            {/each}
           </div>
         </div>
-      {/each}
-    </div>
-    <button class="feito" onclick={confirmar}>Feito</button>
+      </div>
+    {/each}
   </div>
+  <button class="feito" onclick={confirmar}>Feito</button>
 </Sheet>
 
 <style>
-  .wrapper {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
   .total-cal {
-    flex-shrink: 0;
     margin: 0 0 var(--space-3);
     text-align: center;
     color: var(--surface-muted);
@@ -141,8 +120,6 @@
     font-size: var(--font-size-lg);
   }
   .colunas {
-    flex: 1;
-    min-height: 0;
     display: flex;
     gap: var(--space-2);
     margin-bottom: var(--space-4);
@@ -150,20 +127,14 @@
   .coluna {
     flex: 1;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
   }
   .coluna-titulo {
-    flex-shrink: 0;
     margin: 0 0 var(--space-1);
     text-align: center;
     font-size: var(--font-size-sm);
     font-weight: 600;
   }
   .roda-wrap {
-    flex: 1;
-    min-height: 0;
     position: relative;
     overflow: hidden;
     mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent);
@@ -207,7 +178,6 @@
     font-weight: 700;
   }
   .feito {
-    flex-shrink: 0;
     width: 100%;
     padding: var(--space-3);
     border-radius: var(--radius-md);
