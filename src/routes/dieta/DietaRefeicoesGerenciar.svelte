@@ -1230,7 +1230,9 @@
   >
     <div class="dias-lista modal-dias-lista">
       {#each [...diasSelecionados].sort((a, b) => a - b) as dia (dia)}
-        <div class="dia-card">
+        {@const info = diasResolvidos.find((d) => d.diaSemana === dia)}
+        {@const cor = info ? corDoDia(info) : null}
+        <div class="dia-card" class:colorido={cor != null} style={cor ? `background:${cor}; border-color:${cor};` : ""}>
           <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
         </div>
       {/each}
@@ -1266,7 +1268,6 @@
         <button type="button" class="tabela-input" onclick={() => abrirMacrosGrupo("g")}>{grupoCarboidratoG} g</button>
       </div>
     </div>
-    <p class="dica">Toque em "Aplicar" pra ver o resultado; a mudança só grava de verdade quando você tocar em "Salvar" no fim da tela.</p>
     <Button onclick={confirmarCaloriasGrupo} disabled={caloriasGrupoCalc <= 0}>
       Aplicar
     </Button>
