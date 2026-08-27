@@ -212,11 +212,9 @@
 
   <div class="busca-linha">
     <input class="search" type="text" placeholder="Procurar alimento" bind:value={busca} oninput={aoDigitar} />
-    {#if modoAdicionar || modoReceita}
-      <button class="scanner-btn" onclick={abrirScanner} aria-label="Escanear código de barras">
-        {@render iconScanner()}
-      </button>
-    {/if}
+    <button class="scanner-btn" onclick={abrirScanner} aria-label="Escanear código de barras">
+      {@render iconScanner()}
+    </button>
   </div>
 
   {#if loading}
