@@ -72,30 +72,6 @@
   let manuaisOriginal = $state<Map<number, CaloriasDiaManual>>(new Map());
   const manuaisDias = $derived(new Map([...manuaisCompletos].map(([dia, v]) => [dia, v.calorias])));
   let diasSelecionados = $state<Set<number>>(new Set());
-  let mostrarDefinirCalorias = $state(false);
-
-  /** Proteína nunca varia por dia — todo grupo usa sempre o valor global atual, nunca é atribuído diretamente. */
-  const grupoProteinaG = $derived(proteinaGInput ?? 0);
-  let grupoGorduraG = $state(0);
-  let grupoCarboidratoG = $state(0);
-  const caloriasGrupoCalc = $derived(Math.round(4 * grupoProteinaG + 9 * grupoGorduraG + 4 * grupoCarboidratoG));
-
-  function gKgGrupo(gramas: number): string {
-    return pesoAtual > 0 ? (gramas / pesoAtual).toFixed(2) : "0.00";
-  }
-  let campoEditandoGrupo = $state<"calorias" | null>(null);
-  let mostrarMacrosGrupo = $state(false);
-
-  /** Calorias só de proteína+gordura — piso do total ao editar calorias manualmente (carboidrato não pode ficar negativo). */
-  const caloriasGrupoMin = $derived(Math.round(4 * grupoProteinaG + 9 * grupoGorduraG));
-
-  function opcoesCaloriasGrupo(): { valor: number; label: string }[] {
-    const min = caloriasGrupoMin;
-    const max = Math.max(min + 10, 6000);
-    const opcoes: { valor: number; label: string }[] = [];
-    for (let v = min; v <= max; v += 10) opcoes.push({ valor: v, label: `${v} kcal` });
-    return opcoes;
-  }
 
   const caloriasCalc = $derived(
     Math.round(4 * (proteinaGInput ?? 0) + 9 * (gorduraGInput ?? 0) + 4 * (carboidratoGInput ?? 0)),
@@ -140,16 +116,19 @@
     }
   });
 
-  /** Cor fixa por valor de calorias manual distinto — grupos diferentes de dias saem com cores diferentes. */
-  const corPorGrupoManual = $derived.by(() => {
-    const valores = [...new Set(diasResolvidos.filter((d) => d.manual).map((d) => Math.round(d.calorias)))].sort((a, b) => a - b);
-    return new Map(valores.map((v, i) => [v, CORES_GRUPOS_DIA[i % CORES_GRUPOS_DIA.length]]));
+  /** Cor fixa por nome de bloco distinto — blocos diferentes saem com cores diferentes. */
+  const corPorBloco = $derived.by(() => {
+    const nomes = blocosNomeados.map((b) => b.nome).sort();
+    return new Map(nomes.map((n, i) => [n, CORES_GRUPOS_DIA[i % CORES_GRUPOS_DIA.length]]));
   });
 
   function corDoDia(dia: CaloriasPorDia): string | null {
-    if (dia.manual) return corPorGrupoManual.get(Math.round(dia.calorias)) ?? null;
+    if (dia.manual) {
+      const nome = nomeDoDia(dia.diaSemana);
+      return nome ? (corPorBloco.get(nome) ?? null) : null;
+    }
     if (diasSelecionados.has(dia.diaSemana)) {
-      return CORES_GRUPOS_DIA[corPorGrupoManual.size % CORES_GRUPOS_DIA.length];
+      return CORES_GRUPOS_DIA[corPorBloco.size % CORES_GRUPOS_DIA.length];
     }
     return null;
   }
@@ -190,10 +169,33 @@
     return new Map(
       [...manuaisCompletos].map(([dia, v]) => [
         dia,
-        { calorias: v.calorias, proteinaG: p, gorduraG: v.gorduraG, carboidratoG: carboidratoGDoDia(v.calorias, p, v.gorduraG) },
+        { calorias: v.calorias, proteinaG: p, gorduraG: v.gorduraG, carboidratoG: carboidratoGDoDia(v.calorias, p, v.gorduraG), nomeBloco: v.nomeBloco },
       ]),
     );
   });
+
+  function nomeDoDia(dia: number): string | null {
+    return manuaisEfetivos.get(dia)?.nomeBloco ?? null;
+  }
+
+  interface Bloco {
+    nome: string;
+    dias: number[];
+  }
+
+  /** Um bloco = todo dia com o mesmo nome — só existe depois que "Definir bloco" nomeia a seleção. */
+  const blocosNomeados = $derived.by((): Bloco[] => {
+    const porNome = new Map<string, number[]>();
+    for (const [dia, v] of manuaisEfetivos) {
+      if (!v.nomeBloco) continue;
+      const lista = porNome.get(v.nomeBloco) ?? [];
+      lista.push(dia);
+      porNome.set(v.nomeBloco, lista);
+    }
+    return [...porNome.entries()].map(([nome, dias]) => ({ nome, dias: dias.sort((a, b) => a - b) }));
+  });
+
+  const todosOsDiasNomeados = $derived([0, 1, 2, 3, 4, 5, 6].every((d) => manuaisEfetivos.get(d)?.nomeBloco));
 
   /** Dias com a mesma meta de calorias E as mesmas refeições (na mesma ordem) viram um único bloco — dias diferentes em qualquer um dos dois saem em blocos separados. Ordem preservada pela primeira ocorrência (Dom..Sáb). */
   const gruposDias = $derived.by((): GrupoDias[] => {
@@ -204,11 +206,12 @@
       const chave = `${chaveCal}|${listaDia.map((m) => m.id).join(",")}`;
       let g = grupos.get(chave);
       if (!g) {
+        const nome = d.manual ? nomeDoDia(d.diaSemana) : null;
         g = {
           dias: [],
           calorias: d.calorias,
           manual: d.manual,
-          cor: d.manual ? (corPorGrupoManual.get(chaveCal) ?? null) : null,
+          cor: nome ? (corPorBloco.get(nome) ?? null) : null,
           modelos: listaDia,
         };
         grupos.set(chave, g);
@@ -258,148 +261,156 @@
     alterarModoCalorias(modoCalorias === "fixa" ? "ondulatoria" : "fixa");
   }
 
-  /**
-   * Um dia já configurado (manual) nunca entra numa seleção nova pra definir outra meta — o "x"
-   * no card é o único jeito de desvincular. Tocar o card em si: se não há nenhuma seleção em
-   * andamento, seleciona todo o grupo de dias com essa mesma meta (não só o dia tocado) e abre
-   * direto a edição; se já tem outros dias sendo selecionados pra uma meta nova, o toque é
-   * ignorado (não mistura um dia já configurado numa seleção nova).
-   */
+  /** Seleção sempre manual — tocar um dia (automático ou já num bloco) só alterna ele dentro/fora da seleção atual. */
   function toggleDiaSelecionado(dia: number) {
-    const info = diasResolvidos.find((d) => d.diaSemana === dia);
-    if (!info) return;
-
-    if (info.manual) {
-      if (diasSelecionados.size === 0) {
-        const chave = Math.round(info.calorias);
-        const grupo = diasResolvidos.filter((d) => d.manual && Math.round(d.calorias) === chave).map((d) => d.diaSemana);
-        diasSelecionados = new Set(grupo);
-        abrirDefinirCalorias();
-      }
-      return;
-    }
-
     const novo = new Set(diasSelecionados);
     if (novo.has(dia)) novo.delete(dia);
     else novo.add(dia);
     diasSelecionados = novo;
   }
 
-  /** Dias automáticos (sem configuração própria) que ainda não estão na seleção em andamento — candidatos pro "+" no modal. */
-  const diasDisponiveisParaAdicionar = $derived(
-    diasResolvidos.filter((d) => !d.manual && !diasSelecionados.has(d.diaSemana)),
-  );
-  let mostrarAdicionarDiaGrupo = $state(false);
+  let mostrarNomearBloco = $state(false);
+  let nomeBlocoInput = $state("");
 
-  function adicionarDiaAoGrupo(dia: number) {
-    diasSelecionados = new Set([...diasSelecionados, dia]);
+  function abrirNomearBloco() {
+    nomeBlocoInput = "";
+    mostrarNomearBloco = true;
   }
 
-  /** Ao abrir pra um grupo ainda automático (sem override salvo), usa a calorias real que sobrou pra esses dias (diasResolvidos) — não a média semanal fixa (caloriasCalc), senão o carboidrato inicial já abre errado. Proteína nunca é definida aqui — é sempre o global (grupoProteinaG é derived). */
-  function abrirDefinirCalorias() {
-    const dias = [...diasSelecionados];
-    const existente = dias.length ? manuaisEfetivos.get(dias[0]) : undefined;
-    if (existente) {
-      grupoGorduraG = existente.gorduraG;
-      grupoCarboidratoG = existente.carboidratoG;
-    } else {
-      const info = dias.length ? diasResolvidos.find((d) => d.diaSemana === dias[0]) : undefined;
-      grupoGorduraG = (dias.length ? gorduraResolvidaSemana.find((d) => d.diaSemana === dias[0])?.valor : undefined) ?? gorduraGInput ?? 0;
-      grupoCarboidratoG = carboidratoGDoDia(info?.calorias ?? caloriasCalc, grupoProteinaG, grupoGorduraG);
-    }
-    mostrarDefinirCalorias = true;
-  }
-
-  function infoCampoGrupo(campo: "calorias") {
-    return {
-      titulo: "Calorias (kcal)",
-      opcoes: opcoesCaloriasGrupo(),
-      valorAtual: caloriasGrupoCalc,
-      onSelecionar: (v: number) => {
-        grupoCarboidratoG = Math.max(0, Math.round((v - 4 * grupoProteinaG - 9 * grupoGorduraG) / 4));
-      },
-    };
-  }
-
-  function colunasMacrosGrupo() {
-    return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesMacro(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: grupoCarboidratoG, kcalPorGrama: 4, secundario: secundarioMacro },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesMacro(parametro("gordura").min, parametro("gordura").max), valorAtual: grupoGorduraG, kcalPorGrama: 9, secundario: secundarioMacro },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesMacro(parametro("proteina").min, parametro("proteina").max), valorAtual: grupoProteinaG, kcalPorGrama: 4, secundario: secundarioMacro },
-    ];
-  }
-
-  /**
-   * Proteína aqui é a coluna do valor GLOBAL (grupoProteinaG é só um espelho derivado dele) — mudar
-   * essa coluna muda a proteína de todos os blocos, não só deste. A calorias média da semana é a
-   * variável travada nessa edição (só o donut de Calorias mexe nela) — o ajuste de proteína é
-   * absorvido pelo carboidrato médio global, preservando a calorias média. Os outros blocos já
-   * salvos recalculam o carboidrato deles sozinhos (manuaisEfetivos), preservando a calorias de
-   * cada um.
-   */
-  function confirmarMacrosGrupo(valores: Record<string, number>) {
-    grupoCarboidratoG = valores.carboidratoG;
-    grupoGorduraG = valores.gorduraG;
-    if (valores.proteinaG !== proteinaGInput) {
-      const caloriasAlvo = caloriasCalc;
-      proteinaGInput = valores.proteinaG;
-      proteinaGKg = pesoAtual > 0 ? Math.round((proteinaGInput / pesoAtual) * 100) / 100 : 0;
-      carboidratoGInput = Math.max(0, Math.round((caloriasAlvo - 4 * proteinaGInput - 9 * (gorduraGInput ?? 0)) / 4));
-      carboidratoGKg = pesoAtual > 0 ? Math.round((carboidratoGInput / pesoAtual) * 100) / 100 : 0;
-    }
-  }
-
-  /** Só aplica localmente (valida a distribuição antes) — persiste no banco junto com o resto ao tocar em "Salvar" no fim da tela. */
-  function confirmarCaloriasGrupo() {
-    if (caloriasGrupoCalc <= 0) return;
-    const manuaisTeste = new Map(manuaisDias);
-    for (const dia of diasSelecionados) manuaisTeste.set(dia, caloriasGrupoCalc);
-    let resolvido: CaloriasPorDia[];
-    try {
-      resolvido = resolverDistribuicao(caloriasCalc, manuaisTeste, minimoCalorias);
-    } catch (err) {
-      alert((err as Error).message);
-      return;
-    }
-
-    /**
-     * Só aviso, não trava — bloquear aqui poderia deixar a conta sem solução (calorias fecham,
-     * mas nenhuma combinação de gordura/carboidrato possível fecha os mínimos). Proteína nunca
-     * varia por dia (sempre o global, já validado pelo próprio range do editor de valor único),
-     * então só gordura e carboidrato precisam dessa checagem. Simula a distribuição de gordura
-     * da semana com essa edição já aplicada, e confere cada dia automático resultante.
-     */
-    const manuaisGorduraTeste = new Map([...manuaisCompletos].map(([dia, v]) => [dia, v.gorduraG]));
-    for (const dia of diasSelecionados) manuaisGorduraTeste.set(dia, grupoGorduraG);
-    const gorduraResolvidaTeste = distribuirValorPorDia(gorduraGInput ?? 0, manuaisGorduraTeste);
-
-    const gorduraMinG = parametro("gordura").min * pesoAtual;
-    const carboMinG = parametro("carboidrato").min * pesoAtual;
-
-    const avisos: string[] = [];
-    for (const d of resolvido.filter((d) => !d.manual)) {
-      const nome = DIAS_SEMANA_ABREV[d.diaSemana];
-      const g = gorduraResolvidaTeste.find((x) => x.diaSemana === d.diaSemana)?.valor ?? 0;
-      const c = carboidratoGDoDia(d.calorias, grupoProteinaG, g);
-      if (g < gorduraMinG) avisos.push(`${nome}: gordura ${g.toFixed(0)} g (mínimo ${gorduraMinG.toFixed(0)} g)`);
-      if (c < carboMinG) avisos.push(`${nome}: carboidrato ${c.toFixed(0)} g (mínimo ${carboMinG.toFixed(0)} g)`);
-    }
-    if (avisos.length) {
-      alert(`Aviso — abaixo do mínimo parametrizado (aplicando mesmo assim):\n${avisos.join("\n")}`);
-    }
-
+  /** Nomeia os dias selecionados como um bloco — dias já manuais mantêm calorias/gordura/carboidrato, dias ainda automáticos são semeados com o valor atual resolvido pra esse dia. */
+  function salvarNomeBloco() {
+    const nome = nomeBlocoInput.trim();
+    if (!nome) return;
     const novoManual = new Map(manuaisCompletos);
     for (const dia of diasSelecionados) {
-      novoManual.set(dia, {
-        calorias: caloriasGrupoCalc,
-        proteinaG: grupoProteinaG,
-        gorduraG: grupoGorduraG,
-        carboidratoG: grupoCarboidratoG,
-      });
+      const existente = novoManual.get(dia);
+      if (existente) {
+        novoManual.set(dia, { ...existente, nomeBloco: nome });
+      } else {
+        const info = diasResolvidos.find((d) => d.diaSemana === dia);
+        const gorduraG = gorduraResolvidaSemana.find((d) => d.diaSemana === dia)?.valor ?? gorduraGInput ?? 0;
+        const calorias = info?.calorias ?? caloriasCalc;
+        const proteinaG = proteinaGInput ?? 0;
+        novoManual.set(dia, {
+          calorias,
+          proteinaG,
+          gorduraG,
+          carboidratoG: carboidratoGDoDia(calorias, proteinaG, gorduraG),
+          nomeBloco: nome,
+        });
+      }
     }
     manuaisCompletos = novoManual;
     diasSelecionados = new Set();
-    mostrarDefinirCalorias = false;
+    mostrarNomearBloco = false;
+  }
+
+  interface BlocoEdicao {
+    nome: string;
+    dias: number[];
+    calorias: number;
+    gorduraG: number;
+    carboidratoG: number;
+  }
+
+  let mostrarCaloriasBlocos = $state(false);
+  let blocosEdicao = $state<BlocoEdicao[]>([]);
+  let celulaEditando = $state<{ idx: number; campo: "calorias" | "proteinaG" | "gorduraG" | "carboidratoG" } | null>(null);
+
+  function abrirCaloriasBlocos() {
+    blocosEdicao = blocosNomeados.map((b) => {
+      const dados = manuaisEfetivos.get(b.dias[0])!;
+      return { nome: b.nome, dias: b.dias, calorias: dados.calorias, gorduraG: dados.gorduraG, carboidratoG: dados.carboidratoG };
+    });
+    mostrarCaloriasBlocos = true;
+  }
+
+  /**
+   * Generaliza resolverDistribuicao/distribuirValorPorDia pra quando TODOS os dias já têm um valor
+   * próprio (nenhum "automático" sobrando): editar um bloco desloca todos os OUTROS igualmente por
+   * dia (a soma ponderada por dias de cada bloco continua = metaPorDia × 7), preservando a diferença
+   * relativa entre eles em vez de nivelar todos num único valor.
+   */
+  function redistribuirEntreBlocos(
+    metaPorDia: number,
+    blocos: BlocoEdicao[],
+    idxEditado: number,
+    novoValor: number,
+    campo: "calorias" | "gorduraG",
+  ): BlocoEdicao[] {
+    const diasEditado = blocos[idxEditado].dias.length;
+    const diasOutrosTotal = 7 - diasEditado;
+    const valorAntigo = blocos[idxEditado][campo];
+    if (diasOutrosTotal === 0) {
+      return blocos.map((b, i) => (i === idxEditado ? { ...b, [campo]: novoValor } : b));
+    }
+    const deltaTotal = (novoValor - valorAntigo) * diasEditado;
+    const deltaPorDia = -deltaTotal / diasOutrosTotal;
+    return blocos.map((b, i) => (i === idxEditado ? { ...b, [campo]: novoValor } : { ...b, [campo]: Math.max(0, b[campo] + deltaPorDia) }));
+  }
+
+  function aplicarEdicaoCelula(idx: number, campo: "calorias" | "proteinaG" | "gorduraG" | "carboidratoG", valor: number) {
+    if (campo === "proteinaG") {
+      proteinaGInput = valor;
+      proteinaGKg = pesoAtual > 0 ? Math.round((valor / pesoAtual) * 100) / 100 : 0;
+      blocosEdicao = blocosEdicao.map((b) => ({ ...b, carboidratoG: carboidratoGDoDia(b.calorias, valor, b.gorduraG) }));
+      return;
+    }
+    if (campo === "carboidratoG") {
+      blocosEdicao = blocosEdicao.map((b, i) => (i === idx ? { ...b, carboidratoG: valor } : b));
+      return;
+    }
+    const metaPorDia = campo === "calorias" ? caloriasCalc : (gorduraGInput ?? 0);
+    blocosEdicao = redistribuirEntreBlocos(metaPorDia, blocosEdicao, idx, valor, campo);
+    const proteina = proteinaGInput ?? 0;
+    blocosEdicao = blocosEdicao.map((b) => ({ ...b, carboidratoG: carboidratoGDoDia(b.calorias, proteina, b.gorduraG) }));
+  }
+
+  function infoCelula(sel: { idx: number; campo: "calorias" | "proteinaG" | "gorduraG" | "carboidratoG" }) {
+    const bloco = blocosEdicao[sel.idx];
+    switch (sel.campo) {
+      case "calorias":
+        return {
+          titulo: `Calorias — ${bloco.nome}`,
+          opcoes: opcoesCalorias(),
+          valorAtual: Math.round(bloco.calorias / 10) * 10,
+          onSelecionar: (v: number) => aplicarEdicaoCelula(sel.idx, "calorias", v),
+        };
+      case "proteinaG":
+        return {
+          titulo: "Proteína (g)",
+          opcoes: opcoesGramas(parametro("proteina").min, parametro("proteina").max),
+          valorAtual: proteinaGInput ?? 0,
+          onSelecionar: (v: number) => aplicarEdicaoCelula(sel.idx, "proteinaG", v),
+        };
+      case "gorduraG":
+        return {
+          titulo: `Gordura — ${bloco.nome}`,
+          opcoes: opcoesGramas(parametro("gordura").min, parametro("gordura").max),
+          valorAtual: bloco.gorduraG,
+          onSelecionar: (v: number) => aplicarEdicaoCelula(sel.idx, "gorduraG", v),
+        };
+      case "carboidratoG":
+        return {
+          titulo: `Carboidrato — ${bloco.nome}`,
+          opcoes: opcoesGramas(parametro("carboidrato").min, parametro("carboidrato").max),
+          valorAtual: bloco.carboidratoG,
+          onSelecionar: (v: number) => aplicarEdicaoCelula(sel.idx, "carboidratoG", v),
+        };
+    }
+  }
+
+  /** Só aplica localmente — persiste no banco junto com o resto ao tocar em "Salvar" no fim da tela. */
+  function confirmarCaloriasBlocos() {
+    const novoManual = new Map(manuaisCompletos);
+    const proteina = proteinaGInput ?? 0;
+    for (const b of blocosEdicao) {
+      for (const dia of b.dias) {
+        novoManual.set(dia, { calorias: Math.round(b.calorias), proteinaG: proteina, gorduraG: b.gorduraG, carboidratoG: b.carboidratoG, nomeBloco: b.nome });
+      }
+    }
+    manuaisCompletos = novoManual;
+    mostrarCaloriasBlocos = false;
   }
 
   /** Só remove localmente — persiste no banco junto com o resto ao tocar em "Salvar" no fim da tela. */
@@ -432,11 +443,6 @@
   function abrirMacros(unidade: "g" | "gkg") {
     unidadeMacros = unidade;
     mostrarMacros = true;
-  }
-
-  function abrirMacrosGrupo(unidade: "g" | "gkg") {
-    unidadeMacros = unidade;
-    mostrarMacrosGrupo = true;
   }
 
   function opcoesMacro(minGKg: number, maxGKg: number): { valor: number; label: string }[] {
@@ -524,7 +530,7 @@
       await Promise.all(diasRemovidos.map((dia) => removerCaloriasDia(dia)));
       await Promise.all(
         [...manuaisEfetivos].map(([dia, v]) =>
-          definirCaloriasDias([dia], v.proteinaG, v.gorduraG, v.carboidratoG, caloriasCalc, minimoCalorias, manuaisDias),
+          definirCaloriasDias([dia], v.proteinaG, v.gorduraG, v.carboidratoG, caloriasCalc, minimoCalorias, manuaisDias, v.nomeBloco),
         ),
       );
 
@@ -1020,6 +1026,7 @@
           {#each diasResolvidos as dia (dia.diaSemana)}
             {@const cor = corDoDia(dia)}
             {@const treino = treinoDoDia(dia.diaSemana)}
+            {@const nomeBloco = nomeDoDia(dia.diaSemana)}
             <div class="dia-card-slot">
               <div class="dia-card-pill-wrap">
                 <div
@@ -1048,6 +1055,9 @@
                   </button>
                 {/if}
               </div>
+              {#if nomeBloco}
+                <p class="dia-card-bloco">{nomeBloco}</p>
+              {/if}
               {#if treino}
                 <p class="dia-card-treino">{treino}</p>
               {/if}
@@ -1055,16 +1065,14 @@
           {/each}
         </div>
 
-        {#if diasSelecionados.size > 0}
-          <div class="dias-acoes">
-            <button type="button" class="acao-dia-btn" onclick={abrirDefinirCalorias}>Definir calorias</button>
-            <button type="button" class="acao-dia-btn" onclick={() => (diasSelecionados = new Set())}>Limpar seleção</button>
-          </div>
-        {/if}
+        <div class="dias-acoes">
+          <button type="button" class="acao-dia-btn" disabled={diasSelecionados.size === 0} onclick={abrirNomearBloco}>Definir bloco</button>
+          <button type="button" class="acao-dia-btn" disabled={!todosOsDiasNomeados} onclick={abrirCaloriasBlocos}>Definir calorias</button>
+        </div>
       {/if}
 
       <p class="dica">
-        Em Fixa, ajustar proteína, gordura ou carboidrato recalcula as calorias; ajustar as calorias reajusta o carboidrato pra fechar a conta. Em Ondulatória, a calorias média da semana só muda pelo donut — mudar a proteína dentro de um bloco de dias reajusta o carboidrato médio (e o dos demais blocos automáticos) pra manter essa média fixa. Fibras e gordura saturada são calculadas com base nas calorias do dia; água, com base no peso.
+        Em Fixa, ajustar proteína, gordura ou carboidrato recalcula as calorias; ajustar as calorias reajusta o carboidrato pra fechar a conta. Em Ondulatória, toque nos dias e "Definir bloco" pra nomear um grupo de dias; quando todos os 7 estiverem em algum bloco, "Definir calorias" abre um único modal com todos os blocos lado a lado. Fibras e gordura saturada são calculadas com base nas calorias do dia; água, com base no peso.
       </p>
 
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
@@ -1357,77 +1365,73 @@
   />
 {/if}
 
-{#if mostrarDefinirCalorias}
-  <Sheet
-    titulo="Calorias"
-    onFechar={() => {
-      mostrarDefinirCalorias = false;
-      diasSelecionados = new Set();
-    }}
-  >
-    <div class="dias-lista modal-dias-lista">
-      {#each [...diasSelecionados].sort((a, b) => a - b) as dia (dia)}
-        {@const info = diasResolvidos.find((d) => d.diaSemana === dia)}
-        {@const cor = info ? corDoDia(info) : null}
-        <div class="dia-card" class:colorido={cor != null} style={cor ? `background:${cor}; border-color:${cor};` : ""}>
-          <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
-        </div>
-      {/each}
-      {#if diasDisponiveisParaAdicionar.length > 0}
-        <button
-          type="button"
-          class="dia-card dia-card-add"
-          onclick={() => (mostrarAdicionarDiaGrupo = true)}
-          aria-label="Adicionar dia a essa configuração"
-        >
-          +
-        </button>
-      {/if}
-    </div>
-    <div class="tabela-macros calorias-grupo-tabela">
-      <div class="tabela-linha">
-        <span class="tabela-rotulo">Calorias (kcal)</span>
-        <button type="button" class="tabela-input" onclick={() => (campoEditandoGrupo = "calorias")}>{caloriasGrupoCalc}</button>
-      </div>
-      <div class="tabela-linha tabela-linha-3col">
-        <span class="tabela-rotulo">Proteína</span>
-        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => abrirMacrosGrupo("gkg")}>{gKgGrupo(grupoProteinaG)} g/kg</button>
-        <button type="button" class="tabela-input" onclick={() => abrirMacrosGrupo("g")}>{grupoProteinaG} g</button>
-      </div>
-      <div class="tabela-linha tabela-linha-3col">
-        <span class="tabela-rotulo">Gordura</span>
-        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => abrirMacrosGrupo("gkg")}>{gKgGrupo(grupoGorduraG)} g/kg</button>
-        <button type="button" class="tabela-input" onclick={() => abrirMacrosGrupo("g")}>{grupoGorduraG} g</button>
-      </div>
-      <div class="tabela-linha tabela-linha-3col">
-        <span class="tabela-rotulo">Carboidrato</span>
-        <button type="button" class="tabela-input tabela-input-gkg" onclick={() => abrirMacrosGrupo("gkg")}>{gKgGrupo(grupoCarboidratoG)} g/kg</button>
-        <button type="button" class="tabela-input" onclick={() => abrirMacrosGrupo("g")}>{grupoCarboidratoG} g</button>
-      </div>
-    </div>
-    <Button onclick={confirmarCaloriasGrupo} disabled={caloriasGrupoCalc <= 0}>
-      Aplicar
-    </Button>
+{#if mostrarNomearBloco}
+  <Sheet titulo="Definir bloco" onFechar={() => (mostrarNomearBloco = false)}>
+    <input class="nome-input" type="text" placeholder="Nome do bloco (ex: Treino A)" bind:value={nomeBlocoInput} />
+    <Button onclick={salvarNomeBloco} disabled={!nomeBlocoInput.trim()}>Salvar</Button>
   </Sheet>
 {/if}
 
-{#if mostrarMacrosGrupo}
-  <WheelPickerMacros
-    titulo={tituloMacros()}
-    colunas={colunasMacrosGrupo()}
-    onSelecionar={confirmarMacrosGrupo}
-    onFechar={() => (mostrarMacrosGrupo = false)}
-  />
+{#if mostrarCaloriasBlocos}
+  <Sheet titulo="Calorias" onFechar={() => (mostrarCaloriasBlocos = false)}>
+    <div class="grade-scroll">
+      <table class="grade-tabela">
+        <thead>
+          <tr>
+            <th class="grade-col-rotulo"></th>
+            {#each blocosEdicao as bloco (bloco.nome)}
+              <th class="grade-bloco-nome">{bloco.nome}</th>
+            {/each}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="grade-col-rotulo">Calorias (kcal)</td>
+            {#each blocosEdicao as bloco, idx (bloco.nome)}
+              <td class="grade-valor">
+                <button type="button" class="grade-valor-btn" onclick={() => (celulaEditando = { idx, campo: "calorias" })}>{Math.round(bloco.calorias)}</button>
+              </td>
+            {/each}
+          </tr>
+          <tr>
+            <td class="grade-col-rotulo">Proteína (g)</td>
+            {#each blocosEdicao as bloco, idx (bloco.nome)}
+              <td class="grade-valor">
+                <button type="button" class="grade-valor-btn" onclick={() => (celulaEditando = { idx, campo: "proteinaG" })}>{proteinaGInput ?? 0}</button>
+              </td>
+            {/each}
+          </tr>
+          <tr>
+            <td class="grade-col-rotulo">Gordura (g)</td>
+            {#each blocosEdicao as bloco, idx (bloco.nome)}
+              <td class="grade-valor">
+                <button type="button" class="grade-valor-btn" onclick={() => (celulaEditando = { idx, campo: "gorduraG" })}>{Math.round(bloco.gorduraG)}</button>
+              </td>
+            {/each}
+          </tr>
+          <tr>
+            <td class="grade-col-rotulo">Carboidrato (g)</td>
+            {#each blocosEdicao as bloco, idx (bloco.nome)}
+              <td class="grade-valor">
+                <button type="button" class="grade-valor-btn" onclick={() => (celulaEditando = { idx, campo: "carboidratoG" })}>{Math.round(bloco.carboidratoG)}</button>
+              </td>
+            {/each}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <Button onclick={confirmarCaloriasBlocos}>Salvar</Button>
+  </Sheet>
 {/if}
 
-{#if mostrarAdicionarDiaGrupo}
-  <ActionSheet
-    titulo="Adicionar dia"
-    onFechar={() => (mostrarAdicionarDiaGrupo = false)}
-    opcoes={diasDisponiveisParaAdicionar.map((d) => ({
-      label: DIAS_SEMANA_ABREV[d.diaSemana],
-      onSelect: () => adicionarDiaAoGrupo(d.diaSemana),
-    }))}
+{#if celulaEditando}
+  {@const infoCel = infoCelula(celulaEditando)}
+  <WheelPicker
+    titulo={infoCel.titulo}
+    opcoes={infoCel.opcoes}
+    valorAtual={infoCel.valorAtual}
+    onSelecionar={infoCel.onSelecionar}
+    onFechar={() => (celulaEditando = null)}
   />
 {/if}
 
@@ -1439,17 +1443,6 @@
       label: m.nome,
       onSelect: () => adicionarAoGrupo(m),
     }))}
-  />
-{/if}
-
-{#if campoEditandoGrupo}
-  {@const infoGrupo = infoCampoGrupo(campoEditandoGrupo)}
-  <WheelPicker
-    titulo={infoGrupo.titulo}
-    opcoes={infoGrupo.opcoes}
-    valorAtual={infoGrupo.valorAtual}
-    onSelecionar={infoGrupo.onSelecionar}
-    onFechar={() => (campoEditandoGrupo = null)}
   />
 {/if}
 
@@ -1611,12 +1604,6 @@
   .tabela-linha:last-child {
     border-bottom: none;
   }
-  .tabela-linha-3col {
-    display: grid;
-    grid-template-columns: 1fr 88px 64px;
-    align-items: center;
-    gap: var(--space-2);
-  }
   .tabela-rotulo {
     color: var(--surface-fg);
     font-size: var(--font-size-base);
@@ -1635,11 +1622,6 @@
   }
   .tabela-input:focus {
     outline: none;
-  }
-  .tabela-input-gkg {
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
-    font-weight: 400;
   }
   .separador {
     border-top: 1px solid var(--surface-border);
@@ -1804,32 +1786,55 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
   }
-  .calorias-grupo-tabela {
+  .grade-scroll {
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
     margin-bottom: var(--space-3);
   }
-  .modal-dias-lista {
-    padding-top: 0;
-    padding-bottom: 0;
-    margin-bottom: var(--space-2);
-    overflow-x: visible;
-    flex-wrap: wrap;
+  .grade-tabela {
+    border-collapse: collapse;
+    width: 100%;
   }
-  .modal-dias-lista .dia-card {
-    min-width: 48px;
+  .grade-tabela th,
+  .grade-tabela td {
     padding: var(--space-2);
-    gap: 0;
+    text-align: center;
+    white-space: nowrap;
   }
-  .modal-dias-lista .dia-card-add {
-    padding: var(--space-2);
+  .grade-tabela th:not(:first-child),
+  .grade-tabela td:not(:first-child) {
+    border-left: 1px solid var(--surface-border);
   }
-  .dia-card-add {
-    background: #ffffff;
-    border-color: #ffffff;
-    color: #05221c;
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 1;
+  .grade-tabela tbody tr:not(:last-child) td {
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .grade-col-rotulo {
+    text-align: left;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+    position: sticky;
+    left: 0;
+    background: var(--surface-card);
+    padding-left: 0;
+    padding-right: var(--space-3);
+  }
+  .grade-bloco-nome {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-primary);
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .grade-valor-btn {
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--surface-fg);
     cursor: pointer;
+    padding: var(--space-1) var(--space-2);
   }
   .distribuicao-header {
     display: flex;
@@ -1963,6 +1968,17 @@
     font-size: 10px;
     color: var(--surface-muted);
   }
+  .dia-card-bloco {
+    margin: 0 0 4px;
+    max-width: 72px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--color-primary);
+  }
   .dia-card-treino-topo {
     margin: 0 0 4px;
     min-height: 12px;
@@ -2036,6 +2052,10 @@
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
+  }
+  .acao-dia-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 
 </style>

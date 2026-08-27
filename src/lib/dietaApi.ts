@@ -883,21 +883,22 @@ export interface CaloriasPorDia {
 /**
  * Calcula os 7 dias a partir dos dias travados manualmente: o que sobra da meta semanal
  * (metaCalorias × 7 − soma dos manuais) é dividido em partes iguais pelos dias automáticos.
- * Sempre precisa sobrar pelo menos 1 dia automático, e nenhum valor (manual ou automático)
- * pode ficar abaixo do piso mínimo.
+ * Se todos os 7 dias já estiverem manuais (ex: blocos nomeados cobrindo a semana inteira), não
+ * sobra nenhum automático — só valida o mínimo de cada um e devolve os valores manuais direto.
+ * Nenhum valor (manual ou automático) pode ficar abaixo do piso mínimo.
  */
 export function resolverDistribuicao(metaCalorias: number, manuais: Map<number, number>, minimo: number): CaloriasPorDia[] {
   const todosOsDias = [0, 1, 2, 3, 4, 5, 6];
   const diasAuto = todosOsDias.filter((d) => !manuais.has(d));
-  if (diasAuto.length === 0) {
-    throw new Error("Pelo menos 1 dia da semana precisa ficar automático pra fechar a meta.");
-  }
   for (const [dia, valor] of manuais) {
     if (valor < minimo) {
       throw new Error(
         `${DIAS_SEMANA_ABREV[dia]} ficaria com ${Math.round(valor)} kcal, abaixo do mínimo de ${Math.round(minimo)} kcal.`,
       );
     }
+  }
+  if (diasAuto.length === 0) {
+    return todosOsDias.map((dia) => ({ diaSemana: dia, calorias: manuais.get(dia)!, manual: true }));
   }
   const somaManual = [...manuais.values()].reduce((acc, v) => acc + v, 0);
   const restante = metaCalorias * 7 - somaManual;
@@ -949,12 +950,14 @@ export interface CaloriasDiaManual {
   proteinaG: number;
   gorduraG: number;
   carboidratoG: number;
+  /** Nome do bloco de dias ao qual esse dia pertence (ex: "Treino A") — null enquanto não foi nomeado. */
+  nomeBloco: string | null;
 }
 
 export async function getCaloriasDiaManuais(): Promise<Map<number, CaloriasDiaManual>> {
   const { data, error } = await supabase
     .from("dieta_calorias_dia")
-    .select("dia_semana, calorias, proteina_g, gordura_g, carboidrato_g");
+    .select("dia_semana, calorias, proteina_g, gordura_g, carboidrato_g, nome_bloco");
   if (error) throw error;
   return new Map(
     (data ?? []).map((l) => [
@@ -964,6 +967,7 @@ export async function getCaloriasDiaManuais(): Promise<Map<number, CaloriasDiaMa
         proteinaG: (l.proteina_g as number | null) ?? 0,
         gorduraG: (l.gordura_g as number | null) ?? 0,
         carboidratoG: (l.carboidrato_g as number | null) ?? 0,
+        nomeBloco: (l.nome_bloco as string | null) ?? null,
       },
     ]),
   );
@@ -983,6 +987,7 @@ export async function definirCaloriasDias(
   metaCalorias: number,
   minimo: number,
   manuaisAtuais: Map<number, number>,
+  nomeBloco: string | null,
 ): Promise<void> {
   const calorias = Math.round(4 * proteinaG + 9 * gorduraG + 4 * carboidratoG);
   const manuais = new Map(manuaisAtuais);
@@ -997,6 +1002,7 @@ export async function definirCaloriasDias(
       proteina_g: proteinaG,
       gordura_g: gorduraG,
       carboidrato_g: carboidratoG,
+      nome_bloco: nomeBloco,
       updated_at: new Date().toISOString(),
     })),
     { onConflict: "user_id,dia_semana" },
