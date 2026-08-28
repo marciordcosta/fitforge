@@ -799,7 +799,7 @@
   }
   .item .nome {
     font-size: var(--font-size-sm);
-    text-align: center;
+    text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -815,13 +815,13 @@
   .nome-btn {
     font-size: var(--font-size-sm);
     color: var(--surface-fg);
-    text-align: center;
+    text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   .valor-btn {
-    text-align: center;
+    text-align: right;
     font-weight: 600;
     font-size: var(--font-size-sm);
   }
@@ -836,7 +836,7 @@
     border-radius: 6px;
   }
   .item .valor {
-    text-align: center;
+    text-align: right;
     font-weight: 600;
     font-size: var(--font-size-sm);
   }
