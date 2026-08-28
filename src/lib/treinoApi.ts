@@ -92,6 +92,20 @@ function uid(): string {
   return id;
 }
 
+/** Busca "AND de termos": cada palavra digitada precisa aparecer em algum lugar do texto, em qualquer ordem. */
+export function correspondeBusca(texto: string, busca: string): boolean {
+  const termos = busca.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!termos.length) return true;
+  const textoLower = texto.toLowerCase();
+  return termos.every((t) => textoLower.includes(t));
+}
+
+/** Texto combinado (nome + padrão de movimento + músculos) usado pra busca de exercício cobrir tudo, não só o nome. */
+export function textoBuscavelExercicio(ex: Exercicio): string {
+  const musculos = ex.musculos.map((m) => m.musculo?.nome ?? "").join(" ");
+  return [ex.nome, ex.padrao?.nome ?? "", musculos].join(" ");
+}
+
 // ---------------- Músculos ----------------
 
 export async function listMusculos(): Promise<Musculo[]> {

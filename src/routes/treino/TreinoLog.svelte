@@ -15,6 +15,8 @@
     listExercicios,
     listPadroesMovimento,
     listMusculos,
+    correspondeBusca,
+    textoBuscavelExercicio,
     type TreinoComExercicios,
     type Exercicio,
     type PadraoMovimento,
@@ -349,7 +351,7 @@
   }
 
   const opcoesSubstituir = $derived(
-    todosExercicios.filter((e) => e.nome.toLowerCase().includes(buscaSubstituir.trim().toLowerCase())),
+    todosExercicios.filter((e) => correspondeBusca(textoBuscavelExercicio(e), buscaSubstituir)),
   );
 
   async function substituirExercicio(novoEx: Exercicio) {
@@ -429,7 +431,7 @@
   const disponiveisPicker = $derived(
     todosExercicios.filter((ex) => {
       if (sessao.some((s) => s.exercicio_id === ex.id)) return false;
-      if (buscaPicker.trim() && !ex.nome.toLowerCase().includes(buscaPicker.trim().toLowerCase())) return false;
+      if (!correspondeBusca(textoBuscavelExercicio(ex), buscaPicker)) return false;
       if (filtroPadraoPicker && ex.padrao_id !== filtroPadraoPicker) return false;
       if (filtroMusculoPicker && !ex.musculos.some((m) => m.musculo_id === filtroMusculoPicker)) return false;
       return true;

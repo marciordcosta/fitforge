@@ -4,6 +4,8 @@
     listExercicios,
     listPadroesMovimento,
     listMusculos,
+    correspondeBusca,
+    textoBuscavelExercicio,
     type Exercicio,
     type PadraoMovimento,
     type Musculo,
@@ -48,7 +50,7 @@
 
   const filtrados = $derived(
     exercicios.filter((ex) => {
-      if (busca.trim() && !ex.nome.toLowerCase().includes(busca.trim().toLowerCase())) return false;
+      if (!correspondeBusca(textoBuscavelExercicio(ex), busca)) return false;
       if (filtroPadrao && ex.padrao_id !== filtroPadrao) return false;
       if (filtroMusculo && !ex.musculos.some((m) => m.musculo_id === filtroMusculo)) return false;
       return true;

@@ -13,6 +13,8 @@
     listExercicios,
     listPadroesMovimento,
     listMusculos,
+    correspondeBusca,
+    textoBuscavelExercicio,
     getUltimoRegistro,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
@@ -143,7 +145,7 @@
   const disponiveis = $derived(
     todosExercicios.filter((ex) => {
       if (linhas.some((l) => l.exercicio_id === ex.id)) return false;
-      if (buscaPicker.trim() && !ex.nome.toLowerCase().includes(buscaPicker.trim().toLowerCase())) return false;
+      if (!correspondeBusca(textoBuscavelExercicio(ex), buscaPicker)) return false;
       if (filtroPadraoPicker && ex.padrao_id !== filtroPadraoPicker) return false;
       if (filtroMusculoPicker && !ex.musculos.some((m) => m.musculo_id === filtroMusculoPicker)) return false;
       return true;
