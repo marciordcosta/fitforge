@@ -791,6 +791,18 @@ export async function excluirRegistrosDoDia(treinoId: string | null, data: strin
   if (error) throw error;
 }
 
+/** Apaga só os registros de um exercício específico numa sessão (rotina + data, ou avulsa) — usado pra remover um dia registrado errado, sem mexer nos outros exercícios daquele dia. */
+export async function excluirRegistroExercicioDia(
+  exercicioId: string,
+  treinoId: string | null,
+  data: string,
+): Promise<void> {
+  let query = supabase.from("treino_registros").delete().eq("exercicio_id", exercicioId).eq("data", data);
+  query = treinoId ? query.eq("treino_id", treinoId) : query.is("treino_id", null);
+  const { error } = await query;
+  if (error) throw error;
+}
+
 /** Cria uma rotina nova a partir dos exercícios/séries de uma sessão do histórico (peso e reps feitos viram peso-alvo/faixa inicial, editável depois). */
 export async function criarRotinaAPartirDeSessao(
   nome: string,

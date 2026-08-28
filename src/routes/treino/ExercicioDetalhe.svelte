@@ -5,6 +5,7 @@
     updateExercicio,
     deleteExercicio,
     excluirHistoricoExercicio,
+    excluirRegistroExercicioDia,
     construirMusculosInput,
     getHistoricoDetalhadoExercicio,
     type Exercicio,
@@ -32,6 +33,7 @@
   let mostrarConfirmExcluir = $state(false);
   let mostrarConfirmExcluirHistorico = $state(false);
   let excluindoHistorico = $state(false);
+  let sessaoParaExcluir = $state<SessaoHistorico | null>(null);
 
   async function carregar() {
     loading = true;
@@ -111,6 +113,18 @@
       excluindoHistorico = false;
     }
   }
+
+  async function confirmarExcluirSessao() {
+    if (!sessaoParaExcluir) return;
+    const sessao = sessaoParaExcluir;
+    sessaoParaExcluir = null;
+    try {
+      await excluirRegistroExercicioDia(exercicioId, sessao.treinoId, sessao.data);
+      historico = historico.filter((s) => s !== sessao);
+    } catch (e) {
+      alert("Erro ao excluir registro: " + (e as Error).message);
+    }
+  }
 </script>
 
 {#snippet iconVoltar()}
@@ -121,6 +135,14 @@
 {#snippet iconCheck()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
     <polyline points="4 12 10 18 20 6" />
+  </svg>
+{/snippet}
+{#snippet iconLixeira()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
   </svg>
 {/snippet}
 
@@ -170,6 +192,13 @@
               {sessao.treinoNome || "Treino avulso"}
             </button>
             <span class="sessao-data">{formatDataHora(sessao.criadoEm)}</span>
+            <button
+              class="sessao-excluir"
+              onclick={() => (sessaoParaExcluir = sessao)}
+              aria-label="Excluir esse registro"
+            >
+              {@render iconLixeira()}
+            </button>
           </div>
           <div class="sessao-tabela">
             <div class="sessao-linha sessao-cabecalho">
@@ -216,6 +245,15 @@
     textoConfirmar="Excluir Histórico"
     onConfirmar={excluirHistorico}
     onCancelar={() => (mostrarConfirmExcluirHistorico = false)}
+  />
+{/if}
+
+{#if sessaoParaExcluir}
+  <ConfirmDialog
+    titulo={`Excluir o registro de ${formatDataHora(sessaoParaExcluir.criadoEm)}? Só apaga esse dia, não afeta os outros.`}
+    textoConfirmar="Excluir Registro"
+    onConfirmar={confirmarExcluirSessao}
+    onCancelar={() => (sessaoParaExcluir = null)}
   />
 {/if}
 
@@ -317,7 +355,7 @@
   }
   .sessao-header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     margin-bottom: var(--space-3);
     gap: var(--space-2);
@@ -326,6 +364,23 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
     flex-shrink: 0;
+  }
+  .sessao-excluir {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--surface-muted);
+    cursor: pointer;
+    padding: 0;
+  }
+  .sessao-excluir svg {
+    width: 16px;
+    height: 16px;
   }
   .sessao-treino-nome {
     background: none;
