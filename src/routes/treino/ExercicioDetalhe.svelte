@@ -369,7 +369,7 @@
     justify-content: center;
     background: none;
     border: none;
-    color: var(--surface-muted);
+    color: var(--color-danger);
     cursor: pointer;
     padding: 0;
   }
