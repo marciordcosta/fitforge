@@ -10,6 +10,7 @@
     adicionarItemDiario,
     adicionarReceitaAoDiario,
     getRefeicaoDia,
+    getItensDaRefeicao,
     type Alimento,
     type ReceitaResumo,
   } from "../../lib/dietaApi";
@@ -96,6 +97,9 @@
     void getRefeicaoDia(refeicaoIdFixo!).then((r) => {
       refeicaoData = r?.data ?? "";
       refeicaoNome = r?.nome ?? "";
+    });
+    void getItensDaRefeicao(refeicaoIdFixo!).then((itensExistentes) => {
+      adicionadosIds = new Set(itensExistentes.map((i) => i.alimentoId));
     });
   }
 
