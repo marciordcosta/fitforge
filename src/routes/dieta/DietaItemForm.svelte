@@ -260,6 +260,11 @@
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 {/snippet}
+{#snippet iconCheck()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <polyline points="4 12 10 18 20 6" />
+  </svg>
+{/snippet}
 {#snippet iconToggle()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M17 3l4 4-4 4" />
@@ -279,7 +284,9 @@
           {@render iconMenu()}
         </button>
       {/if}
-      <button class="salvar" onclick={salvar} disabled={salvando || loading} aria-label="Salvar">✓</button>
+      <button class="salvar" onclick={salvar} disabled={salvando || loading} aria-label="Salvar">
+        {@render iconCheck()}
+      </button>
     </div>
   </div>
 
@@ -486,16 +493,25 @@
     padding: 0;
   }
   .salvar {
-    background: none;
-    border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-lg);
-    cursor: pointer;
-    padding: var(--space-1);
     flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .salvar svg {
+    width: 18px;
+    height: 18px;
   }
   .salvar:disabled {
-    color: var(--surface-muted);
+    opacity: 0.5;
     cursor: not-allowed;
   }
   .header-acoes {
