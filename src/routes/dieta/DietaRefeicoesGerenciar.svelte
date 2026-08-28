@@ -1376,7 +1376,7 @@
                 </span>
                 <span class="nome-macros" class:invisivel={meta.calorias == null}>
                   <span>carb {(meta.carboidratoG ?? 0).toFixed(0)}g · gord {(meta.gorduraG ?? 0).toFixed(0)}g · prot {(meta.proteinaG ?? 0).toFixed(0)}g</span>
-                  <span class="nome-pct">{pctDeDia(meta.calorias ?? 0, grupo.calorias)}%</span>
+                  <span class="nome-pct">{pctDeDia(arredondarDezena(meta.calorias ?? 0), grupo.calorias)}%</span>
                 </span>
               </button>
               <button class="remover-btn" onclick={() => removerDoGrupo(grupo, m)} aria-label={`Remover ${m.nome} desse dia`}>✕</button>
@@ -1505,7 +1505,7 @@
               </span>
               <span class="nome-macros" class:invisivel={m.metaCalorias == null}>
                 <span>carb {(m.metaCarboidratoG ?? 0).toFixed(0)}g · gord {(m.metaGorduraG ?? 0).toFixed(0)}g · prot {(m.metaProteinaG ?? 0).toFixed(0)}g</span>
-                <span class="nome-pct">{pctDoDia(m.metaCalorias ?? 0)}%</span>
+                <span class="nome-pct">{pctDoDia(arredondarDezena(m.metaCalorias ?? 0))}%</span>
               </span>
             </button>
           </li>

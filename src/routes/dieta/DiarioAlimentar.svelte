@@ -169,6 +169,11 @@
     return `${valor.toFixed(0)}/${meta.toFixed(0)}${unidade}`;
   }
 
+  /** Só pra exibição — arredonda a meta de calorias pra dezena mais próxima (ex: 653 vira 650), sem alterar o valor real usado nos cálculos. */
+  function arredondarDezena(valor: number): number {
+    return Math.round(valor / 10) * 10;
+  }
+
   const fibrasMaxG = $derived(metas ? Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, metas.calorias)) : 0);
   const gorduraSaturadaMaxG = $derived(
     metas ? Math.round(gramasDoParametro(defParametro.get("gordura_saturada")!, parametro("gordura_saturada").max, pesoAtual, metas.calorias)) : 0,
@@ -424,9 +429,9 @@
                 <div class="pct-col">
                   <p class="pct-nome">Calorias</p>
                   <div class="pct-barra-wrap">
-                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.calorias, metaRef.metaCalorias!))}%; background:var(--color-secondary);`}></div>
+                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaRef.metaCalorias!)))}%; background:var(--color-secondary);`}></div>
                   </div>
-                  <p class="pct-valor">{labelAbsoluto(totais.calorias, metaRef.metaCalorias!, "")}</p>
+                  <p class="pct-valor">{labelAbsoluto(totais.calorias, arredondarDezena(metaRef.metaCalorias!), "")}</p>
                 </div>
                 <div class="pct-col">
                   <p class="pct-nome">Carb</p>
