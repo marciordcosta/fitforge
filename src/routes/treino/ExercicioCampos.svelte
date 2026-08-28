@@ -1,13 +1,12 @@
 <script lang="ts">
   import {
     listPadroesMovimento,
-    listMusculos,
     listMusculosDoPadrao,
     PESOS_CONTRIBUICAO_PRESET,
     type PadraoMovimento,
-    type Musculo,
     type LinhaMusculoInput,
   } from "../../lib/treinoApi";
+  import WheelPicker from "../../components/WheelPicker.svelte";
 
   let {
     nome = $bindable(),
@@ -20,37 +19,32 @@
   } = $props();
 
   let padroes = $state<PadraoMovimento[]>([]);
-  let musculos = $state<Musculo[]>([]);
-  let musculosDoPadrao = $state<Musculo[]>([]);
 
-  async function carregarListas() {
-    [padroes, musculos] = await Promise.all([listPadroesMovimento(), listMusculos()]);
+  async function carregarPadroes() {
+    padroes = await listPadroesMovimento();
   }
 
-  void carregarListas();
+  void carregarPadroes();
 
+  /** Ao escolher um Padrão de Movimento, lança automaticamente todos os músculos
+   * cadastrados nele — a contribuição de quem já estava na lista é preservada. */
   $effect(() => {
     const id = padraoId;
-    if (!id) {
-      musculosDoPadrao = [];
-      return;
-    }
-    listMusculosDoPadrao(id).then((lista) => (musculosDoPadrao = lista));
+    if (!id) return;
+    listMusculosDoPadrao(id).then((lista) => {
+      const pesosAtuais = new Map(linhasMusculos.map((l) => [l.nome, l.peso]));
+      linhasMusculos = lista
+        .slice()
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+        .map((m) => ({ nome: m.nome, peso: pesosAtuais.get(m.nome) ?? 1 }));
+    });
   });
 
-  const opcoesMusculo = $derived(
-    (musculosDoPadrao.length ? musculosDoPadrao : musculos)
-      .slice()
-      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
-  );
+  const opcoesPeso = PESOS_CONTRIBUICAO_PRESET.slice()
+    .sort((a, b) => a - b)
+    .map((p) => ({ valor: p, label: String(p) }));
 
-  function adicionarMusculo() {
-    linhasMusculos = [...linhasMusculos, { nome: "", peso: 1 }];
-  }
-
-  function removerMusculo(idx: number) {
-    linhasMusculos = linhasMusculos.filter((_, i) => i !== idx);
-  }
+  let editandoIdx = $state<number | null>(null);
 </script>
 
 <label class="field">
@@ -70,27 +64,34 @@
 
 <div class="field">
   <span>Músculos Envolvidos</span>
-  {#each linhasMusculos as linha, idx (idx)}
-    <div class="secundario-row">
-      <select bind:value={linha.nome}>
-        <option value="">Selecione…</option>
-        {#if linha.nome && !opcoesMusculo.some((m) => m.nome === linha.nome)}
-          <option value={linha.nome}>{linha.nome}</option>
-        {/if}
-        {#each opcoesMusculo as m (m.id)}
-          <option value={m.nome}>{m.nome}</option>
-        {/each}
-      </select>
-      <select bind:value={linha.peso}>
-        {#each PESOS_CONTRIBUICAO_PRESET as p (p)}
-          <option value={p}>{p}</option>
-        {/each}
-      </select>
-      <button class="remover" onclick={() => removerMusculo(idx)} aria-label="Remover">×</button>
+  {#if !linhasMusculos.length}
+    <p class="musculos-vazio">
+      {padraoId
+        ? "Esse movimento ainda não tem músculos cadastrados."
+        : "Selecione um Padrão de Movimento para lançar os músculos."}
+    </p>
+  {:else}
+    <div class="card-musculos">
+      {#each linhasMusculos as linha, idx (linha.nome)}
+        <div class="musculo-linha">
+          <span class="musculo-nome">{linha.nome}</span>
+          <button type="button" class="musculo-valor" onclick={() => (editandoIdx = idx)}>{linha.peso}</button>
+        </div>
+      {/each}
     </div>
-  {/each}
-  <button class="adicionar" onclick={adicionarMusculo}>+ Adicionar músculo</button>
+  {/if}
 </div>
+
+{#if editandoIdx !== null}
+  {@const idx = editandoIdx}
+  <WheelPicker
+    titulo={linhasMusculos[idx]?.nome ?? "Contribuição"}
+    opcoes={opcoesPeso}
+    valorAtual={linhasMusculos[idx]?.peso ?? 1}
+    onSelecionar={(v) => (linhasMusculos[idx].peso = v)}
+    onFechar={() => (editandoIdx = null)}
+  />
+{/if}
 
 <style>
   .field {
@@ -114,33 +115,38 @@
     font-size: var(--font-size-base);
     font-family: inherit;
   }
-  .secundario-row {
-    display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
+  .musculos-vazio {
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+    margin: 0;
   }
-  .secundario-row select:first-child {
-    flex: 1;
-    min-width: 0;
-  }
-  .secundario-row select:nth-child(2) {
-    width: 72px;
-  }
-  .remover {
-    width: 36px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
+  .card-musculos {
     background: var(--surface-card);
-    color: var(--color-danger);
-    font-size: var(--font-size-lg);
-    cursor: pointer;
+    border-radius: var(--radius-lg);
+    padding: 0 var(--space-4);
   }
-  .adicionar {
+  .musculo-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .musculo-linha:last-child {
+    border-bottom: none;
+  }
+  .musculo-nome {
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+  }
+  .musculo-valor {
     background: none;
     border: none;
     color: var(--color-primary);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
+    font-family: inherit;
     cursor: pointer;
-    padding: var(--space-2) 0;
+    padding: var(--space-1) var(--space-2);
   }
 </style>

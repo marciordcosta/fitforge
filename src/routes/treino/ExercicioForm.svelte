@@ -5,7 +5,7 @@
 
   let nome = $state("");
   let padraoId = $state("");
-  let linhasMusculos = $state<LinhaMusculoInput[]>([{ nome: "", peso: 1 }]);
+  let linhasMusculos = $state<LinhaMusculoInput[]>([]);
   let salvando = $state(false);
 
   async function salvar() {

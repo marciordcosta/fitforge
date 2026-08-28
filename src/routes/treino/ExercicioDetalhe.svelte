@@ -27,7 +27,7 @@
 
   let nome = $state("");
   let padraoId = $state("");
-  let linhasMusculos = $state<LinhaMusculoInput[]>([{ nome: "", peso: 1 }]);
+  let linhasMusculos = $state<LinhaMusculoInput[]>([]);
   let salvando = $state(false);
   let mostrarConfirmExcluir = $state(false);
 
@@ -37,9 +37,7 @@
     if (exercicio) {
       nome = exercicio.nome;
       padraoId = exercicio.padrao_id ?? "";
-      linhasMusculos = exercicio.musculos.length
-        ? exercicio.musculos.map((m) => ({ nome: m.musculo?.nome ?? "", peso: m.peso_contribuicao }))
-        : [{ nome: "", peso: 1 }];
+      linhasMusculos = exercicio.musculos.map((m) => ({ nome: m.musculo?.nome ?? "", peso: m.peso_contribuicao }));
     }
     loading = false;
     carregouAlgumaVez = true;
