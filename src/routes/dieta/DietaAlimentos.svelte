@@ -50,6 +50,7 @@
   let refeicaoData = $state("");
   let refeicaoNome = $state("");
   let adicionandoId = $state<string | null>(null);
+  let adicionadosIds = $state<Set<string>>(new Set());
   let mensagem = $state<string | null>(null);
   let erro = $state<string | null>(null);
 
@@ -136,10 +137,11 @@
   }
 
   async function adicionarRapido(a: Alimento) {
-    if (!refeicaoIdFixo) return;
+    if (!refeicaoIdFixo || adicionadosIds.has(a.id)) return;
     adicionandoId = a.id;
     try {
       await adicionarItemDiario({ alimento: a, data: refeicaoData, refeicaoId: refeicaoIdFixo, quantidade: a.porcaoPadraoQtd });
+      adicionadosIds = new Set(adicionadosIds).add(a.id);
       mostrarMensagem(`Adicionado ao ${refeicaoNome}`);
     } catch (err) {
       alert("Erro ao adicionar alimento: " + (err as Error).message);
@@ -164,16 +166,21 @@
   }
 
   async function selecionarReceita(receita: ReceitaResumo) {
-    if (!refeicaoIdFixo) return;
+    if (!refeicaoIdFixo || adicionadosIds.has(receita.id)) return;
     adicionandoId = receita.id;
     try {
       await adicionarReceitaAoDiario(receita.id, refeicaoData, refeicaoIdFixo);
+      adicionadosIds = new Set(adicionadosIds).add(receita.id);
       mostrarMensagem(`Adicionado ao ${refeicaoNome}`);
     } catch (err) {
       alert("Erro ao adicionar refeição: " + (err as Error).message);
     } finally {
       adicionandoId = null;
     }
+  }
+
+  function abrirDetalheReceita(receita: ReceitaResumo) {
+    navigate(`/dieta/receitas/ver/${receita.id}`);
   }
 </script>
 
@@ -227,14 +234,20 @@
       <ul class="lista">
         {#each resultadosReceitas as receita (receita.id)}
           <li class="linha">
-            <button class="info-btn" onclick={() => selecionarReceita(receita)}>
+            <button class="info-btn" onclick={() => abrirDetalheReceita(receita)}>
               <span class="avatar">{iniciais(receita.nome)}</span>
               <span class="info">
                 <span class="nome">{receita.nome}</span>
                 <span class="sub">{receita.calorias.toFixed(0)} kcal</span>
               </span>
             </button>
-            <button class="add-btn" onclick={() => selecionarReceita(receita)} disabled={adicionandoId === receita.id} aria-label="Adicionar">
+            <button
+              class="add-btn"
+              class:adicionado={adicionadosIds.has(receita.id)}
+              onclick={() => selecionarReceita(receita)}
+              disabled={adicionandoId === receita.id || adicionadosIds.has(receita.id)}
+              aria-label="Adicionar"
+            >
               {#if adicionandoId === receita.id}…{:else}{@render iconMais()}{/if}
             </button>
           </li>
@@ -257,7 +270,13 @@
               </span>
             </button>
             {#if modoAdicionar}
-              <button class="add-btn" onclick={() => adicionarRapido(a)} disabled={adicionandoId === a.id} aria-label="Adicionar">
+              <button
+                class="add-btn"
+                class:adicionado={adicionadosIds.has(a.id)}
+                onclick={() => adicionarRapido(a)}
+                disabled={adicionandoId === a.id || adicionadosIds.has(a.id)}
+                aria-label="Adicionar"
+              >
                 {#if adicionandoId === a.id}…{:else}{@render iconMais()}{/if}
               </button>
             {:else if modoReceita}
@@ -413,6 +432,11 @@
   .add-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+  .add-btn.adicionado {
+    background: var(--surface-border);
+    color: var(--surface-muted);
+    opacity: 1;
   }
   .avatar {
     width: 40px;
