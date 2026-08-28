@@ -143,7 +143,7 @@
   .musculo-valor {
     background: none;
     border: none;
-    color: var(--color-primary);
+    color: var(--surface-fg);
     font-size: var(--font-size-base);
     font-family: inherit;
     cursor: pointer;
