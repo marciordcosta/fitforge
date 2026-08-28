@@ -189,6 +189,11 @@
     <circle cx="12" cy="19" r="1.8" />
   </svg>
 {/snippet}
+{#snippet iconCheck()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <polyline points="4 12 10 18 20 6" />
+  </svg>
+{/snippet}
 {#snippet iconSalvarRotina()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
@@ -219,7 +224,9 @@
     <button class="back" onclick={() => voltar("/treino/historico")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>{treinoNome}</h1>
     {#if modoEdicao}
-      <button class="salvar" disabled={salvando || loading} onclick={salvar}>{salvando ? "Salvando…" : "Salvar"}</button>
+      <button class="salvar" disabled={salvando || loading} onclick={salvar} aria-label="Salvar">
+        {@render iconCheck()}
+      </button>
     {:else}
       <button class="menu-btn" disabled={loading || !sessao.length} onclick={() => (menuAberto = true)} aria-label="Mais opções">
         {@render iconMenu()}
@@ -376,17 +383,24 @@
   }
   .salvar {
     flex-shrink: 0;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
     border: none;
-    border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-3);
-    font-weight: 600;
-    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+    padding: 0;
+  }
+  .salvar svg {
+    width: 18px;
+    height: 18px;
   }
   .salvar:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
   .data-label {
