@@ -313,6 +313,25 @@
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 {/snippet}
+{#snippet iconExercicio()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="9" width="4" height="6" rx="1" />
+    <rect x="18" y="9" width="4" height="6" rx="1" />
+    <line x1="9" y1="9" x2="9" y2="15" />
+    <line x1="15" y1="9" x2="15" y2="15" />
+    <line x1="6" y1="12" x2="18" y2="12" />
+  </svg>
+{/snippet}
+{#snippet iconMovimento()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="5 9 2 12 5 15" />
+    <polyline points="9 5 12 2 15 5" />
+    <polyline points="15 19 12 22 9 19" />
+    <polyline points="19 9 22 12 19 15" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <line x1="12" y1="2" x2="12" y2="22" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -495,8 +514,8 @@
   <ActionSheet
     onFechar={() => (mostrarCriarMenu = false)}
     opcoes={[
-      { label: "Exercício", onSelect: () => navigate("/treino/exercicios/novo") },
-      { label: "Movimento", onSelect: () => navigate("/treino/movimentos/novo") },
+      { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo") },
+      { label: "Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos/novo") },
     ]}
   />
 {/if}

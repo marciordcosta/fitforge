@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { listMusculos, type Musculo } from "../../lib/treinoApi";
-
   let {
     nome = $bindable(),
     linhasMusculos = $bindable(),
@@ -8,14 +6,6 @@
     nome: string;
     linhasMusculos: { nome: string }[];
   } = $props();
-
-  let musculos = $state<Musculo[]>([]);
-
-  async function carregarLista() {
-    musculos = await listMusculos();
-  }
-
-  void carregarLista();
 
   function adicionarMusculo() {
     linhasMusculos = [...linhasMusculos, { nome: "" }];
@@ -33,14 +23,9 @@
 
 <div class="field">
   <span>Grupos Musculares</span>
-  <datalist id="musculos-list-movimento">
-    {#each musculos as m (m.id)}
-      <option value={m.nome}></option>
-    {/each}
-  </datalist>
   {#each linhasMusculos as linha, idx (idx)}
     <div class="musculo-row">
-      <input type="text" list="musculos-list-movimento" bind:value={linha.nome} placeholder="Nome do músculo" />
+      <input type="text" bind:value={linha.nome} placeholder="Nome do músculo" />
       <button class="remover" onclick={() => removerMusculo(idx)} aria-label="Remover">×</button>
     </div>
   {/each}
