@@ -162,8 +162,8 @@
   <ActionSheet
     onFechar={() => (menuAberto = false)}
     opcoes={[
-      { label: "Iniciar", icon: iconIniciar, onSelect: () => navigate(`/treino/log/${treino!.id}`) },
       { label: "Editar", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treino!.id}`) },
+      { label: "Iniciar", icon: iconIniciar, onSelect: () => navigate(`/treino/log/${treino!.id}`) },
       { label: "Duplicar", icon: iconDuplicar, onSelect: duplicar },
       { label: "Remover", icon: iconExcluir, destructive: true, onSelect: () => (confirmandoExclusao = true) },
     ]}
