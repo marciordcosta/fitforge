@@ -101,6 +101,9 @@ create table treino_registros (
   serie int not null,
   peso numeric,
   repeticoes int,
+  -- posição do exercício dentro do dia/sessão (não da série) — usada pra
+  -- reconstruir o histórico na ordem em que os exercícios foram feitos.
+  ordem int not null default 0,
   created_at timestamptz not null default now(),
   unique (user_id, treino_id, exercicio_id, data, serie)
 );

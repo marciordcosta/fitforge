@@ -679,6 +679,7 @@ export async function salvarRegistrosDoDia(
   if (delError) throw delError;
 
   const linhas: Record<string, unknown>[] = [];
+  let ordem = 0;
   for (const [exercicioId, sets] of porExercicio.entries()) {
     for (const s of sets) {
       if (s.peso == null && s.repeticoes == null) continue;
@@ -690,8 +691,10 @@ export async function salvarRegistrosDoDia(
         serie: s.serie,
         peso: s.peso,
         repeticoes: s.repeticoes,
+        ordem,
       });
     }
+    ordem++;
   }
   if (!linhas.length) return;
   const { error: insError } = await supabase.from("treino_registros").insert(linhas);
@@ -744,6 +747,7 @@ export async function getHistoricoDia(treinoId: string | null, data: string): Pr
     .from("treino_registros")
     .select("exercicio_id, serie, peso, repeticoes, exercicios(nome)")
     .eq("data", data)
+    .order("ordem", { ascending: true })
     .order("serie", { ascending: true });
   query = treinoId ? query.eq("treino_id", treinoId) : query.is("treino_id", null);
 
