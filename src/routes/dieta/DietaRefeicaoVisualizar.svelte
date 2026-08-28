@@ -516,17 +516,23 @@
     white-space: nowrap;
   }
   .header-spacer {
-    width: 24px;
+    width: 36px;
     flex-shrink: 0;
   }
   .back {
-    background: none;
-    border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
-    cursor: pointer;
-    padding: var(--space-1);
     flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
   }
   .data-inline {
     display: block;

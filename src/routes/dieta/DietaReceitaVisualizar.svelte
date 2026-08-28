@@ -429,7 +429,21 @@
     background: var(--surface-card);
     color: var(--surface-fg);
   }
-  .back,
+  .back {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
   .salvar {
     background: none;
     border: none;

@@ -1550,7 +1550,21 @@
     margin: 0;
     text-align: center;
   }
-  .back,
+  .back {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
   .criar {
     background: none;
     border: none;
@@ -1560,7 +1574,7 @@
     padding: var(--space-1);
   }
   .header-spacer {
-    width: 24px;
+    width: 36px;
     flex-shrink: 0;
   }
   .tabs {
