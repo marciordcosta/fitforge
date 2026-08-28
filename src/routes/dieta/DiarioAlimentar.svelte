@@ -769,6 +769,7 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
+    -webkit-tap-highlight-color: transparent;
   }
   .card-header {
     display: flex;
