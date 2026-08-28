@@ -64,6 +64,12 @@
     <line x1="12" y1="2" x2="12" y2="22" />
   </svg>
 {/snippet}
+{#snippet iconMusculo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 21c-1.5-3-1.5-8 1-11 2-2.5 5-2 6 1 .5-3 3.5-4.5 6-2 3 3 2 9-1 12" />
+    <path d="M4 21h13" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -73,11 +79,6 @@
   </div>
 
   <input class="search" type="text" placeholder="Procurar exercício" bind:value={busca} />
-
-  <div class="filters">
-    <button class="gerenciar-btn" onclick={() => navigate("/treino/movimentos")}>Gerenciar Movimentos</button>
-    <button class="gerenciar-btn" onclick={() => navigate("/treino/musculos")}>Gerenciar Músculos</button>
-  </div>
 
   {#if loading}
     <p class="muted">Carregando…</p>
@@ -106,7 +107,8 @@
     onFechar={() => (mostrarCriarMenu = false)}
     opcoes={[
       { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo") },
-      { label: "Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos/novo") },
+      { label: "Padrão de Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos") },
+      { label: "Grupo Muscular", icon: iconMusculo, onSelect: () => navigate("/treino/musculos") },
     ]}
   />
 {/if}
@@ -177,29 +179,6 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
     margin-bottom: var(--space-3);
-  }
-  .filters {
-    display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-4);
-  }
-  .gerenciar-btn {
-    flex: 1;
-    min-width: 0;
-    box-sizing: border-box;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background-color: var(--surface-card);
-    color: var(--color-primary);
-    font-size: var(--font-size-sm);
-    font-family: inherit;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: center;
-    cursor: pointer;
   }
   .lista {
     list-style: none;

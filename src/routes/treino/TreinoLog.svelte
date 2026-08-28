@@ -13,14 +13,10 @@
     updateDescansoTreinoExercicio,
     updateObservacaoTreinoExercicio,
     listExercicios,
-    listPadroesMovimento,
-    listMusculos,
     correspondeBusca,
     textoBuscavelExercicio,
     type TreinoComExercicios,
     type Exercicio,
-    type PadraoMovimento,
-    type Musculo,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -400,12 +396,8 @@
 
   let mostrarPicker = $state(false);
   let buscaPicker = $state("");
-  let filtroPadraoPicker = $state("");
-  let filtroMusculoPicker = $state("");
   let mostrarCriarMenu = $state(false);
   let adicionandoId = $state<string | null>(null);
-  let padroes = $state<PadraoMovimento[]>([]);
-  let musculos = $state<Musculo[]>([]);
 
   function iniciais(nome: string): string {
     const partes = nome.trim().split(/\s+/);
@@ -423,8 +415,6 @@
 
   async function abrirPicker() {
     if (!todosExercicios.length) todosExercicios = await listExercicios();
-    if (!padroes.length) padroes = await listPadroesMovimento();
-    if (!musculos.length) musculos = await listMusculos();
     mostrarPicker = true;
   }
 
@@ -432,8 +422,6 @@
     todosExercicios.filter((ex) => {
       if (sessao.some((s) => s.exercicio_id === ex.id)) return false;
       if (!correspondeBusca(textoBuscavelExercicio(ex), buscaPicker)) return false;
-      if (filtroPadraoPicker && ex.padrao_id !== filtroPadraoPicker) return false;
-      if (filtroMusculoPicker && !ex.musculos.some((m) => m.musculo_id === filtroMusculoPicker)) return false;
       return true;
     }),
   );
@@ -441,8 +429,6 @@
   function fecharPicker() {
     mostrarPicker = false;
     buscaPicker = "";
-    filtroPadraoPicker = "";
-    filtroMusculoPicker = "";
   }
 
   async function construirExercicioSessao(ex: Exercicio): Promise<ExercicioSessao> {
@@ -746,6 +732,12 @@
     <line x1="12" y1="2" x2="12" y2="22" />
   </svg>
 {/snippet}
+{#snippet iconMusculo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 21c-1.5-3-1.5-8 1-11 2-2.5 5-2 6 1 .5-3 3.5-4.5 6-2 3 3 2 9-1 12" />
+    <path d="M4 21h13" />
+  </svg>
+{/snippet}
 {#snippet iconMedalha()}
   <svg viewBox="0 0 24 24" fill="none">
     <path d="M7 6H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4" stroke="#d97706" stroke-width="1.4" stroke-linecap="round" />
@@ -810,20 +802,6 @@
         <button class="criar" onclick={() => (mostrarCriarMenu = true)} aria-label="Criar">{@render iconMais()}</button>
       </div>
       <input class="search" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
-      <div class="filters">
-        <select bind:value={filtroPadraoPicker}>
-          <option value="">Todo padrão</option>
-          {#each padroes as p (p.id)}
-            <option value={p.id}>{p.nome}</option>
-          {/each}
-        </select>
-        <select bind:value={filtroMusculoPicker}>
-          <option value="">Todos os músculos</option>
-          {#each musculos as m (m.id)}
-            <option value={m.id}>{m.nome}</option>
-          {/each}
-        </select>
-      </div>
       <ul class="picker-lista">
         {#each disponiveisPicker as ex (ex.id)}
           <li class="picker-item">
@@ -850,7 +828,8 @@
     onFechar={() => (mostrarCriarMenu = false)}
     opcoes={[
       { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo") },
-      { label: "Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos/novo") },
+      { label: "Padrão de Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos") },
+      { label: "Grupo Muscular", icon: iconMusculo, onSelect: () => navigate("/treino/musculos") },
     ]}
   />
 {/if}
@@ -1340,33 +1319,6 @@
     font-size: var(--font-size-base);
     margin-bottom: var(--space-3);
     flex-shrink: 0;
-  }
-  .filters {
-    display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-4);
-    flex-shrink: 0;
-  }
-  .filters select {
-    flex: 1;
-    min-width: 0;
-    box-sizing: border-box;
-    padding: var(--space-2) 30px var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background-color: var(--surface-card);
-    color: var(--surface-fg);
-    font-size: var(--font-size-sm);
-    font-family: inherit;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa0ab' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    background-size: 16px;
   }
   .nome-input {
     box-sizing: border-box;
