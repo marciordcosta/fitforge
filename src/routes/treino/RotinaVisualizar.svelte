@@ -7,6 +7,7 @@
     getTreino,
     duplicateTreino,
     deleteTreino,
+    arquivarTreino,
     DIAS_SEMANA_COMPLETO,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
@@ -35,6 +36,20 @@
       navigate(`/treino/rotina/${novoId}/ver`);
     } catch (err) {
       alert("Erro ao duplicar rotina: " + (err as Error).message);
+      processando = false;
+    }
+  }
+
+  async function alternarArquivo() {
+    if (!treino) return;
+    processando = true;
+    try {
+      const novoValor = !treino.arquivado;
+      await arquivarTreino(treino.id, novoValor);
+      treino.arquivado = novoValor;
+    } catch (err) {
+      alert("Erro ao arquivar rotina: " + (err as Error).message);
+    } finally {
       processando = false;
     }
   }
@@ -82,6 +97,13 @@
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
   </svg>
 {/snippet}
+{#snippet iconArquivar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+    <line x1="10" y1="12" x2="14" y2="12" />
+  </svg>
+{/snippet}
 {#snippet iconExcluir()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
@@ -102,6 +124,9 @@
       {treino?.nome_treino ?? ""}
       {#if treino?.dia_semana != null}
         <span class="dia-inline">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
+      {/if}
+      {#if treino?.arquivado}
+        <span class="dia-inline">Arquivada</span>
       {/if}
     </h1>
     {#if treino}
@@ -163,6 +188,11 @@
       { label: "Iniciar", icon: iconIniciar, onSelect: () => navigate(`/treino/log/${treino!.id}`) },
       { label: "Editar", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treino!.id}`) },
       { label: "Duplicar", icon: iconDuplicar, onSelect: duplicar },
+      {
+        label: treino.arquivado ? "Desarquivar" : "Arquivar",
+        icon: iconArquivar,
+        onSelect: alternarArquivo,
+      },
       { label: "Remover", icon: iconExcluir, destructive: true, onSelect: () => (confirmandoExclusao = true) },
     ]}
   />

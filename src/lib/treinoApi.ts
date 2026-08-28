@@ -43,6 +43,7 @@ export interface Treino {
   nome_treino: string;
   dia_semana: number | null;
   ordem: number;
+  arquivado: boolean;
 }
 
 /** 0=domingo..6=sábado, mesma convenção de Date.getDay(). */
@@ -490,7 +491,8 @@ function ordenarExercicios(treino: TreinoComExercicios): void {
 export async function listTreinos(): Promise<TreinoComExercicios[]> {
   const { data, error } = await supabase
     .from("treinos")
-    .select(`id, nome_treino, dia_semana, ordem, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
+    .select(`id, nome_treino, dia_semana, ordem, arquivado, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
+    .eq("arquivado", false)
     .order("ordem", { ascending: true });
   if (error) throw error;
   const treinos = (data ?? []) as unknown as TreinoComExercicios[];
@@ -501,13 +503,18 @@ export async function listTreinos(): Promise<TreinoComExercicios[]> {
 export async function getTreino(id: string): Promise<TreinoComExercicios | null> {
   const { data, error } = await supabase
     .from("treinos")
-    .select(`id, nome_treino, dia_semana, ordem, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
+    .select(`id, nome_treino, dia_semana, ordem, arquivado, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   const treino = data as unknown as TreinoComExercicios | null;
   if (treino) ordenarExercicios(treino);
   return treino;
+}
+
+export async function arquivarTreino(id: string, arquivado: boolean): Promise<void> {
+  const { error } = await supabase.from("treinos").update({ arquivado }).eq("id", id);
+  if (error) throw error;
 }
 
 export async function createTreino(nome: string, diaSemana: number | null = null): Promise<string> {

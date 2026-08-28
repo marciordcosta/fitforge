@@ -62,7 +62,9 @@ create table treinos (
   -- Date.getDay()), opcional. Usado só pra ordenar a lista por proximidade;
   -- rotinas sem dia mantêm a ordenação manual.
   dia_semana int check (dia_semana is null or (dia_semana >= 0 and dia_semana <= 6)),
-  ordem int not null default 0
+  ordem int not null default 0,
+  -- Arquivada: some da lista principal sem apagar nada (histórico permanece).
+  arquivado boolean not null default false
 );
 
 create table treino_exercicios (
