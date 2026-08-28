@@ -1023,6 +1023,12 @@
     <polyline points="15 6 9 12 15 18" />
   </svg>
 {/snippet}
+{#snippet iconMais()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+{/snippet}
 
 {#snippet iconToggle()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1048,7 +1054,7 @@
     <button class="back" onclick={() => voltar("/dieta")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Gerenciar</h1>
     {#if aba === "refeicoes"}
-      <button class="criar" onclick={abrirNovo} aria-label="Nova refeição">+</button>
+      <button class="criar" onclick={abrirNovo} aria-label="Nova refeição">{@render iconMais()}</button>
     {:else}
       <span class="header-spacer"></span>
     {/if}
@@ -1645,12 +1651,22 @@
     height: 18px;
   }
   .criar {
-    background: none;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
     border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: var(--space-1);
+    padding: 0;
+  }
+  .criar svg {
+    width: 18px;
+    height: 18px;
   }
   .header-spacer {
     width: 36px;
