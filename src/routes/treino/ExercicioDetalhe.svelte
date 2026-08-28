@@ -31,8 +31,7 @@
   let linhasMusculos = $state<LinhaMusculoInput[]>([]);
   let salvando = $state(false);
   let mostrarConfirmExcluir = $state(false);
-  let mostrarConfirmExcluirHistorico = $state(false);
-  let excluindoHistorico = $state(false);
+  let mostrarConfirmExcluirHistoricoDepois = $state(false);
   let sessaoParaExcluir = $state<SessaoHistorico | null>(null);
 
   async function carregar() {
@@ -84,34 +83,37 @@
     }
   }
 
-  async function excluir() {
-    mostrarConfirmExcluir = false;
+  async function tentarExcluir() {
     try {
       await deleteExercicio(exercicioId);
       navigate("/treino/exercicios");
     } catch (e) {
       const err = e as { code?: string; message?: string };
-      if (err.code === "23503") {
-        alert(
-          "Não é possível excluir: esse exercício está em uma rotina ou tem histórico de séries registradas. Use \"Excluir Histórico do Exercício\" pra limpar o histórico, e remova-o das rotinas que o usam antes de excluir.",
-        );
+      if (err.code === "23503" && err.message?.includes("treino_registros")) {
+        mostrarConfirmExcluirHistoricoDepois = true;
+      } else if (err.code === "23503") {
+        alert("Não é possível excluir: esse exercício está em uma ou mais rotinas. Remova-o das rotinas antes de excluir.");
       } else {
         alert("Erro ao excluir: " + (err.message ?? String(e)));
       }
     }
   }
 
-  async function excluirHistorico() {
-    mostrarConfirmExcluirHistorico = false;
-    excluindoHistorico = true;
+  function excluir() {
+    mostrarConfirmExcluir = false;
+    void tentarExcluir();
+  }
+
+  async function excluirHistoricoEExcluir() {
+    mostrarConfirmExcluirHistoricoDepois = false;
     try {
       await excluirHistoricoExercicio(exercicioId);
       historico = [];
     } catch (e) {
       alert("Erro ao excluir histórico: " + (e as Error).message);
-    } finally {
-      excluindoHistorico = false;
+      return;
     }
+    await tentarExcluir();
   }
 
   async function confirmarExcluirSessao() {
@@ -217,13 +219,6 @@
     {/if}
   {:else if aba === "edicao"}
     <ExercicioCampos bind:nome bind:padraoId bind:linhasMusculos />
-    <button
-      class="excluir-historico-btn"
-      disabled={excluindoHistorico || !historico.length}
-      onclick={() => (mostrarConfirmExcluirHistorico = true)}
-    >
-      {excluindoHistorico ? "Excluindo…" : "Excluir Histórico do Exercício"}
-    </button>
     <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Exercício</button>
     {/if}
     </div>
@@ -239,12 +234,12 @@
   />
 {/if}
 
-{#if mostrarConfirmExcluirHistorico}
+{#if mostrarConfirmExcluirHistoricoDepois}
   <ConfirmDialog
-    titulo="Isso apaga todos os registros de séries desse exercício, em todos os dias. Não pode ser desfeito. Tem certeza?"
+    titulo="Esse exercício tem histórico de séries registradas. Deseja excluir todo o histórico do exercício?"
     textoConfirmar="Excluir Histórico"
-    onConfirmar={excluirHistorico}
-    onCancelar={() => (mostrarConfirmExcluirHistorico = false)}
+    onConfirmar={excluirHistoricoEExcluir}
+    onCancelar={() => (mostrarConfirmExcluirHistoricoDepois = false)}
   />
 {/if}
 
@@ -410,22 +405,6 @@
   }
   .sessao-serie {
     font-weight: 600;
-  }
-  .excluir-historico-btn {
-    width: 100%;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: none;
-    color: var(--color-danger);
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: var(--space-2);
-  }
-  .excluir-historico-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
   .excluir-btn {
     width: 100%;
