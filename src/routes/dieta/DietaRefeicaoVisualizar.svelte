@@ -3,8 +3,6 @@
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
-  import DietaCopiarParaSheet from "./DietaCopiarParaSheet.svelte";
-  import DietaCopiarDeSheet from "./DietaCopiarDeSheet.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import {
     getRefeicaoDia,
@@ -13,10 +11,6 @@
     removerRefeicaoDia,
     getMetasDiarias,
     getMetaRefeicaoPorNome,
-    getMetaReceitaIdPorNome,
-    refeicaoTemHistorico,
-    adicionarReceitaAoDiario,
-    removerItensDaRefeicao,
     getAlimento,
     atualizarItemDiario,
     getRefeicoesDoDia,
@@ -42,15 +36,11 @@
   let itens = $state<ItemDiario[]>([]);
   let metas = $state<MetasDiarias | null>(null);
   let metaRefeicao = $state<MetasDiarias | null>(null);
-  let temHistorico = $state(false);
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let itemParaRemover = $state<ItemDiario | null>(null);
   let confirmandoExclusaoRefeicao = $state(false);
   let processando = $state(false);
-  let mostrarCopiarPara = $state(false);
-  let mostrarCopiarDe = $state(false);
-  let mostrarOpcoesRefPadrao = $state(false);
   let itemEditando = $state<ItemDiario | null>(null);
   let alimentoEditando = $state<Alimento | null>(null);
   let itemParaMover = $state<ItemDiario | null>(null);
@@ -64,10 +54,7 @@
     erro = null;
     try {
       [refeicao, itens, metas] = await Promise.all([getRefeicaoDia(refeicaoId), getItensDaRefeicao(refeicaoId), getMetasDiarias()]);
-      [metaRefeicao, temHistorico] = await Promise.all([
-        refeicao ? getMetaRefeicaoPorNome(refeicao.nome) : Promise.resolve(null),
-        refeicao ? refeicaoTemHistorico(refeicao.nome, refeicaoId) : Promise.resolve(false),
-      ]);
+      metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome) : null;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -242,75 +229,18 @@
     }
   }
 
-  function iniciarRefPadrao() {
-    if (itens.length > 0) {
-      mostrarOpcoesRefPadrao = true;
-      return;
-    }
-    void aplicarRefPadrao(false);
-  }
-
-  async function aplicarRefPadrao(substituir: boolean) {
-    if (!refeicao) return;
-    processando = true;
-    try {
-      const metaReceitaId = await getMetaReceitaIdPorNome(refeicao.nome);
-      if (!metaReceitaId) {
-        alert(`"${refeicao.nome}" não tem uma referência padrão configurada em Gerenciar > Refeições.`);
-        return;
-      }
-      if (substituir) await removerItensDaRefeicao(refeicaoId);
-      await adicionarReceitaAoDiario(metaReceitaId, refeicao.data, refeicaoId);
-      await carregar();
-    } catch (err) {
-      alert("Erro ao puxar a referência padrão: " + (err as Error).message);
-    } finally {
-      processando = false;
-    }
-  }
-
-  function aoCopiarPara(destinoId: string) {
-    mostrarCopiarPara = false;
-    navigate(`/dieta/refeicao/${destinoId}`);
-  }
-
-  async function aoCopiarDe() {
-    mostrarCopiarDe = false;
-    await carregar();
-  }
-
-  async function removerRefeicao() {
+  async function descartarRefeicao() {
     processando = true;
     try {
       await removerRefeicaoDia(refeicaoId);
       navigate("/dieta");
     } catch (err) {
-      alert("Erro ao remover refeição: " + (err as Error).message);
+      alert("Erro ao descartar refeição: " + (err as Error).message);
       processando = false;
     }
   }
 </script>
 
-{#snippet iconPratoPadrao()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="9" />
-    <circle cx="12" cy="12" r="4" />
-  </svg>
-{/snippet}
-{#snippet iconCopiarDe()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="3" y="3" width="12" height="12" rx="2" />
-    <path d="M21 9v10a2 2 0 0 1-2 2H9" />
-    <path d="M17 13l4-4-4-4" />
-  </svg>
-{/snippet}
-{#snippet iconCopiarPara()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="9" y="9" width="12" height="12" rx="2" />
-    <path d="M3 15V5a2 2 0 0 1 2-2h10" />
-    <path d="M7 11L3 15l4 4" />
-  </svg>
-{/snippet}
 {#snippet iconExcluir()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
@@ -341,19 +271,6 @@
     <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
   </svg>
 {/snippet}
-{#snippet iconAdicionarPrato()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-{/snippet}
-{#snippet iconSubstituirPrato()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M8 3L4 7l4 4" />
-    <path d="M4 7h16" />
-    <path d="M16 21l4-4-4-4" />
-    <path d="M20 17H4" />
-  </svg>
-{/snippet}
 
 <div class="header-fixo">
   <div class="header-fixo-inner">
@@ -374,25 +291,6 @@
   {:else if !refeicao}
     <p class="muted">Refeição não encontrada.</p>
   {:else}
-    <div class="acoes">
-      <button class="acao-btn" disabled={processando || !metaRefeicao} onclick={iniciarRefPadrao}>
-        <span class="acao-label">Ref padrão</span>
-        {@render iconPratoPadrao()}
-      </button>
-      <button class="acao-btn" disabled={processando || !temHistorico} onclick={() => (mostrarCopiarDe = true)}>
-        <span class="acao-label">Copiar de</span>
-        {@render iconCopiarDe()}
-      </button>
-      <button class="acao-btn" disabled={processando || !temHistorico} onclick={() => (mostrarCopiarPara = true)}>
-        <span class="acao-label">Copiar para</span>
-        {@render iconCopiarPara()}
-      </button>
-      <button class="acao-btn acao-destrutiva" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>
-        <span class="acao-label">Remover</span>
-        {@render iconExcluir()}
-      </button>
-    </div>
-
     {#if itens.length}
       <div class="resumo">
         <div class="donut" style={donutStyle}>
@@ -471,6 +369,7 @@
     {/if}
 
     <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/refeicao/${refeicaoId}`)}>+ Adicionar Alimento</button>
+    <button class="descartar" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>Descartar</button>
   {/if}
 </div>
 
@@ -483,41 +382,12 @@
   />
 {/if}
 
-{#if mostrarOpcoesRefPadrao}
-  <ActionSheet
-    titulo="Ref padrão"
-    onFechar={() => (mostrarOpcoesRefPadrao = false)}
-    opcoes={[
-      { label: "Adicionar à refeição", icon: iconAdicionarPrato, onSelect: () => aplicarRefPadrao(false) },
-      { label: "Substituir refeição", icon: iconSubstituirPrato, onSelect: () => aplicarRefPadrao(true) },
-      { label: "Cancelar", icon: iconExcluir, onSelect: () => {} },
-    ]}
-  />
-{/if}
-
 {#if confirmandoExclusaoRefeicao}
   <ConfirmDialog
-    titulo="Tem certeza de que quer remover esta refeição? Todos os alimentos dela serão apagados."
-    textoConfirmar="Remover Refeição"
-    onConfirmar={removerRefeicao}
+    titulo="Tem certeza de que quer descartar esta refeição? Todos os alimentos dela serão apagados."
+    textoConfirmar="Descartar Refeição"
+    onConfirmar={descartarRefeicao}
     onCancelar={() => (confirmandoExclusaoRefeicao = false)}
-  />
-{/if}
-
-{#if mostrarCopiarPara && refeicao}
-  <DietaCopiarParaSheet
-    refeicaoOrigemId={refeicaoId}
-    nomeAtual={refeicao.nome}
-    onFechar={() => (mostrarCopiarPara = false)}
-    onCopiado={aoCopiarPara}
-  />
-{/if}
-
-{#if mostrarCopiarDe && refeicao}
-  <DietaCopiarDeSheet
-    refeicaoDestinoId={refeicaoId}
-    onFechar={() => (mostrarCopiarDe = false)}
-    onCopiado={aoCopiarDe}
   />
 {/if}
 
@@ -609,41 +479,6 @@
     font-weight: 400;
     color: var(--surface-muted);
     text-transform: capitalize;
-  }
-  .acoes {
-    display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-5);
-  }
-  .acao-btn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-1);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
-    color: var(--surface-fg);
-    cursor: pointer;
-  }
-  .acao-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .acao-label {
-    font-size: 12px;
-    font-weight: 400;
-    text-align: center;
-    white-space: nowrap;
-  }
-  .acao-btn svg {
-    width: 20px;
-    height: 20px;
-  }
-  .acao-destrutiva {
-    color: var(--color-danger);
   }
   .resumo {
     display: flex;
@@ -806,6 +641,22 @@
     font-weight: 600;
     font-size: var(--font-size-base);
     cursor: pointer;
+  }
+  .descartar {
+    width: 100%;
+    padding: var(--space-3);
+    margin-top: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: none;
+    color: var(--color-danger);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    cursor: pointer;
+  }
+  .descartar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .muted {
     color: var(--surface-muted);
