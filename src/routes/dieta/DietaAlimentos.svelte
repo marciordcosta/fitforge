@@ -46,6 +46,7 @@
   let alimentos = $state<Alimento[]>([]);
   let resultadosReceitas = $state<ReceitaResumo[]>([]);
   let loading = $state(true);
+  let carregouAlgumaVez = $state(false);
   let busca = $state(untrack(() => lerBuscaDaUrl()));
   let mostrarEscolhaCriar = $state(false);
   let mostrarCriarAlimento = $state(false);
@@ -85,6 +86,7 @@
       erro = (err as Error).message;
     } finally {
       loading = false;
+      carregouAlgumaVez = true;
     }
   }
 
@@ -252,11 +254,12 @@
     </button>
   </div>
 
-  {#if loading}
+  {#if loading && !carregouAlgumaVez}
     <p class="muted">Carregando…</p>
   {:else if erro}
     <p class="erro">Erro ao buscar alimentos: {erro}</p>
   {:else}
+    <div class="resultados" class:carregando={loading}>
     {#if modoAdicionar && resultadosReceitas.length}
       <p class="secao-titulo">Refeições</p>
       <ul class="lista">
@@ -324,6 +327,7 @@
         {/each}
       </ul>
     {/if}
+    </div>
   {/if}
 </div>
 
@@ -432,6 +436,12 @@
     color: var(--surface-muted);
     text-transform: uppercase;
     margin: var(--space-3) 0 var(--space-1);
+  }
+  .resultados {
+    transition: opacity 0.15s;
+  }
+  .resultados.carregando {
+    opacity: 0.5;
   }
   .lista {
     list-style: none;
