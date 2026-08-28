@@ -113,6 +113,9 @@
     font-size: var(--font-size-base);
     font-family: inherit;
   }
+  .musculo-card select {
+    color-scheme: dark;
+  }
   .musculo-card input:focus,
   .musculo-card select:focus {
     outline: none;

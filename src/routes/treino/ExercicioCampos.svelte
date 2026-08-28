@@ -112,6 +112,9 @@
     font-size: var(--font-size-base);
     font-family: inherit;
   }
+  .field select {
+    color-scheme: dark;
+  }
   .musculos-vazio {
     color: var(--surface-muted);
     font-size: var(--font-size-sm);
