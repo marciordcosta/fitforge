@@ -640,6 +640,30 @@ export async function getHistoricoDia(treinoId: string, data: string): Promise<H
   };
 }
 
+/** Apaga todos os registros de uma sessão específica (rotina + data) — usado pra excluir um dia do histórico. */
+export async function excluirRegistrosDoDia(treinoId: string, data: string): Promise<void> {
+  const { error } = await supabase.from("treino_registros").delete().eq("treino_id", treinoId).eq("data", data);
+  if (error) throw error;
+}
+
+/** Cria uma rotina nova a partir dos exercícios/séries de uma sessão do histórico (peso e reps feitos viram peso-alvo/faixa inicial, editável depois). */
+export async function criarRotinaAPartirDeSessao(
+  nome: string,
+  exercicios: { exercicioId: string; sets: SetRegistro[] }[],
+): Promise<string> {
+  const treinoId = await createTreino(nome);
+  const itens: ItemRotina[] = exercicios.map((ex) => ({
+    exercicio_id: ex.exercicioId,
+    descanso_seg: null,
+    observacao: null,
+    series: ex.sets
+      .filter((s) => s.peso != null || s.repeticoes != null)
+      .map((s) => ({ serie: s.serie, peso_alvo: s.peso, rep_min: s.repeticoes, rep_max: s.repeticoes })),
+  }));
+  await salvarExerciciosRotina(treinoId, itens);
+  return treinoId;
+}
+
 /** Último registro de um exercício, filtrado por rotina se `treinoId` for informado. */
 export async function getUltimoRegistro(
   exercicioId: string,

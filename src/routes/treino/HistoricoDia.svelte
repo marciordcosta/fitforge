@@ -1,7 +1,19 @@
 <script lang="ts">
   import { parseISODate } from "../../lib/dates";
-  import { voltar } from "../../lib/router.svelte";
-  import { getHistoricoDia, salvarRegistrosDoDia, type SetRegistro } from "../../lib/treinoApi";
+  import { navigate, voltar } from "../../lib/router.svelte";
+  import { treinoLogSessao, type ExercicioSessao, type SetSessao } from "../../lib/treinoLogSessao.svelte";
+  import Sheet from "../../components/Sheet.svelte";
+  import Button from "../../components/Button.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import {
+    getHistoricoDia,
+    salvarRegistrosDoDia,
+    excluirRegistrosDoDia,
+    criarRotinaAPartirDeSessao,
+    getRecordesExercicio,
+    type SetRegistro,
+  } from "../../lib/treinoApi";
 
   let { treinoId, data }: { treinoId: string; data: string } = $props();
 
@@ -16,6 +28,14 @@
   let loading = $state(true);
   let salvando = $state(false);
   let salvo = $state(false);
+  let modoEdicao = $state(false);
+  let menuAberto = $state(false);
+  let mostrarConfirmarExcluir = $state(false);
+  let mostrarNomearRotina = $state(false);
+  let nomeRotina = $state("");
+  let salvandoRotina = $state(false);
+  let copiando = $state(false);
+  let excluindo = $state(false);
 
   const dataLabel = $derived.by(() => {
     const d = parseISODate(data);
@@ -54,10 +74,103 @@
       for (const ex of sessao) porExercicio.set(ex.exercicioId, ex.sets);
       await salvarRegistrosDoDia(treinoId, data, porExercicio);
       salvo = true;
+      modoEdicao = false;
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
     } finally {
       salvando = false;
+    }
+  }
+
+  function abrirEditar() {
+    menuAberto = false;
+    modoEdicao = true;
+  }
+
+  function abrirSalvarComoRotina() {
+    menuAberto = false;
+    nomeRotina = treinoNome;
+    mostrarNomearRotina = true;
+  }
+
+  async function confirmarSalvarComoRotina() {
+    if (!nomeRotina.trim()) return;
+    salvandoRotina = true;
+    try {
+      const novoId = await criarRotinaAPartirDeSessao(
+        nomeRotina.trim(),
+        sessao.map((ex) => ({ exercicioId: ex.exercicioId, sets: ex.sets })),
+      );
+      mostrarNomearRotina = false;
+      navigate(`/treino/rotina/${novoId}/ver`);
+    } catch (e) {
+      alert("Erro ao criar rotina: " + (e as Error).message);
+    } finally {
+      salvandoRotina = false;
+    }
+  }
+
+  async function copiarTreinamento() {
+    menuAberto = false;
+    copiando = true;
+    try {
+      const novaSessao: ExercicioSessao[] = await Promise.all(
+        sessao.map(async (ex) => {
+          const recordes = await getRecordesExercicio(ex.exercicioId);
+          const sets: SetSessao[] = ex.sets.map((s) => ({
+            serie: s.serie,
+            peso: null,
+            repeticoes: null,
+            concluida: false,
+            anteriorPeso: s.peso,
+            anteriorReps: s.repeticoes,
+            pesoAlvo: null,
+            repMin: null,
+            repMax: null,
+            prPeso: false,
+            prPesoDelta: null,
+            pr1rm: false,
+            pr1rmDelta: null,
+            prVolume: false,
+            prVolumeDelta: null,
+          }));
+          return {
+            treino_exercicio_id: `copia-${ex.exercicioId}-${Date.now()}`,
+            exercicio_id: ex.exercicioId,
+            nome: ex.exercicioNome,
+            descanso_seg: null,
+            observacao: null,
+            sets,
+            descansoAte: null,
+            descansoInicioEm: null,
+            descansoNotificado: false,
+            recordes,
+          };
+        }),
+      );
+      treinoLogSessao.iniciar({
+        treinoId,
+        nomeTreino: treinoNome,
+        inicio: Date.now(),
+        sessao: novaSessao,
+        houveAlteracaoEstrutura: false,
+      });
+      navigate(`/treino/log/${treinoId}`);
+    } catch (e) {
+      alert("Erro ao copiar treinamento: " + (e as Error).message);
+    } finally {
+      copiando = false;
+    }
+  }
+
+  async function excluirTreinamento() {
+    excluindo = true;
+    try {
+      await excluirRegistrosDoDia(treinoId, data);
+      voltar("/treino/historico");
+    } catch (e) {
+      alert("Erro ao excluir: " + (e as Error).message);
+      excluindo = false;
     }
   }
 </script>
@@ -67,12 +180,49 @@
     <polyline points="15 6 9 12 15 18" />
   </svg>
 {/snippet}
+{#snippet iconMenu()}
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <circle cx="12" cy="5" r="1.8" />
+    <circle cx="12" cy="12" r="1.8" />
+    <circle cx="12" cy="19" r="1.8" />
+  </svg>
+{/snippet}
+{#snippet iconSalvarRotina()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
+    <path d="M17 21v-8H7v8" />
+    <path d="M7 3v5h8" />
+  </svg>
+{/snippet}
+{#snippet iconCopiar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+{/snippet}
+{#snippet iconEditar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+{/snippet}
+{#snippet iconExcluir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino/historico")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>{treinoNome}</h1>
-    <button class="salvar" disabled={salvando || loading} onclick={salvar}>{salvando ? "Salvando…" : "Salvar"}</button>
+    {#if modoEdicao}
+      <button class="salvar" disabled={salvando || loading} onclick={salvar}>{salvando ? "Salvando…" : "Salvar"}</button>
+    {:else}
+      <button class="menu-btn" disabled={loading || !sessao.length} onclick={() => (menuAberto = true)} aria-label="Mais opções">
+        {@render iconMenu()}
+      </button>
+    {/if}
   </div>
   <p class="data-label">{dataLabel}</p>
 
@@ -80,7 +230,7 @@
     <p class="muted">Carregando…</p>
   {:else if !sessao.length}
     <p class="muted">Nenhum registro encontrado para esse dia.</p>
-  {:else}
+  {:else if modoEdicao}
     {#if salvo}
       <p class="aviso-salvo">Alterações salvas.</p>
     {/if}
@@ -106,8 +256,56 @@
         <button class="add-serie" onclick={() => adicionarSerie(exIdx)}>+ Adicionar Série</button>
       </div>
     {/each}
+  {:else}
+    {#each sessao as ex (ex.exercicioId)}
+      <div class="sessao-card">
+        <h2 class="sessao-nome">{ex.exercicioNome}</h2>
+        <div class="sessao-tabela">
+          <div class="sessao-linha sessao-cabecalho">
+            <span>Série</span>
+            <span>Peso &amp; Repetições</span>
+          </div>
+          {#each ex.sets as s (s.serie)}
+            <div class="sessao-linha">
+              <span class="sessao-serie">{s.serie}</span>
+              <span>{s.peso != null && s.repeticoes != null ? `${s.peso} kg x ${s.repeticoes}` : "—"}</span>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/each}
   {/if}
 </div>
+
+{#if menuAberto}
+  <ActionSheet
+    onFechar={() => (menuAberto = false)}
+    opcoes={[
+      { label: "Salvar como Rotina", icon: iconSalvarRotina, onSelect: abrirSalvarComoRotina },
+      { label: "Copiar Treinamento", icon: iconCopiar, disabled: copiando, onSelect: copiarTreinamento },
+      { label: "Editar Treinamento", icon: iconEditar, onSelect: abrirEditar },
+      { label: "Deletar Treinamento", icon: iconExcluir, destructive: true, onSelect: () => (mostrarConfirmarExcluir = true) },
+    ]}
+  />
+{/if}
+
+{#if mostrarNomearRotina}
+  <Sheet titulo="Salvar como rotina" onFechar={() => (mostrarNomearRotina = false)}>
+    <input class="nome-input" type="text" placeholder="Nome da rotina" bind:value={nomeRotina} />
+    <Button onclick={confirmarSalvarComoRotina} disabled={salvandoRotina || !nomeRotina.trim()}>
+      {salvandoRotina ? "Salvando…" : "Salvar"}
+    </Button>
+  </Sheet>
+{/if}
+
+{#if mostrarConfirmarExcluir}
+  <ConfirmDialog
+    titulo="Tem certeza de que quer deletar todos os registros desse treino?"
+    textoConfirmar="Deletar Treinamento"
+    onConfirmar={excluirTreinamento}
+    onCancelar={() => (mostrarConfirmarExcluir = false)}
+  />
+{/if}
 
 <style>
   .container {
@@ -149,6 +347,28 @@
   .back svg {
     width: 18px;
     height: 18px;
+  }
+  .menu-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .menu-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  .menu-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .salvar {
     flex-shrink: 0;
@@ -246,6 +466,45 @@
     font-size: var(--font-size-sm);
     font-weight: 600;
     cursor: pointer;
+  }
+  .sessao-card {
+    padding: var(--space-3) 0;
+    margin-bottom: var(--space-4);
+  }
+  .sessao-nome {
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    color: var(--color-primary);
+    margin: 0 0 var(--space-3);
+  }
+  .sessao-tabela {
+    display: flex;
+    flex-direction: column;
+  }
+  .sessao-linha {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+  }
+  .sessao-cabecalho {
+    font-size: 11px;
+    color: var(--surface-muted);
+    text-transform: uppercase;
+  }
+  .sessao-serie {
+    font-weight: 600;
+  }
+  .nome-input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-3);
   }
   .muted {
     color: var(--surface-muted);

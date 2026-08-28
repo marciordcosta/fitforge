@@ -2,6 +2,7 @@
   import { navigate, voltar } from "../../lib/router.svelte";
   import { formatMinSeg } from "../../lib/tempo";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import {
     getTreino,
     duplicateTreino,
@@ -16,6 +17,7 @@
   let loading = $state(true);
   let processando = $state(false);
   let confirmandoExclusao = $state(false);
+  let menuAberto = $state(false);
 
   async function carregar() {
     loading = true;
@@ -78,6 +80,13 @@
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 {/snippet}
+{#snippet iconMenu()}
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <circle cx="12" cy="5" r="1.8" />
+    <circle cx="12" cy="12" r="1.8" />
+    <circle cx="12" cy="19" r="1.8" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -88,7 +97,13 @@
         <span class="dia-inline">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
       {/if}
     </h1>
-    <span class="header-spacer"></span>
+    {#if treino}
+      <button class="menu-btn" onclick={() => (menuAberto = true)} disabled={processando} aria-label="Mais opções">
+        {@render iconMenu()}
+      </button>
+    {:else}
+      <span class="header-spacer"></span>
+    {/if}
   </div>
 
   {#if loading}
@@ -96,25 +111,6 @@
   {:else if !treino}
     <p class="muted">Rotina não encontrada.</p>
   {:else}
-    <div class="acoes">
-      <button class="acao-btn" disabled={processando} onclick={() => navigate(`/treino/log/${treino!.id}`)}>
-        <span class="acao-label">Iniciar</span>
-        {@render iconIniciar()}
-      </button>
-      <button class="acao-btn" disabled={processando} onclick={() => navigate(`/treino/rotina/${treino!.id}`)}>
-        <span class="acao-label">Editar</span>
-        {@render iconEditar()}
-      </button>
-      <button class="acao-btn" disabled={processando} onclick={duplicar}>
-        <span class="acao-label">Duplicar</span>
-        {@render iconDuplicar()}
-      </button>
-      <button class="acao-btn acao-destrutiva" disabled={processando} onclick={() => (confirmandoExclusao = true)}>
-        <span class="acao-label">Remover</span>
-        {@render iconExcluir()}
-      </button>
-    </div>
-
     {#if !treino.exercicios.length}
       <p class="muted">Nenhum exercício adicionado ainda.</p>
     {:else}
@@ -152,6 +148,18 @@
     {/if}
   {/if}
 </div>
+
+{#if menuAberto && treino}
+  <ActionSheet
+    onFechar={() => (menuAberto = false)}
+    opcoes={[
+      { label: "Iniciar", icon: iconIniciar, onSelect: () => navigate(`/treino/log/${treino!.id}`) },
+      { label: "Editar", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treino!.id}`) },
+      { label: "Duplicar", icon: iconDuplicar, onSelect: duplicar },
+      { label: "Remover", icon: iconExcluir, destructive: true, onSelect: () => (confirmandoExclusao = true) },
+    ]}
+  />
+{/if}
 
 {#if confirmandoExclusao}
   <ConfirmDialog
@@ -208,45 +216,33 @@
     width: 18px;
     height: 18px;
   }
+  .menu-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .menu-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  .menu-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   .dia-inline {
     font-size: var(--font-size-sm);
     font-weight: 400;
     color: var(--surface-muted);
     margin-left: var(--space-1);
-  }
-  .acoes {
-    display: flex;
-    gap: var(--space-2);
-    margin-bottom: var(--space-5);
-  }
-  .acao-btn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-1);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
-    color: var(--surface-fg);
-    cursor: pointer;
-  }
-  .acao-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .acao-label {
-    font-size: 12px;
-    font-weight: 400;
-    white-space: nowrap;
-  }
-  .acao-btn svg {
-    width: 20px;
-    height: 20px;
-  }
-  .acao-destrutiva {
-    color: var(--color-danger);
   }
   .exercicio-card {
     padding: var(--space-3) 0;
