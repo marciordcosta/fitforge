@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -45,7 +46,19 @@
   /** Uma cor por meta de calorias distinta nos dias manuais — pra não confundir 2+ ajustes diferentes. */
   const CORES_GRUPOS_DIA = ["#5eead4", "#f9a8d4", "#fbbf24", "#93c5fd", "#c4b5fd", "#fca5a5"];
 
-  let aba = $state<"calorias" | "refeicoes">("calorias");
+  /** Guarda a aba ativa na URL (query ?aba=) pra sobreviver ao remount que acontece quando volta de outra tela (ex: detalhamento de um prato). */
+  function lerAbaDaUrl(): "calorias" | "refeicoes" {
+    return new URLSearchParams(window.location.search).get("aba") === "refeicoes" ? "refeicoes" : "calorias";
+  }
+
+  function irParaAba(valor: "calorias" | "refeicoes") {
+    aba = valor;
+    const url = new URL(window.location.href);
+    url.searchParams.set("aba", valor);
+    window.history.replaceState({}, "", url.pathname + url.search);
+  }
+
+  let aba = $state<"calorias" | "refeicoes">(untrack(() => lerAbaDaUrl()));
 
   let perfilCarregado = $state(false);
   let erroMetas = $state<string | null>(null);
@@ -1042,8 +1055,8 @@
   </div>
 
   <div class="tabs">
-    <button class:active={aba === "calorias"} onclick={() => (aba = "calorias")}>Calorias</button>
-    <button class:active={aba === "refeicoes"} onclick={() => (aba = "refeicoes")}>Refeições</button>
+    <button class:active={aba === "calorias"} onclick={() => irParaAba("calorias")}>Calorias</button>
+    <button class:active={aba === "refeicoes"} onclick={() => irParaAba("refeicoes")}>Refeições</button>
   </div>
 
   {#if aba === "calorias"}
