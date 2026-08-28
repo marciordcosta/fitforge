@@ -13,8 +13,12 @@
     updateDescansoTreinoExercicio,
     updateObservacaoTreinoExercicio,
     listExercicios,
+    listPadroesMovimento,
+    listMusculos,
     type TreinoComExercicios,
     type Exercicio,
+    type PadraoMovimento,
+    type Musculo,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -394,24 +398,48 @@
 
   let mostrarPicker = $state(false);
   let buscaPicker = $state("");
+  let filtroPadraoPicker = $state("");
+  let filtroMusculoPicker = $state("");
   let adicionandoId = $state<string | null>(null);
+  let padroes = $state<PadraoMovimento[]>([]);
+  let musculos = $state<Musculo[]>([]);
+
+  function iniciais(nome: string): string {
+    const partes = nome.trim().split(/\s+/);
+    return (partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "");
+  }
+
+  function subtitulo(ex: Exercicio): string {
+    if (!ex.musculos.length) return "Sem músculo definido";
+    return ex.musculos
+      .slice()
+      .sort((a, b) => b.peso_contribuicao - a.peso_contribuicao)
+      .map((m) => m.musculo?.nome)
+      .join(", ");
+  }
 
   async function abrirPicker() {
     if (!todosExercicios.length) todosExercicios = await listExercicios();
+    if (!padroes.length) padroes = await listPadroesMovimento();
+    if (!musculos.length) musculos = await listMusculos();
     mostrarPicker = true;
   }
 
   const disponiveisPicker = $derived(
-    todosExercicios.filter(
-      (ex) =>
-        !sessao.some((s) => s.exercicio_id === ex.id) &&
-        ex.nome.toLowerCase().includes(buscaPicker.trim().toLowerCase()),
-    ),
+    todosExercicios.filter((ex) => {
+      if (sessao.some((s) => s.exercicio_id === ex.id)) return false;
+      if (buscaPicker.trim() && !ex.nome.toLowerCase().includes(buscaPicker.trim().toLowerCase())) return false;
+      if (filtroPadraoPicker && ex.padrao_id !== filtroPadraoPicker) return false;
+      if (filtroMusculoPicker && !ex.musculos.some((m) => m.musculo_id === filtroMusculoPicker)) return false;
+      return true;
+    }),
   );
 
   function fecharPicker() {
     mostrarPicker = false;
     buscaPicker = "";
+    filtroPadraoPicker = "";
+    filtroMusculoPicker = "";
   }
 
   async function construirExercicioSessao(ex: Exercicio): Promise<ExercicioSessao> {
@@ -666,6 +694,11 @@
   </div>
 {/if}
 
+{#snippet iconVoltar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="15 6 9 12 15 18" />
+  </svg>
+{/snippet}
 {#snippet iconReordenar()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8 7l-4 4 4 4M16 7l4 4-4 4" />
@@ -750,15 +783,33 @@
   <div class="tela-picker">
     <div class="tela-picker-conteudo">
       <div class="picker-header">
-        <button class="cancelar" onclick={fecharPicker}>Cancelar</button>
+        <button class="back" onclick={fecharPicker} aria-label="Cancelar">{@render iconVoltar()}</button>
         <h1>Adicionar Exercício</h1>
-        <span class="header-spacer"></span>
+        <button class="criar" onclick={() => navigate("/treino/exercicios/novo")}>Criar</button>
       </div>
-      <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
+      <input class="search" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
+      <div class="filters">
+        <select bind:value={filtroPadraoPicker}>
+          <option value="">Todo padrão</option>
+          {#each padroes as p (p.id)}
+            <option value={p.id}>{p.nome}</option>
+          {/each}
+        </select>
+        <select bind:value={filtroMusculoPicker}>
+          <option value="">Todos os músculos</option>
+          {#each musculos as m (m.id)}
+            <option value={m.id}>{m.nome}</option>
+          {/each}
+        </select>
+      </div>
       <ul class="picker-lista">
         {#each disponiveisPicker as ex (ex.id)}
           <li class="picker-item">
-            <span class="picker-item-nome">{ex.nome}</span>
+            <span class="avatar">{iniciais(ex.nome)}</span>
+            <span class="info">
+              <span class="nome">{ex.nome}</span>
+              <span class="sub-item">{subtitulo(ex)}</span>
+            </span>
             <button class="add-btn" onclick={() => adicionarRapido(ex)} disabled={adicionandoId === ex.id} aria-label={`Adicionar ${ex.nome}`}>
               {#if adicionandoId === ex.id}…{:else}{@render iconMais()}{/if}
             </button>
@@ -1213,6 +1264,60 @@
     cursor: pointer;
     padding: var(--space-1);
   }
+  .back {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .back svg {
+    width: 18px;
+    height: 18px;
+  }
+  .criar {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+    padding: var(--space-1);
+  }
+  .search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-3);
+    flex-shrink: 0;
+  }
+  .filters {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    flex-shrink: 0;
+  }
+  .filters select {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: var(--font-size-sm);
+  }
   .nome-input {
     box-sizing: border-box;
     width: 100%;
@@ -1235,16 +1340,38 @@
   .picker-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
+    gap: var(--space-3);
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--surface-border);
     color: var(--surface-fg);
     font-size: var(--font-size-base);
   }
-  .picker-item-nome {
+  .picker-item .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--surface-border);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .picker-item .info {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .picker-item .nome {
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+  }
+  .picker-item .sub-item {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .add-btn {
     flex-shrink: 0;
