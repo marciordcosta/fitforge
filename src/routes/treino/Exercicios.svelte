@@ -1,34 +1,17 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import {
-    listExercicios,
-    listPadroesMovimento,
-    listMusculos,
-    correspondeBusca,
-    textoBuscavelExercicio,
-    type Exercicio,
-    type PadraoMovimento,
-    type Musculo,
-  } from "../../lib/treinoApi";
+  import { listExercicios, correspondeBusca, textoBuscavelExercicio, type Exercicio } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
   let exercicios = $state<Exercicio[]>([]);
-  let padroes = $state<PadraoMovimento[]>([]);
-  let musculos = $state<Musculo[]>([]);
   let loading = $state(true);
   let mostrarCriarMenu = $state(false);
 
   let busca = $state("");
-  let filtroPadrao = $state("");
-  let filtroMusculo = $state("");
 
   async function carregar() {
     loading = true;
-    [exercicios, padroes, musculos] = await Promise.all([
-      listExercicios(),
-      listPadroesMovimento(),
-      listMusculos(),
-    ]);
+    exercicios = await listExercicios();
     loading = false;
   }
 
@@ -48,14 +31,7 @@
       .join(", ");
   }
 
-  const filtrados = $derived(
-    exercicios.filter((ex) => {
-      if (!correspondeBusca(textoBuscavelExercicio(ex), busca)) return false;
-      if (filtroPadrao && ex.padrao_id !== filtroPadrao) return false;
-      if (filtroMusculo && !ex.musculos.some((m) => m.musculo_id === filtroMusculo)) return false;
-      return true;
-    }),
-  );
+  const filtrados = $derived(exercicios.filter((ex) => correspondeBusca(textoBuscavelExercicio(ex), busca)));
 </script>
 
 {#snippet iconVoltar()}
@@ -99,36 +75,8 @@
   <input class="search" type="text" placeholder="Procurar exercício" bind:value={busca} />
 
   <div class="filters">
-    <select
-      bind:value={filtroPadrao}
-      onchange={() => {
-        if (filtroPadrao === "__gerenciar__") {
-          filtroPadrao = "";
-          navigate("/treino/movimentos");
-        }
-      }}
-    >
-      <option value="">Todo padrão</option>
-      {#each padroes as p (p.id)}
-        <option value={p.id}>{p.nome}</option>
-      {/each}
-      <option value="__gerenciar__" class="opcao-gerenciar">Gerenciar Movimentos</option>
-    </select>
-    <select
-      bind:value={filtroMusculo}
-      onchange={() => {
-        if (filtroMusculo === "__gerenciar__") {
-          filtroMusculo = "";
-          navigate("/treino/musculos");
-        }
-      }}
-    >
-      <option value="">Todos os músculos</option>
-      {#each musculos as m (m.id)}
-        <option value={m.id}>{m.nome}</option>
-      {/each}
-      <option value="__gerenciar__" class="opcao-gerenciar">Gerenciar Músculos</option>
-    </select>
+    <button class="gerenciar-btn" onclick={() => navigate("/treino/movimentos")}>Gerenciar Movimentos</button>
+    <button class="gerenciar-btn" onclick={() => navigate("/treino/musculos")}>Gerenciar Músculos</button>
   </div>
 
   {#if loading}
@@ -235,29 +183,23 @@
     gap: var(--space-2);
     margin-bottom: var(--space-4);
   }
-  .filters select {
+  .gerenciar-btn {
     flex: 1;
     min-width: 0;
     box-sizing: border-box;
-    padding: var(--space-2) 30px var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     background-color: var(--surface-card);
-    color: var(--surface-fg);
+    color: var(--color-primary);
     font-size: var(--font-size-sm);
     font-family: inherit;
+    font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa0ab' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    background-size: 16px;
-  }
-  .opcao-gerenciar {
-    color: var(--color-primary);
+    text-align: center;
+    cursor: pointer;
   }
   .lista {
     list-style: none;
