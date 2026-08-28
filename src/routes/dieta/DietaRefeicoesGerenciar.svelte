@@ -1724,8 +1724,8 @@
   }
   .donut {
     position: relative;
-    width: 100px;
-    height: 100px;
+    width: 68px;
+    height: 68px;
     border-radius: 50%;
     flex-shrink: 0;
     border: none;
@@ -1745,10 +1745,10 @@
     justify-content: center;
   }
   .donut-centro strong {
-    font-size: var(--font-size-lg);
+    font-size: 15px;
   }
   .donut-centro span {
-    font-size: var(--font-size-sm);
+    font-size: 10px;
     color: var(--surface-muted);
   }
   .resumo-macros {
