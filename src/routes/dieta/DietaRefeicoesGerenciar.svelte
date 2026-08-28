@@ -809,6 +809,59 @@
     }
   }
 
+  /** Tempo segurando o nome da refeição antes do toque virar "pressionar" (abre confirmação de excluir) — evita disparar sem querer num toque rápido. */
+  const ATRASO_PRESSIONAR_MS = 500;
+  let timeoutPressionarNome: ReturnType<typeof setTimeout> | undefined;
+  let pressionarNomeX = 0;
+  let pressionarNomeY = 0;
+  let pressionouLongoNome = false;
+
+  function aoPointerDownNome(e: PointerEvent, m: RefeicaoModelo) {
+    pressionarNomeX = e.clientX;
+    pressionarNomeY = e.clientY;
+    pressionouLongoNome = false;
+    window.addEventListener("pointermove", aoPointerMovePressionarNome);
+    window.addEventListener("pointerup", aoPointerUpPressionarNome);
+    timeoutPressionarNome = setTimeout(() => {
+      pressionouLongoNome = true;
+      cancelarPressionarNome();
+      if (navigator.vibrate) navigator.vibrate(10);
+      paraExcluir = m;
+    }, ATRASO_PRESSIONAR_MS);
+  }
+
+  function aoContextMenuNome(e: MouseEvent, m: RefeicaoModelo) {
+    e.preventDefault();
+    cancelarPressionarNome();
+    pressionouLongoNome = false;
+    paraExcluir = m;
+  }
+
+  function cancelarPressionarNome() {
+    clearTimeout(timeoutPressionarNome);
+    timeoutPressionarNome = undefined;
+    window.removeEventListener("pointermove", aoPointerMovePressionarNome);
+    window.removeEventListener("pointerup", aoPointerUpPressionarNome);
+  }
+
+  function aoPointerMovePressionarNome(e: PointerEvent) {
+    if (Math.hypot(e.clientX - pressionarNomeX, e.clientY - pressionarNomeY) > TOLERANCIA_MOVIMENTO_PX) {
+      cancelarPressionarNome();
+    }
+  }
+
+  function aoPointerUpPressionarNome() {
+    cancelarPressionarNome();
+  }
+
+  function aoClickNome(m: RefeicaoModelo) {
+    if (pressionouLongoNome) {
+      pressionouLongoNome = false;
+      return;
+    }
+    abrirMeta(m);
+  }
+
   /** Tempo segurando o handle parado antes do arrasto realmente começar — evita que um toque de rolagem vire reordenação sem querer. */
   const ATRASO_ARRASTAR_MS = 250;
   const TOLERANCIA_MOVIMENTO_PX = 8;
@@ -1412,7 +1465,12 @@
             <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
               {@render iconArrastar()}
             </button>
-            <button class="nome-btn" onclick={() => abrirMeta(m)}>
+            <button
+              class="nome-btn"
+              onpointerdown={(e) => aoPointerDownNome(e, m)}
+              onclick={() => aoClickNome(m)}
+              oncontextmenu={(e) => aoContextMenuNome(e, m)}
+            >
               <span class="nome-linha">
                 <span class="nome">{m.nome}</span>
                 {#if m.metaCalorias != null}<span class="nome-cal">{Math.round(m.metaCalorias)} cal</span>{/if}
@@ -1422,7 +1480,6 @@
                 <span class="nome-pct">{pctDoDia(m.metaCalorias ?? 0)}%</span>
               </span>
             </button>
-            <button class="remover-btn" onclick={() => (paraExcluir = m)} aria-label={`Remover ${m.nome}`}>✕</button>
           </li>
         {/each}
       </ul>
