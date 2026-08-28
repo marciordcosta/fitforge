@@ -259,6 +259,8 @@ export interface HistoricoPonto {
   maiorPeso: number;
   melhor1rm: number;
   melhorVolumeSerie: { peso: number; reps: number; volume: number };
+  /** Volume total do dia: soma de peso × repetições de todas as séries do exercício. */
+  volumeTotal: number;
 }
 
 export function calcular1RM(peso: number, reps: number): number {
@@ -286,13 +288,15 @@ export async function getHistoricoExercicio(exercicioId: string): Promise<Histor
     const maiorPeso = Math.max(...sets.map((s) => s.peso));
     let melhor1rm = 0;
     let melhorVolumeSerie = { peso: 0, reps: 0, volume: 0 };
+    let volumeTotal = 0;
     for (const s of sets) {
       const rm = calcular1RM(s.peso, s.repeticoes);
       if (rm > melhor1rm) melhor1rm = rm;
       const vol = s.peso * s.repeticoes;
       if (vol > melhorVolumeSerie.volume) melhorVolumeSerie = { peso: s.peso, reps: s.repeticoes, volume: vol };
+      volumeTotal += vol;
     }
-    return { data, maiorPeso, melhor1rm, melhorVolumeSerie };
+    return { data, maiorPeso, melhor1rm, melhorVolumeSerie, volumeTotal };
   });
 }
 

@@ -6,7 +6,7 @@
 
   let historico = $state<HistoricoPonto[]>([]);
   let loading = $state(true);
-  let metrica = $state<"peso" | "1rm">("peso");
+  let metrica = $state<"peso" | "1rm" | "volume">("1rm");
   let canvas = $state<HTMLCanvasElement | undefined>(undefined);
   let chart: Chart | null = null;
 
@@ -26,7 +26,9 @@
   function desenharGrafico() {
     if (!canvas || !historico.length) return;
     chart?.destroy();
-    const valores = historico.map((h) => (metrica === "peso" ? h.maiorPeso : Math.round(h.melhor1rm * 10) / 10));
+    const valores = historico.map((h) =>
+      metrica === "peso" ? h.maiorPeso : metrica === "1rm" ? Math.round(h.melhor1rm * 10) / 10 : h.volumeTotal,
+    );
     chart = new Chart(canvas, {
       type: "line",
       data: {
@@ -67,8 +69,9 @@
     <canvas bind:this={canvas}></canvas>
   </div>
   <div class="toggle">
-    <button class:active={metrica === "peso"} onclick={() => (metrica = "peso")}>Maior Peso</button>
     <button class:active={metrica === "1rm"} onclick={() => (metrica = "1rm")}>Máximo de Uma Repetição</button>
+    <button class:active={metrica === "peso"} onclick={() => (metrica = "peso")}>Maior Peso</button>
+    <button class:active={metrica === "volume"} onclick={() => (metrica = "volume")}>Maior Volume</button>
   </div>
 {/if}
 
@@ -84,12 +87,13 @@
   }
   .toggle button {
     flex: 1;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-1);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
     color: var(--surface-muted);
-    font-size: var(--font-size-sm);
+    font-size: 12px;
+    line-height: 1.3;
     cursor: pointer;
   }
   .toggle button.active {
