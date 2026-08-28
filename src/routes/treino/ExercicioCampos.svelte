@@ -2,6 +2,7 @@
   import {
     listPadroesMovimento,
     listMusculos,
+    listMusculosDoPadrao,
     PESOS_CONTRIBUICAO_PRESET,
     type PadraoMovimento,
     type Musculo,
@@ -10,22 +11,34 @@
 
   let {
     nome = $bindable(),
-    padraoNome = $bindable(),
+    padraoId = $bindable(),
     linhasMusculos = $bindable(),
   }: {
     nome: string;
-    padraoNome: string;
+    padraoId: string;
     linhasMusculos: LinhaMusculoInput[];
   } = $props();
 
   let padroes = $state<PadraoMovimento[]>([]);
   let musculos = $state<Musculo[]>([]);
+  let musculosDoPadrao = $state<Musculo[]>([]);
 
   async function carregarListas() {
     [padroes, musculos] = await Promise.all([listPadroesMovimento(), listMusculos()]);
   }
 
   void carregarListas();
+
+  $effect(() => {
+    const id = padraoId;
+    if (!id) {
+      musculosDoPadrao = [];
+      return;
+    }
+    listMusculosDoPadrao(id).then((lista) => (musculosDoPadrao = lista));
+  });
+
+  const opcoesMusculo = $derived(musculosDoPadrao.length ? musculosDoPadrao : musculos);
 
   function adicionarMusculo() {
     linhasMusculos = [...linhasMusculos, { nome: "", peso: 1 }];
@@ -43,24 +56,27 @@
 
 <label class="field">
   <span>Padrão de Movimento</span>
-  <input type="text" list="padroes-list" bind:value={padraoNome} placeholder="Ex: Empurrar Horizontal" />
-  <datalist id="padroes-list">
+  <select bind:value={padraoId}>
+    <option value="">Nenhum</option>
     {#each padroes as p (p.id)}
-      <option value={p.nome}></option>
+      <option value={p.id}>{p.nome}</option>
     {/each}
-  </datalist>
+  </select>
 </label>
 
 <div class="field">
   <span>Músculos Envolvidos</span>
-  <datalist id="musculos-list">
-    {#each musculos as m (m.id)}
-      <option value={m.nome}></option>
-    {/each}
-  </datalist>
   {#each linhasMusculos as linha, idx (idx)}
     <div class="secundario-row">
-      <input type="text" list="musculos-list" bind:value={linha.nome} placeholder="Nome do músculo" />
+      <select bind:value={linha.nome}>
+        <option value="">Selecione…</option>
+        {#if linha.nome && !opcoesMusculo.some((m) => m.nome === linha.nome)}
+          <option value={linha.nome}>{linha.nome}</option>
+        {/if}
+        {#each opcoesMusculo as m (m.id)}
+          <option value={m.nome}>{m.nome}</option>
+        {/each}
+      </select>
       <select bind:value={linha.peso}>
         {#each PESOS_CONTRIBUICAO_PRESET as p (p)}
           <option value={p}>{p}</option>
@@ -99,11 +115,11 @@
     gap: var(--space-2);
     margin-bottom: var(--space-2);
   }
-  .secundario-row input {
+  .secundario-row select:first-child {
     flex: 1;
     min-width: 0;
   }
-  .secundario-row select {
+  .secundario-row select:nth-child(2) {
     width: 72px;
   }
   .remover {

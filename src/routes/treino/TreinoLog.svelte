@@ -400,6 +400,7 @@
   let buscaPicker = $state("");
   let filtroPadraoPicker = $state("");
   let filtroMusculoPicker = $state("");
+  let mostrarCriarMenu = $state(false);
   let adicionandoId = $state<string | null>(null);
   let padroes = $state<PadraoMovimento[]>([]);
   let musculos = $state<Musculo[]>([]);
@@ -785,7 +786,7 @@
       <div class="picker-header">
         <button class="back" onclick={fecharPicker} aria-label="Cancelar">{@render iconVoltar()}</button>
         <h1>Adicionar Exercício</h1>
-        <button class="criar" onclick={() => navigate("/treino/exercicios/novo")}>Criar</button>
+        <button class="criar" onclick={() => (mostrarCriarMenu = true)}>Criar</button>
       </div>
       <input class="search" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
       <div class="filters">
@@ -821,6 +822,16 @@
       </ul>
     </div>
   </div>
+{/if}
+
+{#if mostrarCriarMenu}
+  <ActionSheet
+    onFechar={() => (mostrarCriarMenu = false)}
+    opcoes={[
+      { label: "Exercício", onSelect: () => navigate("/treino/exercicios/novo") },
+      { label: "Movimento", onSelect: () => navigate("/treino/movimentos/novo") },
+    ]}
+  />
 {/if}
 
 {#if mostrarEscolhaEstrutura}

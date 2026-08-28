@@ -8,11 +8,13 @@
     type PadraoMovimento,
     type Musculo,
   } from "../../lib/treinoApi";
+  import ActionSheet from "../../components/ActionSheet.svelte";
 
   let exercicios = $state<Exercicio[]>([]);
   let padroes = $state<PadraoMovimento[]>([]);
   let musculos = $state<Musculo[]>([]);
   let loading = $state(true);
+  let mostrarCriarMenu = $state(false);
 
   let busca = $state("");
   let filtroPadrao = $state("");
@@ -64,7 +66,7 @@
   <div class="header">
     <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Exercícios</h1>
-    <button class="criar" onclick={() => navigate("/treino/exercicios/novo")}>Criar</button>
+    <button class="criar" onclick={() => (mostrarCriarMenu = true)}>Criar</button>
   </div>
 
   <input class="search" type="text" placeholder="Procurar exercício" bind:value={busca} />
@@ -83,6 +85,8 @@
       {/each}
     </select>
   </div>
+
+  <button class="link-movimentos" onclick={() => navigate("/treino/movimentos")}>Gerenciar Movimentos</button>
 
   {#if loading}
     <p class="muted">Carregando…</p>
@@ -105,6 +109,16 @@
     </ul>
   {/if}
 </div>
+
+{#if mostrarCriarMenu}
+  <ActionSheet
+    onFechar={() => (mostrarCriarMenu = false)}
+    opcoes={[
+      { label: "Exercício", onSelect: () => navigate("/treino/exercicios/novo") },
+      { label: "Movimento", onSelect: () => navigate("/treino/movimentos/novo") },
+    ]}
+  />
+{/if}
 
 <style>
   .container {
@@ -176,6 +190,16 @@
     background: var(--surface-card);
     color: var(--surface-fg);
     font-size: var(--font-size-sm);
+  }
+  .link-movimentos {
+    display: block;
+    margin: calc(var(--space-2) * -1) 0 var(--space-4) auto;
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    padding: var(--space-1) 0;
   }
   .lista {
     list-style: none;

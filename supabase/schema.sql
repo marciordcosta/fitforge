@@ -44,6 +44,16 @@ create table exercicio_musculos (
   unique (exercicio_id, musculo_id)
 );
 
+-- Catálogo de músculos associados a cada padrão de movimento (cadastrado à
+-- parte, na tela "Movimentos"), usado para filtrar as opções de músculo ao
+-- criar/editar um exercício vinculado a esse padrão.
+create table padrao_movimento_musculos (
+  id uuid primary key default gen_random_uuid(),
+  padrao_id uuid not null references padroes_movimento(id) on delete cascade,
+  musculo_id uuid not null references musculos(id) on delete cascade,
+  unique (padrao_id, musculo_id)
+);
+
 create table treinos (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id),
@@ -131,6 +141,7 @@ alter table musculos enable row level security;
 alter table padroes_movimento enable row level security;
 alter table exercicios enable row level security;
 alter table exercicio_musculos enable row level security;
+alter table padrao_movimento_musculos enable row level security;
 alter table treinos enable row level security;
 alter table treino_exercicios enable row level security;
 alter table treino_exercicio_series enable row level security;
@@ -148,6 +159,10 @@ create policy "exercicios_owner" on exercicios for all
 create policy "exercicio_musculos_owner" on exercicio_musculos for all
   using (exercicio_id in (select id from exercicios where user_id = auth.uid()))
   with check (exercicio_id in (select id from exercicios where user_id = auth.uid()));
+
+create policy "padrao_movimento_musculos_owner" on padrao_movimento_musculos for all
+  using (padrao_id in (select id from padroes_movimento where user_id = auth.uid()))
+  with check (padrao_id in (select id from padroes_movimento where user_id = auth.uid()));
 
 create policy "treinos_owner" on treinos for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());

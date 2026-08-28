@@ -1,31 +1,24 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { createExercicio, construirMusculosInput, type LinhaMusculoInput } from "../../lib/treinoApi";
-  import ExercicioCampos from "./ExercicioCampos.svelte";
+  import { createPadraoMovimentoComMusculos } from "../../lib/treinoApi";
+  import MovimentoCampos from "./MovimentoCampos.svelte";
 
   let nome = $state("");
-  let padraoId = $state("");
-  let linhasMusculos = $state<LinhaMusculoInput[]>([{ nome: "", peso: 1 }]);
+  let linhasMusculos = $state<{ nome: string }[]>([{ nome: "" }]);
   let salvando = $state(false);
 
   async function salvar() {
     if (!nome.trim()) {
-      alert("Informe o nome do exercício.");
-      return;
-    }
-    const musculosInput = await construirMusculosInput(linhasMusculos);
-    if (!musculosInput.length) {
-      alert("Informe ao menos um músculo envolvido.");
+      alert("Informe o nome do movimento.");
       return;
     }
     salvando = true;
     try {
-      const novoId = await createExercicio({
-        nome: nome.trim(),
-        padrao_id: padraoId || null,
-        musculos: musculosInput,
-      });
-      navigate(`/treino/exercicios/${novoId}`);
+      const novoId = await createPadraoMovimentoComMusculos(
+        nome,
+        linhasMusculos.map((l) => l.nome),
+      );
+      navigate(`/treino/movimentos/${novoId}`);
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
     } finally {
@@ -42,12 +35,12 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/treino/exercicios")} aria-label="Voltar">{@render iconVoltar()}</button>
-    <h1>Novo Exercício</h1>
+    <button class="back" onclick={() => voltar("/treino/movimentos")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <h1>Novo Movimento</h1>
     <button class="salvar" disabled={salvando} onclick={salvar}>Criar</button>
   </div>
 
-  <ExercicioCampos bind:nome bind:padraoId bind:linhasMusculos />
+  <MovimentoCampos bind:nome bind:linhasMusculos />
 </div>
 
 <style>

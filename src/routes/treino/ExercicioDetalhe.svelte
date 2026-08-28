@@ -5,7 +5,6 @@
     updateExercicio,
     deleteExercicio,
     construirMusculosInput,
-    findOrCreatePadraoMovimento,
     getHistoricoDetalhadoExercicio,
     type Exercicio,
     type SessaoHistorico,
@@ -27,7 +26,7 @@
   let carregouHistorico = $state(false);
 
   let nome = $state("");
-  let padraoNome = $state("");
+  let padraoId = $state("");
   let linhasMusculos = $state<LinhaMusculoInput[]>([{ nome: "", peso: 1 }]);
   let salvando = $state(false);
   let mostrarConfirmExcluir = $state(false);
@@ -37,7 +36,7 @@
     exercicio = await getExercicio(exercicioId);
     if (exercicio) {
       nome = exercicio.nome;
-      padraoNome = exercicio.padrao?.nome ?? "";
+      padraoId = exercicio.padrao_id ?? "";
       linhasMusculos = exercicio.musculos.length
         ? exercicio.musculos.map((m) => ({ nome: m.musculo?.nome ?? "", peso: m.peso_contribuicao }))
         : [{ nome: "", peso: 1 }];
@@ -74,10 +73,9 @@
     }
     salvando = true;
     try {
-      const padrao = padraoNome.trim() ? await findOrCreatePadraoMovimento(padraoNome) : null;
       await updateExercicio(exercicioId, {
         nome: nome.trim(),
-        padrao_id: padrao?.id ?? null,
+        padrao_id: padraoId || null,
         musculos: musculosInput,
       });
       await carregar();
@@ -174,7 +172,7 @@
       {/each}
     {/if}
   {:else if aba === "edicao"}
-    <ExercicioCampos bind:nome bind:padraoNome bind:linhasMusculos />
+    <ExercicioCampos bind:nome bind:padraoId bind:linhasMusculos />
     <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Exercício</button>
     {/if}
     </div>

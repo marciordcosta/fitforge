@@ -7,6 +7,9 @@
   import Exercicios from "./Exercicios.svelte";
   import ExercicioDetalhe from "./ExercicioDetalhe.svelte";
   import ExercicioForm from "./ExercicioForm.svelte";
+  import Movimentos from "./Movimentos.svelte";
+  import MovimentoDetalhe from "./MovimentoDetalhe.svelte";
+  import MovimentoForm from "./MovimentoForm.svelte";
   import DistribuicaoMusculos from "./DistribuicaoMusculos.svelte";
   import HistoricoCalendario from "./HistoricoCalendario.svelte";
   import HistoricoDia from "./HistoricoDia.svelte";
@@ -32,6 +35,12 @@
   <ExercicioDetalhe exercicioId={segmentos[1]} />
 {:else if segmentos[0] === "exercicios"}
   <Exercicios />
+{:else if segmentos[0] === "movimentos" && segmentos[1] === "novo"}
+  <MovimentoForm />
+{:else if segmentos[0] === "movimentos" && segmentos[1]}
+  <MovimentoDetalhe padraoId={segmentos[1]} />
+{:else if segmentos[0] === "movimentos"}
+  <Movimentos />
 {:else if segmentos[0] === "distribuicao"}
   <DistribuicaoMusculos />
 {:else if segmentos[0] === "historico" && segmentos[1] && segmentos[2]}

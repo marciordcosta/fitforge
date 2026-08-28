@@ -152,6 +152,103 @@ export async function findOrCreatePadraoMovimento(nome: string): Promise<PadraoM
   return data;
 }
 
+export interface PadraoMovimentoComMusculos extends PadraoMovimento {
+  musculos: Musculo[];
+}
+
+const PADRAO_COM_MUSCULOS_SELECT =
+  "id, nome, cor_fundo, cor_fonte, ordem, musculos:padrao_movimento_musculos(musculo:musculos(id, nome, grupo_exibicao, ordem))";
+
+interface PadraoRow {
+  id: string;
+  nome: string;
+  cor_fundo: string | null;
+  cor_fonte: string | null;
+  ordem: number;
+  musculos: { musculo: Musculo | null }[];
+}
+
+function mapPadraoComMusculos(row: PadraoRow): PadraoMovimentoComMusculos {
+  return {
+    id: row.id,
+    nome: row.nome,
+    cor_fundo: row.cor_fundo,
+    cor_fonte: row.cor_fonte,
+    ordem: row.ordem,
+    musculos: row.musculos.map((m) => m.musculo).filter((m): m is Musculo => m != null),
+  };
+}
+
+export async function listPadroesMovimentoComMusculos(): Promise<PadraoMovimentoComMusculos[]> {
+  const { data, error } = await supabase
+    .from("padroes_movimento")
+    .select(PADRAO_COM_MUSCULOS_SELECT)
+    .order("nome", { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as unknown as PadraoRow[]).map(mapPadraoComMusculos);
+}
+
+export async function getPadraoMovimentoComMusculos(id: string): Promise<PadraoMovimentoComMusculos | null> {
+  const { data, error } = await supabase
+    .from("padroes_movimento")
+    .select(PADRAO_COM_MUSCULOS_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapPadraoComMusculos(data as unknown as PadraoRow) : null;
+}
+
+export async function listMusculosDoPadrao(padraoId: string): Promise<Musculo[]> {
+  const { data, error } = await supabase
+    .from("padrao_movimento_musculos")
+    .select("musculo:musculos(id, nome, grupo_exibicao, ordem)")
+    .eq("padrao_id", padraoId);
+  if (error) throw error;
+  return ((data ?? []) as unknown as { musculo: Musculo | null }[])
+    .map((r) => r.musculo)
+    .filter((m): m is Musculo => m != null);
+}
+
+async function salvarMusculosPadrao(padraoId: string, musculoIds: string[]): Promise<void> {
+  const { error: delError } = await supabase
+    .from("padrao_movimento_musculos")
+    .delete()
+    .eq("padrao_id", padraoId);
+  if (delError) throw delError;
+
+  if (!musculoIds.length) return;
+  const { error: insError } = await supabase
+    .from("padrao_movimento_musculos")
+    .insert(musculoIds.map((musculo_id) => ({ padrao_id: padraoId, musculo_id })));
+  if (insError) throw insError;
+}
+
+/** Cria (ou reaproveita, por nome) o padrão de movimento e sincroniza os músculos associados a ele. */
+export async function createPadraoMovimentoComMusculos(nome: string, musculoNomes: string[]): Promise<string> {
+  const padrao = await findOrCreatePadraoMovimento(nome);
+  const nomesPreenchidos = musculoNomes.filter((n) => n.trim());
+  const musculosResolvidos = await Promise.all(nomesPreenchidos.map((n) => findOrCreateMusculo(n)));
+  await salvarMusculosPadrao(padrao.id, musculosResolvidos.map((m) => m.id));
+  return padrao.id;
+}
+
+export async function updatePadraoMovimentoComMusculos(
+  id: string,
+  nome: string,
+  musculoNomes: string[],
+): Promise<void> {
+  const { error } = await supabase.from("padroes_movimento").update({ nome: nome.trim() }).eq("id", id);
+  if (error) throw error;
+  const nomesPreenchidos = musculoNomes.filter((n) => n.trim());
+  const musculosResolvidos = await Promise.all(nomesPreenchidos.map((n) => findOrCreateMusculo(n)));
+  await salvarMusculosPadrao(id, musculosResolvidos.map((m) => m.id));
+}
+
+export async function deletePadraoMovimento(id: string): Promise<void> {
+  const { error } = await supabase.from("padroes_movimento").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ---------------- Exercícios ----------------
 
 const EXERCICIO_SELECT =
