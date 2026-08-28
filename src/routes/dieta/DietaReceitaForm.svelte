@@ -210,6 +210,7 @@
 
 {#if itemEditandoIndex != null}
   <DietaQuantidadeDialog
+    titulo={receitaRascunho.itens[itemEditandoIndex].alimento.nome}
     quantidadeInicial={receitaRascunho.itens[itemEditandoIndex].quantidade}
     porcaoPadraoUnidade={receitaRascunho.itens[itemEditandoIndex].alimento.porcaoPadraoUnidade}
     onSalvar={aoSalvarQuantidade}

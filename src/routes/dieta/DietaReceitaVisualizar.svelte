@@ -368,6 +368,7 @@
 
 {#if itemEditando}
   <DietaQuantidadeDialog
+    titulo={itemEditando.nome}
     quantidadeInicial={itemEditando.quantidade}
     porcaoPadraoUnidade={itemEditando.unidade}
     onSalvar={aoSalvarQuantidadeItem}

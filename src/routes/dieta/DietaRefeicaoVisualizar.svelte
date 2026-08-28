@@ -56,6 +56,7 @@
   let itemParaMover = $state<ItemDiario | null>(null);
   let refeicoesParaMover = $state<RefeicaoDia[]>([]);
   let mostrarMoverItem = $state(false);
+  let menuItemAberto = $state<ItemDiario | null>(null);
 
   async function carregar() {
     loading = true;
@@ -118,6 +119,10 @@
     }
   }
 
+  function abrirDetalheItem(item: ItemDiario) {
+    navigate(`/dieta/item/${item.id}`);
+  }
+
   async function aoSalvarQuantidadeItem(quantidade: number) {
     if (!itemEditando || !alimentoEditando) return;
     processando = true;
@@ -151,8 +156,15 @@
       pressionouLongo = true;
       cancelarPressionar();
       if (navigator.vibrate) navigator.vibrate(10);
-      void abrirMoverItem(item);
+      menuItemAberto = item;
     }, ATRASO_PRESSIONAR_MS);
+  }
+
+  function aoContextMenuItem(e: MouseEvent, item: ItemDiario) {
+    e.preventDefault();
+    cancelarPressionar();
+    pressionouLongo = false;
+    menuItemAberto = item;
   }
 
   function cancelarPressionar() {
@@ -297,6 +309,23 @@
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 {/snippet}
+{#snippet iconInfo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <line x1="12" y1="11" x2="12" y2="16" />
+    <circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+{/snippet}
+{#snippet iconMover()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 9l-3 3 3 3" />
+    <path d="M9 5l3-3 3 3" />
+    <path d="M15 19l-3 3-3-3" />
+    <path d="M19 9l3 3-3 3" />
+    <path d="M2 12h20" />
+    <path d="M12 2v20" />
+  </svg>
+{/snippet}
 {#snippet iconAdicionarPrato()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 5v14M5 12h14" />
@@ -395,20 +424,25 @@
       <p class="muted">Nenhum alimento adicionado ainda.</p>
     {:else}
       {#each itens as item (item.id)}
-        <button class="item-card" onpointerdown={(e) => aoPointerDownItem(e, item)} onclick={() => aoClickItem(item)}>
+        <button
+          class="item-card"
+          onpointerdown={(e) => aoPointerDownItem(e, item)}
+          onclick={() => aoClickItem(item)}
+          oncontextmenu={(e) => aoContextMenuItem(e, item)}
+        >
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
             <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal</p>
           </div>
           <span
-            class="item-remover"
+            class="item-detalhe"
             role="button"
             tabindex="0"
-            onclick={(e) => { e.stopPropagation(); itemParaRemover = item; }}
-            onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); itemParaRemover = item; } }}
-            aria-label="Remover alimento"
+            onclick={(e) => { e.stopPropagation(); abrirDetalheItem(item); }}
+            onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); abrirDetalheItem(item); } }}
+            aria-label="Detalhes do alimento"
           >
-            {@render iconExcluir()}
+            {@render iconInfo()}
           </span>
         </button>
       {/each}
@@ -467,10 +501,23 @@
 
 {#if itemEditando && alimentoEditando}
   <DietaQuantidadeDialog
+    titulo={itemEditando.nome}
     quantidadeInicial={itemEditando.quantidade}
     porcaoPadraoUnidade={itemEditando.unidade}
     onSalvar={aoSalvarQuantidadeItem}
     onFechar={() => { itemEditando = null; alimentoEditando = null; }}
+  />
+{/if}
+
+{#if menuItemAberto !== null}
+  {@const itemMenu = menuItemAberto}
+  <ActionSheet
+    titulo={itemMenu.nome}
+    onFechar={() => (menuItemAberto = null)}
+    opcoes={[
+      { label: "Mover", icon: iconMover, onSelect: () => void abrirMoverItem(itemMenu) },
+      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => (itemParaRemover = itemMenu) },
+    ]}
   />
 {/if}
 
@@ -688,17 +735,17 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
-  .item-remover {
+  .item-detalhe {
     flex-shrink: 0;
     width: 28px;
     height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-danger);
+    color: var(--surface-muted);
     cursor: pointer;
   }
-  .item-remover svg {
+  .item-detalhe svg {
     width: 18px;
     height: 18px;
   }

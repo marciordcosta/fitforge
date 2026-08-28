@@ -3,11 +3,13 @@
   import WheelPicker from "../../components/WheelPicker.svelte";
 
   let {
+    titulo,
     quantidadeInicial,
     porcaoPadraoUnidade,
     onSalvar,
     onFechar,
   }: {
+    titulo: string;
     quantidadeInicial: number;
     porcaoPadraoUnidade: string;
     onSalvar: (quantidade: number) => void;
@@ -45,7 +47,7 @@
 </script>
 
 <WheelPicker
-  titulo="Quanto?"
+  {titulo}
   subtitulo={`Quantidade em ${rotuloUnidade}`}
   {opcoes}
   valorAtual={valorInicial}
