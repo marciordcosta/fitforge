@@ -33,10 +33,7 @@
     if (!id) return;
     listMusculosDoPadrao(id).then((lista) => {
       const pesosAtuais = new Map(linhasMusculos.map((l) => [l.nome, l.peso]));
-      linhasMusculos = lista
-        .slice()
-        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
-        .map((m) => ({ nome: m.nome, peso: pesosAtuais.get(m.nome) ?? 1 }));
+      linhasMusculos = lista.map((m) => ({ nome: m.nome, peso: pesosAtuais.get(m.nome) ?? 1 }));
     });
   });
 

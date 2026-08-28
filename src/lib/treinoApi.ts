@@ -217,7 +217,8 @@ export async function listPadroesMovimentoComMusculos(): Promise<PadraoMovimento
   const { data, error } = await supabase
     .from("padroes_movimento")
     .select(PADRAO_COM_MUSCULOS_SELECT)
-    .order("nome", { ascending: true });
+    .order("nome", { ascending: true })
+    .order("ordem", { ascending: true, referencedTable: "padrao_movimento_musculos" });
   if (error) throw error;
   return ((data ?? []) as unknown as PadraoRow[]).map(mapPadraoComMusculos);
 }
@@ -227,6 +228,7 @@ export async function getPadraoMovimentoComMusculos(id: string): Promise<PadraoM
     .from("padroes_movimento")
     .select(PADRAO_COM_MUSCULOS_SELECT)
     .eq("id", id)
+    .order("ordem", { ascending: true, referencedTable: "padrao_movimento_musculos" })
     .maybeSingle();
   if (error) throw error;
   return data ? mapPadraoComMusculos(data as unknown as PadraoRow) : null;
@@ -236,7 +238,8 @@ export async function listMusculosDoPadrao(padraoId: string): Promise<Musculo[]>
   const { data, error } = await supabase
     .from("padrao_movimento_musculos")
     .select("musculo:musculos(id, nome, grupo_exibicao, ordem)")
-    .eq("padrao_id", padraoId);
+    .eq("padrao_id", padraoId)
+    .order("ordem", { ascending: true });
   if (error) throw error;
   return ((data ?? []) as unknown as { musculo: Musculo | null }[])
     .map((r) => r.musculo)
@@ -253,7 +256,7 @@ async function salvarMusculosPadrao(padraoId: string, musculoIds: string[]): Pro
   if (!musculoIds.length) return;
   const { error: insError } = await supabase
     .from("padrao_movimento_musculos")
-    .insert(musculoIds.map((musculo_id) => ({ padrao_id: padraoId, musculo_id })));
+    .insert(musculoIds.map((musculo_id, ordem) => ({ padrao_id: padraoId, musculo_id, ordem })));
   if (insError) throw insError;
 }
 

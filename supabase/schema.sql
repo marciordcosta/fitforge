@@ -51,6 +51,8 @@ create table padrao_movimento_musculos (
   id uuid primary key default gen_random_uuid(),
   padrao_id uuid not null references padroes_movimento(id) on delete cascade,
   musculo_id uuid not null references musculos(id) on delete cascade,
+  -- ordem de cadastro no Padrão de Movimento (não alfabética).
+  ordem int not null default 0,
   unique (padrao_id, musculo_id)
 );
 
