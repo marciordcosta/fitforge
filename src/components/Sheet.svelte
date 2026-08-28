@@ -16,15 +16,19 @@
   } = $props();
 
   let sheetEl = $state<HTMLDivElement | undefined>();
+  let handleEl = $state<HTMLDivElement | undefined>();
+  let conteudoEl = $state<HTMLDivElement | undefined>();
   let alturaArrasto = $state<number | null>(null);
 
   const ALTURA_FECHAR = 120;
 
   function iniciarArraste(e: PointerEvent) {
-    if (!sheetEl) return;
+    if (!sheetEl || !conteudoEl) return;
     const startY = e.clientY;
     const startHeight = sheetEl.getBoundingClientRect().height;
-    const maxima = window.innerHeight * 0.92;
+    /** Não deixa arrastar além do que o conteúdo realmente ocupa — sem isso o sheet cresce pra cima com espaço vazio quando o conteúdo é curto. */
+    const alturaNatural = conteudoEl.scrollHeight + (handleEl?.getBoundingClientRect().height ?? 0);
+    const maxima = Math.min(window.innerHeight * 0.92, alturaNatural);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
     function mover(ev: PointerEvent) {
@@ -51,10 +55,10 @@
     onclick={(e) => e.stopPropagation()}
     style={alturaArrasto != null ? `height: ${alturaArrasto}px; max-height: ${alturaArrasto}px;` : ""}
   >
-    <div class="sheet-handle-wrap" onpointerdown={iniciarArraste} role="presentation">
+    <div class="sheet-handle-wrap" bind:this={handleEl} onpointerdown={iniciarArraste} role="presentation">
       <span class="sheet-handle"></span>
     </div>
-    <div class="sheet-conteudo">
+    <div class="sheet-conteudo" bind:this={conteudoEl}>
       {#if titulo}
         <div class="sheet-header">
           <h3>{titulo}</h3>
