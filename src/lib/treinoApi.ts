@@ -122,6 +122,26 @@ export async function findOrCreateMusculo(nome: string): Promise<Musculo> {
   return data;
 }
 
+export async function getMusculo(id: string): Promise<Musculo | null> {
+  const { data, error } = await supabase
+    .from("musculos")
+    .select("id, nome, grupo_exibicao, ordem")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateMusculo(id: string, nome: string): Promise<void> {
+  const { error } = await supabase.from("musculos").update({ nome: nome.trim() }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteMusculo(id: string): Promise<void> {
+  const { error } = await supabase.from("musculos").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ---------------- Padrões de movimento ----------------
 
 export async function listPadroesMovimento(): Promise<PadraoMovimento[]> {

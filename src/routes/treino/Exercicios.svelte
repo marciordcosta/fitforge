@@ -112,11 +112,20 @@
       {/each}
       <option value="__gerenciar__" class="opcao-gerenciar">Gerenciar Movimentos</option>
     </select>
-    <select bind:value={filtroMusculo}>
+    <select
+      bind:value={filtroMusculo}
+      onchange={() => {
+        if (filtroMusculo === "__gerenciar__") {
+          filtroMusculo = "";
+          navigate("/treino/musculos");
+        }
+      }}
+    >
       <option value="">Todos os músculos</option>
       {#each musculos as m (m.id)}
         <option value={m.id}>{m.nome}</option>
       {/each}
+      <option value="__gerenciar__" class="opcao-gerenciar">Gerenciar Músculos</option>
     </select>
   </div>
 
