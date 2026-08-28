@@ -458,28 +458,28 @@
                   <div class="pct-barra-wrap">
                     <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.calorias, metas.calorias))}%; background:var(--color-secondary);`}></div>
                   </div>
-                  <p class="pct-valor">{totais.calorias.toFixed(0)} · {pctMeta(totais.calorias, metas.calorias).toFixed(0)}%</p>
+                  <p class="pct-valor">{pctMeta(totais.calorias, metas.calorias).toFixed(0)}% · {totais.calorias.toFixed(0)}</p>
                 </div>
                 <div class="pct-col">
                   <p class="pct-nome">Carb</p>
                   <div class="pct-barra-wrap">
                     <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.carboidratoG, metas.carboidratoG))}%; background:${COR_CARBO};`}></div>
                   </div>
-                  <p class="pct-valor">{totais.carboidratoG.toFixed(0)}g · {pctMeta(totais.carboidratoG, metas.carboidratoG).toFixed(0)}%</p>
+                  <p class="pct-valor">{pctMeta(totais.carboidratoG, metas.carboidratoG).toFixed(0)}% · {totais.carboidratoG.toFixed(0)}g</p>
                 </div>
                 <div class="pct-col">
                   <p class="pct-nome">Gorduras</p>
                   <div class="pct-barra-wrap">
                     <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.gorduraG, metas.gorduraG))}%; background:${COR_GORDURA};`}></div>
                   </div>
-                  <p class="pct-valor">{totais.gorduraG.toFixed(0)}g · {pctMeta(totais.gorduraG, metas.gorduraG).toFixed(0)}%</p>
+                  <p class="pct-valor">{pctMeta(totais.gorduraG, metas.gorduraG).toFixed(0)}% · {totais.gorduraG.toFixed(0)}g</p>
                 </div>
                 <div class="pct-col">
                   <p class="pct-nome">Proteínas</p>
                   <div class="pct-barra-wrap">
                     <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.proteinaG, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div>
                   </div>
-                  <p class="pct-valor">{totais.proteinaG.toFixed(0)}g · {pctMeta(totais.proteinaG, metas.proteinaG).toFixed(0)}%</p>
+                  <p class="pct-valor">{pctMeta(totais.proteinaG, metas.proteinaG).toFixed(0)}% · {totais.proteinaG.toFixed(0)}g</p>
                 </div>
               </div>
             {/if}

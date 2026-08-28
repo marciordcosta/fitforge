@@ -735,6 +735,11 @@
     return Math.min(100, pct);
   }
 
+  /** Só pra exibição — arredonda a meta calculada da refeição pra dezena mais próxima (ex: 653 vira 650), sem alterar o valor real usado nos cálculos. */
+  function arredondarDezena(valor: number): number {
+    return Math.round(valor / 10) * 10;
+  }
+
   function restante(valor: number, meta: number): number {
     return Math.max(0, meta - valor);
   }
@@ -1367,7 +1372,7 @@
               <button class="nome-btn" onclick={() => abrirMeta(m, grupo.dias)}>
                 <span class="nome-linha">
                   <span class="nome">{m.nome}</span>
-                  {#if meta.calorias != null}<span class="nome-cal">{Math.round(meta.calorias)} cal</span>{/if}
+                  {#if meta.calorias != null}<span class="nome-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
                 </span>
                 <span class="nome-macros" class:invisivel={meta.calorias == null}>
                   <span>carb {(meta.carboidratoG ?? 0).toFixed(0)}g · gord {(meta.gorduraG ?? 0).toFixed(0)}g · prot {(meta.proteinaG ?? 0).toFixed(0)}g</span>
@@ -1496,7 +1501,7 @@
             >
               <span class="nome-linha">
                 <span class="nome">{m.nome}</span>
-                {#if m.metaCalorias != null}<span class="nome-cal">{Math.round(m.metaCalorias)} cal</span>{/if}
+                {#if m.metaCalorias != null}<span class="nome-cal">{arredondarDezena(m.metaCalorias)} cal</span>{/if}
               </span>
               <span class="nome-macros" class:invisivel={m.metaCalorias == null}>
                 <span>carb {(m.metaCarboidratoG ?? 0).toFixed(0)}g · gord {(m.metaGorduraG ?? 0).toFixed(0)}g · prot {(m.metaProteinaG ?? 0).toFixed(0)}g</span>

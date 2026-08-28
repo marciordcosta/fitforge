@@ -196,7 +196,7 @@
     border: none;
     background: none;
     color: var(--surface-muted);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-lg);
     font-family: inherit;
     cursor: pointer;
     padding: 0;
