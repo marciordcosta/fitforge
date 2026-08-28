@@ -38,7 +38,11 @@
     listMusculosDoPadrao(id).then((lista) => (musculosDoPadrao = lista));
   });
 
-  const opcoesMusculo = $derived(musculosDoPadrao.length ? musculosDoPadrao : musculos);
+  const opcoesMusculo = $derived(
+    (musculosDoPadrao.length ? musculosDoPadrao : musculos)
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+  );
 
   function adicionarMusculo() {
     linhasMusculos = [...linhasMusculos, { nome: "", peso: 1 }];
