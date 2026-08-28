@@ -16,14 +16,13 @@
 
   let { exercicioId }: { exercicioId: string } = $props();
 
-  type Aba = "resumo" | "historico" | "edicao";
-  let aba = $state<Aba>("resumo");
+  type Aba = "historico" | "edicao";
+  let aba = $state<Aba>("historico");
 
   let exercicio = $state<Exercicio | null>(null);
   let historico = $state<SessaoHistorico[]>([]);
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
-  let carregouHistorico = $state(false);
 
   let nome = $state("");
   let padraoId = $state("");
@@ -33,7 +32,9 @@
 
   async function carregar() {
     loading = true;
-    exercicio = await getExercicio(exercicioId);
+    const [ex, hist] = await Promise.all([getExercicio(exercicioId), getHistoricoDetalhadoExercicio(exercicioId)]);
+    exercicio = ex;
+    historico = hist;
     if (exercicio) {
       nome = exercicio.nome;
       padraoId = exercicio.padrao_id ?? "";
@@ -44,13 +45,6 @@
   }
 
   void carregar();
-
-  async function abrirHistorico() {
-    aba = "historico";
-    if (carregouHistorico) return;
-    carregouHistorico = true;
-    historico = await getHistoricoDetalhadoExercicio(exercicioId);
-  }
 
   function formatDataHora(iso: string): string {
     const d = new Date(iso);
@@ -77,7 +71,7 @@
         musculos: musculosInput,
       });
       await carregar();
-      aba = "resumo";
+      aba = "historico";
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
     } finally {
@@ -126,8 +120,7 @@
   </div>
 
   <div class="tabs">
-    <button class:active={aba === "resumo"} onclick={() => (aba = "resumo")}>Resumo</button>
-    <button class:active={aba === "historico"} onclick={abrirHistorico}>Histórico</button>
+    <button class:active={aba === "historico"} onclick={() => (aba = "historico")}>Histórico</button>
     <button class:active={aba === "edicao"} onclick={() => (aba = "edicao")}>Edição</button>
   </div>
 
@@ -137,7 +130,7 @@
     <div class="conteudo" class:carregando={loading}>
     {#if !exercicio}
     <p class="muted">Exercício não encontrado.</p>
-  {:else if aba === "resumo"}
+  {:else if aba === "historico"}
     <p class="musculos">
       <strong>Músculos:</strong>
       {exercicio.musculos
@@ -147,7 +140,6 @@
         .join(", ")}
     </p>
     <ExercicioChart {exercicioId} />
-  {:else if aba === "historico"}
     {#if !historico.length}
       <p class="muted">Nenhum registro ainda.</p>
     {:else}
