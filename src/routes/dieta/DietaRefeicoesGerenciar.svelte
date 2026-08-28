@@ -635,6 +635,7 @@
   let metasDiaModelo = $state<MetaDiaModelo[]>([]);
   let modelosPorDia = $state<RefeicaoModeloDia[]>([]);
   let loading = $state(true);
+  let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
   let mostrarForm = $state(false);
   let nome = $state("");
@@ -749,6 +750,7 @@
       erro = (err as Error).message;
     } finally {
       loading = false;
+      carregouAlgumaVez = true;
     }
   }
 
@@ -1229,9 +1231,11 @@
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
     {/if}
   {:else}
-    {#if loading}
+    {#if loading && !carregouAlgumaVez}
       <p class="muted">Carregando…</p>
-    {:else if erro}
+    {:else}
+    <div class="conteudo" class:carregando={loading}>
+    {#if erro}
       <p class="erro">Erro ao carregar refeições: {erro}</p>
     {:else if !modelos.length}
       <p class="muted">Nenhuma refeição cadastrada ainda.</p>
@@ -1502,6 +1506,8 @@
           </li>
         {/each}
       </ul>
+    {/if}
+    </div>
     {/if}
   {/if}
 </div>
@@ -1960,6 +1966,12 @@
     font-size: var(--font-size-base);
     cursor: pointer;
     padding: var(--space-2);
+  }
+  .conteudo {
+    transition: opacity 0.15s;
+  }
+  .conteudo.carregando {
+    opacity: 0.5;
   }
   .muted {
     color: var(--surface-muted);

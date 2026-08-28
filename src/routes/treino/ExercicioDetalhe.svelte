@@ -23,6 +23,7 @@
   let exercicio = $state<Exercicio | null>(null);
   let historico = $state<SessaoHistorico[]>([]);
   let loading = $state(true);
+  let carregouAlgumaVez = $state(false);
   let carregouHistorico = $state(false);
 
   let nome = $state("");
@@ -42,6 +43,7 @@
         : [{ nome: "", peso: 1 }];
     }
     loading = false;
+    carregouAlgumaVez = true;
   }
 
   void carregar();
@@ -117,9 +119,11 @@
     <button class:active={aba === "edicao"} onclick={() => (aba = "edicao")}>Edição</button>
   </div>
 
-  {#if loading}
+  {#if loading && !carregouAlgumaVez}
     <p class="muted">Carregando…</p>
-  {:else if !exercicio}
+  {:else}
+    <div class="conteudo" class:carregando={loading}>
+    {#if !exercicio}
     <p class="muted">Exercício não encontrado.</p>
   {:else if aba === "resumo"}
     <p class="musculos">
@@ -159,6 +163,8 @@
   {:else if aba === "edicao"}
     <ExercicioCampos bind:nome bind:padraoNome bind:linhasMusculos />
     <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Exercício</button>
+    {/if}
+    </div>
   {/if}
 </div>
 
@@ -298,5 +304,11 @@
   }
   .muted {
     color: var(--surface-muted);
+  }
+  .conteudo {
+    transition: opacity 0.15s;
+  }
+  .conteudo.carregando {
+    opacity: 0.5;
   }
 </style>

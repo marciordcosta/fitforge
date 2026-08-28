@@ -49,6 +49,7 @@
   let metas = $state<MetasDiarias | null>(null);
   let metaRefeicao = $state<MetasDiarias | null>(null);
   let loading = $state(true);
+  let carregouAlgumaVez = $state(false);
   let dataResolvida = $state(untrack(() => data ?? ""));
   let refeicao = $state<RefeicaoDia | null>(null);
   let quantidade = $state(0);
@@ -95,6 +96,7 @@
       erro = (err as Error).message;
     } finally {
       loading = false;
+      carregouAlgumaVez = true;
     }
   }
 
@@ -296,13 +298,14 @@
     </div>
   </div>
 
-  {#if loading}
+  {#if loading && !carregouAlgumaVez}
     <p class="muted">Carregando…</p>
   {:else if erro}
     <p class="erro">Erro ao carregar: {erro}</p>
   {:else if !alimento}
     <p class="muted">Alimento não encontrado.</p>
   {:else}
+    <div class="conteudo" class:carregando={loading}>
     <h2 class="nome-alimento">
       {alimento.nome}
       <span class="porcao-padrao">{alimento.porcaoPadraoQtd}{alimento.porcaoPadraoUnidade}</span>
@@ -401,6 +404,7 @@
         <span>Fibras</span>
         <span>{fibraG != null ? `${fibraG.toFixed(1)} g` : "—"}</span>
       </div>
+    </div>
     </div>
   {/if}
 </div>
@@ -693,6 +697,12 @@
   }
   .nutriente-item span:first-child {
     color: var(--surface-muted);
+  }
+  .conteudo {
+    transition: opacity 0.15s;
+  }
+  .conteudo.carregando {
+    opacity: 0.5;
   }
   .muted {
     color: var(--surface-muted);

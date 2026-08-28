@@ -22,6 +22,7 @@
   let mesBase = $state(new Date());
   let dias = $state<DiaComTreino[]>([]);
   let loading = $state(true);
+  let carregouAlgumaVez = $state(false);
 
   const mesLabel = $derived(`${MESES[mesBase.getMonth()]} ${mesBase.getFullYear()}`);
   const mesInicio = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth(), 1));
@@ -31,6 +32,7 @@
     loading = true;
     dias = await getDiasComTreino(toISODate(mesInicio), toISODate(mesFim));
     loading = false;
+    carregouAlgumaVez = true;
   }
 
   void carregar();
@@ -85,10 +87,10 @@
     {/each}
   </div>
 
-  {#if loading}
+  {#if loading && !carregouAlgumaVez}
     <p class="muted">Carregando…</p>
   {:else}
-    <div class="grade">
+    <div class="grade" class:carregando={loading}>
       {#each celulas as cel, i (i)}
         {#if cel === null}
           <div class="celula vazia"></div>
@@ -185,6 +187,10 @@
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 2px;
+    transition: opacity 0.15s;
+  }
+  .grade.carregando {
+    opacity: 0.5;
   }
   .celula {
     aspect-ratio: 1;

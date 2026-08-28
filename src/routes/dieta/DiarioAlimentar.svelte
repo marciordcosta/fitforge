@@ -37,6 +37,7 @@
   let itens = $state<ItemDiario[]>([]);
   let metas = $state<MetasDiarias | null>(null);
   let loading = $state(true);
+  let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
   let mostrarCriarRefeicao = $state(false);
   let mostrarMenuMais = $state(false);
@@ -99,6 +100,7 @@
       erro = (err as Error).message;
     } finally {
       loading = false;
+      carregouAlgumaVez = true;
     }
   }
 
@@ -275,11 +277,12 @@
     <button class="icon-btn" onclick={() => (mostrarMenuMais = true)} aria-label="Adicionar">+</button>
   </div>
 
-  {#if loading}
+  {#if loading && !carregouAlgumaVez}
     <p class="muted">Carregando…</p>
   {:else if erro}
     <p class="erro">Erro ao carregar o diário: {erro}</p>
   {:else}
+    <div class="conteudo" class:carregando={loading}>
     {#if metas}
       <div class="card-calorias">
         <p class="card-titulo">Calorias</p>
@@ -496,6 +499,7 @@
         </div>
       {/each}
     {/if}
+    </div>
   {/if}
 </div>
 
@@ -837,6 +841,12 @@
     margin: 0;
     font-size: 11px;
     color: var(--surface-muted);
+  }
+  .conteudo {
+    transition: opacity 0.15s;
+  }
+  .conteudo.carregando {
+    opacity: 0.5;
   }
   .muted {
     color: var(--surface-muted);

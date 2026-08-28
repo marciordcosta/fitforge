@@ -37,6 +37,7 @@
   let metas = $state<MetasDiarias | null>(null);
   let metaRefeicao = $state<MetasDiarias | null>(null);
   let loading = $state(true);
+  let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
   let itemParaRemover = $state<ItemDiario | null>(null);
   let confirmandoExclusaoRefeicao = $state(false);
@@ -59,6 +60,7 @@
       erro = (err as Error).message;
     } finally {
       loading = false;
+      carregouAlgumaVez = true;
     }
   }
 
@@ -290,13 +292,14 @@
 </div>
 
 <div class="container has-bottom-nav">
-  {#if loading}
+  {#if loading && !carregouAlgumaVez}
     <p class="muted">Carregando…</p>
   {:else if erro}
     <p class="erro">Erro ao carregar a refeição: {erro}</p>
   {:else if !refeicao}
     <p class="muted">Refeição não encontrada.</p>
   {:else}
+    <div class="conteudo" class:carregando={loading}>
     {#if itens.length}
       <div class="resumo">
         <div class="donut" style={donutStyle}>
@@ -376,6 +379,7 @@
 
     <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/refeicao/${refeicaoId}`)}>+ Adicionar Alimento</button>
     <button class="descartar" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>Descartar refeição</button>
+    </div>
   {/if}
 </div>
 
@@ -666,6 +670,12 @@
   .descartar:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  .conteudo {
+    transition: opacity 0.15s;
+  }
+  .conteudo.carregando {
+    opacity: 0.5;
   }
   .muted {
     color: var(--surface-muted);

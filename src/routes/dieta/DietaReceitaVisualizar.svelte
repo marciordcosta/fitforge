@@ -39,6 +39,7 @@
   let refeicao = $state<RefeicaoDia | null>(null);
   let opcoesRefeicao = $state<RefeicaoDia[]>([]);
   let loading = $state(true);
+  let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
   let mostrarEscolhaRefeicao = $state(false);
   let mostrarCriarRefeicao = $state(false);
@@ -100,6 +101,7 @@
       erro = (err as Error).message;
     } finally {
       loading = false;
+      carregouAlgumaVez = true;
     }
   }
 
@@ -317,13 +319,14 @@
     </button>
   </div>
 
-  {#if loading}
+  {#if loading && !carregouAlgumaVez}
     <p class="muted">Carregando…</p>
   {:else if erro}
     <p class="erro">Erro ao carregar: {erro}</p>
   {:else if !receita}
     <p class="muted">Refeição não encontrada.</p>
   {:else}
+    <div class="conteudo" class:carregando={loading}>
     {#if !ehMetaPadrao}
       <div
         class="linha"
@@ -412,6 +415,7 @@
 
     <div class="acao-excluir">
       <Button variant="danger" onclick={() => (confirmandoExclusao = true)} disabled={excluindo}>Excluir Refeição</Button>
+    </div>
     </div>
   {/if}
 </div>
@@ -706,6 +710,12 @@
   }
   .acao-excluir {
     margin-top: var(--space-4);
+  }
+  .conteudo {
+    transition: opacity 0.15s;
+  }
+  .conteudo.carregando {
+    opacity: 0.5;
   }
   .muted {
     color: var(--surface-muted);

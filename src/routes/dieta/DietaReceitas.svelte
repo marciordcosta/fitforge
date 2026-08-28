@@ -11,6 +11,7 @@
 
   let receitas = $state<ReceitaResumo[]>([]);
   let loading = $state(true);
+  let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
   let busca = $state("");
   let vinculando = $state<string | null>(null);
@@ -55,6 +56,7 @@
       erro = (err as Error).message;
     } finally {
       loading = false;
+      carregouAlgumaVez = true;
     }
   }
 
@@ -71,6 +73,7 @@
         erro = (err as Error).message;
       } finally {
         loading = false;
+        carregouAlgumaVez = true;
       }
     }, 300);
   }
@@ -96,27 +99,31 @@
 
   <input class="search" type="text" placeholder="Procurar refeição" bind:value={busca} oninput={aoDigitar} />
 
-  {#if loading}
+  {#if loading && !carregouAlgumaVez}
     <p class="muted">Carregando…</p>
-  {:else if erro}
-    <p class="erro">Erro ao buscar refeições: {erro}</p>
-  {:else if !receitas.length}
-    <p class="muted">Nenhuma refeição criada ainda. Toque em + pra juntar alimentos num prato.</p>
   {:else}
-    <ul class="lista">
-      {#each receitas as r (r.id)}
-        <li class="linha">
-          <button class="info-btn" onclick={() => selecionar(r)} disabled={vinculando === r.id}>
-            <span class="avatar">{iniciais(r.nome)}</span>
-            <span class="info">
-              <span class="nome">{r.nome}</span>
-              <span class="sub">{r.calorias.toFixed(0)} kcal</span>
-            </span>
-          </button>
-          <span class="chevron">{vinculando === r.id ? "…" : "›"}</span>
-        </li>
-      {/each}
-    </ul>
+    <div class="conteudo" class:carregando={loading}>
+    {#if erro}
+      <p class="erro">Erro ao buscar refeições: {erro}</p>
+    {:else if !receitas.length}
+      <p class="muted">Nenhuma refeição criada ainda. Toque em + pra juntar alimentos num prato.</p>
+    {:else}
+      <ul class="lista">
+        {#each receitas as r (r.id)}
+          <li class="linha">
+            <button class="info-btn" onclick={() => selecionar(r)} disabled={vinculando === r.id}>
+              <span class="avatar">{iniciais(r.nome)}</span>
+              <span class="info">
+                <span class="nome">{r.nome}</span>
+                <span class="sub">{r.calorias.toFixed(0)} kcal</span>
+              </span>
+            </button>
+            <span class="chevron">{vinculando === r.id ? "…" : "›"}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    </div>
   {/if}
 </div>
 
@@ -237,6 +244,12 @@
   .sub {
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .conteudo {
+    transition: opacity 0.15s;
+  }
+  .conteudo.carregando {
+    opacity: 0.5;
   }
   .muted {
     color: var(--surface-muted);

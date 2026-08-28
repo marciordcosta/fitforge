@@ -21,6 +21,7 @@
   let mesBase = $state(new Date());
   let linhasRealizadoMes = $state<{ data: string; musculo_id: string; series_equivalentes: number }[]>([]);
   let carregandoRealizado = $state(false);
+  let carregouRealizadoAlgumaVez = $state(false);
   let feitoPorMusculoSemana = $state<Map<string, number>>(new Map());
 
   /** Semana ancorada em segunda-feira (exceção proposital, igual à tela inicial de Treino — o resto do app usa terça, ver inicioSemana em dates.ts). Vai virar parametrizável. */
@@ -208,6 +209,7 @@
     carregandoRealizado = true;
     linhasRealizadoMes = await getVolumeRealizadoBruto(toISODate(mesInicio), toISODate(mesFim));
     carregandoRealizado = false;
+    carregouRealizadoAlgumaVez = true;
   }
 
   function trocarMes(delta: number) {
@@ -482,12 +484,12 @@
         <h2 class="rotina-nome">Realizado <span class="dia-tag">(média semanal)</span></h2>
         <button class="icon-btn" onclick={() => abrirMenuRealizado()} aria-label="Mais opções">⋮</button>
       </div>
-      {#if carregandoRealizado}
+      {#if carregandoRealizado && !carregouRealizadoAlgumaVez}
         <p class="muted">Carregando…</p>
       {:else if !listaRealizado.length}
         <p class="muted">Nenhum treino registrado nesse mês.</p>
       {:else}
-        <div class="lista">
+        <div class="lista" class:carregando={carregandoRealizado}>
           {#each listaRealizado as item (item.musculo.id)}
             {@const meta = metaPorMusculo.get(item.musculo.id) ?? 0}
             <div class="item">
@@ -784,6 +786,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    transition: opacity 0.15s;
+  }
+  .lista.carregando {
+    opacity: 0.5;
   }
   .item {
     display: grid;
