@@ -46,6 +46,7 @@
   let itemParaRemover = $state<ReceitaItem | null>(null);
   let confirmandoExclusao = $state(false);
   let excluindo = $state(false);
+  let menuItemAberto = $state<ReceitaItem | null>(null);
 
   /** Cópia local editável — nome e itens só são gravados no banco ao tocar em "concluir". Saindo sem salvar, nada muda. */
   let nomeEditavel = $state("");
@@ -200,6 +201,64 @@
     itemEditando = null;
   }
 
+  function abrirDetalheItem(item: ReceitaItem) {
+    navigate(`/dieta/alimento/${item.alimentoId}/${hojeISO()}`);
+  }
+
+  /** Tempo segurando o card parado antes do toque virar "pressionar" (abre o menu) — evita disparar sem querer num toque rápido/rolagem. */
+  const ATRASO_PRESSIONAR_MS = 500;
+  const TOLERANCIA_MOVIMENTO_PX = 8;
+  let timeoutPressionar: ReturnType<typeof setTimeout> | undefined;
+  let pressionarX = 0;
+  let pressionarY = 0;
+  let pressionouLongo = false;
+
+  function aoPointerDownItem(e: PointerEvent, item: ReceitaItem) {
+    pressionarX = e.clientX;
+    pressionarY = e.clientY;
+    pressionouLongo = false;
+    window.addEventListener("pointermove", aoPointerMovePressionar);
+    window.addEventListener("pointerup", aoPointerUpPressionar);
+    timeoutPressionar = setTimeout(() => {
+      pressionouLongo = true;
+      cancelarPressionar();
+      if (navigator.vibrate) navigator.vibrate(10);
+      menuItemAberto = item;
+    }, ATRASO_PRESSIONAR_MS);
+  }
+
+  function aoContextMenuItem(e: MouseEvent, item: ReceitaItem) {
+    e.preventDefault();
+    cancelarPressionar();
+    pressionouLongo = false;
+    menuItemAberto = item;
+  }
+
+  function cancelarPressionar() {
+    clearTimeout(timeoutPressionar);
+    timeoutPressionar = undefined;
+    window.removeEventListener("pointermove", aoPointerMovePressionar);
+    window.removeEventListener("pointerup", aoPointerUpPressionar);
+  }
+
+  function aoPointerMovePressionar(e: PointerEvent) {
+    if (Math.hypot(e.clientX - pressionarX, e.clientY - pressionarY) > TOLERANCIA_MOVIMENTO_PX) {
+      cancelarPressionar();
+    }
+  }
+
+  function aoPointerUpPressionar() {
+    cancelarPressionar();
+  }
+
+  function aoClickItem(item: ReceitaItem) {
+    if (pressionouLongo) {
+      pressionouLongo = false;
+      return;
+    }
+    itemEditando = item;
+  }
+
   function removerItem() {
     if (!itemParaRemover) return;
     if (!itemParaRemover.id.startsWith(PREFIXO_NOVO)) {
@@ -222,6 +281,12 @@
   }
 </script>
 
+{#snippet iconVoltar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="15 6 9 12 15 18" />
+  </svg>
+{/snippet}
+
 {#snippet iconExcluir()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
@@ -232,10 +297,17 @@
     <polyline points="4 12 10 18 20 6" />
   </svg>
 {/snippet}
+{#snippet iconInfo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <line x1="12" y1="11" x2="12" y2="16" />
+    <circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/dieta/receitas")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/dieta/receitas")} aria-label="Voltar">{@render iconVoltar()}</button>
     {#if nomeEditando}
       <input
         class="nome-input"
@@ -318,20 +390,25 @@
       <p class="muted">Nenhum alimento nessa refeição.</p>
     {:else}
       {#each itensLocais as item (item.id)}
-        <button class="item-card" onclick={() => (itemEditando = item)}>
+        <button
+          class="item-card"
+          onpointerdown={(e) => aoPointerDownItem(e, item)}
+          onclick={() => aoClickItem(item)}
+          oncontextmenu={(e) => aoContextMenuItem(e, item)}
+        >
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
             <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal</p>
           </div>
           <span
-            class="item-remover"
+            class="item-detalhe"
             role="button"
             tabindex="0"
-            onclick={(e) => { e.stopPropagation(); itemParaRemover = item; }}
-            onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); itemParaRemover = item; } }}
-            aria-label="Remover alimento"
+            onclick={(e) => { e.stopPropagation(); abrirDetalheItem(item); }}
+            onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); abrirDetalheItem(item); } }}
+            aria-label="Detalhes do alimento"
           >
-            {@render iconExcluir()}
+            {@render iconInfo()}
           </span>
         </button>
       {/each}
@@ -392,6 +469,17 @@
   />
 {/if}
 
+{#if menuItemAberto !== null}
+  {@const itemMenu = menuItemAberto}
+  <ActionSheet
+    titulo={itemMenu.nome}
+    onFechar={() => (menuItemAberto = null)}
+    opcoes={[
+      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => (itemParaRemover = itemMenu) },
+    ]}
+  />
+{/if}
+
 <style>
   .container {
     max-width: 480px;
@@ -445,12 +533,15 @@
     background: var(--surface-card);
     border: none;
     color: var(--surface-fg);
-    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     padding: 0;
+  }
+  .back svg {
+    width: 18px;
+    height: 18px;
   }
   .salvar {
     flex-shrink: 0;
@@ -604,17 +695,17 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
-  .item-remover {
+  .item-detalhe {
     flex-shrink: 0;
     width: 28px;
     height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-danger);
+    color: var(--surface-muted);
     cursor: pointer;
   }
-  .item-remover svg {
+  .item-detalhe svg {
     width: 18px;
     height: 18px;
   }
