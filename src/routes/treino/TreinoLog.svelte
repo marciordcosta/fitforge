@@ -1227,16 +1227,13 @@
     inset: 0;
     background: var(--surface-bg);
     z-index: 150;
-    overflow: hidden;
+    overflow-y: auto;
   }
   .tela-picker-conteudo {
     max-width: 480px;
-    height: 100%;
     margin: 0 auto;
     padding: var(--space-4);
     box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
   }
   .picker-header {
     display: flex;
@@ -1334,8 +1331,6 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    overflow-y: auto;
-    flex: 1;
   }
   .picker-item {
     display: flex;

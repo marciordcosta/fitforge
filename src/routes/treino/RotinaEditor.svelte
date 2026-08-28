@@ -437,7 +437,7 @@
 
 {#if mostrarPicker}
   <div class="tela-picker">
-    <div class="tela-picker-conteudo">
+    <div class="picker-conteudo">
       <div class="header">
         <button
           class="back"
@@ -723,13 +723,25 @@
     cursor: pointer;
     margin-top: var(--space-2);
   }
-  .tela-picker,
+  .tela-picker {
+    position: fixed;
+    inset: 0;
+    background: var(--surface-bg);
+    z-index: 150;
+    overflow-y: auto;
+  }
   .tela-reordenar {
     position: fixed;
     inset: 0;
     background: var(--surface-bg);
     z-index: 150;
     overflow: hidden;
+  }
+  .picker-conteudo {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: var(--space-4);
+    box-sizing: border-box;
   }
   .tela-picker-conteudo {
     max-width: 480px;
@@ -741,7 +753,8 @@
     flex-direction: column;
   }
   .tela-picker .header,
-  .tela-reordenar .header {
+  .tela-reordenar .header,
+  .picker-conteudo .header {
     margin-bottom: var(--space-4);
     flex-shrink: 0;
   }
@@ -815,8 +828,6 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    overflow-y: auto;
-    flex: 1;
   }
   .picker-item {
     display: flex;
