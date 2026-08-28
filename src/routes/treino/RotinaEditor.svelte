@@ -404,57 +404,61 @@
 
 {#if mostrarPicker}
   <div class="tela-picker">
-    <div class="header">
-      <button class="cancelar" onclick={() => { mostrarPicker = false; buscaPicker = ""; }}>
-        Cancelar
-      </button>
-      <h1>Adicionar Exercício</h1>
-      <span class="header-spacer"></span>
+    <div class="tela-picker-conteudo">
+      <div class="header">
+        <button class="cancelar" onclick={() => { mostrarPicker = false; buscaPicker = ""; }}>
+          Cancelar
+        </button>
+        <h1>Adicionar Exercício</h1>
+        <span class="header-spacer"></span>
+      </div>
+      <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
+      <ul class="picker-lista">
+        {#each disponiveis as ex (ex.id)}
+          <li class="picker-item">
+            <span class="picker-item-nome">{ex.nome}</span>
+            <button class="add-btn" onclick={() => adicionarRapido(ex)} disabled={adicionandoId === ex.id} aria-label={`Adicionar ${ex.nome}`}>
+              {#if adicionandoId === ex.id}…{:else}{@render iconMais()}{/if}
+            </button>
+          </li>
+        {/each}
+        {#if !disponiveis.length}
+          <li class="muted-item">Nenhum exercício encontrado.</li>
+        {/if}
+      </ul>
     </div>
-    <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
-    <ul class="picker-lista">
-      {#each disponiveis as ex (ex.id)}
-        <li class="picker-item">
-          <span class="picker-item-nome">{ex.nome}</span>
-          <button class="add-btn" onclick={() => adicionarRapido(ex)} disabled={adicionandoId === ex.id} aria-label={`Adicionar ${ex.nome}`}>
-            {#if adicionandoId === ex.id}…{:else}{@render iconMais()}{/if}
-          </button>
-        </li>
-      {/each}
-      {#if !disponiveis.length}
-        <li class="muted-item">Nenhum exercício encontrado.</li>
-      {/if}
-    </ul>
   </div>
 {/if}
 
 {#if reordenando}
   <div class="tela-reordenar">
-    <div class="header">
-      <button class="voltar-icon" onclick={() => (reordenando = false)} aria-label="Voltar">←</button>
-      <h1>Reordenar</h1>
-      <span class="header-spacer"></span>
-    </div>
-    <div class="reordenar-lista">
-      {#each linhas as linha, idx (linha.exercicio_id)}
-        <div
-          class="reordenar-item"
-          class:arrastando={arrastandoIdx === idx}
-          bind:this={itemRefs[idx]}
-        >
-          <button class="remover-circulo" onclick={() => remover(idx)} aria-label="Remover">−</button>
-          <span class="reordenar-nome">{linha.nome}</span>
-          <button
-            class="handle-arraste"
-            onpointerdown={(e) => iniciarArraste(e, idx)}
-            aria-label="Arrastar para reordenar"
+    <div class="tela-picker-conteudo">
+      <div class="header">
+        <button class="voltar-icon" onclick={() => (reordenando = false)} aria-label="Voltar">←</button>
+        <h1>Reordenar</h1>
+        <span class="header-spacer"></span>
+      </div>
+      <div class="reordenar-lista">
+        {#each linhas as linha, idx (linha.exercicio_id)}
+          <div
+            class="reordenar-item"
+            class:arrastando={arrastandoIdx === idx}
+            bind:this={itemRefs[idx]}
           >
-            ☰
-          </button>
-        </div>
-      {/each}
+            <button class="remover-circulo" onclick={() => remover(idx)} aria-label="Remover">−</button>
+            <span class="reordenar-nome">{linha.nome}</span>
+            <button
+              class="handle-arraste"
+              onpointerdown={(e) => iniciarArraste(e, idx)}
+              aria-label="Arrastar para reordenar"
+            >
+              ☰
+            </button>
+          </div>
+        {/each}
+      </div>
+      <button class="feito-btn" onclick={() => (reordenando = false)}>Feito</button>
     </div>
-    <button class="feito-btn" onclick={() => (reordenando = false)}>Feito</button>
   </div>
 {/if}
 
@@ -665,6 +669,12 @@
     inset: 0;
     background: var(--surface-bg);
     z-index: 150;
+    overflow: hidden;
+  }
+  .tela-picker-conteudo {
+    max-width: 480px;
+    height: 100%;
+    margin: 0 auto;
     padding: var(--space-4);
     box-sizing: border-box;
     display: flex;

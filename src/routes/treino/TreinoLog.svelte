@@ -727,44 +727,48 @@
 
 {#if substituindoExIdx !== null}
   <div class="tela-picker">
-    <div class="picker-header">
-      <button class="cancelar" onclick={fecharSubstituir}>Cancelar</button>
-      <h1>Substituir por</h1>
-      <span class="header-spacer"></span>
+    <div class="tela-picker-conteudo">
+      <div class="picker-header">
+        <button class="cancelar" onclick={fecharSubstituir}>Cancelar</button>
+        <h1>Substituir por</h1>
+        <span class="header-spacer"></span>
+      </div>
+      <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaSubstituir} />
+      <ul class="picker-lista">
+        {#each opcoesSubstituir as ex (ex.id)}
+          <li><button class="picker-item-full" onclick={() => substituirExercicio(ex)}>{ex.nome}</button></li>
+        {/each}
+        {#if !opcoesSubstituir.length}
+          <li class="muted-item">Nenhum exercício encontrado.</li>
+        {/if}
+      </ul>
     </div>
-    <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaSubstituir} />
-    <ul class="picker-lista">
-      {#each opcoesSubstituir as ex (ex.id)}
-        <li><button class="picker-item-full" onclick={() => substituirExercicio(ex)}>{ex.nome}</button></li>
-      {/each}
-      {#if !opcoesSubstituir.length}
-        <li class="muted-item">Nenhum exercício encontrado.</li>
-      {/if}
-    </ul>
   </div>
 {/if}
 
 {#if mostrarPicker}
   <div class="tela-picker">
-    <div class="picker-header">
-      <button class="cancelar" onclick={fecharPicker}>Cancelar</button>
-      <h1>Adicionar Exercício</h1>
-      <span class="header-spacer"></span>
+    <div class="tela-picker-conteudo">
+      <div class="picker-header">
+        <button class="cancelar" onclick={fecharPicker}>Cancelar</button>
+        <h1>Adicionar Exercício</h1>
+        <span class="header-spacer"></span>
+      </div>
+      <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
+      <ul class="picker-lista">
+        {#each disponiveisPicker as ex (ex.id)}
+          <li class="picker-item">
+            <span class="picker-item-nome">{ex.nome}</span>
+            <button class="add-btn" onclick={() => adicionarRapido(ex)} disabled={adicionandoId === ex.id} aria-label={`Adicionar ${ex.nome}`}>
+              {#if adicionandoId === ex.id}…{:else}{@render iconMais()}{/if}
+            </button>
+          </li>
+        {/each}
+        {#if !disponiveisPicker.length}
+          <li class="muted-item">Nenhum exercício encontrado.</li>
+        {/if}
+      </ul>
     </div>
-    <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
-    <ul class="picker-lista">
-      {#each disponiveisPicker as ex (ex.id)}
-        <li class="picker-item">
-          <span class="picker-item-nome">{ex.nome}</span>
-          <button class="add-btn" onclick={() => adicionarRapido(ex)} disabled={adicionandoId === ex.id} aria-label={`Adicionar ${ex.nome}`}>
-            {#if adicionandoId === ex.id}…{:else}{@render iconMais()}{/if}
-          </button>
-        </li>
-      {/each}
-      {#if !disponiveisPicker.length}
-        <li class="muted-item">Nenhum exercício encontrado.</li>
-      {/if}
-    </ul>
   </div>
 {/if}
 
@@ -1172,6 +1176,12 @@
     inset: 0;
     background: var(--surface-bg);
     z-index: 150;
+    overflow: hidden;
+  }
+  .tela-picker-conteudo {
+    max-width: 480px;
+    height: 100%;
+    margin: 0 auto;
     padding: var(--space-4);
     box-sizing: border-box;
     display: flex;
