@@ -41,7 +41,10 @@
     .sort((a, b) => a - b)
     .map((p) => ({ valor: p, label: String(p) }));
 
+  const opcoesPadrao = $derived([{ valor: "", label: "Nenhum" }, ...padroes.map((p) => ({ valor: p.id, label: p.nome }))]);
+
   let editandoIdx = $state<number | null>(null);
+  let mostrarPadraoPicker = $state(false);
 </script>
 
 <label class="field">
@@ -49,15 +52,12 @@
   <input type="text" bind:value={nome} placeholder="Ex: Supino Inclinado" />
 </label>
 
-<label class="field">
+<div class="field">
   <span>Padrão de Movimento</span>
-  <select bind:value={padraoId}>
-    <option value="">Nenhum</option>
-    {#each padroes as p (p.id)}
-      <option value={p.id}>{p.nome}</option>
-    {/each}
-  </select>
-</label>
+  <button type="button" class="select-btn" onclick={() => (mostrarPadraoPicker = true)}>
+    {padroes.find((p) => p.id === padraoId)?.nome ?? "Nenhum"}
+  </button>
+</div>
 
 <div class="field">
   <span>Músculos Envolvidos</span>
@@ -90,6 +90,16 @@
   />
 {/if}
 
+{#if mostrarPadraoPicker}
+  <WheelPicker
+    titulo="Padrão de Movimento"
+    opcoes={opcoesPadrao}
+    valorAtual={padraoId}
+    onSelecionar={(v) => (padraoId = v)}
+    onFechar={() => (mostrarPadraoPicker = false)}
+  />
+{/if}
+
 <style>
   .field {
     display: flex;
@@ -102,7 +112,7 @@
     color: var(--surface-muted);
   }
   .field input,
-  .field select {
+  .select-btn {
     box-sizing: border-box;
     padding: var(--space-3);
     border-radius: var(--radius-md);
@@ -112,8 +122,10 @@
     font-size: var(--font-size-base);
     font-family: inherit;
   }
-  .field select {
-    color-scheme: dark;
+  .select-btn {
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
   }
   .musculos-vazio {
     color: var(--surface-muted);

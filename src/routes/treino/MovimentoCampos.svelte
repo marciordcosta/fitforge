@@ -1,5 +1,6 @@
 <script lang="ts">
   import { listMusculos, type Musculo } from "../../lib/treinoApi";
+  import WheelPicker from "../../components/WheelPicker.svelte";
 
   let {
     nome = $bindable(),
@@ -17,8 +18,14 @@
 
   void carregarLista();
 
+  const opcoesMusculo = $derived([
+    ...musculos.map((m) => ({ valor: m.nome, label: m.nome })),
+    { valor: "__novo__", label: "+ Novo músculo" },
+  ]);
+
   /** Índices das linhas em modo "digitar músculo novo" (nome ainda não existe no catálogo). */
   let modoNovo = $state<Set<number>>(new Set());
+  let editandoIdx = $state<number | null>(null);
 
   function aoEscolher(idx: number, valor: string) {
     if (valor === "__novo__") {
@@ -27,6 +34,7 @@
     } else {
       linhasMusculos[idx].nome = valor;
     }
+    editandoIdx = null;
   }
 
   function adicionarMusculo() {
@@ -56,19 +64,26 @@
       {#if modoNovo.has(idx)}
         <input type="text" bind:value={linha.nome} placeholder="Nome do músculo novo" />
       {:else}
-        <select value={linha.nome} onchange={(e) => aoEscolher(idx, e.currentTarget.value)}>
-          <option value="" disabled>Selecione…</option>
-          {#each musculos as m (m.id)}
-            <option value={m.nome}>{m.nome}</option>
-          {/each}
-          <option value="__novo__">+ Novo músculo</option>
-        </select>
+        <button type="button" class="musculo-select-btn" onclick={() => (editandoIdx = idx)}>
+          {linha.nome || "Selecione…"}
+        </button>
       {/if}
       <button class="remover" onclick={() => removerMusculo(idx)} aria-label="Remover">×</button>
     </div>
   {/each}
   <button class="adicionar" onclick={adicionarMusculo}>+ Adicionar músculo</button>
 </div>
+
+{#if editandoIdx !== null}
+  {@const idx = editandoIdx}
+  <WheelPicker
+    titulo="Músculo"
+    opcoes={opcoesMusculo}
+    valorAtual={linhasMusculos[idx]?.nome ?? ""}
+    onSelecionar={(v) => aoEscolher(idx, v)}
+    onFechar={() => (editandoIdx = null)}
+  />
+{/if}
 
 <style>
   .field {
@@ -100,25 +115,32 @@
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
   }
-  .musculo-card input,
-  .musculo-card select {
+  .musculo-card input {
     flex: 1;
     min-width: 0;
     box-sizing: border-box;
     padding: var(--space-3);
-    padding-left: var(--space-3);
     border: none;
     background: none;
     color: var(--surface-fg);
     font-size: var(--font-size-base);
     font-family: inherit;
   }
-  .musculo-card select {
-    color-scheme: dark;
-  }
-  .musculo-card input:focus,
-  .musculo-card select:focus {
+  .musculo-card input:focus {
     outline: none;
+  }
+  .musculo-select-btn {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: var(--space-3);
+    border: none;
+    background: none;
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
   }
   .remover {
     flex-shrink: 0;
