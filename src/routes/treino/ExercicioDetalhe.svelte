@@ -4,6 +4,7 @@
     getExercicio,
     updateExercicio,
     deleteExercicio,
+    excluirHistoricoExercicio,
     construirMusculosInput,
     getHistoricoDetalhadoExercicio,
     type Exercicio,
@@ -29,6 +30,8 @@
   let linhasMusculos = $state<LinhaMusculoInput[]>([]);
   let salvando = $state(false);
   let mostrarConfirmExcluir = $state(false);
+  let mostrarConfirmExcluirHistorico = $state(false);
+  let excluindoHistorico = $state(false);
 
   async function carregar() {
     loading = true;
@@ -88,11 +91,24 @@
       const err = e as { code?: string; message?: string };
       if (err.code === "23503") {
         alert(
-          "Não é possível excluir: esse exercício está em uma rotina ou tem histórico de séries registradas. Remova-o das rotinas e do histórico antes de excluir.",
+          "Não é possível excluir: esse exercício está em uma rotina ou tem histórico de séries registradas. Use \"Excluir Histórico do Exercício\" pra limpar o histórico, e remova-o das rotinas que o usam antes de excluir.",
         );
       } else {
         alert("Erro ao excluir: " + (err.message ?? String(e)));
       }
+    }
+  }
+
+  async function excluirHistorico() {
+    mostrarConfirmExcluirHistorico = false;
+    excluindoHistorico = true;
+    try {
+      await excluirHistoricoExercicio(exercicioId);
+      historico = [];
+    } catch (e) {
+      alert("Erro ao excluir histórico: " + (e as Error).message);
+    } finally {
+      excluindoHistorico = false;
     }
   }
 </script>
@@ -172,6 +188,13 @@
     {/if}
   {:else if aba === "edicao"}
     <ExercicioCampos bind:nome bind:padraoId bind:linhasMusculos />
+    <button
+      class="excluir-historico-btn"
+      disabled={excluindoHistorico || !historico.length}
+      onclick={() => (mostrarConfirmExcluirHistorico = true)}
+    >
+      {excluindoHistorico ? "Excluindo…" : "Excluir Histórico do Exercício"}
+    </button>
     <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Exercício</button>
     {/if}
     </div>
@@ -184,6 +207,15 @@
     textoConfirmar="Excluir Exercício"
     onConfirmar={excluir}
     onCancelar={() => (mostrarConfirmExcluir = false)}
+  />
+{/if}
+
+{#if mostrarConfirmExcluirHistorico}
+  <ConfirmDialog
+    titulo="Isso apaga todos os registros de séries desse exercício, em todos os dias. Não pode ser desfeito. Tem certeza?"
+    textoConfirmar="Excluir Histórico"
+    onConfirmar={excluirHistorico}
+    onCancelar={() => (mostrarConfirmExcluirHistorico = false)}
   />
 {/if}
 
@@ -323,6 +355,22 @@
   }
   .sessao-serie {
     font-weight: 600;
+  }
+  .excluir-historico-btn {
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: none;
+    color: var(--color-danger);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: var(--space-2);
+  }
+  .excluir-historico-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .excluir-btn {
     width: 100%;

@@ -363,6 +363,12 @@ export async function deleteExercicio(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Apaga todo o histórico de séries registradas desse exercício, em qualquer dia — usado pra desbloquear a exclusão do exercício. */
+export async function excluirHistoricoExercicio(exercicioId: string): Promise<void> {
+  const { error } = await supabase.from("treino_registros").delete().eq("exercicio_id", exercicioId);
+  if (error) throw error;
+}
+
 export interface LinhaMusculoInput {
   nome: string;
   peso: number;
