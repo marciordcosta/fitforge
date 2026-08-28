@@ -91,8 +91,19 @@
 
   async function excluir() {
     mostrarConfirmExcluir = false;
-    await deleteExercicio(exercicioId);
-    navigate("/treino/exercicios");
+    try {
+      await deleteExercicio(exercicioId);
+      navigate("/treino/exercicios");
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      if (err.code === "23503") {
+        alert(
+          "Não é possível excluir: esse exercício está em uma rotina ou tem histórico de séries registradas. Remova-o das rotinas e do histórico antes de excluir.",
+        );
+      } else {
+        alert("Erro ao excluir: " + (err.message ?? String(e)));
+      }
+    }
   }
 </script>
 
