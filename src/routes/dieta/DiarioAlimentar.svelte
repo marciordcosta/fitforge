@@ -306,7 +306,7 @@
         </button>
         <div class="macros-grid">
           <div class="macro-col">
-            <p class="macro-nome" style={`color:${COR_CARBO}`}>Carb</p>
+            <p class="macro-nome">Carb</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}% 100%);`}>
               <div class="macro-anel-centro">
                 {#if modoRestante}
@@ -320,7 +320,7 @@
             </div>
           </div>
           <div class="macro-col">
-            <p class="macro-nome" style={`color:${COR_GORDURA}`}>Gorduras</p>
+            <p class="macro-nome">Gorduras</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}% 100%);`}>
               <div class="macro-anel-centro">
                 {#if modoRestante}
@@ -334,7 +334,7 @@
             </div>
           </div>
           <div class="macro-col">
-            <p class="macro-nome" style={`color:${COR_PROTEINA}`}>Proteínas</p>
+            <p class="macro-nome">Proteínas</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}% 100%);`}>
               <div class="macro-anel-centro">
                 {#if modoRestante}
@@ -348,7 +348,7 @@
             </div>
           </div>
           <div class="macro-col">
-            <p class="macro-nome" style={`color:${COR_GORDURA}`}>Gordura Sat.</p>
+            <p class="macro-nome">Gordura Sat.</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}% 100%);`}>
               <div class="macro-anel-centro">
                 {#if modoRestante}
@@ -362,7 +362,7 @@
             </div>
           </div>
           <div class="macro-col">
-            <p class="macro-nome" style={`color:${COR_CARBO}`}>Fibras</p>
+            <p class="macro-nome">Fibras</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}% 100%);`}>
               <div class="macro-anel-centro">
                 {#if modoRestante}
@@ -730,6 +730,7 @@
   .macro-nome {
     margin: 0 0 var(--space-2);
     font-size: var(--font-size-sm);
+    color: var(--surface-fg);
     white-space: nowrap;
     text-align: center;
   }
@@ -798,6 +799,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
   .toggle-btn-card svg {
     width: 14px;
