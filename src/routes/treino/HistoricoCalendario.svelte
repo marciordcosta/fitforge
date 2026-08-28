@@ -42,6 +42,23 @@
     void carregar();
   }
 
+  let toqueInicioX = 0;
+  let toqueInicioY = 0;
+
+  function aoTocarInicio(e: TouchEvent) {
+    toqueInicioX = e.touches[0].clientX;
+    toqueInicioY = e.touches[0].clientY;
+  }
+
+  /** Arrasto horizontal (mais que vertical) acima de 50px troca de mês. */
+  function aoTocarFim(e: TouchEvent) {
+    const dx = e.changedTouches[0].clientX - toqueInicioX;
+    const dy = e.changedTouches[0].clientY - toqueInicioY;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      trocarMes(dx < 0 ? 1 : -1);
+    }
+  }
+
   const diasPorData = $derived.by(() => {
     const mapa = new Map<string, DiaComTreino>();
     for (const d of dias) mapa.set(d.data, d);
@@ -81,40 +98,42 @@
     <button onclick={() => trocarMes(1)} aria-label="Próximo mês">›</button>
   </div>
 
-  <div class="dias-semana">
-    {#each DIAS_ABREV as d (d)}
-      <span>{d}</span>
-    {/each}
-  </div>
-
-  {#if loading && !carregouAlgumaVez}
-    <p class="muted">Carregando…</p>
-  {:else}
-    <div class="grade" class:carregando={loading}>
-      {#each celulas as cel, i (i)}
-        {#if cel === null}
-          <div class="celula vazia"></div>
-        {:else if cel.treino}
-          <div class="celula">
-            <button
-              class="dia-btn"
-              onclick={() =>
-                navigate(`/treino/historico/${cel.treino!.treinoId ?? "avulso"}/${cel.iso}`)}
-            >
-              <span class="dia-circulo">{cel.dia}</span>
-              <span class="treino-nome">{cel.treino.treinoNome}</span>
-            </button>
-          </div>
-        {:else}
-          <div class="celula">
-            <span class="dia-numero-wrap">
-              <span class="dia-numero" class:hoje={cel.iso === hojeISO()}>{cel.dia}</span>
-            </span>
-          </div>
-        {/if}
+  <div class="calendario-toque" role="presentation" ontouchstart={aoTocarInicio} ontouchend={aoTocarFim}>
+    <div class="dias-semana">
+      {#each DIAS_ABREV as d (d)}
+        <span>{d}</span>
       {/each}
     </div>
-  {/if}
+
+    {#if loading && !carregouAlgumaVez}
+      <p class="muted">Carregando…</p>
+    {:else}
+      <div class="grade" class:carregando={loading}>
+        {#each celulas as cel, i (i)}
+          {#if cel === null}
+            <div class="celula vazia"></div>
+          {:else if cel.treino}
+            <div class="celula">
+              <button
+                class="dia-btn"
+                onclick={() =>
+                  navigate(`/treino/historico/${cel.treino!.treinoId ?? "avulso"}/${cel.iso}`)}
+              >
+                <span class="dia-circulo">{cel.dia}</span>
+                <span class="treino-nome">{cel.treino.treinoNome}</span>
+              </button>
+            </div>
+          {:else}
+            <div class="celula">
+              <span class="dia-numero-wrap">
+                <span class="dia-numero" class:hoje={cel.iso === hojeISO()}>{cel.dia}</span>
+              </span>
+            </div>
+          {/if}
+        {/each}
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
