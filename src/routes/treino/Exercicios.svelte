@@ -104,7 +104,7 @@
       {#each padroes as p (p.id)}
         <option value={p.id}>{p.nome}</option>
       {/each}
-      <option value="__gerenciar__">Gerenciar Movimentos</option>
+      <option value="__gerenciar__" class="opcao-gerenciar">Gerenciar Movimentos</option>
     </select>
     <select bind:value={filtroMusculo}>
       <option value="">Todos os músculos</option>
@@ -228,6 +228,9 @@
     background-repeat: no-repeat;
     background-position: right 10px center;
     background-size: 16px;
+  }
+  .opcao-gerenciar {
+    color: var(--color-primary);
   }
   .lista {
     list-style: none;
