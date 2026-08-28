@@ -241,6 +241,10 @@
     padding: var(--space-1);
     flex-shrink: 0;
   }
+  .atualizar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   .tabs {
     display: flex;
     border-bottom: 1px solid var(--surface-border);

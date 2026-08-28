@@ -583,6 +583,10 @@
     padding: var(--space-1);
     flex-shrink: 0;
   }
+  .atualizar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   .nome-input {
     width: 100%;
     box-sizing: border-box;

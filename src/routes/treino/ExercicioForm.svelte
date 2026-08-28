@@ -96,4 +96,8 @@
     cursor: pointer;
     padding: var(--space-1);
   }
+  .salvar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 </style>

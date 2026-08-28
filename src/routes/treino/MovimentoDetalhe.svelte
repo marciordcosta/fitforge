@@ -145,6 +145,10 @@
     padding: var(--space-1);
     flex-shrink: 0;
   }
+  .atualizar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   .excluir-btn {
     width: 100%;
     padding: var(--space-3);
