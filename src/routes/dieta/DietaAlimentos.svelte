@@ -11,6 +11,7 @@
     adicionarReceitaAoDiario,
     getRefeicaoDia,
     getItensDaRefeicao,
+    getReceita,
     type Alimento,
     type ReceitaResumo,
   } from "../../lib/dietaApi";
@@ -103,6 +104,21 @@
     });
   }
 
+  const modoReceitaFixo = untrack(() => modoReceita);
+  const receitaIdExistenteFixo = untrack(() => receitaIdExistente);
+
+  if (modoReceitaFixo) {
+    const doRascunho =
+      receitaRascunho.contexto === (receitaIdExistenteFixo ?? "nova") ? receitaRascunho.itens.map((it) => it.alimento.id) : [];
+    adicionadosIds = new Set(doRascunho);
+    if (receitaIdExistenteFixo) {
+      void getReceita(receitaIdExistenteFixo).then((r) => {
+        if (!r) return;
+        adicionadosIds = new Set([...adicionadosIds, ...r.itens.map((i) => i.alimentoId)]);
+      });
+    }
+  }
+
   function aoDigitar() {
     clearTimeout(timeoutBusca);
     timeoutBusca = setTimeout(() => {
@@ -155,8 +171,10 @@
   }
 
   function adicionarNaReceita(a: Alimento) {
+    if (adicionadosIds.has(a.id)) return;
     definirContexto(receitaIdExistente ?? "nova");
     adicionarAoRascunho(a);
+    adicionadosIds = new Set(adicionadosIds).add(a.id);
     mostrarMensagem(`${a.nome} adicionado`);
   }
 
@@ -290,7 +308,13 @@
                 {#if adicionandoId === a.id}…{:else}{@render iconMais()}{/if}
               </button>
             {:else if modoReceita}
-              <button class="add-btn" onclick={() => adicionarNaReceita(a)} aria-label="Adicionar">
+              <button
+                class="add-btn"
+                class:adicionado={adicionadosIds.has(a.id)}
+                onclick={() => adicionarNaReceita(a)}
+                disabled={adicionadosIds.has(a.id)}
+                aria-label="Adicionar"
+              >
                 {@render iconMais()}
               </button>
             {:else}
