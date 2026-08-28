@@ -92,7 +92,9 @@ create table treino_exercicio_series (
 create table treino_registros (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id),
-  treino_id uuid not null references treinos(id) on delete cascade,
+  -- restrict (não cascade): apagar a rotina não pode apagar junto o
+  -- histórico de séries já registradas nela.
+  treino_id uuid not null references treinos(id) on delete restrict,
   exercicio_id uuid not null references exercicios(id) on delete restrict,
   data date not null,
   serie int not null,

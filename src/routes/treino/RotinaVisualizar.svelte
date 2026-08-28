@@ -46,7 +46,14 @@
       await deleteTreino(treino.id);
       navigate("/treino");
     } catch (err) {
-      alert("Erro ao excluir rotina: " + (err as Error).message);
+      const erro = err as { code?: string; message?: string };
+      if (erro.code === "23503") {
+        alert(
+          "Não é possível excluir: essa rotina tem histórico de treinos registrados. Apague o histórico dela antes de excluir a rotina.",
+        );
+      } else {
+        alert("Erro ao excluir rotina: " + (erro.message ?? String(err)));
+      }
       processando = false;
     }
   }
