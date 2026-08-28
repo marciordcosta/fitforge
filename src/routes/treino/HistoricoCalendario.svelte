@@ -211,7 +211,7 @@
     visibility: hidden;
   }
   .celula.com-treino {
-    background: var(--surface-card);
+    background: var(--color-primary);
     cursor: pointer;
   }
   .dia-numero {
@@ -223,9 +223,12 @@
     color: var(--surface-muted);
     font-weight: 400;
   }
+  .celula.com-treino .dia-numero {
+    color: var(--color-primary-fg);
+  }
   .treino-nome {
     font-size: 9px;
-    color: var(--color-primary);
+    color: var(--color-primary-fg);
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
