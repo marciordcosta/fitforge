@@ -106,6 +106,7 @@
     background: var(--color-primary);
     color: var(--color-primary-fg);
     border-color: var(--color-primary);
+    font-weight: 700;
   }
   .muted {
     color: var(--surface-muted);
