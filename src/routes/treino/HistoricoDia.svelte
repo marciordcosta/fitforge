@@ -15,7 +15,11 @@
     type SetRegistro,
   } from "../../lib/treinoApi";
 
-  let { treinoId, data }: { treinoId: string | null; data: string } = $props();
+  let {
+    treinoId,
+    data,
+    destaqueExercicioId = null,
+  }: { treinoId: string | null; data: string; destaqueExercicioId?: string | null } = $props();
 
   interface ExercicioSessaoHistorico {
     exercicioId: string;
@@ -268,7 +272,7 @@
   {:else}
     {#each sessao as ex (ex.exercicioId)}
       <div class="sessao-card">
-        <h2 class="sessao-nome">{ex.exercicioNome}</h2>
+        <h2 class="sessao-nome" class:destaque={ex.exercicioId === destaqueExercicioId}>{ex.exercicioNome}</h2>
         <div class="sessao-tabela">
           <div class="sessao-linha sessao-cabecalho">
             <span>Série</span>
@@ -492,8 +496,11 @@
   .sessao-nome {
     font-size: var(--font-size-base);
     font-weight: 700;
-    color: var(--color-primary);
+    color: var(--surface-fg);
     margin: 0 0 var(--space-3);
+  }
+  .sessao-nome.destaque {
+    color: var(--color-primary);
   }
   .sessao-tabela {
     display: flex;

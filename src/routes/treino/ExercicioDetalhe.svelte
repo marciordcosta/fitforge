@@ -148,7 +148,8 @@
           <div class="sessao-header">
             <button
               class="sessao-treino-nome"
-              onclick={() => navigate(`/treino/historico/${sessao.treinoId ?? "avulso"}/${sessao.data}`)}
+              onclick={() =>
+                navigate(`/treino/historico/${sessao.treinoId ?? "avulso"}/${sessao.data}/${exercicioId}`)}
             >
               {sessao.treinoNome || "Treino avulso"}
             </button>
