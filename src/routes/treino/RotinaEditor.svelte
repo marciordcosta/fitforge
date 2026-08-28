@@ -847,12 +847,24 @@
   }
   .filters select {
     flex: 1;
-    padding: var(--space-2) var(--space-3);
+    min-width: 0;
+    box-sizing: border-box;
+    padding: var(--space-2) 30px var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
-    background: var(--surface-card);
+    background-color: var(--surface-card);
     color: var(--surface-fg);
     font-size: var(--font-size-sm);
+    font-family: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa0ab' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 16px;
   }
   .picker-lista {
     list-style: none;
