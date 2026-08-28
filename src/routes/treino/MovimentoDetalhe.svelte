@@ -14,19 +14,26 @@
   let linhasMusculos = $state<{ nome: string }[]>([{ nome: "" }]);
   let encontrado = $state(true);
   let loading = $state(true);
+  let erroCarregar = $state<string | null>(null);
   let salvando = $state(false);
   let mostrarConfirmExcluir = $state(false);
 
   async function carregar() {
     loading = true;
-    const padrao = await getPadraoMovimentoComMusculos(padraoId);
-    if (padrao) {
-      nome = padrao.nome;
-      linhasMusculos = padrao.musculos.length ? padrao.musculos.map((m) => ({ nome: m.nome })) : [{ nome: "" }];
-    } else {
-      encontrado = false;
+    erroCarregar = null;
+    try {
+      const padrao = await getPadraoMovimentoComMusculos(padraoId);
+      if (padrao) {
+        nome = padrao.nome;
+        linhasMusculos = padrao.musculos.length ? padrao.musculos.map((m) => ({ nome: m.nome })) : [{ nome: "" }];
+      } else {
+        encontrado = false;
+      }
+    } catch (e) {
+      erroCarregar = (e as Error).message;
+    } finally {
+      loading = false;
     }
-    loading = false;
   }
 
   void carregar();
@@ -82,6 +89,8 @@
 
   {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if erroCarregar}
+    <p class="erro">Erro ao carregar: {erroCarregar}</p>
   {:else if !encontrado}
     <p class="muted">Movimento não encontrado.</p>
   {:else}
@@ -177,5 +186,8 @@
   }
   .muted {
     color: var(--surface-muted);
+  }
+  .erro {
+    color: var(--color-danger);
   }
 </style>

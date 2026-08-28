@@ -4,11 +4,18 @@
 
   let padroes = $state<PadraoMovimentoComMusculos[]>([]);
   let loading = $state(true);
+  let erroCarregar = $state<string | null>(null);
 
   async function carregar() {
     loading = true;
-    padroes = await listPadroesMovimentoComMusculos();
-    loading = false;
+    erroCarregar = null;
+    try {
+      padroes = await listPadroesMovimentoComMusculos();
+    } catch (e) {
+      erroCarregar = (e as Error).message;
+    } finally {
+      loading = false;
+    }
   }
 
   void carregar();
@@ -42,6 +49,8 @@
 
   {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if erroCarregar}
+    <p class="erro">Erro ao carregar: {erroCarregar}</p>
   {:else if !padroes.length}
     <p class="muted">Nenhum movimento cadastrado.</p>
   {:else}
@@ -156,5 +165,8 @@
   }
   .muted {
     color: var(--surface-muted);
+  }
+  .erro {
+    color: var(--color-danger);
   }
 </style>
