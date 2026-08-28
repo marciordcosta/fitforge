@@ -404,7 +404,7 @@
         >
           <div class="card-header">
             <h2>{refeicao.nome}</h2>
-            {#if metaRef}
+            {#if metaRef && temItens}
               <button
                 class="toggle-btn-card"
                 onclick={(e) => { e.stopPropagation(); alternarModoRefeicao(refeicao.id); }}
