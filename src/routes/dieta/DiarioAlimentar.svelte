@@ -18,6 +18,7 @@
     type ItemDiario,
     type MetasDiarias,
     type LimiteParametro,
+    type RefeicaoModelo,
   } from "../../lib/dietaApi";
   import { listTreinos, type Treino } from "../../lib/treinoApi";
   import { getProgressoMetaHoje, getPesoMedioAtual, type ProgressoMetaPeso } from "../../lib/pesoApi";
@@ -43,7 +44,8 @@
   let modoRestante = $state(false);
   let rotinaHoje = $state<Treino | null>(null);
   let progressoPeso = $state<ProgressoMetaPeso | null>(null);
-  let metasCaloriasPorRefeicao = $state<Map<string, number>>(new Map());
+  let metasRefeicaoPorNome = $state<Map<string, RefeicaoModelo>>(new Map());
+  let modoDiarioPorId = $state<Set<string>>(new Set());
   let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
   let pesoAtual = $state(76);
   const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
@@ -55,11 +57,9 @@
   async function carregarMetasRefeicoes() {
     try {
       const modelos = await listRefeicoesModelo();
-      metasCaloriasPorRefeicao = new Map(
-        modelos.filter((m) => m.metaCalorias !== null).map((m) => [m.nome, m.metaCalorias as number]),
-      );
+      metasRefeicaoPorNome = new Map(modelos.filter((m) => m.metaCalorias !== null).map((m) => [m.nome, m]));
     } catch {
-      // opcional — sem meta cadastrada, os cards seguem mostrando só o total
+      // opcional — sem meta cadastrada, os cards seguem mostrando só o percentual da meta diária
     }
   }
 
@@ -154,6 +154,17 @@
 
   function restante(valor: number, meta: number): number {
     return Math.max(0, meta - valor);
+  }
+
+  function alternarModoRefeicao(refeicaoId: string) {
+    const novo = new Set(modoDiarioPorId);
+    if (novo.has(refeicaoId)) novo.delete(refeicaoId);
+    else novo.add(refeicaoId);
+    modoDiarioPorId = novo;
+  }
+
+  function labelAbsoluto(valor: number, meta: number, unidade: string): string {
+    return `${valor.toFixed(0)}/${meta.toFixed(0)}${unidade}`;
   }
 
   const fibrasMaxG = $derived(metas ? Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, metas.calorias)) : 0);
@@ -382,7 +393,8 @@
       {#each refeicoes as refeicao (refeicao.id)}
         {@const totais = totaisRefeicao(refeicao.id)}
         {@const temItens = itens.some((i) => i.refeicaoId === refeicao.id)}
-        {@const metaCal = metasCaloriasPorRefeicao.get(refeicao.nome)}
+        {@const metaRef = metasRefeicaoPorNome.get(refeicao.nome)}
+        {@const modoDiario = modoDiarioPorId.has(refeicao.id)}
         <div
           class="refeicao-item"
           role="button"
@@ -392,42 +404,82 @@
         >
           <div class="card-header">
             <h2>{refeicao.nome}</h2>
-            {#if metaCal !== undefined}
-              <span class="card-cal">{metaCal.toFixed(0)} cal</span>
+            {#if metaRef}
+              <button
+                class="toggle-btn-card"
+                onclick={(e) => { e.stopPropagation(); alternarModoRefeicao(refeicao.id); }}
+                aria-label="Alternar exibição"
+              >
+                {@render iconToggle()}
+              </button>
             {/if}
           </div>
           {#if temItens && metas}
-            <p class="pct-titulo">Percentual das suas metas diárias</p>
-            <div class="pct-grid">
-              <div class="pct-col">
-                <p class="pct-nome">Calorias</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.calorias, metas.calorias))}%; background:var(--color-secondary);`}></div>
+            {#if metaRef && !modoDiario}
+              <p class="pct-titulo">Meta de {refeicao.nome}</p>
+              <div class="pct-grid">
+                <div class="pct-col">
+                  <p class="pct-nome">Calorias</p>
+                  <div class="pct-barra-wrap">
+                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.calorias, metaRef.metaCalorias!))}%; background:var(--color-secondary);`}></div>
+                  </div>
+                  <p class="pct-valor">{labelAbsoluto(totais.calorias, metaRef.metaCalorias!, "")}</p>
                 </div>
-                <p class="pct-valor">{totais.calorias.toFixed(0)} · {pctMeta(totais.calorias, metas.calorias).toFixed(0)}%</p>
-              </div>
-              <div class="pct-col">
-                <p class="pct-nome">Carb</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.carboidratoG, metas.carboidratoG))}%; background:${COR_CARBO};`}></div>
+                <div class="pct-col">
+                  <p class="pct-nome">Carb</p>
+                  <div class="pct-barra-wrap">
+                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.carboidratoG, metaRef.metaCarboidratoG!))}%; background:${COR_CARBO};`}></div>
+                  </div>
+                  <p class="pct-valor">{labelAbsoluto(totais.carboidratoG, metaRef.metaCarboidratoG!, "g")}</p>
                 </div>
-                <p class="pct-valor">{totais.carboidratoG.toFixed(0)}g · {pctMeta(totais.carboidratoG, metas.carboidratoG).toFixed(0)}%</p>
-              </div>
-              <div class="pct-col">
-                <p class="pct-nome">Gorduras</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.gorduraG, metas.gorduraG))}%; background:${COR_GORDURA};`}></div>
+                <div class="pct-col">
+                  <p class="pct-nome">Gorduras</p>
+                  <div class="pct-barra-wrap">
+                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.gorduraG, metaRef.metaGorduraG!))}%; background:${COR_GORDURA};`}></div>
+                  </div>
+                  <p class="pct-valor">{labelAbsoluto(totais.gorduraG, metaRef.metaGorduraG!, "g")}</p>
                 </div>
-                <p class="pct-valor">{totais.gorduraG.toFixed(0)}g · {pctMeta(totais.gorduraG, metas.gorduraG).toFixed(0)}%</p>
-              </div>
-              <div class="pct-col">
-                <p class="pct-nome">Proteínas</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.proteinaG, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div>
+                <div class="pct-col">
+                  <p class="pct-nome">Proteínas</p>
+                  <div class="pct-barra-wrap">
+                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.proteinaG, metaRef.metaProteinaG!))}%; background:${COR_PROTEINA};`}></div>
+                  </div>
+                  <p class="pct-valor">{labelAbsoluto(totais.proteinaG, metaRef.metaProteinaG!, "g")}</p>
                 </div>
-                <p class="pct-valor">{totais.proteinaG.toFixed(0)}g · {pctMeta(totais.proteinaG, metas.proteinaG).toFixed(0)}%</p>
               </div>
-            </div>
+            {:else}
+              <p class="pct-titulo">Percentual das suas metas diárias</p>
+              <div class="pct-grid">
+                <div class="pct-col">
+                  <p class="pct-nome">Calorias</p>
+                  <div class="pct-barra-wrap">
+                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.calorias, metas.calorias))}%; background:var(--color-secondary);`}></div>
+                  </div>
+                  <p class="pct-valor">{totais.calorias.toFixed(0)} · {pctMeta(totais.calorias, metas.calorias).toFixed(0)}%</p>
+                </div>
+                <div class="pct-col">
+                  <p class="pct-nome">Carb</p>
+                  <div class="pct-barra-wrap">
+                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.carboidratoG, metas.carboidratoG))}%; background:${COR_CARBO};`}></div>
+                  </div>
+                  <p class="pct-valor">{totais.carboidratoG.toFixed(0)}g · {pctMeta(totais.carboidratoG, metas.carboidratoG).toFixed(0)}%</p>
+                </div>
+                <div class="pct-col">
+                  <p class="pct-nome">Gorduras</p>
+                  <div class="pct-barra-wrap">
+                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.gorduraG, metas.gorduraG))}%; background:${COR_GORDURA};`}></div>
+                  </div>
+                  <p class="pct-valor">{totais.gorduraG.toFixed(0)}g · {pctMeta(totais.gorduraG, metas.gorduraG).toFixed(0)}%</p>
+                </div>
+                <div class="pct-col">
+                  <p class="pct-nome">Proteínas</p>
+                  <div class="pct-barra-wrap">
+                    <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.proteinaG, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div>
+                  </div>
+                  <p class="pct-valor">{totais.proteinaG.toFixed(0)}g · {pctMeta(totais.proteinaG, metas.proteinaG).toFixed(0)}%</p>
+                </div>
+              </div>
+            {/if}
           {:else}
             <p class="preview">{preview(refeicao.id)}</p>
           {/if}
@@ -710,11 +762,22 @@
     font-weight: 600;
     margin: 0 0 var(--space-3);
   }
-  .card-cal {
+  .toggle-btn-card {
     flex-shrink: 0;
-    color: var(--surface-muted);
-    font-size: 12px;
-    font-weight: 400;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .toggle-btn-card svg {
+    width: 14px;
+    height: 14px;
   }
   .preview {
     color: var(--surface-muted);
