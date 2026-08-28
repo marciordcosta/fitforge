@@ -15,7 +15,7 @@
     type SetRegistro,
   } from "../../lib/treinoApi";
 
-  let { treinoId, data }: { treinoId: string; data: string } = $props();
+  let { treinoId, data }: { treinoId: string | null; data: string } = $props();
 
   interface ExercicioSessaoHistorico {
     exercicioId: string;
@@ -111,6 +111,8 @@
   }
 
   async function copiarTreinamento() {
+    if (!treinoId) return;
+    const idRotina = treinoId;
     menuAberto = false;
     copiando = true;
     try {
@@ -149,13 +151,13 @@
         }),
       );
       treinoLogSessao.iniciar({
-        treinoId,
+        treinoId: idRotina,
         nomeTreino: treinoNome,
         inicio: Date.now(),
         sessao: novaSessao,
         houveAlteracaoEstrutura: false,
       });
-      navigate(`/treino/log/${treinoId}`);
+      navigate(`/treino/log/${idRotina}`);
     } catch (e) {
       alert("Erro ao copiar treinamento: " + (e as Error).message);
     } finally {
@@ -282,7 +284,9 @@
     onFechar={() => (menuAberto = false)}
     opcoes={[
       { label: "Salvar como Rotina", icon: iconSalvarRotina, onSelect: abrirSalvarComoRotina },
-      { label: "Copiar Treinamento", icon: iconCopiar, disabled: copiando, onSelect: copiarTreinamento },
+      ...(treinoId
+        ? [{ label: "Copiar Treinamento", icon: iconCopiar, disabled: copiando, onSelect: copiarTreinamento }]
+        : []),
       { label: "Editar Treinamento", icon: iconEditar, onSelect: abrirEditar },
       { label: "Deletar Treinamento", icon: iconExcluir, destructive: true, onSelect: () => (mostrarConfirmarExcluir = true) },
     ]}

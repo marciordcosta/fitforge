@@ -52,6 +52,8 @@
   <Musculos />
 {:else if segmentos[0] === "distribuicao"}
   <DistribuicaoMusculos />
+{:else if segmentos[0] === "historico" && segmentos[1] === "avulso" && segmentos[2]}
+  <HistoricoDia treinoId={null} data={segmentos[2]} />
 {:else if segmentos[0] === "historico" && segmentos[1] && segmentos[2]}
   <HistoricoDia treinoId={segmentos[1]} data={segmentos[2]} />
 {:else if segmentos[0] === "historico"}

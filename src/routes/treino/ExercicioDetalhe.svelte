@@ -154,7 +154,10 @@
       {#each historico as sessao (sessao.treinoNome + sessao.data)}
         <div class="sessao-card">
           <div class="sessao-header">
-            <button class="sessao-treino-nome" onclick={() => navigate(`/treino/historico/${sessao.treinoId}/${sessao.data}`)}>
+            <button
+              class="sessao-treino-nome"
+              onclick={() => navigate(`/treino/historico/${sessao.treinoId ?? "avulso"}/${sessao.data}`)}
+            >
               {sessao.treinoNome || "Treino avulso"}
             </button>
             <span class="sessao-data">{formatDataHora(sessao.criadoEm)}</span>

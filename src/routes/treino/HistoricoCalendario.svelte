@@ -96,7 +96,11 @@
           <div class="celula vazia"></div>
         {:else if cel.treino}
           <div class="celula">
-            <button class="dia-btn" onclick={() => navigate(`/treino/historico/${cel.treino!.treinoId}/${cel.iso}`)}>
+            <button
+              class="dia-btn"
+              onclick={() =>
+                navigate(`/treino/historico/${cel.treino!.treinoId ?? "avulso"}/${cel.iso}`)}
+            >
               <span class="dia-circulo">{cel.dia}</span>
               <span class="treino-nome">{cel.treino.treinoNome}</span>
             </button>

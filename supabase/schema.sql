@@ -62,9 +62,7 @@ create table treinos (
   -- Date.getDay()), opcional. Usado só pra ordenar a lista por proximidade;
   -- rotinas sem dia mantêm a ordenação manual.
   dia_semana int check (dia_semana is null or (dia_semana >= 0 and dia_semana <= 6)),
-  ordem int not null default 0,
-  -- Arquivada: some da lista principal sem apagar nada (histórico permanece).
-  arquivado boolean not null default false
+  ordem int not null default 0
 );
 
 create table treino_exercicios (
@@ -94,9 +92,10 @@ create table treino_exercicio_series (
 create table treino_registros (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id),
-  -- restrict (não cascade): apagar a rotina não pode apagar junto o
-  -- histórico de séries já registradas nela.
-  treino_id uuid not null references treinos(id) on delete restrict,
+  -- nullable + set null (não cascade/restrict): o histórico pertence ao
+  -- exercício, não à rotina — apagar a rotina desvincula (treino_id vira
+  -- null, aparece como "Treino Avulso") em vez de bloquear ou apagar.
+  treino_id uuid references treinos(id) on delete set null,
   exercicio_id uuid not null references exercicios(id) on delete restrict,
   data date not null,
   serie int not null,

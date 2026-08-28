@@ -43,7 +43,6 @@ export interface Treino {
   nome_treino: string;
   dia_semana: number | null;
   ordem: number;
-  arquivado: boolean;
 }
 
 /** 0=domingo..6=sábado, mesma convenção de Date.getDay(). */
@@ -419,7 +418,7 @@ export async function getHistoricoExercicio(exercicioId: string): Promise<Histor
 }
 
 export interface SessaoHistorico {
-  treinoId: string;
+  treinoId: string | null;
   treinoNome: string;
   data: string;
   criadoEm: string;
@@ -491,8 +490,7 @@ function ordenarExercicios(treino: TreinoComExercicios): void {
 export async function listTreinos(): Promise<TreinoComExercicios[]> {
   const { data, error } = await supabase
     .from("treinos")
-    .select(`id, nome_treino, dia_semana, ordem, arquivado, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
-    .eq("arquivado", false)
+    .select(`id, nome_treino, dia_semana, ordem, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
     .order("ordem", { ascending: true });
   if (error) throw error;
   const treinos = (data ?? []) as unknown as TreinoComExercicios[];
@@ -503,18 +501,13 @@ export async function listTreinos(): Promise<TreinoComExercicios[]> {
 export async function getTreino(id: string): Promise<TreinoComExercicios | null> {
   const { data, error } = await supabase
     .from("treinos")
-    .select(`id, nome_treino, dia_semana, ordem, arquivado, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
+    .select(`id, nome_treino, dia_semana, ordem, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   const treino = data as unknown as TreinoComExercicios | null;
   if (treino) ordenarExercicios(treino);
   return treino;
-}
-
-export async function arquivarTreino(id: string, arquivado: boolean): Promise<void> {
-  const { error } = await supabase.from("treinos").update({ arquivado }).eq("id", id);
-  if (error) throw error;
 }
 
 export async function createTreino(nome: string, diaSemana: number | null = null): Promise<string> {
@@ -662,15 +655,13 @@ export async function getRegistrosDoDia(treinoId: string, data: string): Promise
 
 /** Salva todos os registros de uma sessão (substitui o que existir para essa data+rotina). */
 export async function salvarRegistrosDoDia(
-  treinoId: string,
+  treinoId: string | null,
   data: string,
   porExercicio: Map<string, SetRegistro[]>,
 ): Promise<void> {
-  const { error: delError } = await supabase
-    .from("treino_registros")
-    .delete()
-    .eq("treino_id", treinoId)
-    .eq("data", data);
+  let delQuery = supabase.from("treino_registros").delete().eq("data", data);
+  delQuery = treinoId ? delQuery.eq("treino_id", treinoId) : delQuery.is("treino_id", null);
+  const { error: delError } = await delQuery;
   if (delError) throw delError;
 
   const linhas: Record<string, unknown>[] = [];
@@ -695,7 +686,7 @@ export async function salvarRegistrosDoDia(
 
 export interface DiaComTreino {
   data: string;
-  treinoId: string;
+  treinoId: string | null;
   treinoNome: string;
 }
 
@@ -714,7 +705,9 @@ export async function getDiasComTreino(dataInicio: string, dataFim: string): Pro
     porDia.set(r.data, {
       data: r.data,
       treinoId: r.treino_id,
-      treinoNome: (r.treinos as unknown as { nome_treino: string } | null)?.nome_treino ?? "",
+      treinoNome: r.treino_id
+        ? ((r.treinos as unknown as { nome_treino: string } | null)?.nome_treino ?? "")
+        : "Treino avulso",
     });
   }
   return Array.from(porDia.values());
@@ -731,17 +724,16 @@ export interface HistoricoDia {
   exercicios: ExercicioRegistroDia[];
 }
 
-/** Registro completo de uma sessão específica (rotina + data), agrupado por exercício e com nomes já resolvidos. */
-export async function getHistoricoDia(treinoId: string, data: string): Promise<HistoricoDia> {
-  const [{ data: rows, error }, treino] = await Promise.all([
-    supabase
-      .from("treino_registros")
-      .select("exercicio_id, serie, peso, repeticoes, exercicios(nome)")
-      .eq("treino_id", treinoId)
-      .eq("data", data)
-      .order("serie", { ascending: true }),
-    getTreino(treinoId),
-  ]);
+/** Registro completo de uma sessão específica (rotina + data, ou avulsa se `treinoId` for null), agrupado por exercício e com nomes já resolvidos. */
+export async function getHistoricoDia(treinoId: string | null, data: string): Promise<HistoricoDia> {
+  let query = supabase
+    .from("treino_registros")
+    .select("exercicio_id, serie, peso, repeticoes, exercicios(nome)")
+    .eq("data", data)
+    .order("serie", { ascending: true });
+  query = treinoId ? query.eq("treino_id", treinoId) : query.is("treino_id", null);
+
+  const [{ data: rows, error }, treino] = await Promise.all([query, treinoId ? getTreino(treinoId) : null]);
   if (error) throw error;
 
   const porExercicio = new Map<string, ExercicioRegistroDia>();
@@ -759,14 +751,16 @@ export async function getHistoricoDia(treinoId: string, data: string): Promise<H
   }
 
   return {
-    treinoNome: treino?.nome_treino ?? "",
+    treinoNome: treinoId ? (treino?.nome_treino ?? "") : "Treino avulso",
     exercicios: Array.from(porExercicio.values()),
   };
 }
 
-/** Apaga todos os registros de uma sessão específica (rotina + data) — usado pra excluir um dia do histórico. */
-export async function excluirRegistrosDoDia(treinoId: string, data: string): Promise<void> {
-  const { error } = await supabase.from("treino_registros").delete().eq("treino_id", treinoId).eq("data", data);
+/** Apaga todos os registros de uma sessão específica (rotina + data, ou avulsa) — usado pra excluir um dia do histórico. */
+export async function excluirRegistrosDoDia(treinoId: string | null, data: string): Promise<void> {
+  let query = supabase.from("treino_registros").delete().eq("data", data);
+  query = treinoId ? query.eq("treino_id", treinoId) : query.is("treino_id", null);
+  const { error } = await query;
   if (error) throw error;
 }
 
@@ -863,7 +857,7 @@ export async function getVolumeRealizadoBruto(
 export async function getRegistrosPorTreinoPeriodo(
   dataInicio: string,
   dataFim: string,
-): Promise<{ treino_id: string; exercicio_id: string }[]> {
+): Promise<{ treino_id: string | null; exercicio_id: string }[]> {
   const { data, error } = await supabase
     .from("treino_registros")
     .select("treino_id, exercicio_id")

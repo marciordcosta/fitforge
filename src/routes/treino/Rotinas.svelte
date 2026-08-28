@@ -14,6 +14,7 @@
 
   let treinos = $state<TreinoComExercicios[]>([]);
   let loading = $state(true);
+  let erroCarregar = $state<string | null>(null);
   let musculos = $state<Musculo[]>([]);
   let seriesPorTreino = $state<Map<string, number>>(new Map());
   let feitoPorMusculoSalvo = $state<Map<string, number>>(new Map());
@@ -40,35 +41,43 @@
 
   async function carregar() {
     loading = true;
-    const [treinosCarregados, musculosCarregados, registros] = await Promise.all([
-      listTreinos(),
-      listMusculos(),
-      getRegistrosPorTreinoPeriodo(segundaISO(), hojeISO()),
-    ]);
-    treinos = ordenarPorDia(treinosCarregados);
-    musculos = musculosCarregados;
+    erroCarregar = null;
+    try {
+      const [treinosCarregados, musculosCarregados, registros] = await Promise.all([
+        listTreinos(),
+        listMusculos(),
+        getRegistrosPorTreinoPeriodo(segundaISO(), hojeISO()),
+      ]);
+      treinos = ordenarPorDia(treinosCarregados);
+      musculos = musculosCarregados;
 
-    const mapaMusculos = new Map<string, string[]>();
-    for (const t of treinosCarregados) {
-      for (const ex of t.exercicios) {
-        if (!mapaMusculos.has(ex.exercicio_id)) {
-          mapaMusculos.set(ex.exercicio_id, (ex.exercicio?.musculos ?? []).map((m) => m.musculo_id));
+      const mapaMusculos = new Map<string, string[]>();
+      for (const t of treinosCarregados) {
+        for (const ex of t.exercicios) {
+          if (!mapaMusculos.has(ex.exercicio_id)) {
+            mapaMusculos.set(ex.exercicio_id, (ex.exercicio?.musculos ?? []).map((m) => m.musculo_id));
+          }
         }
       }
-    }
-    musculosPorExercicio = mapaMusculos;
+      musculosPorExercicio = mapaMusculos;
 
-    const mapaSeriesPorTreino = new Map<string, number>();
-    const mapaFeito = new Map<string, number>();
-    for (const r of registros) {
-      mapaSeriesPorTreino.set(r.treino_id, (mapaSeriesPorTreino.get(r.treino_id) ?? 0) + 1);
-      for (const musculoId of mapaMusculos.get(r.exercicio_id) ?? []) {
-        mapaFeito.set(musculoId, (mapaFeito.get(musculoId) ?? 0) + 1);
+      const mapaSeriesPorTreino = new Map<string, number>();
+      const mapaFeito = new Map<string, number>();
+      for (const r of registros) {
+        if (r.treino_id) {
+          mapaSeriesPorTreino.set(r.treino_id, (mapaSeriesPorTreino.get(r.treino_id) ?? 0) + 1);
+        }
+        for (const musculoId of mapaMusculos.get(r.exercicio_id) ?? []) {
+          mapaFeito.set(musculoId, (mapaFeito.get(musculoId) ?? 0) + 1);
+        }
       }
+      seriesPorTreino = mapaSeriesPorTreino;
+      feitoPorMusculoSalvo = mapaFeito;
+    } catch (e) {
+      erroCarregar = (e as Error).message;
+    } finally {
+      loading = false;
     }
-    seriesPorTreino = mapaSeriesPorTreino;
-    feitoPorMusculoSalvo = mapaFeito;
-    loading = false;
   }
 
   void carregar();
@@ -261,6 +270,8 @@
 
   {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if erroCarregar}
+    <p class="erro">Erro ao carregar: {erroCarregar}</p>
   {:else if !treinos.length}
     <p class="muted">Nenhuma rotina ainda. Crie a primeira.</p>
   {:else}
@@ -496,5 +507,8 @@
   }
   .muted {
     color: var(--surface-muted);
+  }
+  .erro {
+    color: var(--color-danger);
   }
 </style>

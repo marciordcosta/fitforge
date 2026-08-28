@@ -7,7 +7,6 @@
     getTreino,
     duplicateTreino,
     deleteTreino,
-    arquivarTreino,
     DIAS_SEMANA_COMPLETO,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
@@ -16,14 +15,21 @@
 
   let treino = $state<TreinoComExercicios | null>(null);
   let loading = $state(true);
+  let erroCarregar = $state<string | null>(null);
   let processando = $state(false);
   let confirmandoExclusao = $state(false);
   let menuAberto = $state(false);
 
   async function carregar() {
     loading = true;
-    treino = await getTreino(treinoId);
-    loading = false;
+    erroCarregar = null;
+    try {
+      treino = await getTreino(treinoId);
+    } catch (e) {
+      erroCarregar = (e as Error).message;
+    } finally {
+      loading = false;
+    }
   }
 
   void carregar();
@@ -40,20 +46,6 @@
     }
   }
 
-  async function alternarArquivo() {
-    if (!treino) return;
-    processando = true;
-    try {
-      const novoValor = !treino.arquivado;
-      await arquivarTreino(treino.id, novoValor);
-      treino.arquivado = novoValor;
-    } catch (err) {
-      alert("Erro ao arquivar rotina: " + (err as Error).message);
-    } finally {
-      processando = false;
-    }
-  }
-
   async function excluir() {
     if (!treino) return;
     processando = true;
@@ -61,14 +53,7 @@
       await deleteTreino(treino.id);
       navigate("/treino");
     } catch (err) {
-      const erro = err as { code?: string; message?: string };
-      if (erro.code === "23503") {
-        alert(
-          "Não é possível excluir: essa rotina tem histórico de treinos registrados. Apague o histórico dela antes de excluir a rotina.",
-        );
-      } else {
-        alert("Erro ao excluir rotina: " + (erro.message ?? String(err)));
-      }
+      alert("Erro ao excluir rotina: " + (err as Error).message);
       processando = false;
     }
   }
@@ -97,13 +82,6 @@
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
   </svg>
 {/snippet}
-{#snippet iconArquivar()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="3" y="4" width="18" height="4" rx="1" />
-    <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
-    <line x1="10" y1="12" x2="14" y2="12" />
-  </svg>
-{/snippet}
 {#snippet iconExcluir()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
@@ -125,9 +103,6 @@
       {#if treino?.dia_semana != null}
         <span class="dia-inline">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
       {/if}
-      {#if treino?.arquivado}
-        <span class="dia-inline">Arquivada</span>
-      {/if}
     </h1>
     {#if treino}
       <button class="menu-btn" onclick={() => (menuAberto = true)} disabled={processando} aria-label="Mais opções">
@@ -140,6 +115,8 @@
 
   {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if erroCarregar}
+    <p class="erro">Erro ao carregar: {erroCarregar}</p>
   {:else if !treino}
     <p class="muted">Rotina não encontrada.</p>
   {:else}
@@ -188,11 +165,6 @@
       { label: "Iniciar", icon: iconIniciar, onSelect: () => navigate(`/treino/log/${treino!.id}`) },
       { label: "Editar", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treino!.id}`) },
       { label: "Duplicar", icon: iconDuplicar, onSelect: duplicar },
-      {
-        label: treino.arquivado ? "Desarquivar" : "Arquivar",
-        icon: iconArquivar,
-        onSelect: alternarArquivo,
-      },
       { label: "Remover", icon: iconExcluir, destructive: true, onSelect: () => (confirmandoExclusao = true) },
     ]}
   />
