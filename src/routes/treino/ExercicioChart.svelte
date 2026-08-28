@@ -97,7 +97,7 @@
     background: var(--surface-card);
     color: var(--surface-muted);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -107,7 +107,7 @@
     background: var(--color-primary);
     color: var(--color-primary-fg);
     border-color: var(--color-primary);
-    font-weight: 700;
+    font-weight: 800;
   }
   .muted {
     color: var(--surface-muted);
