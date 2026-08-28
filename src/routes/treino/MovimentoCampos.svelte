@@ -24,7 +24,7 @@
 <div class="field">
   <span>Grupos Musculares</span>
   {#each linhasMusculos as linha, idx (idx)}
-    <div class="musculo-row">
+    <div class="musculo-card">
       <input type="text" bind:value={linha.nome} placeholder="Nome do músculo" />
       <button class="remover" onclick={() => removerMusculo(idx)} aria-label="Remover">×</button>
     </div>
@@ -53,20 +53,33 @@
     font-size: var(--font-size-base);
     font-family: inherit;
   }
-  .musculo-row {
+  .musculo-card {
     display: flex;
-    gap: var(--space-2);
+    align-items: center;
+    gap: var(--space-1);
     margin-bottom: var(--space-2);
-  }
-  .musculo-row input {
-    flex: 1;
-    min-width: 0;
-  }
-  .remover {
-    width: 36px;
+    padding-left: var(--space-3);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
+  }
+  .musculo-card input {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-3) 0;
+    border: none;
+    background: none;
+  }
+  .musculo-card input:focus {
+    outline: none;
+  }
+  .remover {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: none;
     color: var(--color-danger);
     font-size: var(--font-size-lg);
     cursor: pointer;
