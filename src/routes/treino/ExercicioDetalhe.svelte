@@ -108,13 +108,18 @@
     <polyline points="15 6 9 12 15 18" />
   </svg>
 {/snippet}
+{#snippet iconCheck()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <polyline points="4 12 10 18 20 6" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino/exercicios")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>{exercicio?.nome ?? ""}</h1>
     {#if aba === "edicao"}
-      <button class="atualizar" disabled={salvando} onclick={salvar}>Atualizar</button>
+      <button class="atualizar" disabled={salvando} onclick={salvar} aria-label="Atualizar">{@render iconCheck()}</button>
     {:else}
       <span class="header-spacer"></span>
     {/if}
@@ -211,7 +216,7 @@
     white-space: nowrap;
   }
   .header-spacer {
-    width: 40px;
+    width: 36px;
     flex-shrink: 0;
   }
   .back {
@@ -233,13 +238,22 @@
     height: 18px;
   }
   .atualizar {
-    background: none;
-    border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
-    cursor: pointer;
-    padding: var(--space-1);
     flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .atualizar svg {
+    width: 18px;
+    height: 18px;
   }
   .atualizar:disabled {
     opacity: 0.5;

@@ -291,6 +291,11 @@
     <polyline points="15 6 9 12 15 18" />
   </svg>
 {/snippet}
+{#snippet iconCheck()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <polyline points="4 12 10 18 20 6" />
+  </svg>
+{/snippet}
 {#snippet iconMais()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" />
@@ -337,7 +342,9 @@
   <div class="header">
     <button class="cancelar" onclick={aoClicarCancelar}>Cancelar</button>
     <h1>{treinoId ? "Editar rotina" : "Nova rotina"}</h1>
-    <button class="atualizar" disabled={salvando} onclick={salvar}>{treinoId ? "Atualizar" : "Criar"}</button>
+    <button class="atualizar" disabled={salvando} onclick={salvar} aria-label={treinoId ? "Atualizar" : "Criar"}>
+      {@render iconCheck()}
+    </button>
   </div>
 
   {#if loading}
@@ -472,7 +479,7 @@
           {@render iconVoltar()}
         </button>
         <h1>Adicionar Exercício</h1>
-        <button class="criar" onclick={() => (mostrarCriarMenu = true)}>Criar</button>
+        <button class="criar" onclick={() => (mostrarCriarMenu = true)} aria-label="Criar">{@render iconMais()}</button>
       </div>
       <input class="search" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
       <div class="filters">
@@ -573,8 +580,7 @@
     margin: 0;
     text-align: center;
   }
-  .cancelar,
-  .atualizar {
+  .cancelar {
     background: none;
     border: none;
     color: var(--color-primary);
@@ -582,6 +588,24 @@
     cursor: pointer;
     padding: var(--space-1);
     flex-shrink: 0;
+  }
+  .atualizar {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .atualizar svg {
+    width: 18px;
+    height: 18px;
   }
   .atualizar:disabled {
     opacity: 0.5;
@@ -824,12 +848,21 @@
   }
   .criar {
     flex-shrink: 0;
-    background: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
     border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: var(--space-1);
+    padding: 0;
+  }
+  .criar svg {
+    width: 18px;
+    height: 18px;
   }
   .search {
     width: 100%;

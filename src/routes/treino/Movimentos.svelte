@@ -24,12 +24,20 @@
     <polyline points="15 6 9 12 15 18" />
   </svg>
 {/snippet}
+{#snippet iconMais()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino/exercicios")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Movimentos</h1>
-    <button class="criar" onclick={() => navigate("/treino/movimentos/novo")}>Criar</button>
+    <button class="criar" onclick={() => navigate("/treino/movimentos/novo")} aria-label="Novo movimento">
+      {@render iconMais()}
+    </button>
   </div>
 
   {#if loading}
@@ -92,12 +100,22 @@
     height: 18px;
   }
   .criar {
-    background: none;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
     border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: var(--space-1);
+    padding: 0;
+  }
+  .criar svg {
+    width: 18px;
+    height: 18px;
   }
   .lista {
     list-style: none;

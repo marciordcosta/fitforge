@@ -32,12 +32,17 @@
     <polyline points="15 6 9 12 15 18" />
   </svg>
 {/snippet}
+{#snippet iconCheck()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <polyline points="4 12 10 18 20 6" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino/movimentos")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Novo Movimento</h1>
-    <button class="salvar" disabled={salvando} onclick={salvar}>Criar</button>
+    <button class="salvar" disabled={salvando} onclick={salvar} aria-label="Criar">{@render iconCheck()}</button>
   </div>
 
   <MovimentoCampos bind:nome bind:linhasMusculos />
@@ -82,12 +87,22 @@
     height: 18px;
   }
   .salvar {
-    background: none;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
     border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: var(--space-1);
+    padding: 0;
+  }
+  .salvar svg {
+    width: 18px;
+    height: 18px;
   }
   .salvar:disabled {
     opacity: 0.5;

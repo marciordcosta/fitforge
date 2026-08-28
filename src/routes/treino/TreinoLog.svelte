@@ -805,7 +805,7 @@
       <div class="picker-header">
         <button class="back" onclick={fecharPicker} aria-label="Cancelar">{@render iconVoltar()}</button>
         <h1>Adicionar Exercício</h1>
-        <button class="criar" onclick={() => (mostrarCriarMenu = true)}>Criar</button>
+        <button class="criar" onclick={() => (mostrarCriarMenu = true)} aria-label="Criar">{@render iconMais()}</button>
       </div>
       <input class="search" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
       <div class="filters">
@@ -1311,12 +1311,21 @@
   }
   .criar {
     flex-shrink: 0;
-    background: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
     border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: var(--space-1);
+    padding: 0;
+  }
+  .criar svg {
+    width: 18px;
+    height: 18px;
   }
   .search {
     width: 100%;

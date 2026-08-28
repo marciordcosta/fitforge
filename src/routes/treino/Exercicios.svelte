@@ -61,6 +61,12 @@
     <polyline points="15 6 9 12 15 18" />
   </svg>
 {/snippet}
+{#snippet iconMaisCriar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+{/snippet}
 {#snippet iconExercicio()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="2" y="9" width="4" height="6" rx="1" />
@@ -85,7 +91,7 @@
   <div class="header">
     <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Exercícios</h1>
-    <button class="criar" onclick={() => (mostrarCriarMenu = true)}>Criar</button>
+    <button class="criar" onclick={() => (mostrarCriarMenu = true)} aria-label="Criar">{@render iconMaisCriar()}</button>
   </div>
 
   <input class="search" type="text" placeholder="Procurar exercício" bind:value={busca} />
@@ -185,12 +191,22 @@
     height: 18px;
   }
   .criar {
-    background: none;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
     border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: var(--space-1);
+    padding: 0;
+  }
+  .criar svg {
+    width: 18px;
+    height: 18px;
   }
   .search {
     width: 100%;
