@@ -369,7 +369,7 @@
     {/if}
 
     <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/refeicao/${refeicaoId}`)}>+ Adicionar Alimento</button>
-    <button class="descartar" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>Descartar</button>
+    <button class="descartar" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>Descartar refeição</button>
   {/if}
 </div>
 
@@ -647,9 +647,9 @@
     padding: var(--space-3);
     margin-top: var(--space-3);
     border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: none;
-    color: var(--color-danger);
+    border: none;
+    background: var(--color-danger);
+    color: #fff;
     font-weight: 600;
     font-size: var(--font-size-base);
     cursor: pointer;
