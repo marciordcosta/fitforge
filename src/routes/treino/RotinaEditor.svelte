@@ -317,18 +317,17 @@
 {/snippet}
 {#snippet iconMovimento()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="5 9 2 12 5 15" />
-    <polyline points="9 5 12 2 15 5" />
-    <polyline points="15 19 12 22 9 19" />
-    <polyline points="19 9 22 12 19 15" />
-    <line x1="2" y1="12" x2="22" y2="12" />
-    <line x1="12" y1="2" x2="12" y2="22" />
+    <polyline points="17 3 21 7 17 11" />
+    <path d="M3 7h18" />
+    <polyline points="7 13 3 17 7 21" />
+    <path d="M21 17H3" />
   </svg>
 {/snippet}
 {#snippet iconMusculo()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M4 21c-1.5-3-1.5-8 1-11 2-2.5 5-2 6 1 .5-3 3.5-4.5 6-2 3 3 2 9-1 12" />
-    <path d="M4 21h13" />
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
   </svg>
 {/snippet}
 
