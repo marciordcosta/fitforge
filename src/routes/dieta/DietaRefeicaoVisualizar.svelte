@@ -57,6 +57,7 @@
   let refeicoesParaMover = $state<RefeicaoDia[]>([]);
   let mostrarMoverItem = $state(false);
   let menuItemAberto = $state<ItemDiario | null>(null);
+  let modoDiarioMeta = $state(false);
 
   async function carregar() {
     loading = true;
@@ -76,7 +77,8 @@
 
   void carregar();
 
-  const metasEfetivas = $derived(metaRefeicao ?? metas);
+  const usaMetaRefeicao = $derived(metaRefeicao != null && !modoDiarioMeta);
+  const metasEfetivas = $derived(usaMetaRefeicao ? metaRefeicao : metas);
 
   const dataLabel = $derived.by(() => {
     if (!refeicao) return "";
@@ -111,7 +113,7 @@
   }
 
   function metaValorTexto(consumido: number, meta: number, unidade: string): string {
-    if (metaRefeicao) return `${consumido.toFixed(0)} de ${meta.toFixed(0)}${unidade}`;
+    if (usaMetaRefeicao) return `${consumido.toFixed(0)} de ${meta.toFixed(0)}${unidade}`;
     return `${pctMeta(consumido, meta).toFixed(0)}% · ${meta.toFixed(0)}${unidade}`;
   }
 
@@ -331,6 +333,14 @@
     <path d="M12 2v20" />
   </svg>
 {/snippet}
+{#snippet iconToggle()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 3l4 4-4 4" />
+    <path d="M21 7H7a4 4 0 0 0-4 4v1" />
+    <path d="M7 21l-4-4 4-4" />
+    <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
+  </svg>
+{/snippet}
 {#snippet iconAdicionarPrato()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 5v14M5 12h14" />
@@ -399,7 +409,14 @@
       </div>
 
       {#if metasEfetivas}
-        <p class="metas-titulo">{metaRefeicao ? `Meta de ${refeicao?.nome}` : "Percentual das suas metas diárias"}</p>
+        <div class="metas-titulo-linha">
+          <p class="metas-titulo">{usaMetaRefeicao ? `Meta de ${refeicao?.nome}` : "Percentual das suas metas diárias"}</p>
+          {#if metaRefeicao}
+            <button class="toggle-btn-meta" onclick={() => (modoDiarioMeta = !modoDiarioMeta)} aria-label="Alternar exibição">
+              {@render iconToggle()}
+            </button>
+          {/if}
+        </div>
         <div class="metas-grid">
           <div class="meta-col">
             <span class="meta-label">Calorias</span>
@@ -676,9 +693,33 @@
   .resumo-macros .valor-g {
     font-size: 17px;
   }
+  .metas-titulo-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 var(--space-3);
+  }
   .metas-titulo {
     font-weight: 600;
-    margin: var(--space-2) 0 var(--space-3);
+    margin: 0;
+  }
+  .toggle-btn-meta {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .toggle-btn-meta svg {
+    width: 14px;
+    height: 14px;
   }
   .metas-grid {
     display: grid;
