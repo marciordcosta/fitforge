@@ -1,6 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { toISODate } from "../../lib/dates";
+  import { toISODate, hojeISO } from "../../lib/dates";
   import { getDiasComTreino, type DiaComTreino } from "../../lib/treinoApi";
 
   const MESES = [
@@ -95,13 +95,15 @@
         {#if cel === null}
           <div class="celula vazia"></div>
         {:else if cel.treino}
-          <button class="celula com-treino" onclick={() => navigate(`/treino/historico/${cel.treino!.treinoId}/${cel.iso}`)}>
-            <span class="dia-numero">{cel.dia}</span>
-            <span class="treino-nome">{cel.treino.treinoNome}</span>
-          </button>
+          <div class="celula">
+            <button class="dia-btn" onclick={() => navigate(`/treino/historico/${cel.treino!.treinoId}/${cel.iso}`)}>
+              <span class="dia-circulo">{cel.dia}</span>
+              <span class="treino-nome">{cel.treino.treinoNome}</span>
+            </button>
+          </div>
         {:else}
           <div class="celula">
-            <span class="dia-numero muted">{cel.dia}</span>
+            <span class="dia-numero muted" class:hoje={cel.iso === hojeISO()}>{cel.dia}</span>
           </div>
         {/if}
       {/each}
@@ -186,49 +188,61 @@
   .grade {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
     transition: opacity 0.15s;
   }
   .grade.carregando {
     opacity: 0.5;
   }
   .celula {
-    aspect-ratio: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 2px;
-    border-radius: var(--radius-sm);
-    background: none;
-    border: none;
-    font-family: inherit;
-    padding: 2px;
+    justify-content: flex-start;
+    gap: 6px;
+    border-bottom: 1px solid var(--surface-border);
+    padding: var(--space-3) 2px;
     box-sizing: border-box;
     overflow: hidden;
   }
-  .celula.vazia {
-    visibility: hidden;
-  }
-  .celula.com-treino {
-    background: var(--color-primary);
+  .dia-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    padding: 0;
     cursor: pointer;
+    font-family: inherit;
+    max-width: 100%;
+  }
+  .dia-circulo {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
   }
   .dia-numero {
     font-size: var(--font-size-sm);
     color: var(--surface-fg);
-    font-weight: 600;
   }
   .dia-numero.muted {
     color: var(--surface-muted);
-    font-weight: 400;
   }
-  .celula.com-treino .dia-numero {
-    color: var(--color-primary-fg);
+  .dia-numero.hoje {
+    color: var(--color-primary);
+    font-weight: 600;
   }
   .treino-nome {
-    font-size: 9px;
-    color: var(--color-primary-fg);
+    font-size: 10px;
+    color: var(--surface-muted);
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
