@@ -54,9 +54,15 @@
   );
 </script>
 
+{#snippet iconVoltar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="15 6 9 12 15 18" />
+  </svg>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Exercícios</h1>
     <button class="criar" onclick={() => navigate("/treino/exercicios/novo")}>Criar</button>
   </div>
@@ -128,12 +134,15 @@
     background: var(--surface-card);
     border: none;
     color: var(--surface-fg);
-    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     padding: 0;
+  }
+  .back svg {
+    width: 18px;
+    height: 18px;
   }
   .criar {
     background: none;

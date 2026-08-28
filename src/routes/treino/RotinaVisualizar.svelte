@@ -50,6 +50,12 @@
   }
 </script>
 
+{#snippet iconVoltar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="15 6 9 12 15 18" />
+  </svg>
+{/snippet}
+
 {#snippet iconIniciar()}
   <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
     <polygon points="6 3 20 12 6 21 6 3" />
@@ -75,7 +81,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">←</button>
+    <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>
       {treino?.nome_treino ?? ""}
       {#if treino?.dia_semana != null}
@@ -192,12 +198,15 @@
     background: var(--surface-card);
     border: none;
     color: var(--surface-fg);
-    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     padding: 0;
+  }
+  .back svg {
+    width: 18px;
+    height: 18px;
   }
   .dia-inline {
     font-size: var(--font-size-sm);
