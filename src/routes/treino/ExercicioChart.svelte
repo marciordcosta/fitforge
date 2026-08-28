@@ -48,7 +48,10 @@
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          x: { grid: { display: false }, ticks: { color: "#9aa0ab" } },
+          x: {
+            grid: { display: false },
+            ticks: { color: "#9aa0ab", maxTicksLimit: 5, autoSkip: true, font: { size: 10 } },
+          },
           y: { ticks: { color: "#9aa0ab" } },
         },
       },
