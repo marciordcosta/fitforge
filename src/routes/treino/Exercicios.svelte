@@ -91,11 +91,20 @@
   <input class="search" type="text" placeholder="Procurar exercício" bind:value={busca} />
 
   <div class="filters">
-    <select bind:value={filtroPadrao}>
+    <select
+      bind:value={filtroPadrao}
+      onchange={() => {
+        if (filtroPadrao === "__gerenciar__") {
+          filtroPadrao = "";
+          navigate("/treino/movimentos");
+        }
+      }}
+    >
       <option value="">Todo padrão</option>
       {#each padroes as p (p.id)}
         <option value={p.id}>{p.nome}</option>
       {/each}
+      <option value="__gerenciar__">Gerenciar Movimentos</option>
     </select>
     <select bind:value={filtroMusculo}>
       <option value="">Todos os músculos</option>
@@ -104,8 +113,6 @@
       {/each}
     </select>
   </div>
-
-  <button class="link-movimentos" onclick={() => navigate("/treino/movimentos")}>Gerenciar Movimentos</button>
 
   {#if loading}
     <p class="muted">Carregando…</p>
@@ -209,16 +216,6 @@
     background: var(--surface-card);
     color: var(--surface-fg);
     font-size: var(--font-size-sm);
-  }
-  .link-movimentos {
-    display: block;
-    margin: calc(var(--space-2) * -1) 0 var(--space-4) auto;
-    background: none;
-    border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    padding: var(--space-1) 0;
   }
   .lista {
     list-style: none;
