@@ -46,7 +46,6 @@
   let itemParaRemover = $state<ReceitaItem | null>(null);
   let confirmandoExclusao = $state(false);
   let excluindo = $state(false);
-  let menuItemAberto = $state<ReceitaItem | null>(null);
 
   /** Cópia local editável — nome e itens só são gravados no banco ao tocar em "concluir". Saindo sem salvar, nada muda. */
   let nomeEditavel = $state("");
@@ -205,7 +204,7 @@
     navigate(`/dieta/alimento/${item.alimentoId}/${hojeISO()}`);
   }
 
-  /** Tempo segurando o card parado antes do toque virar "pressionar" (abre o menu) — evita disparar sem querer num toque rápido/rolagem. */
+  /** Tempo segurando o card parado antes do toque virar "pressionar" (abre a confirmação de excluir) — evita disparar sem querer num toque rápido/rolagem. */
   const ATRASO_PRESSIONAR_MS = 500;
   const TOLERANCIA_MOVIMENTO_PX = 8;
   let timeoutPressionar: ReturnType<typeof setTimeout> | undefined;
@@ -223,7 +222,7 @@
       pressionouLongo = true;
       cancelarPressionar();
       if (navigator.vibrate) navigator.vibrate(10);
-      menuItemAberto = item;
+      itemParaRemover = item;
     }, ATRASO_PRESSIONAR_MS);
   }
 
@@ -231,7 +230,7 @@
     e.preventDefault();
     cancelarPressionar();
     pressionouLongo = false;
-    menuItemAberto = item;
+    itemParaRemover = item;
   }
 
   function cancelarPressionar() {
@@ -287,11 +286,6 @@
   </svg>
 {/snippet}
 
-{#snippet iconExcluir()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 6L6 18M6 6l12 12" />
-  </svg>
-{/snippet}
 {#snippet iconCheck()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
     <polyline points="4 12 10 18 20 6" />
@@ -466,17 +460,6 @@
     textoConfirmar="Remover"
     onConfirmar={removerItem}
     onCancelar={() => (itemParaRemover = null)}
-  />
-{/if}
-
-{#if menuItemAberto !== null}
-  {@const itemMenu = menuItemAberto}
-  <ActionSheet
-    titulo={itemMenu.nome}
-    onFechar={() => (menuItemAberto = null)}
-    opcoes={[
-      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => (itemParaRemover = itemMenu) },
-    ]}
   />
 {/if}
 
