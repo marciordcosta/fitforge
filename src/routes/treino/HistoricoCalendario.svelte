@@ -107,7 +107,9 @@
           </div>
         {:else}
           <div class="celula">
-            <span class="dia-numero muted" class:hoje={cel.iso === hojeISO()}>{cel.dia}</span>
+            <span class="dia-numero-wrap">
+              <span class="dia-numero" class:hoje={cel.iso === hojeISO()}>{cel.dia}</span>
+            </span>
           </div>
         {/if}
       {/each}
@@ -233,16 +235,21 @@
     font-size: var(--font-size-sm);
     font-weight: 600;
   }
+  .dia-numero-wrap {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   .dia-numero {
     font-size: var(--font-size-sm);
     color: var(--surface-fg);
-  }
-  .dia-numero.muted {
-    color: var(--surface-muted);
+    font-weight: 600;
   }
   .dia-numero.hoje {
     color: var(--color-primary);
-    font-weight: 600;
   }
   .treino-nome {
     font-size: 10px;
