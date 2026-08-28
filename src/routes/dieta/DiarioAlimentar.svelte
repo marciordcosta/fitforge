@@ -307,67 +307,72 @@
         <div class="macros-grid">
           <div class="macro-col">
             <p class="macro-nome">Carb</p>
-            <p class="macro-valor">
-              {#if modoRestante}
-                <strong>{restante(totalCarboidrato, metas.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
-              {:else}
-                <strong>{totalCarboidrato.toFixed(0)} g</strong> <span class="macro-meta">/ {metas.carboidratoG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%; background:${COR_CARBO};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestante}
+                  <strong>{restante(totalCarboidrato, metas.carboidratoG).toFixed(0)}g</strong>
+                  <span class="macro-meta">rest.</span>
+                {:else}
+                  <strong>{totalCarboidrato.toFixed(0)}g</strong>
+                  <span class="macro-meta">/{metas.carboidratoG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Gorduras</p>
-            <p class="macro-valor">
-              {#if modoRestante}
-                <strong>{restante(totalGordura, metas.gorduraG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
-              {:else}
-                <strong>{totalGordura.toFixed(0)} g</strong> <span class="macro-meta">/ {metas.gorduraG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%; background:${COR_GORDURA};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestante}
+                  <strong>{restante(totalGordura, metas.gorduraG).toFixed(0)}g</strong>
+                  <span class="macro-meta">rest.</span>
+                {:else}
+                  <strong>{totalGordura.toFixed(0)}g</strong>
+                  <span class="macro-meta">/{metas.gorduraG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Proteínas</p>
-            <p class="macro-valor">
-              {#if modoRestante}
-                <strong>{restante(totalProteina, metas.proteinaG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
-              {:else}
-                <strong>{totalProteina.toFixed(0)} g</strong> <span class="macro-meta">/ {metas.proteinaG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestante}
+                  <strong>{restante(totalProteina, metas.proteinaG).toFixed(0)}g</strong>
+                  <span class="macro-meta">rest.</span>
+                {:else}
+                  <strong>{totalProteina.toFixed(0)}g</strong>
+                  <span class="macro-meta">/{metas.proteinaG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Gordura Sat.</p>
-            <p class="macro-valor">
-              {#if modoRestante}
-                <strong>{restante(totalGorduraSaturada, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
-              {:else}
-                <strong>{totalGorduraSaturada.toFixed(0)} g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}%; background:${COR_GORDURA};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestante}
+                  <strong>{restante(totalGorduraSaturada, gorduraSaturadaMaxG).toFixed(0)}g</strong>
+                  <span class="macro-meta">rest.</span>
+                {:else}
+                  <strong>{totalGorduraSaturada.toFixed(0)}g</strong>
+                  <span class="macro-meta">/{gorduraSaturadaMaxG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Fibras</p>
-            <p class="macro-valor">
-              {#if modoRestante}
-                <strong>{restante(totalFibras, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
-              {:else}
-                <strong>{totalFibras.toFixed(0)} g</strong> <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}%; background:${COR_CARBO};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestante}
+                  <strong>{restante(totalFibras, fibrasMaxG).toFixed(0)}g</strong>
+                  <span class="macro-meta">rest.</span>
+                {:else}
+                  <strong>{totalFibras.toFixed(0)}g</strong>
+                  <span class="macro-meta">/{fibrasMaxG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
         </div>
@@ -723,28 +728,39 @@
     scroll-snap-align: start;
   }
   .macro-nome {
-    margin: 0 0 var(--space-1);
+    margin: 0 0 var(--space-2);
     font-size: var(--font-size-base);
     color: var(--surface-fg);
     white-space: nowrap;
-  }
-  .macro-valor {
-    margin: 0 0 var(--space-2);
-    font-size: 13px;
-    color: var(--surface-fg);
+    text-align: center;
   }
   .macro-meta {
     color: var(--surface-muted);
   }
-  .barra-wrap {
-    height: 8px;
-    background: var(--surface-border);
-    border-radius: 5px;
-    overflow: hidden;
+  .macro-anel {
+    position: relative;
+    width: 68px;
+    height: 68px;
+    margin: 0 auto;
+    border-radius: 50%;
   }
-  .barra {
-    height: 100%;
-    border-radius: 5px;
+  .macro-anel-centro {
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+  }
+  .macro-anel-centro strong {
+    font-size: 14px;
+    color: var(--surface-fg);
+  }
+  .macro-anel-centro .macro-meta {
+    font-size: 10px;
   }
   .refeicao-item {
     cursor: pointer;
