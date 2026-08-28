@@ -97,6 +97,7 @@
     background: var(--surface-card);
     color: var(--surface-muted);
     font-size: 11px;
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
