@@ -72,7 +72,7 @@
     <canvas bind:this={canvas}></canvas>
   </div>
   <div class="toggle">
-    <button class:active={metrica === "1rm"} onclick={() => (metrica = "1rm")}>Máximo de Uma Repetição</button>
+    <button class:active={metrica === "1rm"} onclick={() => (metrica = "1rm")}>Máximo 1RM</button>
     <button class:active={metrica === "peso"} onclick={() => (metrica = "peso")}>Maior Peso</button>
     <button class:active={metrica === "volume"} onclick={() => (metrica = "volume")}>Maior Volume</button>
   </div>
@@ -90,13 +90,16 @@
   }
   .toggle button {
     flex: 1;
+    min-width: 0;
     padding: var(--space-2) var(--space-1);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
     color: var(--surface-muted);
-    font-size: 12px;
-    line-height: 1.3;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     cursor: pointer;
   }
   .toggle button.active {
