@@ -142,7 +142,9 @@
       {#each historico as sessao (sessao.treinoNome + sessao.data)}
         <div class="sessao-card">
           <div class="sessao-header">
-            <strong>{sessao.treinoNome || "Treino avulso"}</strong>
+            <button class="sessao-treino-nome" onclick={() => navigate(`/treino/historico/${sessao.treinoId}/${sessao.data}`)}>
+              {sessao.treinoNome || "Treino avulso"}
+            </button>
             <span class="sessao-data">{formatDataHora(sessao.criadoEm)}</span>
           </div>
           <div class="sessao-tabela">
@@ -271,6 +273,17 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
     flex-shrink: 0;
+  }
+  .sessao-treino-nome {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 700;
+    color: var(--surface-fg);
+    cursor: pointer;
+    text-align: left;
   }
   .sessao-tabela {
     display: flex;

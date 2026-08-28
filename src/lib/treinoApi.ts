@@ -297,6 +297,7 @@ export async function getHistoricoExercicio(exercicioId: string): Promise<Histor
 }
 
 export interface SessaoHistorico {
+  treinoId: string;
   treinoNome: string;
   data: string;
   criadoEm: string;
@@ -319,6 +320,7 @@ export async function getHistoricoDetalhadoExercicio(exercicioId: string): Promi
     let grupo = grupos.get(chave);
     if (!grupo) {
       grupo = {
+        treinoId: r.treino_id,
         treinoNome: (r.treinos as unknown as { nome_treino: string } | null)?.nome_treino ?? "",
         data: r.data,
         criadoEm: r.created_at,
