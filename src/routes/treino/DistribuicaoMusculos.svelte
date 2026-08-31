@@ -11,6 +11,7 @@
     getVolumeRealizadoBruto,
     DIAS_SEMANA_ABREV,
     abreviarMusculo,
+    distribuicaoMusculosExercicio,
     type Musculo,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
@@ -82,12 +83,11 @@
     const mapa = new Map<string, number>();
     for (const ex of treino.exercicios) {
       const numSeries = ex.series.length;
-      if (!numSeries) continue;
-      const musculosEx = ex.exercicio?.musculos ?? [];
-      const pesoTotal = musculosEx.reduce((acc, m) => acc + m.peso_contribuicao, 0);
-      if (!pesoTotal) continue;
-      for (const m of musculosEx) {
-        const parte = (m.peso_contribuicao / pesoTotal) * numSeries;
+      if (!numSeries || !ex.exercicio) continue;
+      // Mesma normalização por exercício usada na tela de Exercícios e no detalhe do
+      // exercício (distribuicaoMusculosExercicio) — só multiplica o % pelas séries daqui.
+      for (const m of distribuicaoMusculosExercicio(ex.exercicio)) {
+        const parte = (m.pct / 100) * numSeries;
         mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + parte);
       }
     }
@@ -126,16 +126,18 @@
 
   /**
    * Distribuição estática de cada rotina (sem acompanhamento ao vivo — isso fica só no
-   * card semanal). Cada músculo entra com sua série equivalente (ver
-   * contarSeriesEquivalentesPorMusculo) e o percentual sobre o total de séries da
-   * própria rotina — a soma de todos os músculos bate com esse total.
+   * card semanal). A barra/percentual/cor usam a série equivalente (ver
+   * contarSeriesEquivalentesPorMusculo, soma bate com o total de séries da rotina); o
+   * número exibido ao lado é a contagem bruta (1 série válida por músculo que ela
+   * trabalha), mais fácil de ler que um valor fracionado.
    */
   const distribuicaoPorTreino = $derived.by(() => {
     return treinos.map((t) => {
       const totalSeries = t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-      const mapa = contarSeriesEquivalentesPorMusculo(t);
+      const mapaEquivalente = contarSeriesEquivalentesPorMusculo(t);
+      const mapaBruto = contarSeriesPorMusculo(t);
       const bruto = musculos
-        .map((m) => ({ musculo: m, valor: mapa.get(m.id) ?? 0 }))
+        .map((m) => ({ musculo: m, valor: mapaEquivalente.get(m.id) ?? 0, contagem: mapaBruto.get(m.id) ?? 0 }))
         .filter((item) => item.valor > 0)
         .sort((a, b) => b.valor - a.valor);
       let acumulado = 0;
@@ -147,12 +149,6 @@
       return { treino: t, lista };
     });
   });
-
-  /** 1 casa decimal, sem ".0" sobrando quando o valor é inteiro (ex: "3.5" mas "7", não "7.0"). */
-  function formatSerieEquivalente(valor: number): string {
-    const arredondado = Math.round(valor * 10) / 10;
-    return arredondado % 1 === 0 ? String(arredondado) : arredondado.toFixed(1);
-  }
 
   /**
    * Séries já marcadas como concluídas na sessão ao vivo (treinoLogSessao), contadas por músculo.
@@ -473,7 +469,11 @@
       .map((m) => ({ musculo: m, valor: Math.round(mapaTrabalho.get(m.id) ?? 0) }))
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
-    const porSerie = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
+    const mapaBruto = contarSeriesPorMusculo(treino);
+    const porSerie = musculos
+      .map((m) => ({ musculo: m, valor: mapaBruto.get(m.id) ?? 0 }))
+      .filter((item) => item.valor > 0)
+      .sort((a, b) => b.valor - a.valor);
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
     modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie, porTrabalho };
   }
@@ -548,7 +548,7 @@
                         <span class="barra-pct">{item.pct.toFixed(0)}%</span>
                       </div>
                     </div>
-                    <span class="valor">{formatSerieEquivalente(item.valor)}</span>
+                    <span class="valor">{item.contagem}</span>
                   </div>
                 {/each}
               </div>
