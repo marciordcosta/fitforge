@@ -157,9 +157,9 @@
     />
   {/each}
   {#if centro.valor != null}
-    <text x={CX} y={CY} text-anchor="middle" class="centro-valor">{centro.valor}</text>
+    <text x={CX} y={CY - 3.5} text-anchor="middle" dominant-baseline="central" class="centro-valor">{centro.valor}</text>
     {#if centro.label}
-      <text x={CX} y={CY + 6} text-anchor="middle" class="centro-label">{centro.label}</text>
+      <text x={CX} y={CY + 3.5} text-anchor="middle" dominant-baseline="central" class="centro-label">{centro.label}</text>
     {/if}
   {/if}
   {#each fatias as f (f.nome)}
