@@ -830,7 +830,7 @@
   <ActionSheet
     onFechar={() => (mostrarCriarMenu = false)}
     opcoes={[
-      { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo") },
+      { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo/voltar") },
       { label: "Padrão de Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos") },
       { label: "Grupo Muscular", icon: iconMusculo, onSelect: () => navigate("/treino/musculos") },
       { label: "Agrupamento", icon: iconAgrupamento, onSelect: () => navigate("/treino/agrupamentos") },

@@ -35,6 +35,8 @@
   <RotinaEditor treinoId={segmentos[1]} />
 {:else if segmentos[0] === "log" && segmentos[1]}
   <TreinoLog treinoId={segmentos[1]} />
+{:else if segmentos[0] === "exercicios" && segmentos[1] === "novo" && segmentos[2] === "voltar"}
+  <ExercicioForm voltarAoSalvar={true} />
 {:else if segmentos[0] === "exercicios" && segmentos[1] === "novo"}
   <ExercicioForm />
 {:else if segmentos[0] === "exercicios" && segmentos[1]}

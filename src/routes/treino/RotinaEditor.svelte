@@ -7,6 +7,7 @@
   import WheelPicker from "../../components/WheelPicker.svelte";
   import {
     getTreino,
+    listTreinos,
     createTreino,
     renameTreino,
     salvarExerciciosRotina,
@@ -14,11 +15,14 @@
     correspondeBusca,
     textoBuscavelExercicio,
     getUltimoRegistro,
+    distribuicaoMusculosExercicio,
+    abreviarMusculo,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
     type Exercicio,
     type SetRegistro,
   } from "../../lib/treinoApi";
+  import { PALETA } from "../../components/PieChart.svelte";
   import { rotinaEditorSessao, type Linha, type LinhaSerie } from "../../lib/rotinaEditorSessao.svelte";
 
   let { treinoId }: { treinoId: string | null } = $props();
@@ -34,18 +38,29 @@
   let mostrarDiaPicker = $state(false);
   let mostrarCriarMenu = $state(false);
 
+  /** Primeira rotina (qualquer uma) que já usa cada exercício — mesmo destaque da lista de Exercícios. */
+  let rotinaPorExercicio = $state<Map<string, { id: string; nome: string }>>(new Map());
+
+  async function carregarRotinaPorExercicio() {
+    const treinos = await listTreinos();
+    const mapa = new Map<string, { id: string; nome: string }>();
+    for (const t of treinos) {
+      for (const te of t.exercicios) {
+        if (!mapa.has(te.exercicio_id)) mapa.set(te.exercicio_id, { id: t.id, nome: t.nome_treino });
+      }
+    }
+    rotinaPorExercicio = mapa;
+  }
+
+  void carregarRotinaPorExercicio();
+
   function iniciais(nome: string): string {
     const partes = nome.trim().split(/\s+/);
     return (partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "");
   }
 
-  function subtitulo(ex: Exercicio): string {
-    if (!ex.musculos.length) return "Sem músculo definido";
-    return ex.musculos
-      .slice()
-      .sort((a, b) => b.peso_contribuicao - a.peso_contribuicao)
-      .map((m) => m.musculo?.nome)
-      .join(", ");
+  function distribuicao(ex: Exercicio) {
+    return distribuicaoMusculosExercicio(ex).map((m, i) => ({ ...m, cor: PALETA[i % PALETA.length] }));
   }
 
   const opcoesDia = [
@@ -548,10 +563,32 @@
       <ul class="picker-lista">
         {#each disponiveis as ex (ex.id)}
           <li class="picker-item">
-            <span class="avatar">{iniciais(ex.nome)}</span>
+            <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
+              {#if rotinaPorExercicio.has(ex.id)}
+                <span class="avatar-rotina-texto">{rotinaPorExercicio.get(ex.id)?.nome}</span>
+              {:else}
+                {iniciais(ex.nome)}
+              {/if}
+            </span>
             <span class="info">
               <span class="nome">{ex.nome}</span>
-              <span class="sub">{subtitulo(ex)}</span>
+              {#if !ex.musculos.length}
+                <span class="sub">Sem músculo definido</span>
+              {:else}
+                <span class="musculos-linhas">
+                  {#each distribuicao(ex) as m (m.nome)}
+                    <span class="musculo-coluna">
+                      <span class="musculo-nome-mini">{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome}</span>
+                      <span class="musculo-linha-barra">
+                        <span class="musculo-barra-mini-wrap">
+                          <span class="musculo-barra-mini" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
+                        </span>
+                        <span class="musculo-pct-mini">{m.pct.toFixed(0)}%</span>
+                      </span>
+                    </span>
+                  {/each}
+                </span>
+              {/if}
             </span>
             <button class="add-btn" onclick={() => adicionarRapido(ex)} disabled={adicionandoId === ex.id} aria-label={`Adicionar ${ex.nome}`}>
               {#if adicionandoId === ex.id}…{:else}{@render iconMais()}{/if}
@@ -570,7 +607,7 @@
   <ActionSheet
     onFechar={() => (mostrarCriarMenu = false)}
     opcoes={[
-      { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo") },
+      { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo/voltar") },
       { label: "Padrão de Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos") },
       { label: "Grupo Muscular", icon: iconMusculo, onSelect: () => navigate("/treino/musculos") },
       { label: "Agrupamento", icon: iconAgrupamento, onSelect: () => navigate("/treino/agrupamentos") },
@@ -966,6 +1003,19 @@
     font-weight: 600;
     flex-shrink: 0;
   }
+  .picker-item .avatar-rotina {
+    border: 2px solid var(--color-primary);
+  }
+  .picker-item .avatar-rotina-texto {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding: 0 3px;
+    font-size: 5px;
+    font-weight: 700;
+    text-align: center;
+  }
   .picker-item .info {
     flex: 1;
     min-width: 0;
@@ -978,6 +1028,47 @@
   }
   .picker-item .sub {
     font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .picker-item .musculos-linhas {
+    display: flex;
+    gap: var(--space-3);
+    margin-top: var(--space-1);
+  }
+  .picker-item .musculo-coluna {
+    flex: 0 0 calc((100% - 3 * var(--space-3)) / 4);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .picker-item .musculo-nome-mini {
+    font-size: 10px;
+    color: var(--surface-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .picker-item .musculo-linha-barra {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  .picker-item .musculo-barra-mini-wrap {
+    flex: 1;
+    min-width: 0;
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--surface-border);
+  }
+  .picker-item .musculo-barra-mini {
+    display: block;
+    height: 100%;
+  }
+  .picker-item .musculo-pct-mini {
+    flex-shrink: 0;
+    font-size: 9px;
     color: var(--surface-muted);
   }
   .add-btn {

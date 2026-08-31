@@ -3,6 +3,11 @@
   import { createExercicio, construirMusculosInput, type LinhaMusculoInput } from "../../lib/treinoApi";
   import ExercicioCampos from "./ExercicioCampos.svelte";
 
+  /** Quando aberto a partir de "Adicionar Exercício" de uma rotina/sessão (em vez da lista
+   * principal de Exercícios), depois de salvar volta pra tela de onde veio (editor da
+   * rotina, sessão ao vivo) em vez de ir pro detalhe do exercício recém-criado. */
+  let { voltarAoSalvar = false }: { voltarAoSalvar?: boolean } = $props();
+
   let nome = $state("");
   let padraoId = $state("");
   let linhasMusculos = $state<LinhaMusculoInput[]>([]);
@@ -25,7 +30,11 @@
         padrao_id: padraoId || null,
         musculos: musculosInput,
       });
-      navigate(`/treino/exercicios/${novoId}`);
+      if (voltarAoSalvar) {
+        voltar("/treino/exercicios");
+      } else {
+        navigate(`/treino/exercicios/${novoId}`);
+      }
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
     } finally {
