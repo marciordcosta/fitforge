@@ -118,6 +118,17 @@
    * número exibido ao lado é a contagem bruta (1 série válida por músculo que ela
    * trabalha), mais fácil de ler que um valor fracionado.
    */
+  interface LinhaRotina {
+    chave: string;
+    nome: string;
+    valor: number;
+    contagem: number;
+    pct: number;
+    cor: string;
+    musculo: Musculo | null;
+    subItens: { musculo: Musculo; valor: number; contagem: number }[] | null;
+  }
+
   const distribuicaoPorTreino = $derived.by(() => {
     return treinos.map((t) => {
       const totalSeries = t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
@@ -125,10 +136,46 @@
       const mapaBruto = contarSeriesPorMusculo(t);
       const bruto = musculos
         .map((m) => ({ musculo: m, valor: mapaEquivalente.get(m.id) ?? 0, contagem: mapaBruto.get(m.id) ?? 0 }))
-        .filter((item) => item.valor > 0)
-        .sort((a, b) => b.valor - a.valor);
+        .filter((item) => item.valor > 0);
+
+      const porGrupo = new Map<string, { nome: string; itens: typeof bruto }>();
+      const avulsos: typeof bruto = [];
+      for (const item of bruto) {
+        const agrupamento = item.musculo.agrupamento;
+        if (agrupamento) {
+          const grupo = porGrupo.get(agrupamento.id) ?? { nome: agrupamento.nome, itens: [] };
+          grupo.itens.push(item);
+          porGrupo.set(agrupamento.id, grupo);
+        } else {
+          avulsos.push(item);
+        }
+      }
+
+      const base: Omit<LinhaRotina, "pct" | "cor">[] = [];
+      for (const [id, grupo] of porGrupo) {
+        base.push({
+          chave: id,
+          nome: grupo.nome,
+          valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
+          contagem: grupo.itens.reduce((acc, i) => acc + i.contagem, 0),
+          musculo: null,
+          subItens: grupo.itens,
+        });
+      }
+      for (const item of avulsos) {
+        base.push({
+          chave: item.musculo.id,
+          nome: item.musculo.nome,
+          valor: item.valor,
+          contagem: item.contagem,
+          musculo: item.musculo,
+          subItens: null,
+        });
+      }
+      base.sort((a, b) => b.valor - a.valor);
+
       let acumulado = 0;
-      const lista = bruto.map((item) => {
+      const lista: LinhaRotina[] = base.map((item) => {
         const pct = totalSeries > 0 ? (item.valor / totalSeries) * 100 : 0;
         acumulado += pct;
         return { ...item, pct, cor: corPorFaixa(acumulado) };
@@ -367,6 +414,58 @@
       .map((m) => ({ musculo: m, valor: Math.round((mapa.get(m.id) ?? 0) / divisor) }))
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
+  });
+
+  interface LinhaRealizado {
+    chave: string;
+    nome: string;
+    valor: number;
+    meta: number;
+    musculo: Musculo | null;
+    subItens: { musculo: Musculo; valor: number; meta: number }[] | null;
+  }
+
+  /** Mesmo agrupamento por musculos.agrupamento_id usado na Distribuição Semanal, aplicado ao Realizado. */
+  const linhasRealizado = $derived.by(() => {
+    const porGrupo = new Map<string, { nome: string; itens: typeof listaRealizado }>();
+    const avulsos: typeof listaRealizado = [];
+    for (const item of listaRealizado) {
+      const agrupamento = item.musculo.agrupamento;
+      if (agrupamento) {
+        const grupo = porGrupo.get(agrupamento.id) ?? { nome: agrupamento.nome, itens: [] };
+        grupo.itens.push(item);
+        porGrupo.set(agrupamento.id, grupo);
+      } else {
+        avulsos.push(item);
+      }
+    }
+
+    const linhas: LinhaRealizado[] = [];
+    for (const [id, grupo] of porGrupo) {
+      linhas.push({
+        chave: id,
+        nome: grupo.nome,
+        valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
+        meta: grupo.itens.reduce((acc, i) => acc + (metaPorMusculo.get(i.musculo.id) ?? 0), 0),
+        musculo: null,
+        subItens: grupo.itens.map((i) => ({
+          musculo: i.musculo,
+          valor: i.valor,
+          meta: metaPorMusculo.get(i.musculo.id) ?? 0,
+        })),
+      });
+    }
+    for (const item of avulsos) {
+      linhas.push({
+        chave: item.musculo.id,
+        nome: item.musculo.nome,
+        valor: item.valor,
+        meta: metaPorMusculo.get(item.musculo.id) ?? 0,
+        musculo: item.musculo,
+        subItens: null,
+      });
+    }
+    return linhas.sort((a, b) => b.valor - a.valor);
   });
 
   let mostrarGradeRealizado = $state(false);
@@ -631,16 +730,39 @@
               <p class="muted">Nenhuma série definida ainda.</p>
             {:else}
               <div class="lista">
-                {#each lista as item (item.musculo.id)}
+                {#each lista as linha (linha.chave)}
+                  {@const grupoChave = `${treino.id}:${linha.chave}`}
+                  {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
                   <div class="item">
-                    <span class="nome">{item.musculo.nome}</span>
+                    {#if linha.subItens}
+                      <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
+                        <span class="chevron-grupo" class:aberto>›</span>
+                        {linha.nome}
+                      </button>
+                    {:else}
+                      <span class="nome">{linha.nome}</span>
+                    {/if}
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${item.pct}%; background: ${item.cor};`}>
-                        <span class="barra-pct">{item.pct.toFixed(0)}%</span>
+                      <div class="barra" style={`width: ${linha.pct}%; background: ${linha.cor};`}>
+                        <span class="barra-pct">{linha.pct.toFixed(0)}%</span>
                       </div>
                     </div>
-                    <span class="valor">{item.contagem}</span>
+                    <span class="valor">{linha.contagem}</span>
                   </div>
+                  {#if aberto && linha.subItens}
+                    {#each linha.subItens as sub (sub.musculo.id)}
+                      <div class="item item-sub">
+                        <span class="nome">{sub.musculo.nome}</span>
+                        <div class="barra-wrap">
+                          <div
+                            class="barra"
+                            style={`width: ${linha.valor > 0 ? (sub.valor / linha.valor) * 100 : 0}%; background: ${linha.cor};`}
+                          ></div>
+                        </div>
+                        <span class="valor">{sub.contagem}</span>
+                      </div>
+                    {/each}
+                  {/if}
                 {/each}
               </div>
             {/if}
@@ -672,22 +794,48 @@
         <p class="muted">Nenhum treino registrado nesse mês.</p>
       {:else}
         <div class="lista" class:carregando={carregandoRealizado}>
-          {#each listaRealizado as item (item.musculo.id)}
-            {@const meta = metaPorMusculo.get(item.musculo.id) ?? 0}
+          {#each linhasRealizado as linha (linha.chave)}
+            {@const grupoChave = `realizado:${linha.chave}`}
+            {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
             <div class="item">
-              <span class="nome">{item.musculo.nome}</span>
-              {#if meta > 0}
+              {#if linha.subItens}
+                <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
+                  <span class="chevron-grupo" class:aberto>›</span>
+                  {linha.nome}
+                </button>
+              {:else}
+                <span class="nome">{linha.nome}</span>
+              {/if}
+              {#if linha.meta > 0}
                 <div class="barra-wrap">
-                  <div class="barra" style={`width: ${Math.min((item.valor / meta) * 100, 100)}%; background: var(--color-neutral);`}></div>
+                  <div class="barra" style={`width: ${Math.min((linha.valor / linha.meta) * 100, 100)}%; background: var(--color-neutral);`}></div>
                 </div>
-                <span class="valor" style="color: var(--color-neutral);">{item.valor} / {meta}</span>
+                <span class="valor" style="color: var(--color-neutral);">{linha.valor} / {linha.meta}</span>
               {:else}
                 <div class="barra-wrap">
-                  <div class="barra" style={`width: ${Math.min(item.valor * 8, 100)}%; background: ${corVolume(item.valor)};`}></div>
+                  <div class="barra" style={`width: ${Math.min(linha.valor * 8, 100)}%; background: ${corVolume(linha.valor)};`}></div>
                 </div>
-                <span class="valor" style={`color: ${corVolume(item.valor)};`}>{item.valor}</span>
+                <span class="valor" style={`color: ${corVolume(linha.valor)};`}>{linha.valor}</span>
               {/if}
             </div>
+            {#if aberto && linha.subItens}
+              {#each linha.subItens as sub (sub.musculo.id)}
+                <div class="item item-sub">
+                  <span class="nome">{sub.musculo.nome}</span>
+                  {#if sub.meta > 0}
+                    <div class="barra-wrap">
+                      <div class="barra" style={`width: ${Math.min((sub.valor / sub.meta) * 100, 100)}%; background: var(--color-neutral);`}></div>
+                    </div>
+                    <span class="valor" style="color: var(--color-neutral);">{sub.valor} / {sub.meta}</span>
+                  {:else}
+                    <div class="barra-wrap">
+                      <div class="barra" style={`width: ${Math.min(sub.valor * 8, 100)}%; background: ${corVolume(sub.valor)};`}></div>
+                    </div>
+                    <span class="valor" style={`color: ${corVolume(sub.valor)};`}>{sub.valor}</span>
+                  {/if}
+                </div>
+              {/each}
+            {/if}
           {/each}
         </div>
       {/if}
