@@ -249,8 +249,8 @@
     flex-shrink: 0;
   }
   .avatar-rotina {
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
+    border: 2px solid var(--color-primary);
+    color: var(--surface-fg);
   }
   .avatar-rotina-texto {
     display: -webkit-box;
