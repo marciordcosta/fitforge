@@ -33,12 +33,6 @@
     return distribuicaoMusculosExercicio(ex).map((m, i) => ({ ...m, cor: PALETA[i % PALETA.length] }));
   }
 
-  function subtituloAria(ex: Exercicio): string {
-    return distribuicao(ex)
-      .map((m) => `${m.nome} ${m.pct.toFixed(0)}%`)
-      .join(", ");
-  }
-
   const filtrados = $derived(exercicios.filter((ex) => correspondeBusca(textoBuscavelExercicio(ex), busca)));
 </script>
 
@@ -102,9 +96,17 @@
               {#if !ex.musculos.length}
                 <span class="sub">Sem músculo definido</span>
               {:else}
-                <span class="musculos-barra" aria-label={subtituloAria(ex)}>
+                <span class="musculos-linhas">
                   {#each distribuicao(ex) as m (m.nome)}
-                    <span class="musculos-segmento" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
+                    <span class="musculo-coluna">
+                      <span class="musculo-nome-mini">{m.nome}</span>
+                      <span class="musculo-linha-barra">
+                        <span class="musculo-barra-mini-wrap">
+                          <span class="musculo-barra-mini" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
+                        </span>
+                        <span class="musculo-pct-mini">{m.pct.toFixed(0)}%</span>
+                      </span>
+                    </span>
                   {/each}
                 </span>
               {/if}
@@ -241,17 +243,46 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
-  .musculos-barra {
+  .musculos-linhas {
     display: flex;
-    width: 100%;
-    height: 8px;
+    gap: var(--space-3);
     margin-top: var(--space-1);
-    border-radius: 4px;
+  }
+  .musculo-coluna {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .musculo-nome-mini {
+    font-size: 10px;
+    color: var(--surface-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .musculo-linha-barra {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  .musculo-barra-mini-wrap {
+    flex: 1;
+    min-width: 0;
+    height: 4px;
+    border-radius: 2px;
     overflow: hidden;
     background: var(--surface-border);
   }
-  .musculos-segmento {
+  .musculo-barra-mini {
+    display: block;
     height: 100%;
+  }
+  .musculo-pct-mini {
+    flex-shrink: 0;
+    font-size: 9px;
+    color: var(--surface-muted);
   }
   .chevron {
     color: var(--surface-muted);
