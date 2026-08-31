@@ -18,7 +18,7 @@
     onFechar,
   }: {
     exercicio: Exercicio;
-    metricaInicial: "peso" | "1rm" | "volume";
+    metricaInicial: "peso" | "1rm" | "volume" | "todos";
     filtroQtd?: number | null;
     onFechar: () => void;
   } = $props();
@@ -81,8 +81,26 @@
   }
 
   function alternarComparacao() {
+    if (metrica === "todos") return;
     comparando = !comparando;
     if (comparando) void carregarComparaveis();
+  }
+
+  function escolherMetrica(nova: typeof metrica) {
+    metrica = nova;
+    if (nova === "todos") comparando = false;
+  }
+
+  /** Comparação entre 1RM, Peso e Volume do próprio exercício, cada um numa linha (também
+   * só a forma da curva, não o valor bruto — as unidades nem são comparáveis entre si). */
+  const METRICAS_TODOS = [
+    { chave: "1rm" as const, label: "1RM", cor: "#5eead4" },
+    { chave: "peso" as const, label: "Peso", cor: "#60a5fa" },
+    { chave: "volume" as const, label: "Volume", cor: "#f472b6" },
+  ];
+
+  function valorPorChave(h: HistoricoPonto, chave: "1rm" | "peso" | "volume"): number {
+    return chave === "peso" ? h.maiorPeso : chave === "1rm" ? Math.round(h.melhor1rm * 10) / 10 : h.volumeTotal;
   }
 
   function formatData(iso: string): string {
@@ -122,6 +140,40 @@
   function desenharGrafico() {
     if (!canvas || !historicoFiltrado.length) return;
     chart?.destroy();
+
+    if (metrica === "todos") {
+      chart = new Chart(canvas, {
+        type: "line",
+        data: {
+          labels: historicoFiltrado.map((h) => formatData(h.data)),
+          datasets: METRICAS_TODOS.map((m) => ({
+            label: m.label,
+            data: normalizar(historicoFiltrado.map((h) => valorPorChave(h, m.chave))),
+            borderColor: m.cor,
+            backgroundColor: m.cor,
+            tension: 0.3,
+            pointRadius: 3,
+            spanGaps: true,
+          })),
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 20 } },
+          plugins: {
+            legend: { display: true, position: "bottom", labels: { color: "#9aa0ab", boxWidth: 12, font: { size: 11 } } },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: "#9aa0ab", maxTicksLimit: 6, autoSkip: true, font: { size: 10 } },
+            },
+            y: { display: false, min: 0, max: 1 },
+          },
+        },
+      });
+      return;
+    }
 
     // União de todas as datas visíveis (principal + comparação), pra alinhar tudo na mesma linha do tempo.
     const datasSet = new Set(historicoFiltrado.map((h) => h.data));
@@ -221,7 +273,7 @@
       class="icone-topo"
       class:ativo={comparando}
       onclick={alternarComparacao}
-      disabled={carregandoComparaveis}
+      disabled={carregandoComparaveis || metrica === "todos"}
       aria-label="Comparar com outros exercícios"
     >
       {@render iconComparar()}
@@ -238,9 +290,10 @@
     {/if}
   </div>
   <div class="toggle">
-    <button class:active={metrica === "1rm"} onclick={() => (metrica = "1rm")}>Máximo 1RM</button>
-    <button class:active={metrica === "peso"} onclick={() => (metrica = "peso")}>Maior Peso</button>
-    <button class:active={metrica === "volume"} onclick={() => (metrica = "volume")}>Maior Volume</button>
+    <button class:active={metrica === "1rm"} onclick={() => escolherMetrica("1rm")}>Máximo 1RM</button>
+    <button class:active={metrica === "peso"} onclick={() => escolherMetrica("peso")}>Maior Peso</button>
+    <button class:active={metrica === "volume"} onclick={() => escolherMetrica("volume")}>Maior Volume</button>
+    <button class:active={metrica === "todos"} onclick={() => escolherMetrica("todos")}>Todos</button>
   </div>
 </div>
 
