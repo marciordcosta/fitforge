@@ -632,6 +632,7 @@
     titulo: string;
     totalSeries: number;
     porSerie: ItemDetalheRotina[];
+    cores: string[];
   } | null>(null);
 
   function abrirGraficoTreino(treino: TreinoComExercicios): void {
@@ -641,7 +642,7 @@
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie };
+    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie, cores: coresAbcAcumulado(porSerie) };
   }
 </script>
 
@@ -995,6 +996,7 @@
     <div class="pizza-wrap">
       <PieChart
         dados={modalGraficoTreino.porSerie.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
+        cores={modalGraficoTreino.cores}
         centroValor={modalGraficoTreino.totalSeries}
         centroLabel="séries"
       />
