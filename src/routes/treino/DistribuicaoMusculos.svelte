@@ -140,13 +140,10 @@
    * Classifica cada série da rotina pela POSIÇÃO no treino (não pelo músculo) — a fadiga
    * acumula ao longo do treino, então uma série no início vale mais que uma no fim. Usa a
    * mesma regra 80/20 (corPorFaixa) sobre o percentual acumulado de séries já feitas na
-   * ordem dos exercícios, e distribui a contribuição de cada músculo entre a faixa em que
-   * ela caiu. `ponderado` escolhe a mesma unidade do valor que vai ser dividido:
-   * true = série equivalente (normalizada por peso_contribuicao, bate com
-   * contarSeriesEquivalentesPorMusculo); false = contagem bruta (bate com
-   * contarSeriesPorMusculo — 1 série conta 1 pra cada músculo do exercício).
+   * ordem dos exercícios, e distribui a série equivalente de cada músculo (mesma
+   * normalização de contarSeriesEquivalentesPorMusculo) entre a faixa em que ela caiu.
    */
-  function contarSeriesPorFaixaDePosicao(treino: TreinoComExercicios, ponderado: boolean): Map<string, Partes> {
+  function contarSeriesPorFaixaDePosicao(treino: TreinoComExercicios): Map<string, Partes> {
     const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
     const totalSeries = exerciciosOrdenados.reduce((acc, ex) => acc + ex.series.length, 0);
     const mapa = new Map<string, Partes>();
@@ -155,9 +152,7 @@
     let posicao = 0;
     for (const ex of exerciciosOrdenados) {
       if (!ex.exercicio) continue;
-      const distribuicao = ponderado
-        ? distribuicaoMusculosExercicio(ex.exercicio)
-        : ex.exercicio.musculos.map((m) => ({ musculo_id: m.musculo_id, pct: 100 }));
+      const distribuicao = distribuicaoMusculosExercicio(ex.exercicio);
       for (let s = 0; s < ex.series.length; s++) {
         posicao += 1;
         const cor = corPorFaixa((posicao / totalSeries) * 100);
@@ -198,7 +193,7 @@
       const totalSeries = t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
       const mapaEquivalente = contarSeriesEquivalentesPorMusculo(t);
       const mapaBruto = contarSeriesPorMusculo(t);
-      const mapaFaixaPosicao = contarSeriesPorFaixaDePosicao(t, true);
+      const mapaFaixaPosicao = contarSeriesPorFaixaDePosicao(t);
       const bruto = musculos
         .map((m) => ({
           musculo: m,
@@ -693,26 +688,20 @@
     });
   }
 
-  /** Gráfico de uma rotina específica: anel com o total literal de séries da rotina no
-   * centro por padrão (sem nada selecionado). Ao selecionar uma fatia, o centro passa a
-   * mostrar a contagem bruta daquele músculo (1 série conta pra cada músculo envolvido).
-   * Cada fatia é dividida nas faixas A/B/C por POSIÇÃO no treino (fadiga acumulada), não
-   * pela dominância do músculo — um músculo pode ter séries espalhadas do início ao fim. */
+  /** Gráfico de uma rotina específica: mesmos dados do card da rotina (distribuicaoPorTreino
+   * — série equivalente, agrupamento por agrupamento_id, faixas A/B/C por posição), só que
+   * em anel em vez de barras. Sem isso os dois ficavam mostrando números diferentes pro
+   * mesmo músculo (um bruto sem agrupar, outro ponderado agrupado). */
   let modalGraficoTreino = $state<{
     titulo: string;
     totalSeries: number;
-    porSerie: (ItemDetalheRotina & { partes: Partes })[];
+    porSerie: LinhaRotina[];
   } | null>(null);
 
   function abrirGraficoTreino(treino: TreinoComExercicios): void {
-    const mapaBruto = contarSeriesPorMusculo(treino);
-    const mapaFaixaPosicao = contarSeriesPorFaixaDePosicao(treino, false);
-    const porSerie = musculos
-      .map((m) => ({ musculo: m, valor: mapaBruto.get(m.id) ?? 0, partes: mapaFaixaPosicao.get(m.id) ?? partesVazias() }))
-      .filter((item) => item.valor > 0)
-      .sort((a, b) => b.valor - a.valor);
+    const lista = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie };
+    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie: lista };
   }
 </script>
 
@@ -1084,7 +1073,7 @@
     <div class="pizza-wrap">
       <PieChart
         dados={modalGraficoTreino.porSerie.map((i) => ({
-          nome: i.musculo.nome,
+          nome: i.nome,
           valor: i.valor,
           partes: partesParaSegmentos(i.partes),
         }))}
