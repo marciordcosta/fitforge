@@ -298,15 +298,17 @@
 </div>
 
 {#if mostrarFiltro}
-  <ActionSheet
-    titulo="Quantidade de registros"
-    onFechar={() => (mostrarFiltro = false)}
-    opcoes={FILTROS.map((f) => ({
-      label: f.label,
-      valor: filtroQtd === f.valor ? "✓" : undefined,
-      onSelect: () => (filtroQtd = f.valor),
-    }))}
-  />
+  <div class="sheet-acima">
+    <ActionSheet
+      titulo="Quantidade de registros"
+      onFechar={() => (mostrarFiltro = false)}
+      opcoes={FILTROS.map((f) => ({
+        label: f.label,
+        valor: filtroQtd === f.valor ? "✓" : undefined,
+        onSelect: () => (filtroQtd = f.valor),
+      }))}
+    />
+  </div>
 {/if}
 
 <style>
@@ -410,5 +412,11 @@
   .muted {
     color: var(--surface-muted);
     text-align: center;
+  }
+  /* O Sheet/ActionSheet usa z-index: 100, menor que o da tela cheia (200) — sem esse
+     wrapper com z-index maior, o menu de filtro abre escondido atrás do gráfico. */
+  .sheet-acima {
+    position: relative;
+    z-index: 300;
   }
 </style>
