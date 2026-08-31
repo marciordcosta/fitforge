@@ -337,6 +337,14 @@
   let buscaSubstituir = $state("");
   let todosExercicios = $state<Exercicio[]>([]);
 
+  /** Altura real (medida em runtime) do botão "+ Adicionar Série", pra igualar a altura das caixas de série/kg/reps/check sem chutar um valor fixo. */
+  let addSerieEls = $state<(HTMLButtonElement | null)[]>([]);
+  let alturaCaixaSerie = $state<number | null>(null);
+  $effect(() => {
+    const el = addSerieEls.find((e) => e != null);
+    if (el) alturaCaixaSerie = el.getBoundingClientRect().height;
+  });
+
   async function abrirSubstituir(exIdx: number) {
     substituindoExIdx = exIdx;
     if (!todosExercicios.length) todosExercicios = await listExercicios();
@@ -484,14 +492,47 @@
     }
   }
 
-  function moverExercicio(idx: number, direcao: -1 | 1) {
-    const alvo = idx + direcao;
-    if (alvo < 0 || alvo >= sessao.length) return;
-    const novas = sessao.slice();
-    [novas[idx], novas[alvo]] = [novas[alvo], novas[idx]];
-    sessao = novas;
-    houveAlteracaoEstrutura = true;
+  let arrastandoIdx = $state<number | null>(null);
+  let itemReordenarRefs: (HTMLElement | null)[] = [];
+
+  function iniciarArrasteExercicio(e: PointerEvent, idx: number) {
+    arrastandoIdx = idx;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
+
+  function moverDuranteArraste(e: PointerEvent) {
+    if (arrastandoIdx === null) return;
+    const y = e.clientY;
+    for (let i = 0; i < itemReordenarRefs.length; i++) {
+      const el = itemReordenarRefs[i];
+      if (!el || i === arrastandoIdx) continue;
+      const rect = el.getBoundingClientRect();
+      const meio = rect.top + rect.height / 2;
+      if ((i < arrastandoIdx && y < meio) || (i > arrastandoIdx && y > meio)) {
+        const novas = sessao.slice();
+        const [item] = novas.splice(arrastandoIdx, 1);
+        novas.splice(i, 0, item);
+        sessao = novas;
+        arrastandoIdx = i;
+        houveAlteracaoEstrutura = true;
+        break;
+      }
+    }
+  }
+
+  function finalizarArrasteExercicio() {
+    arrastandoIdx = null;
+  }
+
+  $effect(() => {
+    if (arrastandoIdx === null) return;
+    window.addEventListener("pointermove", moverDuranteArraste);
+    window.addEventListener("pointerup", finalizarArrasteExercicio);
+    return () => {
+      window.removeEventListener("pointermove", moverDuranteArraste);
+      window.removeEventListener("pointerup", finalizarArrasteExercicio);
+    };
+  });
 
   let mostrarEscolhaEstrutura = $state(false);
 
@@ -616,13 +657,18 @@
               {#if serieItem.prPeso || serieItem.pr1rm || serieItem.prVolume}
                 <button
                   class="serie-num medalha"
+                  style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
                   onclick={() => (recordeAberto = { exIdx, setIdx })}
                   aria-label="Ver recorde batido"
                 >
                   {@render iconMedalha()}
                 </button>
               {:else}
-                <button class="serie-num" onclick={() => toggleMenuSerie(exIdx, setIdx)}>
+                <button
+                  class="serie-num"
+                  style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
+                  onclick={() => toggleMenuSerie(exIdx, setIdx)}
+                >
                   {serieItem.serie}
                 </button>
               {/if}
@@ -636,18 +682,21 @@
               <input
                 type="number"
                 inputmode="decimal"
+                style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
                 placeholder={serieItem.anteriorPeso != null ? String(serieItem.anteriorPeso) : "-"}
                 bind:value={serieItem.peso}
               />
               <input
                 type="number"
                 inputmode="decimal"
+                style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
                 placeholder={serieItem.anteriorReps != null ? String(serieItem.anteriorReps) : "-"}
                 bind:value={serieItem.repeticoes}
               />
               <button
                 class="check"
                 class:ativo={serieItem.concluida}
+                style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
                 onclick={() => toggleConcluida(exIdx, setIdx)}
                 aria-label="Marcar série concluída"
               >
@@ -656,7 +705,7 @@
             </div>
           {/each}
         </div>
-        <button class="add-serie" onclick={() => adicionarSerie(exIdx)}>+ Adicionar Série</button>
+        <button class="add-serie" bind:this={addSerieEls[exIdx]} onclick={() => adicionarSerie(exIdx)}>+ Adicionar Série</button>
       </div>
     {/each}
 
@@ -850,17 +899,35 @@
 {/if}
 
 {#if reordenando}
-  <Sheet titulo="Reordenar Exercícios" onFechar={() => (reordenando = false)}>
-    {#each sessao as ex, idx (ex.exercicio_id)}
-      <div class="reorder-item">
-        <span>{ex.nome}</span>
-        <div class="acoes">
-          <button onclick={() => moverExercicio(idx, -1)} disabled={idx === 0} aria-label="Mover para cima">▲</button>
-          <button onclick={() => moverExercicio(idx, 1)} disabled={idx === sessao.length - 1} aria-label="Mover para baixo">▼</button>
-        </div>
+  <div class="tela-reordenar">
+    <div class="reordenar-conteudo">
+      <div class="picker-header">
+        <button class="voltar-icon" onclick={() => (reordenando = false)} aria-label="Voltar">←</button>
+        <h1>Reordenar</h1>
+        <span class="header-spacer"></span>
       </div>
-    {/each}
-  </Sheet>
+      <div class="reordenar-lista">
+        {#each sessao as ex, idx (ex.exercicio_id)}
+          <div
+            class="reordenar-item"
+            class:arrastando={arrastandoIdx === idx}
+            bind:this={itemReordenarRefs[idx]}
+          >
+            <button class="remover-circulo" onclick={() => removerExercicio(idx)} aria-label="Remover">−</button>
+            <span class="reordenar-nome">{ex.nome}</span>
+            <button
+              class="handle-arraste"
+              onpointerdown={(e) => iniciarArrasteExercicio(e, idx)}
+              aria-label="Arrastar para reordenar"
+            >
+              ☰
+            </button>
+          </div>
+        {/each}
+      </div>
+      <button class="feito-btn" onclick={() => (reordenando = false)}>Feito</button>
+    </div>
+  </div>
 {/if}
 
 {#if mostrarConfirmDescartar}
@@ -1238,6 +1305,88 @@
     z-index: 150;
     overflow-y: auto;
   }
+  .tela-reordenar {
+    position: fixed;
+    inset: 0;
+    background: var(--surface-bg);
+    z-index: 150;
+    overflow: hidden;
+  }
+  .reordenar-conteudo {
+    max-width: 480px;
+    height: 100%;
+    margin: 0 auto;
+    padding: var(--space-4);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+  .voltar-icon {
+    background: none;
+    border: none;
+    color: var(--surface-fg);
+    font-size: var(--font-size-lg);
+    cursor: pointer;
+    padding: var(--space-1);
+  }
+  .reordenar-lista {
+    overflow-y: auto;
+    flex: 1;
+  }
+  .reordenar-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--surface-border);
+    touch-action: none;
+  }
+  .reordenar-item.arrastando {
+    background: var(--surface-card);
+    opacity: 0.8;
+  }
+  .remover-circulo {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-danger);
+    color: #fff;
+    font-size: var(--font-size-base);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .reordenar-nome {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .handle-arraste {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--surface-muted);
+    font-size: var(--font-size-lg);
+    cursor: grab;
+    touch-action: none;
+    padding: var(--space-2);
+  }
+  .feito-btn {
+    flex-shrink: 0;
+    margin-top: var(--space-3);
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+  }
   .tela-picker-conteudo {
     max-width: 480px;
     margin: 0 auto;
@@ -1479,31 +1628,5 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
     cursor: pointer;
-  }
-  .reorder-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--surface-border);
-  }
-  .reorder-item .acoes {
-    display: flex;
-    gap: var(--space-1);
-  }
-  .reorder-item .acoes button {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
-    color: var(--surface-fg);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-  }
-  .reorder-item .acoes button:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
   }
 </style>
