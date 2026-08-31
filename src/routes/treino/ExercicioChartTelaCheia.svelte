@@ -14,8 +14,14 @@
   let {
     exercicio,
     metricaInicial,
+    filtroQtd = $bindable(6),
     onFechar,
-  }: { exercicio: Exercicio; metricaInicial: "peso" | "1rm" | "volume"; onFechar: () => void } = $props();
+  }: {
+    exercicio: Exercicio;
+    metricaInicial: "peso" | "1rm" | "volume";
+    filtroQtd?: number | null;
+    onFechar: () => void;
+  } = $props();
 
   const COR_PRINCIPAL = "#5eead4";
 
@@ -39,7 +45,6 @@
     { valor: 24, label: "Últimos 24 registros" },
     { valor: null, label: "Tudo" },
   ] as const;
-  let filtroQtd = $state<number | null>(6);
   let mostrarFiltro = $state(false);
 
   const historicoFiltrado = $derived(filtroQtd == null ? historico : historico.slice(-filtroQtd));
@@ -89,6 +94,18 @@
     return metrica === "peso" ? h.maiorPeso : metrica === "1rm" ? Math.round(h.melhor1rm * 10) / 10 : h.volumeTotal;
   }
 
+  /** Normaliza a série pro próprio intervalo (0 a 1) — na comparação não interessa o valor
+   * absoluto (escalas muito diferentes entre exercícios), só a forma da curva: se um está
+   * subindo enquanto o outro cai, por exemplo. */
+  function normalizar(serie: (number | null)[]): (number | null)[] {
+    const valores = serie.filter((v): v is number => v != null);
+    if (!valores.length) return serie;
+    const min = Math.min(...valores);
+    const max = Math.max(...valores);
+    if (max === min) return serie.map((v) => (v == null ? null : 0.5));
+    return serie.map((v) => (v == null ? null : (v - min) / (max - min)));
+  }
+
   /** Só entram na comparação os registros dentro da mesma janela de datas do exercício principal (já filtrado). */
   const comparaveisNaJanela = $derived.by(() => {
     if (!comparando || !historicoFiltrado.length) return [];
@@ -123,10 +140,12 @@
       return arr;
     }
 
+    const ajustar = (s: (number | null)[]) => (comparando ? normalizar(s) : s);
+
     const datasets: ChartDataset<"line", (number | null)[]>[] = [
       {
         label: exercicio.nome,
-        data: serie(historicoFiltrado),
+        data: ajustar(serie(historicoFiltrado)),
         borderColor: COR_PRINCIPAL,
         backgroundColor: COR_PRINCIPAL,
         tension: 0.3,
@@ -137,7 +156,7 @@
         const cor = PALETA[i % PALETA.length];
         return {
           label: c.exercicio.nome,
-          data: serie(c.historico),
+          data: ajustar(serie(c.historico)),
           borderColor: cor,
           backgroundColor: cor,
           tension: 0.3,
@@ -167,7 +186,9 @@
             grid: { display: false },
             ticks: { color: "#9aa0ab", maxTicksLimit: 6, autoSkip: true, font: { size: 10 } },
           },
-          y: { ticks: { color: "#9aa0ab" }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
+          y: comparando
+            ? { display: false, min: 0, max: 1 }
+            : { ticks: { color: "#9aa0ab" }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
         },
       },
     });

@@ -29,6 +29,12 @@
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
 
+  /** Compartilhado com o gráfico (ExercicioChart) — o mesmo filtro por quantidade de
+   * registros usado no gráfico também restringe a lista de sessões abaixo dele.
+   * `historico` já vem ordenado do mais recente pro mais antigo. */
+  let filtroQtd = $state<number | null>(6);
+  const historicoFiltrado = $derived(filtroQtd == null ? historico : historico.slice(0, filtroQtd));
+
   let nome = $state("");
   let padraoId = $state("");
   let linhasMusculos = $state<LinhaMusculoInput[]>([]);
@@ -191,11 +197,11 @@
         {/each}
       </div>
     {/if}
-    <ExercicioChart {exercicio} />
+    <ExercicioChart {exercicio} bind:filtroQtd />
     {#if !historico.length}
       <p class="muted">Nenhum registro ainda.</p>
     {:else}
-      {#each historico as sessao (sessao.treinoNome + sessao.data)}
+      {#each historicoFiltrado as sessao (sessao.treinoNome + sessao.data)}
         <div class="sessao-card">
           <div class="sessao-header">
             <button

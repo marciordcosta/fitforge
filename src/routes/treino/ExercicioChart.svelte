@@ -3,7 +3,7 @@
   import { getHistoricoExercicio, type HistoricoPonto, type Exercicio } from "../../lib/treinoApi";
   import ExercicioChartTelaCheia from "./ExercicioChartTelaCheia.svelte";
 
-  let { exercicio }: { exercicio: Exercicio } = $props();
+  let { exercicio, filtroQtd = $bindable(6) }: { exercicio: Exercicio; filtroQtd?: number | null } = $props();
 
   let historico = $state<HistoricoPonto[]>([]);
   let loading = $state(true);
@@ -20,21 +20,23 @@
 
   void carregar();
 
+  const historicoFiltrado = $derived(filtroQtd == null ? historico : historico.slice(-filtroQtd));
+
   function formatData(iso: string): string {
     const [y, m, d] = iso.split("-");
     return `${d}/${m}/${y.slice(2)}`;
   }
 
   function desenharGrafico() {
-    if (!canvas || !historico.length) return;
+    if (!canvas || !historicoFiltrado.length) return;
     chart?.destroy();
-    const valores = historico.map((h) =>
+    const valores = historicoFiltrado.map((h) =>
       metrica === "peso" ? h.maiorPeso : metrica === "1rm" ? Math.round(h.melhor1rm * 10) / 10 : h.volumeTotal,
     );
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: historico.map((h) => formatData(h.data)),
+        labels: historicoFiltrado.map((h) => formatData(h.data)),
         datasets: [
           {
             data: valores,
@@ -81,7 +83,7 @@
 {/if}
 
 {#if mostrarTelaCheia}
-  <ExercicioChartTelaCheia {exercicio} metricaInicial={metrica} onFechar={() => (mostrarTelaCheia = false)} />
+  <ExercicioChartTelaCheia {exercicio} metricaInicial={metrica} bind:filtroQtd onFechar={() => (mostrarTelaCheia = false)} />
 {/if}
 
 <style>
