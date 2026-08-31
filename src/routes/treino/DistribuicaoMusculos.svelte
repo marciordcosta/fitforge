@@ -513,9 +513,11 @@
                   <div class="item">
                     <span class="nome">{item.musculo.nome}</span>
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${item.pct}%; background: ${item.cor};`}></div>
+                      <div class="barra" style={`width: ${item.pct}%; background: ${item.cor};`}>
+                        <span class="barra-pct">{item.pct.toFixed(0)}%</span>
+                      </div>
                     </div>
-                    <span class="valor">{item.pct.toFixed(0)}%</span>
+                    <span class="valor">{item.valor}</span>
                   </div>
                 {/each}
               </div>
@@ -904,11 +906,22 @@
     height: 10px;
     background: var(--surface-border);
     border-radius: 6px;
-    overflow: hidden;
   }
   .barra {
+    position: relative;
     height: 100%;
     border-radius: 6px;
+  }
+  .barra-pct {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: var(--space-1);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--surface-muted);
+    white-space: nowrap;
   }
   .item .valor {
     text-align: right;
