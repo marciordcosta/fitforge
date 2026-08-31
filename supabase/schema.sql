@@ -8,11 +8,19 @@
 -- TREINO
 -- ============================================================
 
+create table agrupamentos_musculares (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id),
+  nome text not null,
+  ordem int not null default 0,
+  unique (user_id, nome)
+);
+
 create table musculos (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id),
   nome text not null,
-  grupo_exibicao text,
+  agrupamento_id uuid references agrupamentos_musculares(id) on delete set null,
   ordem int not null default 0,
   unique (user_id, nome)
 );
@@ -145,6 +153,7 @@ from treino_registros tr
 join exercicio_musculos em on em.exercicio_id = tr.exercicio_id
 group by tr.user_id, tr.data, em.musculo_id;
 
+alter table agrupamentos_musculares enable row level security;
 alter table musculos enable row level security;
 alter table padroes_movimento enable row level security;
 alter table exercicios enable row level security;
@@ -154,6 +163,9 @@ alter table treinos enable row level security;
 alter table treino_exercicios enable row level security;
 alter table treino_exercicio_series enable row level security;
 alter table treino_registros enable row level security;
+
+create policy "agrupamentos_musculares_owner" on agrupamentos_musculares for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 create policy "musculos_owner" on musculos for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());

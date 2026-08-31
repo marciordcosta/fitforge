@@ -6,10 +6,17 @@ export const PESOS_CONTRIBUICAO_PRESET = [1, 0.75, 0.5, 0.25] as const;
 export type Papel = "primario" | "secundario";
 export type HistoricoFonte = "ultimo_exercicio" | "ultima_rotina";
 
+export interface AgrupamentoMuscular {
+  id: string;
+  nome: string;
+  ordem: number;
+}
+
 export interface Musculo {
   id: string;
   nome: string;
-  grupo_exibicao: string | null;
+  agrupamento_id: string | null;
+  agrupamento?: AgrupamentoMuscular | null;
   ordem: number;
 }
 
@@ -125,54 +132,105 @@ export function textoBuscavelExercicio(ex: Exercicio): string {
   return [ex.nome, ex.padrao?.nome ?? "", musculos].join(" ");
 }
 
-// ---------------- Músculos ----------------
+// ---------------- Agrupamentos Musculares ----------------
+// Catálogo próprio de "grupo de exibição" pra músculos subdivididos (ex: Ombro
+// Anterior/Lateral/Posterior todos no agrupamento "Ombro") — usado futuramente
+// pra somar totais por grupo. Referenciado por musculos.agrupamento_id.
 
-export async function listMusculos(): Promise<Musculo[]> {
+export async function listAgrupamentosMusculares(): Promise<AgrupamentoMuscular[]> {
   const { data, error } = await supabase
-    .from("musculos")
-    .select("id, nome, grupo_exibicao, ordem")
+    .from("agrupamentos_musculares")
+    .select("id, nome, ordem")
     .order("ordem", { ascending: true });
   if (error) throw error;
   return data ?? [];
 }
 
-/**
- * Busca um músculo pelo nome ou cria um novo. `grupoExibicao` só é usado na criação (nunca
- * sobrescreve o grupo de um músculo já existente que só está sendo referenciado por nome).
- */
-export async function findOrCreateMusculo(nome: string, grupoExibicao?: string | null): Promise<Musculo> {
+export async function findOrCreateAgrupamentoMuscular(nome: string): Promise<AgrupamentoMuscular> {
   const nomeTrim = nome.trim();
   const { data: existente } = await supabase
-    .from("musculos")
-    .select("id, nome, grupo_exibicao, ordem")
+    .from("agrupamentos_musculares")
+    .select("id, nome, ordem")
     .eq("user_id", uid())
     .ilike("nome", nomeTrim)
     .maybeSingle();
   if (existente) return existente;
 
   const { data, error } = await supabase
-    .from("musculos")
-    .insert({ user_id: uid(), nome: nomeTrim, grupo_exibicao: grupoExibicao?.trim() || null, ordem: 0 })
-    .select("id, nome, grupo_exibicao, ordem")
+    .from("agrupamentos_musculares")
+    .insert({ user_id: uid(), nome: nomeTrim, ordem: 0 })
+    .select("id, nome, ordem")
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function getMusculo(id: string): Promise<Musculo | null> {
+export async function getAgrupamentoMuscular(id: string): Promise<AgrupamentoMuscular | null> {
   const { data, error } = await supabase
-    .from("musculos")
-    .select("id, nome, grupo_exibicao, ordem")
+    .from("agrupamentos_musculares")
+    .select("id, nome, ordem")
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
   return data;
 }
 
-export async function updateMusculo(id: string, nome: string, grupoExibicao: string | null): Promise<void> {
+export async function updateAgrupamentoMuscular(id: string, nome: string): Promise<void> {
+  const { error } = await supabase.from("agrupamentos_musculares").update({ nome: nome.trim() }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteAgrupamentoMuscular(id: string): Promise<void> {
+  const { error } = await supabase.from("agrupamentos_musculares").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------------- Músculos ----------------
+
+const MUSCULO_SELECT = "id, nome, agrupamento_id, ordem, agrupamento:agrupamentos_musculares(id, nome, ordem)";
+
+export async function listMusculos(): Promise<Musculo[]> {
+  const { data, error } = await supabase
+    .from("musculos")
+    .select(MUSCULO_SELECT)
+    .order("ordem", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as Musculo[];
+}
+
+/**
+ * Busca um músculo pelo nome ou cria um novo. `agrupamentoId` só é usado na criação (nunca
+ * sobrescreve o agrupamento de um músculo já existente que só está sendo referenciado por nome).
+ */
+export async function findOrCreateMusculo(nome: string, agrupamentoId?: string | null): Promise<Musculo> {
+  const nomeTrim = nome.trim();
+  const { data: existente } = await supabase
+    .from("musculos")
+    .select(MUSCULO_SELECT)
+    .eq("user_id", uid())
+    .ilike("nome", nomeTrim)
+    .maybeSingle();
+  if (existente) return existente as unknown as Musculo;
+
+  const { data, error } = await supabase
+    .from("musculos")
+    .insert({ user_id: uid(), nome: nomeTrim, agrupamento_id: agrupamentoId || null, ordem: 0 })
+    .select(MUSCULO_SELECT)
+    .single();
+  if (error) throw error;
+  return data as unknown as Musculo;
+}
+
+export async function getMusculo(id: string): Promise<Musculo | null> {
+  const { data, error } = await supabase.from("musculos").select(MUSCULO_SELECT).eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data as unknown as Musculo | null;
+}
+
+export async function updateMusculo(id: string, nome: string, agrupamentoId: string | null): Promise<void> {
   const { error } = await supabase
     .from("musculos")
-    .update({ nome: nome.trim(), grupo_exibicao: grupoExibicao?.trim() || null })
+    .update({ nome: nome.trim(), agrupamento_id: agrupamentoId || null })
     .eq("id", id);
   if (error) throw error;
 }
@@ -216,8 +274,7 @@ export interface PadraoMovimentoComMusculos extends PadraoMovimento {
   musculos: Musculo[];
 }
 
-const PADRAO_COM_MUSCULOS_SELECT =
-  "id, nome, cor_fundo, cor_fonte, ordem, musculos:padrao_movimento_musculos(musculo:musculos(id, nome, grupo_exibicao, ordem))";
+const PADRAO_COM_MUSCULOS_SELECT = `id, nome, cor_fundo, cor_fonte, ordem, musculos:padrao_movimento_musculos(musculo:musculos(${MUSCULO_SELECT}))`;
 
 interface PadraoRow {
   id: string;
@@ -263,7 +320,7 @@ export async function getPadraoMovimentoComMusculos(id: string): Promise<PadraoM
 export async function listMusculosDoPadrao(padraoId: string): Promise<Musculo[]> {
   const { data, error } = await supabase
     .from("padrao_movimento_musculos")
-    .select("musculo:musculos(id, nome, grupo_exibicao, ordem)")
+    .select(`musculo:musculos(${MUSCULO_SELECT})`)
     .eq("padrao_id", padraoId)
     .order("ordem", { ascending: true });
   if (error) throw error;
@@ -314,8 +371,7 @@ export async function deletePadraoMovimento(id: string): Promise<void> {
 
 // ---------------- Exercícios ----------------
 
-const EXERCICIO_SELECT =
-  "id, padrao_id, nome, descanso_padrao_seg, ordem, padrao:padroes_movimento(id, nome, cor_fundo, cor_fonte, ordem), musculos:exercicio_musculos(musculo_id, papel, peso_contribuicao, musculo:musculos(id, nome, grupo_exibicao, ordem))";
+const EXERCICIO_SELECT = `id, padrao_id, nome, descanso_padrao_seg, ordem, padrao:padroes_movimento(id, nome, cor_fundo, cor_fonte, ordem), musculos:exercicio_musculos(musculo_id, papel, peso_contribuicao, musculo:musculos(${MUSCULO_SELECT}))`;
 
 export async function listExercicios(): Promise<Exercicio[]> {
   const { data, error } = await supabase

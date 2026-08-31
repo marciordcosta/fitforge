@@ -13,6 +13,9 @@
   import Musculos from "./Musculos.svelte";
   import MusculoDetalhe from "./MusculoDetalhe.svelte";
   import MusculoForm from "./MusculoForm.svelte";
+  import AgrupamentosMusculares from "./AgrupamentosMusculares.svelte";
+  import AgrupamentoMuscularDetalhe from "./AgrupamentoMuscularDetalhe.svelte";
+  import AgrupamentoMuscularForm from "./AgrupamentoMuscularForm.svelte";
   import DistribuicaoMusculos from "./DistribuicaoMusculos.svelte";
   import HistoricoCalendario from "./HistoricoCalendario.svelte";
   import HistoricoDia from "./HistoricoDia.svelte";
@@ -50,6 +53,12 @@
   <MusculoDetalhe musculoId={segmentos[1]} />
 {:else if segmentos[0] === "musculos"}
   <Musculos />
+{:else if segmentos[0] === "agrupamentos" && segmentos[1] === "novo"}
+  <AgrupamentoMuscularForm />
+{:else if segmentos[0] === "agrupamentos" && segmentos[1]}
+  <AgrupamentoMuscularDetalhe agrupamentoId={segmentos[1]} />
+{:else if segmentos[0] === "agrupamentos"}
+  <AgrupamentosMusculares />
 {:else if segmentos[0] === "distribuicao"}
   <DistribuicaoMusculos />
 {:else if segmentos[0] === "historico" && segmentos[1] === "avulso" && segmentos[2]}

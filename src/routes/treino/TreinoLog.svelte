@@ -734,6 +734,13 @@
     <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
   </svg>
 {/snippet}
+{#snippet iconAgrupamento()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+    <polyline points="2 17 12 22 22 17" />
+    <polyline points="2 12 12 17 22 12" />
+  </svg>
+{/snippet}
 {#snippet iconMedalha()}
   <svg viewBox="0 0 24 24" fill="none">
     <path d="M7 6H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4" stroke="#d97706" stroke-width="1.4" stroke-linecap="round" />
@@ -826,6 +833,7 @@
       { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo") },
       { label: "Padrão de Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos") },
       { label: "Grupo Muscular", icon: iconMusculo, onSelect: () => navigate("/treino/musculos") },
+      { label: "Agrupamento", icon: iconAgrupamento, onSelect: () => navigate("/treino/agrupamentos") },
     ]}
   />
 {/if}

@@ -1,38 +1,19 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { findOrCreateMusculo, listAgrupamentosMusculares, type AgrupamentoMuscular } from "../../lib/treinoApi";
-  import WheelPicker from "../../components/WheelPicker.svelte";
+  import { findOrCreateAgrupamentoMuscular } from "../../lib/treinoApi";
 
   let nome = $state("");
-  let agrupamentoId = $state("");
   let salvando = $state(false);
-
-  let agrupamentos = $state<AgrupamentoMuscular[]>([]);
-  let mostrarAgrupamentoPicker = $state(false);
-
-  async function carregarAgrupamentos() {
-    agrupamentos = await listAgrupamentosMusculares();
-  }
-
-  void carregarAgrupamentos();
-
-  const opcoesAgrupamento = $derived([
-    { valor: "", label: "Nenhum" },
-    ...agrupamentos
-      .slice()
-      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
-      .map((a) => ({ valor: a.id, label: a.nome })),
-  ]);
 
   async function salvar() {
     if (!nome.trim()) {
-      alert("Informe o nome do músculo.");
+      alert("Informe o nome do agrupamento.");
       return;
     }
     salvando = true;
     try {
-      const musculo = await findOrCreateMusculo(nome, agrupamentoId);
-      navigate(`/treino/musculos/${musculo.id}`);
+      const agrupamento = await findOrCreateAgrupamentoMuscular(nome);
+      navigate(`/treino/agrupamentos/${agrupamento.id}`);
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
     } finally {
@@ -54,38 +35,16 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/treino/musculos")} aria-label="Voltar">{@render iconVoltar()}</button>
-    <h1>Novo Músculo</h1>
+    <button class="back" onclick={() => voltar("/treino/agrupamentos")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <h1>Novo Agrupamento</h1>
     <button class="salvar" disabled={salvando} onclick={salvar} aria-label="Criar">{@render iconCheck()}</button>
   </div>
 
   <label class="field">
     <span>Nome</span>
-    <input type="text" bind:value={nome} placeholder="Ex: Deltoide Posterior" />
+    <input type="text" bind:value={nome} placeholder="Ex: Ombro" />
   </label>
-
-  <div class="field">
-    <span>Agrupamento (opcional)</span>
-    <button type="button" class="select-btn" onclick={() => (mostrarAgrupamentoPicker = true)}>
-      {agrupamentos.find((a) => a.id === agrupamentoId)?.nome ?? "Nenhum"}
-    </button>
-    <span class="ajuda">
-      Usado para somar músculos relacionados em totais futuros — ex: "Ombro Anterior", "Ombro
-      Lateral" e "Ombro Posterior" no agrupamento "Ombro". Cadastre agrupamentos no menu "+" em
-      Exercícios.
-    </span>
-  </div>
 </div>
-
-{#if mostrarAgrupamentoPicker}
-  <WheelPicker
-    titulo="Agrupamento"
-    opcoes={opcoesAgrupamento}
-    valorAtual={agrupamentoId}
-    onSelecionar={(v) => (agrupamentoId = v)}
-    onFechar={() => (mostrarAgrupamentoPicker = false)}
-  />
-{/if}
 
 <style>
   .container {
@@ -157,8 +116,7 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
-  .field input,
-  .select-btn {
+  .field input {
     box-sizing: border-box;
     padding: var(--space-3);
     border-radius: var(--radius-md);
@@ -167,14 +125,5 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
     font-family: inherit;
-  }
-  .select-btn {
-    width: 100%;
-    text-align: left;
-    cursor: pointer;
-  }
-  .ajuda {
-    font-size: 12px;
-    color: var(--surface-muted);
   }
 </style>

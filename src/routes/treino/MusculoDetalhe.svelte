@@ -1,23 +1,34 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { getMusculo, updateMusculo, deleteMusculo } from "../../lib/treinoApi";
+  import {
+    getMusculo,
+    updateMusculo,
+    deleteMusculo,
+    listAgrupamentosMusculares,
+    type AgrupamentoMuscular,
+  } from "../../lib/treinoApi";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import WheelPicker from "../../components/WheelPicker.svelte";
 
   let { musculoId }: { musculoId: string } = $props();
 
   let nome = $state("");
-  let grupoExibicao = $state("");
+  let agrupamentoId = $state("");
   let encontrado = $state(true);
   let loading = $state(true);
   let salvando = $state(false);
   let mostrarConfirmExcluir = $state(false);
 
+  let agrupamentos = $state<AgrupamentoMuscular[]>([]);
+  let mostrarAgrupamentoPicker = $state(false);
+
   async function carregar() {
     loading = true;
-    const musculo = await getMusculo(musculoId);
+    const [musculo, listaAgrupamentos] = await Promise.all([getMusculo(musculoId), listAgrupamentosMusculares()]);
+    agrupamentos = listaAgrupamentos;
     if (musculo) {
       nome = musculo.nome;
-      grupoExibicao = musculo.grupo_exibicao ?? "";
+      agrupamentoId = musculo.agrupamento_id ?? "";
     } else {
       encontrado = false;
     }
@@ -26,6 +37,14 @@
 
   void carregar();
 
+  const opcoesAgrupamento = $derived([
+    { valor: "", label: "Nenhum" },
+    ...agrupamentos
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+      .map((a) => ({ valor: a.id, label: a.nome })),
+  ]);
+
   async function salvar() {
     if (!nome.trim()) {
       alert("Informe o nome do músculo.");
@@ -33,7 +52,7 @@
     }
     salvando = true;
     try {
-      await updateMusculo(musculoId, nome, grupoExibicao);
+      await updateMusculo(musculoId, nome, agrupamentoId || null);
       voltar("/treino/musculos");
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
@@ -81,18 +100,31 @@
       <input type="text" bind:value={nome} placeholder="Ex: Deltoide Posterior" />
     </label>
 
-    <label class="field">
-      <span>Grupo de Exibição (opcional)</span>
-      <input type="text" bind:value={grupoExibicao} placeholder="Ex: Ombro" />
+    <div class="field">
+      <span>Agrupamento (opcional)</span>
+      <button type="button" class="select-btn" onclick={() => (mostrarAgrupamentoPicker = true)}>
+        {agrupamentos.find((a) => a.id === agrupamentoId)?.nome ?? "Nenhum"}
+      </button>
       <span class="ajuda">
         Usado para somar músculos relacionados em totais futuros — ex: "Ombro Anterior", "Ombro
-        Lateral" e "Ombro Posterior" no grupo "Ombro". Deixe em branco se não precisar agrupar.
+        Lateral" e "Ombro Posterior" no agrupamento "Ombro". Cadastre agrupamentos no menu "+" em
+        Exercícios.
       </span>
-    </label>
+    </div>
 
     <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Músculo</button>
   {/if}
 </div>
+
+{#if mostrarAgrupamentoPicker}
+  <WheelPicker
+    titulo="Agrupamento"
+    opcoes={opcoesAgrupamento}
+    valorAtual={agrupamentoId}
+    onSelecionar={(v) => (agrupamentoId = v)}
+    onFechar={() => (mostrarAgrupamentoPicker = false)}
+  />
+{/if}
 
 {#if mostrarConfirmExcluir}
   <ConfirmDialog
@@ -177,7 +209,8 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
-  .field input {
+  .field input,
+  .select-btn {
     box-sizing: border-box;
     padding: var(--space-3);
     border-radius: var(--radius-md);
@@ -186,6 +219,11 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
     font-family: inherit;
+  }
+  .select-btn {
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
   }
   .ajuda {
     font-size: 12px;

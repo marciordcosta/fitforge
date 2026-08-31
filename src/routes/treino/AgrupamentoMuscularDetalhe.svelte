@@ -1,42 +1,52 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { findOrCreateMusculo, listAgrupamentosMusculares, type AgrupamentoMuscular } from "../../lib/treinoApi";
-  import WheelPicker from "../../components/WheelPicker.svelte";
+  import { getAgrupamentoMuscular, updateAgrupamentoMuscular, deleteAgrupamentoMuscular } from "../../lib/treinoApi";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+
+  let { agrupamentoId }: { agrupamentoId: string } = $props();
 
   let nome = $state("");
-  let agrupamentoId = $state("");
+  let encontrado = $state(true);
+  let loading = $state(true);
   let salvando = $state(false);
+  let mostrarConfirmExcluir = $state(false);
 
-  let agrupamentos = $state<AgrupamentoMuscular[]>([]);
-  let mostrarAgrupamentoPicker = $state(false);
-
-  async function carregarAgrupamentos() {
-    agrupamentos = await listAgrupamentosMusculares();
+  async function carregar() {
+    loading = true;
+    const agrupamento = await getAgrupamentoMuscular(agrupamentoId);
+    if (agrupamento) {
+      nome = agrupamento.nome;
+    } else {
+      encontrado = false;
+    }
+    loading = false;
   }
 
-  void carregarAgrupamentos();
-
-  const opcoesAgrupamento = $derived([
-    { valor: "", label: "Nenhum" },
-    ...agrupamentos
-      .slice()
-      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
-      .map((a) => ({ valor: a.id, label: a.nome })),
-  ]);
+  void carregar();
 
   async function salvar() {
     if (!nome.trim()) {
-      alert("Informe o nome do músculo.");
+      alert("Informe o nome do agrupamento.");
       return;
     }
     salvando = true;
     try {
-      const musculo = await findOrCreateMusculo(nome, agrupamentoId);
-      navigate(`/treino/musculos/${musculo.id}`);
+      await updateAgrupamentoMuscular(agrupamentoId, nome);
+      voltar("/treino/agrupamentos");
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
     } finally {
       salvando = false;
+    }
+  }
+
+  async function excluir() {
+    mostrarConfirmExcluir = false;
+    try {
+      await deleteAgrupamentoMuscular(agrupamentoId);
+      navigate("/treino/agrupamentos");
+    } catch (e) {
+      alert("Erro ao excluir: " + (e as Error).message);
     }
   }
 </script>
@@ -54,36 +64,30 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/treino/musculos")} aria-label="Voltar">{@render iconVoltar()}</button>
-    <h1>Novo Músculo</h1>
-    <button class="salvar" disabled={salvando} onclick={salvar} aria-label="Criar">{@render iconCheck()}</button>
+    <button class="back" onclick={() => voltar("/treino/agrupamentos")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <h1>{nome || "Agrupamento"}</h1>
+    <button class="atualizar" disabled={salvando} onclick={salvar} aria-label="Atualizar">{@render iconCheck()}</button>
   </div>
 
-  <label class="field">
-    <span>Nome</span>
-    <input type="text" bind:value={nome} placeholder="Ex: Deltoide Posterior" />
-  </label>
-
-  <div class="field">
-    <span>Agrupamento (opcional)</span>
-    <button type="button" class="select-btn" onclick={() => (mostrarAgrupamentoPicker = true)}>
-      {agrupamentos.find((a) => a.id === agrupamentoId)?.nome ?? "Nenhum"}
-    </button>
-    <span class="ajuda">
-      Usado para somar músculos relacionados em totais futuros — ex: "Ombro Anterior", "Ombro
-      Lateral" e "Ombro Posterior" no agrupamento "Ombro". Cadastre agrupamentos no menu "+" em
-      Exercícios.
-    </span>
-  </div>
+  {#if loading}
+    <p class="muted">Carregando…</p>
+  {:else if !encontrado}
+    <p class="muted">Agrupamento não encontrado.</p>
+  {:else}
+    <label class="field">
+      <span>Nome</span>
+      <input type="text" bind:value={nome} placeholder="Ex: Ombro" />
+    </label>
+    <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Agrupamento</button>
+  {/if}
 </div>
 
-{#if mostrarAgrupamentoPicker}
-  <WheelPicker
-    titulo="Agrupamento"
-    opcoes={opcoesAgrupamento}
-    valorAtual={agrupamentoId}
-    onSelecionar={(v) => (agrupamentoId = v)}
-    onFechar={() => (mostrarAgrupamentoPicker = false)}
+{#if mostrarConfirmExcluir}
+  <ConfirmDialog
+    titulo="Excluir esse agrupamento não apaga nenhum músculo — eles só ficam sem agrupamento. Tem certeza?"
+    textoConfirmar="Excluir Agrupamento"
+    onConfirmar={excluir}
+    onCancelar={() => (mostrarConfirmExcluir = false)}
   />
 {/if}
 
@@ -103,9 +107,13 @@
   }
   .header h1 {
     flex: 1;
+    min-width: 0;
     font-size: var(--font-size-lg);
     margin: 0;
     text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .back {
     flex-shrink: 0;
@@ -125,7 +133,7 @@
     width: 18px;
     height: 18px;
   }
-  .salvar {
+  .atualizar {
     flex-shrink: 0;
     width: 36px;
     height: 36px;
@@ -139,11 +147,11 @@
     cursor: pointer;
     padding: 0;
   }
-  .salvar svg {
+  .atualizar svg {
     width: 18px;
     height: 18px;
   }
-  .salvar:disabled {
+  .atualizar:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
@@ -157,8 +165,7 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
-  .field input,
-  .select-btn {
+  .field input {
     box-sizing: border-box;
     padding: var(--space-3);
     border-radius: var(--radius-md);
@@ -168,13 +175,19 @@
     font-size: var(--font-size-base);
     font-family: inherit;
   }
-  .select-btn {
+  .excluir-btn {
     width: 100%;
-    text-align: left;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-danger);
+    background: none;
+    color: var(--color-danger);
+    font-size: var(--font-size-base);
+    font-weight: 600;
     cursor: pointer;
+    margin-top: var(--space-2);
   }
-  .ajuda {
-    font-size: 12px;
+  .muted {
     color: var(--surface-muted);
   }
 </style>
