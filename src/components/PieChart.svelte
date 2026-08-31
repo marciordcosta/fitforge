@@ -17,6 +17,10 @@
   interface Fatia {
     nome: string;
     valor: number;
+    /** Se informado, subdivide a fatia nessas partes internas (cores próprias), mantendo
+     * o ângulo total da fatia baseado em valor — ex: quanto do músculo veio de séries no
+     * início/meio/fim do treino (faixa A/B/C por posição, não por músculo). */
+    partes?: { valor: number; cor: string }[];
   }
 
   let {
@@ -84,6 +88,26 @@
 
   const total = $derived(dados.reduce((s, d) => s + d.valor, 0));
 
+  /** Caminho de um arco do anel entre dois ângulos (graus), com o truque de 3 pontos pra círculo completo. */
+  function caminhoAnel(inicio: number, fim: number): string {
+    const angulo = fim - inicio;
+    if (angulo >= 359.99) {
+      const o0 = ponto(R, inicio);
+      const o1 = ponto(R, inicio + 179.99);
+      const o2 = ponto(R, inicio + 359.98);
+      const i0 = ponto(R_INTERNO, inicio);
+      const i1 = ponto(R_INTERNO, inicio + 179.99);
+      const i2 = ponto(R_INTERNO, inicio + 359.98);
+      return `M ${o0.x} ${o0.y} A ${R} ${R} 0 1 1 ${o1.x} ${o1.y} A ${R} ${R} 0 1 1 ${o2.x} ${o2.y} L ${i2.x} ${i2.y} A ${R_INTERNO} ${R_INTERNO} 0 1 0 ${i1.x} ${i1.y} A ${R_INTERNO} ${R_INTERNO} 0 1 0 ${i0.x} ${i0.y} Z`;
+    }
+    const o0 = ponto(R, inicio);
+    const o1 = ponto(R, fim);
+    const i0 = ponto(R_INTERNO, inicio);
+    const i1 = ponto(R_INTERNO, fim);
+    const largeArc = angulo > 180 ? 1 : 0;
+    return `M ${o0.x} ${o0.y} A ${R} ${R} 0 ${largeArc} 1 ${o1.x} ${o1.y} L ${i1.x} ${i1.y} A ${R_INTERNO} ${R_INTERNO} 0 ${largeArc} 0 ${i0.x} ${i0.y} Z`;
+  }
+
   const fatias = $derived.by(() => {
     if (total <= 0) return [];
     let anguloAtual = 0;
@@ -92,26 +116,21 @@
       const inicio = anguloAtual;
       const fim = anguloAtual + angulo;
       anguloAtual = fim;
-      let path: string;
-      if (angulo >= 359.99) {
-        const o0 = ponto(R, 0);
-        const o1 = ponto(R, 179.99);
-        const o2 = ponto(R, 359.98);
-        const i0 = ponto(R_INTERNO, 0);
-        const i1 = ponto(R_INTERNO, 179.99);
-        const i2 = ponto(R_INTERNO, 359.98);
-        path = `M ${o0.x} ${o0.y} A ${R} ${R} 0 1 1 ${o1.x} ${o1.y} A ${R} ${R} 0 1 1 ${o2.x} ${o2.y} L ${i2.x} ${i2.y} A ${R_INTERNO} ${R_INTERNO} 0 1 0 ${i1.x} ${i1.y} A ${R_INTERNO} ${R_INTERNO} 0 1 0 ${i0.x} ${i0.y} Z`;
-      } else {
-        const o0 = ponto(R, inicio);
-        const o1 = ponto(R, fim);
-        const i0 = ponto(R_INTERNO, inicio);
-        const i1 = ponto(R_INTERNO, fim);
-        const largeArc = angulo > 180 ? 1 : 0;
-        path = `M ${o0.x} ${o0.y} A ${R} ${R} 0 ${largeArc} 1 ${o1.x} ${o1.y} L ${i1.x} ${i1.y} A ${R_INTERNO} ${R_INTERNO} 0 ${largeArc} 0 ${i0.x} ${i0.y} Z`;
-      }
+
+      const corPadrao = cores?.[i] ?? PALETA[i % PALETA.length];
+      const partesValidas = (d.partes ?? []).filter((p) => p.valor > 0);
+      const partesResolvidas = partesValidas.length ? partesValidas : [{ valor: d.valor, cor: corPadrao }];
+      const somaPartes = partesResolvidas.reduce((s, p) => s + p.valor, 0) || 1;
+      let anguloParte = inicio;
+      const segmentos = partesResolvidas.map((p) => {
+        const anguloSeg = angulo * (p.valor / somaPartes);
+        const segInicio = anguloParte;
+        const segFim = anguloParte + anguloSeg;
+        anguloParte = segFim;
+        return { path: caminhoAnel(segInicio, segFim), cor: p.cor };
+      });
 
       const meio = (inicio + fim) / 2;
-      const cor = cores?.[i] ?? PALETA[i % PALETA.length];
       const pct = Math.round((d.valor / total) * 100);
 
       const pBorda = ponto(R, meio);
@@ -130,8 +149,8 @@
         pct,
         linhasNome,
         dyInicial,
-        path,
-        cor,
+        segmentos,
+        corLinha: corPadrao,
         linha: `M ${pBorda.x} ${pBorda.y} L ${pCotovelo.x} ${pCotovelo.y} L ${colX} ${pCotovelo.y}`,
         label: { x: labelX, y: pCotovelo.y },
         ancora: ladoDireito ? "start" : "end",
@@ -149,19 +168,21 @@
 
 <svg bind:this={svgEl} viewBox="0 0 100 100" class="pizza" role="img" aria-label="Distribuição muscular">
   {#each fatias as f (f.nome)}
-    <path
-      d={f.path}
-      fill={f.cor}
-      stroke="#fff"
-      stroke-width="0.6"
-      stroke-linejoin="round"
-      opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
-      class="fatia-clicavel"
-      role="button"
-      tabindex={0}
-      onclick={() => aoClicarFatia(f)}
-      onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
-    />
+    {#each f.segmentos as seg, i (i)}
+      <path
+        d={seg.path}
+        fill={seg.cor}
+        stroke="#fff"
+        stroke-width="0.6"
+        stroke-linejoin="round"
+        opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
+        class="fatia-clicavel"
+        role="button"
+        tabindex={0}
+        onclick={() => aoClicarFatia(f)}
+        onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
+      />
+    {/each}
   {/each}
   {#if centro.valor != null}
     <text x={CX} y={CY - 3.5} text-anchor="middle" dominant-baseline="central" class="centro-valor">{centro.valor}</text>
@@ -173,7 +194,7 @@
     <path
       d={f.linha}
       class="fatia-linha"
-      style={`stroke: ${f.cor}; opacity: ${nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1};`}
+      style={`stroke: ${f.corLinha}; opacity: ${nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1};`}
       fill="none"
     />
     <text

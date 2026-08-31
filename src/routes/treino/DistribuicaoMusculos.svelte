@@ -114,12 +114,73 @@
     return CORES_FAIXA.c;
   }
 
+  interface Partes {
+    a: number;
+    b: number;
+    c: number;
+  }
+
+  function partesVazias(): Partes {
+    return { a: 0, b: 0, c: 0 };
+  }
+
+  function somarPartes(...listas: Partes[]): Partes {
+    return listas.reduce((acc, p) => ({ a: acc.a + p.a, b: acc.b + p.b, c: acc.c + p.c }), partesVazias());
+  }
+
+  function partesParaSegmentos(p: Partes): { valor: number; cor: string }[] {
+    return [
+      { valor: p.a, cor: CORES_FAIXA.a },
+      { valor: p.b, cor: CORES_FAIXA.b },
+      { valor: p.c, cor: CORES_FAIXA.c },
+    ];
+  }
+
+  /**
+   * Classifica cada série da rotina pela POSIÇÃO no treino (não pelo músculo) — a fadiga
+   * acumula ao longo do treino, então uma série no início vale mais que uma no fim. Usa a
+   * mesma regra 80/20 (corPorFaixa) sobre o percentual acumulado de séries já feitas na
+   * ordem dos exercícios, e distribui a contribuição de cada músculo entre a faixa em que
+   * ela caiu. `ponderado` escolhe a mesma unidade do valor que vai ser dividido:
+   * true = série equivalente (normalizada por peso_contribuicao, bate com
+   * contarSeriesEquivalentesPorMusculo); false = contagem bruta (bate com
+   * contarSeriesPorMusculo — 1 série conta 1 pra cada músculo do exercício).
+   */
+  function contarSeriesPorFaixaDePosicao(treino: TreinoComExercicios, ponderado: boolean): Map<string, Partes> {
+    const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+    const totalSeries = exerciciosOrdenados.reduce((acc, ex) => acc + ex.series.length, 0);
+    const mapa = new Map<string, Partes>();
+    if (!totalSeries) return mapa;
+
+    let posicao = 0;
+    for (const ex of exerciciosOrdenados) {
+      if (!ex.exercicio) continue;
+      const distribuicao = ponderado
+        ? distribuicaoMusculosExercicio(ex.exercicio)
+        : ex.exercicio.musculos.map((m) => ({ musculo_id: m.musculo_id, pct: 100 }));
+      for (let s = 0; s < ex.series.length; s++) {
+        posicao += 1;
+        const cor = corPorFaixa((posicao / totalSeries) * 100);
+        for (const m of distribuicao) {
+          const parte = m.pct / 100;
+          const atual = mapa.get(m.musculo_id) ?? partesVazias();
+          if (cor === CORES_FAIXA.a) atual.a += parte;
+          else if (cor === CORES_FAIXA.b) atual.b += parte;
+          else atual.c += parte;
+          mapa.set(m.musculo_id, atual);
+        }
+      }
+    }
+    return mapa;
+  }
+
   /**
    * Distribuição estática de cada rotina (sem acompanhamento ao vivo — isso fica só no
-   * card semanal). A barra/percentual/cor usam a série equivalente (ver
+   * card semanal). A barra/percentual usam a série equivalente (ver
    * contarSeriesEquivalentesPorMusculo, soma bate com o total de séries da rotina); o
-   * número exibido ao lado é a contagem bruta (1 série válida por músculo que ela
-   * trabalha), mais fácil de ler que um valor fracionado.
+   * número exibido ao lado é a contagem bruta. A barra é dividida nas faixas A/B/C por
+   * POSIÇÃO no treino (contarSeriesPorFaixaDePosicao) — não pela dominância do músculo —
+   * já que um músculo pode ter séries espalhadas do início ao fim do treino.
    */
   interface LinhaRotina {
     chave: string;
@@ -127,9 +188,9 @@
     valor: number;
     contagem: number;
     pct: number;
-    cor: string;
+    partes: Partes;
     musculo: Musculo | null;
-    subItens: { musculo: Musculo; valor: number; contagem: number }[] | null;
+    subItens: { musculo: Musculo; valor: number; contagem: number; partes: Partes }[] | null;
   }
 
   const distribuicaoPorTreino = $derived.by(() => {
@@ -137,8 +198,14 @@
       const totalSeries = t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
       const mapaEquivalente = contarSeriesEquivalentesPorMusculo(t);
       const mapaBruto = contarSeriesPorMusculo(t);
+      const mapaFaixaPosicao = contarSeriesPorFaixaDePosicao(t, true);
       const bruto = musculos
-        .map((m) => ({ musculo: m, valor: mapaEquivalente.get(m.id) ?? 0, contagem: mapaBruto.get(m.id) ?? 0 }))
+        .map((m) => ({
+          musculo: m,
+          valor: mapaEquivalente.get(m.id) ?? 0,
+          contagem: mapaBruto.get(m.id) ?? 0,
+          partes: mapaFaixaPosicao.get(m.id) ?? partesVazias(),
+        }))
         .filter((item) => item.valor > 0);
 
       const porGrupo = new Map<string, { nome: string; itens: typeof bruto }>();
@@ -154,13 +221,14 @@
         }
       }
 
-      const base: Omit<LinhaRotina, "pct" | "cor">[] = [];
+      const base: Omit<LinhaRotina, "pct">[] = [];
       for (const [id, grupo] of porGrupo) {
         base.push({
           chave: id,
           nome: grupo.nome,
           valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
           contagem: grupo.itens.reduce((acc, i) => acc + i.contagem, 0),
+          partes: somarPartes(...grupo.itens.map((i) => i.partes)),
           musculo: null,
           subItens: grupo.itens,
         });
@@ -171,18 +239,17 @@
           nome: item.musculo.nome,
           valor: item.valor,
           contagem: item.contagem,
+          partes: item.partes,
           musculo: item.musculo,
           subItens: null,
         });
       }
       base.sort((a, b) => b.valor - a.valor);
 
-      let acumulado = 0;
-      const lista: LinhaRotina[] = base.map((item) => {
-        const pct = totalSeries > 0 ? (item.valor / totalSeries) * 100 : 0;
-        acumulado += pct;
-        return { ...item, pct, cor: corPorFaixa(acumulado) };
-      });
+      const lista: LinhaRotina[] = base.map((item) => ({
+        ...item,
+        pct: totalSeries > 0 ? (item.valor / totalSeries) * 100 : 0,
+      }));
       return { treino: t, lista };
     });
   });
@@ -629,23 +696,23 @@
   /** Gráfico de uma rotina específica: anel com o total literal de séries da rotina no
    * centro por padrão (sem nada selecionado). Ao selecionar uma fatia, o centro passa a
    * mostrar a contagem bruta daquele músculo (1 série conta pra cada músculo envolvido).
-   * O trabalho ponderado por peso_contribuicao já aparece na Distribuição Semanal — aqui
-   * é só pra ver rápido onde está o foco da rotina. */
+   * Cada fatia é dividida nas faixas A/B/C por POSIÇÃO no treino (fadiga acumulada), não
+   * pela dominância do músculo — um músculo pode ter séries espalhadas do início ao fim. */
   let modalGraficoTreino = $state<{
     titulo: string;
     totalSeries: number;
-    porSerie: ItemDetalheRotina[];
-    cores: string[];
+    porSerie: (ItemDetalheRotina & { partes: Partes })[];
   } | null>(null);
 
   function abrirGraficoTreino(treino: TreinoComExercicios): void {
     const mapaBruto = contarSeriesPorMusculo(treino);
+    const mapaFaixaPosicao = contarSeriesPorFaixaDePosicao(treino, false);
     const porSerie = musculos
-      .map((m) => ({ musculo: m, valor: mapaBruto.get(m.id) ?? 0 }))
+      .map((m) => ({ musculo: m, valor: mapaBruto.get(m.id) ?? 0, partes: mapaFaixaPosicao.get(m.id) ?? partesVazias() }))
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie, cores: coresAbcAcumulado(porSerie) };
+    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie };
   }
 </script>
 
@@ -747,7 +814,17 @@
                       <span class="nome">{linha.nome}</span>
                     {/if}
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${linha.pct}%; background: ${linha.cor};`}>
+                      <div class="barra" style={`width: ${linha.pct}%;`}>
+                        <div class="barra-segmentos">
+                          {#each partesParaSegmentos(linha.partes) as seg (seg.cor)}
+                            {#if seg.valor > 0}
+                              <div
+                                class="barra-seg"
+                                style={`width: ${linha.valor > 0 ? (seg.valor / linha.valor) * 100 : 0}%; background: ${seg.cor};`}
+                              ></div>
+                            {/if}
+                          {/each}
+                        </div>
                         <span class="barra-pct">{linha.pct.toFixed(0)}%</span>
                       </div>
                     </div>
@@ -758,10 +835,18 @@
                       <div class="item item-sub">
                         <span class="nome">{sub.musculo.nome}</span>
                         <div class="barra-wrap">
-                          <div
-                            class="barra"
-                            style={`width: ${linha.valor > 0 ? (sub.valor / linha.valor) * 100 : 0}%; background: ${linha.cor};`}
-                          ></div>
+                          <div class="barra" style={`width: ${linha.valor > 0 ? (sub.valor / linha.valor) * 100 : 0}%;`}>
+                            <div class="barra-segmentos">
+                              {#each partesParaSegmentos(sub.partes) as seg (seg.cor)}
+                                {#if seg.valor > 0}
+                                  <div
+                                    class="barra-seg"
+                                    style={`width: ${sub.valor > 0 ? (seg.valor / sub.valor) * 100 : 0}%; background: ${seg.cor};`}
+                                  ></div>
+                                {/if}
+                              {/each}
+                            </div>
+                          </div>
                         </div>
                         <span class="valor">{sub.contagem}</span>
                       </div>
@@ -998,8 +1083,11 @@
   <Sheet titulo={modalGraficoTreino.titulo} onFechar={() => (modalGraficoTreino = null)}>
     <div class="pizza-wrap">
       <PieChart
-        dados={modalGraficoTreino.porSerie.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
-        cores={modalGraficoTreino.cores}
+        dados={modalGraficoTreino.porSerie.map((i) => ({
+          nome: i.musculo.nome,
+          valor: i.valor,
+          partes: partesParaSegmentos(i.partes),
+        }))}
         centroValor={modalGraficoTreino.totalSeries}
         centroLabel="séries"
       />
@@ -1197,6 +1285,15 @@
     position: relative;
     height: 100%;
     border-radius: 6px;
+  }
+  .barra-segmentos {
+    display: flex;
+    height: 100%;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .barra-seg {
+    height: 100%;
   }
   .barra-pct {
     position: absolute;
