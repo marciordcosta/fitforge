@@ -11,7 +11,6 @@
     getVolumeRealizadoBruto,
     DIAS_SEMANA_ABREV,
     abreviarMusculo,
-    distribuicaoMusculosExercicio,
     type Musculo,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
@@ -72,29 +71,6 @@
   }
 
   /**
-   * Série equivalente por músculo — o peso_contribuicao de cada exercício é normalizado
-   * (dividido pela soma dos pesos daquele exercício) antes de multiplicar pela série, então
-   * cada série sempre soma exatamente 1 no total, dividida entre os músculos que ela
-   * trabalha. Ex: supino com peito 1 / tríceps 0.5 / deltoide 0.5 (soma 2) — 1 série vira
-   * 0,5 série de peito + 0,25 de tríceps + 0,25 de deltoide. Assim a soma de todos os
-   * músculos bate exatamente com o total de séries da rotina.
-   */
-  function contarSeriesEquivalentesPorMusculo(treino: TreinoComExercicios): Map<string, number> {
-    const mapa = new Map<string, number>();
-    for (const ex of treino.exercicios) {
-      const numSeries = ex.series.length;
-      if (!numSeries || !ex.exercicio) continue;
-      // Mesma normalização por exercício usada na tela de Exercícios e no detalhe do
-      // exercício (distribuicaoMusculosExercicio) — só multiplica o % pelas séries daqui.
-      for (const m of distribuicaoMusculosExercicio(ex.exercicio)) {
-        const parte = (m.pct / 100) * numSeries;
-        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + parte);
-      }
-    }
-    return mapa;
-  }
-
-  /**
    * Cor por faixa do percentual ACUMULADO (regra 80/20 — corte em 20%/50%), com margem
    * de tolerância pra não trocar de cor por pouca diferença perto do corte. A lista já
    * vem ordenada do músculo mais dominante pro menos — o acumulado soma na ordem, então
@@ -140,8 +116,8 @@
    * Classifica cada série da rotina pela POSIÇÃO no treino (não pelo músculo) — a fadiga
    * acumula ao longo do treino, então uma série no início vale mais que uma no fim. Usa a
    * mesma regra 80/20 (corPorFaixa) sobre o percentual acumulado de séries já feitas na
-   * ordem dos exercícios, e distribui a série equivalente de cada músculo (mesma
-   * normalização de contarSeriesEquivalentesPorMusculo) entre a faixa em que ela caiu.
+   * ordem dos exercícios. Contagem bruta (1 série conta 1 pra cada músculo que ela
+   * trabalha), igual contarSeriesPorMusculo — sem dividir por peso_contribuicao.
    */
   function contarSeriesPorFaixaDePosicao(treino: TreinoComExercicios): Map<string, Partes> {
     const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
@@ -151,17 +127,15 @@
 
     let posicao = 0;
     for (const ex of exerciciosOrdenados) {
-      if (!ex.exercicio) continue;
-      const distribuicao = distribuicaoMusculosExercicio(ex.exercicio);
+      const musculosEx = ex.exercicio?.musculos ?? [];
       for (let s = 0; s < ex.series.length; s++) {
         posicao += 1;
         const cor = corPorFaixa((posicao / totalSeries) * 100);
-        for (const m of distribuicao) {
-          const parte = m.pct / 100;
+        for (const m of musculosEx) {
           const atual = mapa.get(m.musculo_id) ?? partesVazias();
-          if (cor === CORES_FAIXA.a) atual.a += parte;
-          else if (cor === CORES_FAIXA.b) atual.b += parte;
-          else atual.c += parte;
+          if (cor === CORES_FAIXA.a) atual.a += 1;
+          else if (cor === CORES_FAIXA.b) atual.b += 1;
+          else atual.c += 1;
           mapa.set(m.musculo_id, atual);
         }
       }
@@ -171,34 +145,31 @@
 
   /**
    * Distribuição estática de cada rotina (sem acompanhamento ao vivo — isso fica só no
-   * card semanal). A barra/percentual usam a série equivalente (ver
-   * contarSeriesEquivalentesPorMusculo, soma bate com o total de séries da rotina); o
-   * número exibido ao lado é a contagem bruta. A barra é dividida nas faixas A/B/C por
-   * POSIÇÃO no treino (contarSeriesPorFaixaDePosicao) — não pela dominância do músculo —
-   * já que um músculo pode ter séries espalhadas do início ao fim do treino.
+   * card semanal). Contagem bruta: 1 série conta 1 pra cada músculo que o exercício
+   * trabalha (mesma regra do gráfico/anel) — sem dividir por peso_contribuicao, então a
+   * soma pode passar do total de séries da rotina quando um exercício trabalha vários
+   * músculos. A barra é dividida nas faixas A/B/C por POSIÇÃO no treino
+   * (contarSeriesPorFaixaDePosicao) — não pela dominância do músculo.
    */
   interface LinhaRotina {
     chave: string;
     nome: string;
     valor: number;
-    contagem: number;
     pct: number;
     partes: Partes;
     musculo: Musculo | null;
-    subItens: { musculo: Musculo; valor: number; contagem: number; partes: Partes }[] | null;
+    subItens: { musculo: Musculo; valor: number; partes: Partes }[] | null;
   }
 
   const distribuicaoPorTreino = $derived.by(() => {
     return treinos.map((t) => {
       const totalSeries = t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-      const mapaEquivalente = contarSeriesEquivalentesPorMusculo(t);
-      const mapaBruto = contarSeriesPorMusculo(t);
+      const mapaValor = contarSeriesPorMusculo(t);
       const mapaFaixaPosicao = contarSeriesPorFaixaDePosicao(t);
       const bruto = musculos
         .map((m) => ({
           musculo: m,
-          valor: mapaEquivalente.get(m.id) ?? 0,
-          contagem: mapaBruto.get(m.id) ?? 0,
+          valor: mapaValor.get(m.id) ?? 0,
           partes: mapaFaixaPosicao.get(m.id) ?? partesVazias(),
         }))
         .filter((item) => item.valor > 0);
@@ -222,7 +193,6 @@
           chave: id,
           nome: grupo.nome,
           valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
-          contagem: grupo.itens.reduce((acc, i) => acc + i.contagem, 0),
           partes: somarPartes(...grupo.itens.map((i) => i.partes)),
           musculo: null,
           subItens: grupo.itens,
@@ -233,7 +203,6 @@
           chave: item.musculo.id,
           nome: item.musculo.nome,
           valor: item.valor,
-          contagem: item.contagem,
           partes: item.partes,
           musculo: item.musculo,
           subItens: null,
@@ -803,7 +772,7 @@
                       <span class="nome">{linha.nome}</span>
                     {/if}
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${linha.pct}%;`}>
+                      <div class="barra" style={`width: ${Math.min(linha.pct, 100)}%;`}>
                         <div class="barra-segmentos">
                           {#each partesParaSegmentos(linha.partes) as seg (seg.cor)}
                             {#if seg.valor > 0}
@@ -817,7 +786,7 @@
                         <span class="barra-pct">{linha.pct.toFixed(0)}%</span>
                       </div>
                     </div>
-                    <span class="valor">{linha.contagem}</span>
+                    <span class="valor">{linha.valor}</span>
                   </div>
                   {#if aberto && linha.subItens}
                     {#each linha.subItens as sub (sub.musculo.id)}
@@ -837,7 +806,7 @@
                             </div>
                           </div>
                         </div>
-                        <span class="valor">{sub.contagem}</span>
+                        <span class="valor">{sub.valor}</span>
                       </div>
                     {/each}
                   {/if}
