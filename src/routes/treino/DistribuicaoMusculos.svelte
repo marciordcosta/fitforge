@@ -70,7 +70,31 @@
     return mapa;
   }
 
-  /** Igual à anterior, mas ponderada pelo peso_contribuicao — o valor real de trabalho de cada músculo, não a simples contagem de séries que passam por ele. */
+  /**
+   * Série equivalente por músculo — o peso_contribuicao de cada exercício é normalizado
+   * (dividido pela soma dos pesos daquele exercício) antes de multiplicar pela série, então
+   * cada série sempre soma exatamente 1 no total, dividida entre os músculos que ela
+   * trabalha. Ex: supino com peito 1 / tríceps 0.5 / deltoide 0.5 (soma 2) — 1 série vira
+   * 0,5 série de peito + 0,25 de tríceps + 0,25 de deltoide. Assim a soma de todos os
+   * músculos bate exatamente com o total de séries da rotina.
+   */
+  function contarSeriesEquivalentesPorMusculo(treino: TreinoComExercicios): Map<string, number> {
+    const mapa = new Map<string, number>();
+    for (const ex of treino.exercicios) {
+      const numSeries = ex.series.length;
+      if (!numSeries) continue;
+      const musculosEx = ex.exercicio?.musculos ?? [];
+      const pesoTotal = musculosEx.reduce((acc, m) => acc + m.peso_contribuicao, 0);
+      if (!pesoTotal) continue;
+      for (const m of musculosEx) {
+        const parte = (m.peso_contribuicao / pesoTotal) * numSeries;
+        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + parte);
+      }
+    }
+    return mapa;
+  }
+
+  /** Igual a contarSeriesPorMusculo, mas ponderada pelo peso_contribuicao — o valor real de trabalho de cada músculo, não a simples contagem de séries que passam por ele. */
   function contarSeriesTrabalhoPorMusculo(treino: TreinoComExercicios): Map<string, number> {
     const mapa = new Map<string, number>();
     for (const ex of treino.exercicios) {
@@ -102,26 +126,33 @@
 
   /**
    * Distribuição estática de cada rotina (sem acompanhamento ao vivo — isso fica só no
-   * card semanal). Cada músculo entra com sua contagem bruta de séries (1 por exercício
-   * que o trabalha) e o percentual sobre o total da própria rotina (soma = 100%).
+   * card semanal). Cada músculo entra com sua série equivalente (ver
+   * contarSeriesEquivalentesPorMusculo) e o percentual sobre o total de séries da
+   * própria rotina — a soma de todos os músculos bate com esse total.
    */
   const distribuicaoPorTreino = $derived.by(() => {
     return treinos.map((t) => {
-      const mapa = contarSeriesPorMusculo(t);
+      const totalSeries = t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
+      const mapa = contarSeriesEquivalentesPorMusculo(t);
       const bruto = musculos
         .map((m) => ({ musculo: m, valor: mapa.get(m.id) ?? 0 }))
         .filter((item) => item.valor > 0)
         .sort((a, b) => b.valor - a.valor);
-      const total = bruto.reduce((acc, item) => acc + item.valor, 0);
       let acumulado = 0;
       const lista = bruto.map((item) => {
-        const pct = total > 0 ? (item.valor / total) * 100 : 0;
+        const pct = totalSeries > 0 ? (item.valor / totalSeries) * 100 : 0;
         acumulado += pct;
         return { ...item, pct, cor: corPorFaixa(acumulado) };
       });
       return { treino: t, lista };
     });
   });
+
+  /** 1 casa decimal, sem ".0" sobrando quando o valor é inteiro (ex: "3.5" mas "7", não "7.0"). */
+  function formatSerieEquivalente(valor: number): string {
+    const arredondado = Math.round(valor * 10) / 10;
+    return arredondado % 1 === 0 ? String(arredondado) : arredondado.toFixed(1);
+  }
 
   /**
    * Séries já marcadas como concluídas na sessão ao vivo (treinoLogSessao), contadas por músculo.
@@ -517,7 +548,7 @@
                         <span class="barra-pct">{item.pct.toFixed(0)}%</span>
                       </div>
                     </div>
-                    <span class="valor">{item.valor}</span>
+                    <span class="valor">{formatSerieEquivalente(item.valor)}</span>
                   </div>
                 {/each}
               </div>
