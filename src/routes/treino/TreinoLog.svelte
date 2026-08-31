@@ -670,9 +670,11 @@
   <div class="descanso-bar">
     <div class="descanso-progresso" style={`width: ${progressoDescanso * 100}%`}></div>
     <div class="descanso-bar-conteudo">
-      <button class="descanso-ajuste" onclick={() => ajustarDescanso(-15)}>-15</button>
-      <span class="descanso-tempo">{formatMMSS(restanteDescansoSeg)}</span>
-      <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
+      <div class="descanso-central">
+        <button class="descanso-ajuste" onclick={() => ajustarDescanso(-15)}>-15</button>
+        <span class="descanso-tempo">{formatMMSS(restanteDescansoSeg)}</span>
+        <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
+      </div>
       <button class="descanso-pular" onclick={pularDescanso}>Pular</button>
     </div>
   </div>
@@ -1090,7 +1092,7 @@
   }
   .serie-num {
     width: 40px;
-    height: 40px;
+    height: 48px;
     border-radius: 8px;
     background: var(--surface-card);
     border: none;
@@ -1126,7 +1128,8 @@
   .linha input {
     box-sizing: border-box;
     width: 100%;
-    padding: var(--space-3) var(--space-1);
+    height: 48px;
+    padding: 0 var(--space-1);
     border-radius: 8px;
     border: 1px solid var(--surface-border);
     background: var(--surface-bg);
@@ -1136,7 +1139,7 @@
   }
   .check {
     width: 40px;
-    height: 40px;
+    height: 48px;
     border-radius: 8px;
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
@@ -1417,24 +1420,30 @@
     margin: 0 auto;
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
   }
+  .descanso-central {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    min-width: 0;
+  }
   .descanso-ajuste {
     flex-shrink: 0;
-    width: 48px;
-    height: 40px;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     background: var(--surface-bg);
     color: var(--surface-fg);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     font-weight: 600;
     cursor: pointer;
   }
   .descanso-tempo {
-    flex: 1;
+    flex-shrink: 0;
     text-align: center;
     font-size: 28px;
     font-weight: 700;
