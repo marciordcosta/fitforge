@@ -62,6 +62,8 @@
   const COL_ESQUERDA = 22;
   const MAX_CHARS_LINHA = 9;
   const ALTURA_LINHA = 5.4;
+  /** Espaço vazio (graus) entre fatias de músculos diferentes, no lugar de uma linha. */
+  const GAP_GRAUS = 2.5;
 
   function ponto(r: number, anguloGraus: number): { x: number; y: number } {
     const rad = ((anguloGraus - 90) * Math.PI) / 180;
@@ -122,15 +124,23 @@
       const fim = anguloAtual + angulo;
       anguloAtual = fim;
 
+      // Espaço vazio entre músculos vizinhos (não entre as partes internas do mesmo
+      // músculo) — encolhe a fatia desenhada pra dentro dos dois lados, sem tocar o
+      // ângulo "cheio" usado pro rótulo/linha guia (meio, pct etc. abaixo).
+      const gap = Math.min(GAP_GRAUS, angulo * 0.3);
+      const inicioDesenho = inicio + gap / 2;
+      const fimDesenho = fim - gap / 2;
+      const anguloDesenho = fimDesenho - inicioDesenho;
+
       const corPadrao = cores?.[i] ?? PALETA[i % PALETA.length];
       const partesValidas = (d.partes ?? []).filter((p) => p.valor > 0);
       const dividida = partesValidas.length > 1;
       const partesResolvidas = partesValidas.length ? partesValidas : [{ valor: d.valor, cor: corPadrao }];
       const somaPartes = partesResolvidas.reduce((s, p) => s + p.valor, 0) || 1;
       const R_MEIO = (R + R_INTERNO) / 2;
-      let anguloParte = inicio;
+      let anguloParte = inicioDesenho;
       const segmentos = partesResolvidas.map((p) => {
-        const anguloSeg = angulo * (p.valor / somaPartes);
+        const anguloSeg = anguloDesenho * (p.valor / somaPartes);
         const segInicio = anguloParte;
         const segFim = anguloParte + anguloSeg;
         anguloParte = segFim;
@@ -160,16 +170,10 @@
       const totalLinhas = linhasNome.length + 1;
       const dyInicial = -((totalLinhas - 1) / 2) * ALTURA_LINHA;
 
-      const pInicioInterno = ponto(R_INTERNO, inicio);
-      const pInicioExterno = ponto(R, inicio);
-
       return {
         nome: d.nome,
         valor: d.valor,
         pct,
-        // Reta radial só na fronteira com a fatia anterior — separa músculos vizinhos
-        // sem contornar o anel inteiro (sem borda por fora/por dentro).
-        divisor: `M ${pInicioInterno.x} ${pInicioInterno.y} L ${pInicioExterno.x} ${pInicioExterno.y}`,
         linhasNome,
         dyInicial,
         segmentos,
@@ -216,16 +220,6 @@
         </text>
       {/if}
     {/each}
-    <!-- Reta divisória só na fronteira entre músculos vizinhos — sem borda por fora/por
-         dentro do anel, e sem cortar as partes internas (faixas A/B/C) da mesma fatia. -->
-    <path
-      d={f.divisor}
-      stroke="#fff"
-      stroke-width="0.6"
-      stroke-linecap="round"
-      opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
-      class="fatia-divisor"
-    />
   {/each}
   {#if centro.valor != null}
     <text x={CX} y={CY - 3.5} text-anchor="middle" dominant-baseline="central" class="centro-valor">{centro.valor}</text>
@@ -303,9 +297,6 @@
   }
   .fatia-clicavel {
     cursor: pointer;
-  }
-  .fatia-divisor {
-    pointer-events: none;
   }
   .seg-texto {
     fill: rgba(0, 0, 0, 0.7);
