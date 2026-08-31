@@ -5,6 +5,7 @@
     correspondeBusca,
     textoBuscavelExercicio,
     distribuicaoMusculosExercicio,
+    abreviarMusculo,
     type Exercicio,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
@@ -99,7 +100,7 @@
                 <span class="musculos-linhas">
                   {#each distribuicao(ex) as m (m.nome)}
                     <span class="musculo-coluna">
-                      <span class="musculo-nome-mini">{m.nome}</span>
+                      <span class="musculo-nome-mini">{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome}</span>
                       <span class="musculo-linha-barra">
                         <span class="musculo-barra-mini-wrap">
                           <span class="musculo-barra-mini" style={`width: ${m.pct}%; background: ${m.cor};`}></span>

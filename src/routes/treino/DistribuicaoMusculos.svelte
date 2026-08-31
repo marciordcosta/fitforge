@@ -10,6 +10,7 @@
     listTreinos,
     getVolumeRealizadoBruto,
     DIAS_SEMANA_ABREV,
+    abreviarMusculo,
     type Musculo,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
@@ -221,13 +222,6 @@
     if (v > 10) return "var(--color-negative)";
     if (v >= 5) return "var(--color-success)";
     return "var(--color-neutral)";
-  }
-
-  /** Nomes com 2+ palavras abreviam cada uma (ex: "Deltoide Anterior" -> "Delt. Ant."), pra caber na coluna estreita da grade. */
-  function abreviarMusculo(nome: string): string {
-    const partes = nome.split(" ");
-    if (partes.length < 2) return nome;
-    return partes.map((p) => (p.length > 4 ? `${p.slice(0, 4)}.` : p)).join(" ");
   }
 
   const SEMANAS_MES = [

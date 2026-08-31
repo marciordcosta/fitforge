@@ -38,6 +38,13 @@ export interface Exercicio {
   musculos: ExercicioMusculo[];
 }
 
+/** Nomes com 2+ palavras abreviam cada uma (ex: "Deltoide Anterior" -> "Delt. Ant."), pra caber em espaços estreitos. */
+export function abreviarMusculo(nome: string): string {
+  const partes = nome.split(" ");
+  if (partes.length < 2) return nome;
+  return partes.map((p) => (p.length > 4 ? `${p.slice(0, 4)}.` : p)).join(" ");
+}
+
 /**
  * Distribuição percentual de contribuição entre os músculos do exercício — a soma dos
  * peso_contribuicao de todos vira 100%, cada músculo recebe a fatia proporcional (desc).
