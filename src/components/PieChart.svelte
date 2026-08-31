@@ -206,15 +206,8 @@
         onclick={() => aoClicarFatia(f)}
         onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
       />
-      {#if seg.rotuloVisivel}
-        <text
-          x={seg.rotuloX}
-          y={seg.rotuloY}
-          text-anchor="middle"
-          class="seg-texto"
-          opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
-          style="pointer-events: none;"
-        >
+      {#if seg.rotuloVisivel && f.nome === nomeDestacado}
+        <text x={seg.rotuloX} y={seg.rotuloY} text-anchor="middle" class="seg-texto" style="pointer-events: none;">
           <tspan x={seg.rotuloX} dy="-0.9" class="seg-valor">{formatValor(seg.valor)}</tspan>
           <tspan x={seg.rotuloX} dy="2.6" class="seg-pct">{seg.pct}%</tspan>
         </text>
@@ -299,15 +292,19 @@
     cursor: pointer;
   }
   .seg-texto {
-    fill: rgba(0, 0, 0, 0.7);
+    fill: #fff;
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.55);
+    stroke-width: 0.5px;
+    stroke-linejoin: round;
   }
   .seg-valor {
-    font-size: 3px;
-    font-weight: 700;
+    font-size: 3.6px;
+    font-weight: 800;
   }
   .seg-pct {
-    font-size: 2.1px;
-    font-weight: 500;
+    font-size: 2.4px;
+    font-weight: 600;
   }
   .centro-valor {
     font-size: 15px;
