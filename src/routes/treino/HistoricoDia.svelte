@@ -425,7 +425,7 @@
     margin-bottom: var(--space-5);
   }
   .exercicio-card h2 {
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-md);
     color: var(--color-primary);
     margin: 0 0 var(--space-2);
   }
@@ -494,7 +494,7 @@
     margin-bottom: var(--space-4);
   }
   .sessao-nome {
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-md);
     font-weight: 700;
     color: var(--surface-fg);
     margin: 0 0 var(--space-3);

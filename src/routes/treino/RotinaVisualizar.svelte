@@ -258,17 +258,17 @@
     margin-bottom: var(--space-4);
   }
   .exercicio-card h2 {
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-md);
     color: var(--color-primary);
     margin: 0 0 var(--space-1);
   }
   .observacao {
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     color: var(--surface-muted);
     margin: 0 0 var(--space-1);
   }
   .descanso {
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     color: var(--surface-muted);
     margin: 0 0 var(--space-3);
   }

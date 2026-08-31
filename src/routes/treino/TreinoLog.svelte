@@ -57,6 +57,7 @@
   });
 
   const seriesTotal = $derived(sessao.reduce((acc, ex) => acc + ex.sets.filter((s) => s.concluida).length, 0));
+  const seriesPlanejadas = $derived(sessao.reduce((acc, ex) => acc + ex.sets.length, 0));
 
   async function carregar() {
     loading = true;
@@ -570,7 +571,7 @@
     </div>
     <div class="stat-inline">
       <span class="stat-label">Séries</span>
-      <span class="stat-valor">{seriesTotal}</span>
+      <span class="stat-valor">{seriesTotal}/{seriesPlanejadas}</span>
     </div>
     <button class="concluir" disabled={salvando} onclick={concluirTreino}>Concluir</button>
   </div>
@@ -606,7 +607,6 @@
           <div class="linha cabecalho">
             <span>Série</span>
             <span>Reps</span>
-            <span>Anterior</span>
             <span>Kg</span>
             <span>Reps</span>
             <span></span>
@@ -633,11 +633,6 @@
               {:else}
                 <span class="meta-cel meta-cel-vazia">—</span>
               {/if}
-              <span class="anterior-valor">
-                {serieItem.anteriorPeso != null && serieItem.anteriorReps != null
-                  ? `${serieItem.anteriorPeso} x ${serieItem.anteriorReps}`
-                  : "—"}
-              </span>
               <input
                 type="number"
                 inputmode="decimal"
@@ -996,7 +991,7 @@
     margin-bottom: var(--space-5);
   }
   .exercicio-card h2 {
-    font-size: 17px;
+    font-size: var(--font-size-md);
     color: var(--color-primary);
     margin: 0;
   }
@@ -1036,7 +1031,7 @@
   }
   .descanso {
     display: inline-block;
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     color: var(--color-primary);
     background: none;
     border: none;
@@ -1055,7 +1050,7 @@
     padding: 0;
     margin: 0 0 var(--space-2);
     color: var(--surface-muted);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     font-family: inherit;
   }
   .observacao-input::placeholder {
@@ -1067,8 +1062,8 @@
   }
   .linha {
     display: grid;
-    grid-template-columns: 36px 40px minmax(0, 1fr) 66px 58px 36px;
-    gap: var(--space-1);
+    grid-template-columns: 40px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 40px;
+    gap: var(--space-2);
     align-items: center;
     padding: var(--space-1) 0;
     margin: 0;
@@ -1094,9 +1089,9 @@
     border-color: transparent;
   }
   .serie-num {
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
     background: var(--surface-card);
     border: none;
     color: var(--surface-fg);
@@ -1112,16 +1107,9 @@
     width: 26px;
     height: 26px;
   }
-  .anterior-valor {
-    font-size: var(--font-size-base);
-    color: var(--surface-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: center;
-  }
   .meta-cel {
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-md);
+    font-weight: 600;
     color: var(--surface-muted);
     background: none;
     border: none;
@@ -1138,18 +1126,18 @@
   .linha input {
     box-sizing: border-box;
     width: 100%;
-    padding: var(--space-2) var(--space-1);
-    border-radius: 6px;
+    padding: var(--space-3) var(--space-1);
+    border-radius: 8px;
     border: 1px solid var(--surface-border);
     background: var(--surface-bg);
     color: var(--surface-fg);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-md);
     text-align: center;
   }
   .check {
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
     color: var(--surface-muted);

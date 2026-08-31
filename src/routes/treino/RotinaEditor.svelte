@@ -639,7 +639,7 @@
     background: none;
     border: none;
     padding: 0;
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-md);
     font-family: inherit;
     font-weight: 600;
     color: var(--color-primary);
@@ -665,7 +665,7 @@
     padding: 0;
     margin: 0 0 var(--space-2);
     color: var(--surface-muted);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     font-family: inherit;
   }
   .observacao-input::placeholder {
@@ -678,7 +678,7 @@
     padding: 0;
     margin: 0 0 var(--space-3);
     color: var(--color-primary);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     font-family: inherit;
     cursor: pointer;
   }
