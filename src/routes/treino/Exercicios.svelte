@@ -249,7 +249,7 @@
     margin-top: var(--space-1);
   }
   .musculo-coluna {
-    flex: 1;
+    flex: 0 0 calc((100% - 3 * var(--space-3)) / 4);
     min-width: 0;
     display: flex;
     flex-direction: column;
