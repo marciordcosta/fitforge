@@ -253,17 +253,14 @@
     color: var(--surface-fg);
   }
   .avatar-rotina-texto {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
+    max-width: 100%;
     overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     padding: 0 3px;
-    font-size: 9px;
+    font-size: 7px;
     font-weight: 700;
-    line-height: 1.1;
     text-align: center;
-    word-break: break-word;
   }
   .info {
     flex: 1;
