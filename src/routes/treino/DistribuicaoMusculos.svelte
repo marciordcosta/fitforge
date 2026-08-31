@@ -3,7 +3,7 @@
   import { toISODate, parseISODate } from "../../lib/dates";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
-  import PieChart from "../../components/PieChart.svelte";
+  import PieChart, { PALETA } from "../../components/PieChart.svelte";
   import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import {
     listMusculos,
@@ -83,24 +83,26 @@
     return mapa;
   }
 
-  /** Igual à lista de rotinas, mas com a rotina em sessão ao vivo (se houver) sempre na frente — as demais ficam opacas no card. */
+  /**
+   * Distribuição estática de cada rotina (sem acompanhamento ao vivo — isso fica só no
+   * card semanal). Cada músculo entra com sua contagem bruta de séries (1 por exercício
+   * que o trabalha) e o percentual sobre o total da própria rotina (soma = 100%).
+   */
   const distribuicaoPorTreino = $derived.by(() => {
-    const base = treinos.map((t) => {
+    return treinos.map((t) => {
       const mapa = contarSeriesPorMusculo(t);
-      const lista = musculos
+      const bruto = musculos
         .map((m) => ({ musculo: m, valor: mapa.get(m.id) ?? 0 }))
         .filter((item) => item.valor > 0)
         .sort((a, b) => b.valor - a.valor);
+      const total = bruto.reduce((acc, item) => acc + item.valor, 0);
+      const lista = bruto.map((item, i) => ({
+        ...item,
+        pct: total > 0 ? (item.valor / total) * 100 : 0,
+        cor: PALETA[i % PALETA.length],
+      }));
       return { treino: t, lista };
     });
-    const ativoId = treinoLogSessao.atual?.treinoId;
-    if (!ativoId) return base;
-    const idx = base.findIndex((b) => b.treino.id === ativoId);
-    if (idx <= 0) return base;
-    const copia = base.slice();
-    const [ativo] = copia.splice(idx, 1);
-    copia.unshift(ativo);
-    return copia;
   });
 
   /**
@@ -478,15 +480,10 @@
         </div>
 
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
-          {@const algumaSessaoAtiva = treinoLogSessao.atual != null}
-          {@const sessaoAtiva = treinoLogSessao.atual?.treinoId === treino.id}
-          {@const feitoTreino = sessaoAtiva ? contarFeitoAoVivo(treino, false) : new Map()}
-          <div class="rotina-card" class:opaco={algumaSessaoAtiva && !sessaoAtiva}>
+          <div class="rotina-card">
             <div class="rotina-cabecalho">
               <h2 class="rotina-nome">{treino.nome_treino}</h2>
-              {#if sessaoAtiva}
-                <span class="dia-tag dia-tag-ao-vivo">Ao vivo</span>
-              {:else if treino.dia_semana != null}
+              {#if treino.dia_semana != null}
                 <span class="dia-tag">{DIAS_SEMANA_ABREV[treino.dia_semana]}</span>
               {/if}
             </div>
@@ -495,13 +492,12 @@
             {:else}
               <div class="lista">
                 {#each lista as item (item.musculo.id)}
-                  {@const feito = feitoTreino.get(item.musculo.id) ?? 0}
                   <div class="item">
                     <span class="nome">{item.musculo.nome}</span>
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${Math.min((feito / item.valor) * 100, 100)}%; background: ${sessaoAtiva ? "var(--color-success)" : "var(--color-neutral)"};`}></div>
+                      <div class="barra" style={`width: ${item.pct}%; background: ${item.cor};`}></div>
                     </div>
-                    <span class="valor" style={`color: ${sessaoAtiva ? "var(--color-success)" : "var(--color-neutral)"};`}>{feito} / {item.valor}</span>
+                    <span class="valor">{item.pct.toFixed(0)}%</span>
                   </div>
                 {/each}
               </div>
@@ -796,10 +792,6 @@
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     box-shadow: var(--shadow-card);
-    transition: opacity 0.2s;
-  }
-  .rotina-card.opaco {
-    opacity: 0.4;
   }
   .rotina-cabecalho {
     display: flex;
@@ -817,10 +809,6 @@
   .dia-tag {
     font-size: 11px;
     color: var(--surface-muted);
-  }
-  .dia-tag-ao-vivo {
-    color: var(--color-success);
-    font-weight: 600;
   }
   .icon-btn {
     margin-left: auto;
