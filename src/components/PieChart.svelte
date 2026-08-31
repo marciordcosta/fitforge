@@ -68,6 +68,11 @@
     return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
   }
 
+  /** Número inteiro sem casas decimais soltas; fracionário com 1 casa. */
+  function formatValor(valor: number): string {
+    return Number.isInteger(valor) ? String(valor) : valor.toFixed(1);
+  }
+
   /** Quebra o nome em linhas curtas pra nunca ultrapassar a largura reservada pro rótulo. */
   function quebrarLinhas(texto: string): string[] {
     const palavras = texto.split(" ");
@@ -119,15 +124,27 @@
 
       const corPadrao = cores?.[i] ?? PALETA[i % PALETA.length];
       const partesValidas = (d.partes ?? []).filter((p) => p.valor > 0);
+      const dividida = partesValidas.length > 1;
       const partesResolvidas = partesValidas.length ? partesValidas : [{ valor: d.valor, cor: corPadrao }];
       const somaPartes = partesResolvidas.reduce((s, p) => s + p.valor, 0) || 1;
+      const R_MEIO = (R + R_INTERNO) / 2;
       let anguloParte = inicio;
       const segmentos = partesResolvidas.map((p) => {
         const anguloSeg = angulo * (p.valor / somaPartes);
         const segInicio = anguloParte;
         const segFim = anguloParte + anguloSeg;
         anguloParte = segFim;
-        return { path: caminhoAnel(segInicio, segFim), cor: p.cor };
+        const pRotulo = ponto(R_MEIO, (segInicio + segFim) / 2);
+        return {
+          path: caminhoAnel(segInicio, segFim),
+          cor: p.cor,
+          valor: p.valor,
+          pct: Math.round((p.valor / total) * 100),
+          // Só mostra o rótulo interno se o arco for largo o bastante pra caber o texto.
+          rotuloVisivel: dividida && anguloSeg >= 12,
+          rotuloX: pRotulo.x,
+          rotuloY: pRotulo.y,
+        };
       });
 
       const meio = (inicio + fim) / 2;
@@ -143,11 +160,16 @@
       const totalLinhas = linhasNome.length + 1;
       const dyInicial = -((totalLinhas - 1) / 2) * ALTURA_LINHA;
 
+      const pInicioInterno = ponto(R_INTERNO, inicio);
+      const pInicioExterno = ponto(R, inicio);
+
       return {
         nome: d.nome,
         valor: d.valor,
         pct,
-        contorno: caminhoAnel(inicio, fim),
+        // Reta radial só na fronteira com a fatia anterior — separa músculos vizinhos
+        // sem contornar o anel inteiro (sem borda por fora/por dentro).
+        divisor: `M ${pInicioInterno.x} ${pInicioInterno.y} L ${pInicioExterno.x} ${pInicioExterno.y}`,
         linhasNome,
         dyInicial,
         segmentos,
@@ -180,17 +202,29 @@
         onclick={() => aoClicarFatia(f)}
         onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
       />
+      {#if seg.rotuloVisivel}
+        <text
+          x={seg.rotuloX}
+          y={seg.rotuloY}
+          text-anchor="middle"
+          class="seg-texto"
+          opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
+          style="pointer-events: none;"
+        >
+          <tspan x={seg.rotuloX} dy="-0.9" class="seg-valor">{formatValor(seg.valor)}</tspan>
+          <tspan x={seg.rotuloX} dy="2.6" class="seg-pct">{seg.pct}%</tspan>
+        </text>
+      {/if}
     {/each}
-    <!-- Contorno só no perímetro do músculo inteiro — separa músculos vizinhos sem
-         cortar as partes internas (faixas A/B/C) da mesma fatia. -->
+    <!-- Reta divisória só na fronteira entre músculos vizinhos — sem borda por fora/por
+         dentro do anel, e sem cortar as partes internas (faixas A/B/C) da mesma fatia. -->
     <path
-      d={f.contorno}
-      fill="none"
+      d={f.divisor}
       stroke="#fff"
       stroke-width="0.6"
-      stroke-linejoin="round"
+      stroke-linecap="round"
       opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
-      class="fatia-contorno"
+      class="fatia-divisor"
     />
   {/each}
   {#if centro.valor != null}
@@ -270,8 +304,19 @@
   .fatia-clicavel {
     cursor: pointer;
   }
-  .fatia-contorno {
+  .fatia-divisor {
     pointer-events: none;
+  }
+  .seg-texto {
+    fill: rgba(0, 0, 0, 0.7);
+  }
+  .seg-valor {
+    font-size: 3px;
+    font-weight: 700;
+  }
+  .seg-pct {
+    font-size: 2.1px;
+    font-weight: 500;
   }
   .centro-valor {
     font-size: 15px;
