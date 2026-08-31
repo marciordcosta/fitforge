@@ -230,15 +230,19 @@
           {#each top6 as item (item.musculo.id)}
             <div class="musculo-col">
               <p class="musculo-nome">{item.musculo.nome}</p>
-              <p class="musculo-valor">
-                {#if modoRestante}
-                  <strong>{restante(item.feito, item.planejado).toFixed(0)}</strong> <span class="musculo-meta">restantes</span>
-                {:else}
-                  <strong>{item.feito.toFixed(0)}</strong> <span class="musculo-meta">/ {item.planejado.toFixed(0)}</span>
-                {/if}
-              </p>
-              <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(item.feito, item.planejado))}%; background:var(--color-primary);`}></div>
+              <div
+                class="musculo-anel"
+                style={`background: conic-gradient(var(--color-primary) 0% ${larguraBarra(pctMeta(item.feito, item.planejado))}%, var(--surface-border) ${larguraBarra(pctMeta(item.feito, item.planejado))}% 100%);`}
+              >
+                <div class="musculo-anel-centro">
+                  {#if modoRestante}
+                    <strong>{pctMeta(item.feito, item.planejado).toFixed(0)}%</strong>
+                    <span class="musculo-meta">{restante(item.feito, item.planejado).toFixed(0)} rest.</span>
+                  {:else}
+                    <strong>{item.feito.toFixed(0)}</strong>
+                    <span class="musculo-meta">/{item.planejado.toFixed(0)}</span>
+                  {/if}
+                </div>
               </div>
             </div>
           {/each}
@@ -410,30 +414,41 @@
     scroll-snap-align: start;
   }
   .musculo-nome {
-    margin: 0 0 var(--space-1);
-    font-size: var(--font-size-base);
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-sm);
     color: var(--surface-fg);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .musculo-valor {
-    margin: 0 0 var(--space-2);
-    font-size: 13px;
-    color: var(--surface-fg);
+    text-align: center;
   }
   .musculo-meta {
     color: var(--surface-muted);
   }
-  .barra-wrap {
-    height: 8px;
-    background: var(--surface-border);
-    border-radius: 5px;
-    overflow: hidden;
+  .musculo-anel {
+    position: relative;
+    width: 68px;
+    height: 68px;
+    margin: 0 auto;
+    border-radius: 50%;
   }
-  .barra {
-    height: 100%;
-    border-radius: 5px;
+  .musculo-anel-centro {
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+  }
+  .musculo-anel-centro strong {
+    font-size: 14px;
+    color: var(--surface-fg);
+  }
+  .musculo-anel-centro .musculo-meta {
+    font-size: 10px;
   }
   .quick-actions {
     display: flex;
