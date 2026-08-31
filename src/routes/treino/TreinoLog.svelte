@@ -1100,7 +1100,7 @@
   }
   .serie-num {
     width: 40px;
-    height: 52px;
+    height: 48px;
     border-radius: 8px;
     background: var(--surface-card);
     border: none;
@@ -1136,7 +1136,7 @@
   .linha input {
     box-sizing: border-box;
     width: 100%;
-    height: 52px;
+    height: 48px;
     padding: 0 var(--space-1);
     border-radius: 8px;
     border: 1px solid var(--surface-border);
@@ -1147,7 +1147,7 @@
   }
   .check {
     width: 40px;
-    height: 52px;
+    height: 48px;
     border-radius: 8px;
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
@@ -1205,13 +1205,9 @@
     font-weight: 600;
   }
   .add-serie {
-    box-sizing: border-box;
     width: 100%;
-    height: 52px;
     margin-top: var(--space-3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding: var(--space-3);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
