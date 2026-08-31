@@ -147,6 +147,7 @@
         nome: d.nome,
         valor: d.valor,
         pct,
+        contorno: caminhoAnel(inicio, fim),
         linhasNome,
         dyInicial,
         segmentos,
@@ -172,9 +173,6 @@
       <path
         d={seg.path}
         fill={seg.cor}
-        stroke="#fff"
-        stroke-width="0.6"
-        stroke-linejoin="round"
         opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
         class="fatia-clicavel"
         role="button"
@@ -183,6 +181,17 @@
         onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
       />
     {/each}
+    <!-- Contorno só no perímetro do músculo inteiro — separa músculos vizinhos sem
+         cortar as partes internas (faixas A/B/C) da mesma fatia. -->
+    <path
+      d={f.contorno}
+      fill="none"
+      stroke="#fff"
+      stroke-width="0.6"
+      stroke-linejoin="round"
+      opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
+      class="fatia-contorno"
+    />
   {/each}
   {#if centro.valor != null}
     <text x={CX} y={CY - 3.5} text-anchor="middle" dominant-baseline="central" class="centro-valor">{centro.valor}</text>
@@ -260,6 +269,9 @@
   }
   .fatia-clicavel {
     cursor: pointer;
+  }
+  .fatia-contorno {
+    pointer-events: none;
   }
   .centro-valor {
     font-size: 15px;
