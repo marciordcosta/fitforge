@@ -94,19 +94,6 @@
     return mapa;
   }
 
-  /** Igual a contarSeriesPorMusculo, mas ponderada pelo peso_contribuicao — o valor real de trabalho de cada músculo, não a simples contagem de séries que passam por ele. */
-  function contarSeriesTrabalhoPorMusculo(treino: TreinoComExercicios): Map<string, number> {
-    const mapa = new Map<string, number>();
-    for (const ex of treino.exercicios) {
-      const numSeries = ex.series.length;
-      if (!numSeries) continue;
-      for (const m of ex.exercicio?.musculos ?? []) {
-        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + numSeries * m.peso_contribuicao);
-      }
-    }
-    return mapa;
-  }
-
   /**
    * Cor por faixa do percentual ACUMULADO (regra 80/20 — corte em 20%/30%), com margem
    * de tolerância pra não trocar de cor por pouca diferença perto do corte. A lista já
@@ -450,32 +437,25 @@
     modalDetalheRotina = { titulo, itens, centroValor, centroLabel };
   }
 
-  /** Gráfico de uma rotina específica: dois anéis, ambos com o mesmo total literal de
-   * séries da rotina no centro por padrão (sem nada selecionado). Ao selecionar uma
-   * fatia, o centro passa a mostrar o valor daquele músculo específico — no anel "Por
-   * Série" é a contagem bruta (1 série conta pra cada músculo envolvido); no anel "Por
-   * Trabalho Real" é o valor ponderado por peso_contribuicao (o trabalho de fato daquele
-   * músculo no exercício). */
+  /** Gráfico de uma rotina específica: anel com o total literal de séries da rotina no
+   * centro por padrão (sem nada selecionado). Ao selecionar uma fatia, o centro passa a
+   * mostrar a contagem bruta daquele músculo (1 série conta pra cada músculo envolvido).
+   * O trabalho ponderado por peso_contribuicao já aparece na Distribuição Semanal — aqui
+   * é só pra ver rápido onde está o foco da rotina. */
   let modalGraficoTreino = $state<{
     titulo: string;
     totalSeries: number;
     porSerie: ItemDetalheRotina[];
-    porTrabalho: ItemDetalheRotina[];
   } | null>(null);
 
   function abrirGraficoTreino(treino: TreinoComExercicios): void {
-    const mapaTrabalho = contarSeriesTrabalhoPorMusculo(treino);
-    const porTrabalho = musculos
-      .map((m) => ({ musculo: m, valor: Math.round(mapaTrabalho.get(m.id) ?? 0) }))
-      .filter((item) => item.valor > 0)
-      .sort((a, b) => b.valor - a.valor);
     const mapaBruto = contarSeriesPorMusculo(treino);
     const porSerie = musculos
       .map((m) => ({ musculo: m, valor: mapaBruto.get(m.id) ?? 0 }))
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie, porTrabalho };
+    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie };
   }
 </script>
 
@@ -752,18 +732,9 @@
 
 {#if modalGraficoTreino}
   <Sheet titulo={modalGraficoTreino.titulo} onFechar={() => (modalGraficoTreino = null)}>
-    <p class="pizza-legenda">Por Série</p>
-    <div class="pizza-wrap pizza-wrap-dupla">
+    <div class="pizza-wrap">
       <PieChart
         dados={modalGraficoTreino.porSerie.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
-        centroValor={modalGraficoTreino.totalSeries}
-        centroLabel="séries"
-      />
-    </div>
-    <p class="pizza-legenda">Por Trabalho Real</p>
-    <div class="pizza-wrap pizza-wrap-dupla">
-      <PieChart
-        dados={modalGraficoTreino.porTrabalho.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
         centroValor={modalGraficoTreino.totalSeries}
         centroLabel="séries"
       />
@@ -1075,15 +1046,5 @@
     aspect-ratio: 1;
     overflow: hidden;
     margin: var(--space-2) auto 0;
-  }
-  .pizza-legenda {
-    margin: var(--space-4) 0 0;
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--surface-fg);
-    text-align: center;
-  }
-  .pizza-wrap-dupla {
-    max-width: 260px;
   }
 </style>
