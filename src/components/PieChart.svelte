@@ -19,8 +19,12 @@
     valor: number;
   }
 
-  let { dados, centroValor, centroLabel }: { dados: Fatia[]; centroValor?: string | number; centroLabel?: string } =
-    $props();
+  let {
+    dados,
+    cores,
+    centroValor,
+    centroLabel,
+  }: { dados: Fatia[]; cores?: string[]; centroValor?: string | number; centroLabel?: string } = $props();
 
   let nomeDestacado = $state<string | null>(null);
   let svgEl = $state<SVGSVGElement | undefined>();
@@ -107,7 +111,7 @@
       }
 
       const meio = (inicio + fim) / 2;
-      const cor = PALETA[i % PALETA.length];
+      const cor = cores?.[i] ?? PALETA[i % PALETA.length];
       const pct = Math.round((d.valor / total) * 100);
 
       const pBorda = ponto(R, meio);

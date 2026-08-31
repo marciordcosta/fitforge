@@ -408,7 +408,14 @@
         {
           label: "Gráfico",
           icon: iconGrafico,
-          onSelect: () => abrirDetalheRotina("Distribuição Semanal", distribuicaoSemanal, totaisSemanais.series, "séries"),
+          onSelect: () =>
+            abrirDetalheRotina(
+              "Distribuição Semanal",
+              distribuicaoSemanal,
+              totaisSemanais.series,
+              "séries",
+              coresAbcAcumulado(distribuicaoSemanal),
+            ),
         },
       ],
     };
@@ -426,6 +433,7 @@
     itens: ItemDetalheRotina[];
     centroValor?: number;
     centroLabel?: string;
+    cores?: string[];
   } | null>(null);
 
   function abrirDetalheRotina(
@@ -433,8 +441,22 @@
     itens: { musculo: Musculo; valor: number }[],
     centroValor?: number,
     centroLabel?: string,
+    cores?: string[],
   ): void {
-    modalDetalheRotina = { titulo, itens, centroValor, centroLabel };
+    modalDetalheRotina = { titulo, itens, centroValor, centroLabel, cores };
+  }
+
+  /** Cor de cada fatia pela faixa ABC do percentual acumulado (itens já precisam vir
+   * ordenados do mais dominante pro menos) — visual discreto pra saber onde cada músculo
+   * se enquadra na curva 80/20, sem depender de abrir a lista de rotina pra ver. */
+  function coresAbcAcumulado(itens: { valor: number }[]): string[] {
+    const total = itens.reduce((acc, i) => acc + i.valor, 0);
+    let acumulado = 0;
+    return itens.map((i) => {
+      const pct = total > 0 ? (i.valor / total) * 100 : 0;
+      acumulado += pct;
+      return corPorFaixa(acumulado);
+    });
   }
 
   /** Gráfico de uma rotina específica: anel com o total literal de séries da rotina no
@@ -723,6 +745,7 @@
     <div class="pizza-wrap">
       <PieChart
         dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
+        cores={modalDetalheRotina.cores}
         centroValor={modalDetalheRotina.centroValor}
         centroLabel={modalDetalheRotina.centroLabel}
       />
