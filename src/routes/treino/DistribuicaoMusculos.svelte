@@ -590,6 +590,19 @@
     return treinos.find((t) => t.id === m[1]) ?? null;
   });
 
+  /** Abre o gráfico direto (sem passar pelo menu) quando se entra em
+   * /treino/distribuicao/rotina/:id/grafico — usado pela opção "Distribuição" no menu de
+   * Visualizar Rotina. "Voltar" do navegador fecha o gráfico e sai dessa rota. */
+  const graficoUrlTreino = $derived.by(() => {
+    const m = router.path.match(/^\/treino\/distribuicao\/rotina\/([^/]+)\/grafico$/);
+    if (!m) return null;
+    return treinos.find((t) => t.id === m[1]) ?? null;
+  });
+
+  $effect(() => {
+    if (graficoUrlTreino) abrirGraficoTreino(graficoUrlTreino);
+  });
+
   const rotinaMenuOpcoes = $derived.by((): AcaoSheet[] => {
     if (!rotinaMenuUrl) return [];
     return [
@@ -1038,7 +1051,13 @@
 {/if}
 
 {#if modalGraficoTreino}
-  <Sheet titulo={modalGraficoTreino.titulo} onFechar={() => (modalGraficoTreino = null)}>
+  <Sheet
+    titulo={modalGraficoTreino.titulo}
+    onFechar={() => {
+      modalGraficoTreino = null;
+      if (graficoUrlTreino) window.history.back();
+    }}
+  >
     <div class="pizza-wrap">
       <PieChart
         dados={modalGraficoTreino.porSerie.map((i) => ({

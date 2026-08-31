@@ -87,6 +87,12 @@
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 {/snippet}
+{#snippet iconDistribuicao()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+    <path d="M22 12A10 10 0 0 0 12 2v10z" />
+  </svg>
+{/snippet}
 {#snippet iconMenu()}
   <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
     <circle cx="12" cy="5" r="1.8" />
@@ -164,6 +170,11 @@
     opcoes={[
       { label: "Editar", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treino!.id}`) },
       { label: "Iniciar", icon: iconIniciar, onSelect: () => navigate(`/treino/log/${treino!.id}`) },
+      {
+        label: "Distribuição",
+        icon: iconDistribuicao,
+        onSelect: () => navigate(`/treino/distribuicao/rotina/${treino!.id}/grafico`),
+      },
       { label: "Duplicar", icon: iconDuplicar, onSelect: duplicar },
       { label: "Remover", icon: iconExcluir, destructive: true, onSelect: () => (confirmandoExclusao = true) },
     ]}
