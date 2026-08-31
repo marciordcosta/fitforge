@@ -189,7 +189,7 @@
    * (ex: "séries") continua o mesmo, só o número muda. */
   const centro = $derived.by(() => {
     const f = nomeDestacado ? fatias.find((f) => f.nome === nomeDestacado) : undefined;
-    return { valor: f ? f.valor : centroValor, label: centroLabel };
+    return { valor: f ? formatValor(f.valor) : centroValor, label: centroLabel };
   });
 </script>
 
