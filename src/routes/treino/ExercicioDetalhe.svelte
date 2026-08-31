@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { parseISODate } from "../../lib/dates";
   import {
     getExercicio,
     updateExercicio,
@@ -50,11 +51,9 @@
 
   void carregar();
 
-  function formatDataHora(iso: string): string {
-    const d = new Date(iso);
-    const dataStr = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
-    const horaStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    return `${dataStr}, ${horaStr}`;
+  /** Data real do treino (coluna `data`), não a data em que o registro foi salvo/importado no banco. */
+  function formatData(data: string): string {
+    return parseISODate(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
   }
 
   async function salvar() {
@@ -193,7 +192,7 @@
             >
               {sessao.treinoNome || "Treino avulso"}
             </button>
-            <span class="sessao-data">{formatDataHora(sessao.criadoEm)}</span>
+            <span class="sessao-data">{formatData(sessao.data)}</span>
             <button
               class="sessao-excluir"
               onclick={() => (sessaoParaExcluir = sessao)}
@@ -245,7 +244,7 @@
 
 {#if sessaoParaExcluir}
   <ConfirmDialog
-    titulo={`Excluir o registro de ${formatDataHora(sessaoParaExcluir.criadoEm)}? Só apaga esse dia, não afeta os outros.`}
+    titulo={`Excluir o registro de ${formatData(sessaoParaExcluir.data)}? Só apaga esse dia, não afeta os outros.`}
     textoConfirmar="Excluir Registro"
     onConfirmar={confirmarExcluirSessao}
     onCancelar={() => (sessaoParaExcluir = null)}

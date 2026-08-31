@@ -444,7 +444,6 @@ export interface SessaoHistorico {
   treinoId: string | null;
   treinoNome: string;
   data: string;
-  criadoEm: string;
   sets: { serie: number; peso: number | null; repeticoes: number | null }[];
 }
 
@@ -452,7 +451,7 @@ export interface SessaoHistorico {
 export async function getHistoricoDetalhadoExercicio(exercicioId: string): Promise<SessaoHistorico[]> {
   const { data, error } = await supabase
     .from("treino_registros")
-    .select("data, serie, peso, repeticoes, created_at, treino_id, treinos(nome_treino)")
+    .select("data, serie, peso, repeticoes, treino_id, treinos(nome_treino)")
     .eq("exercicio_id", exercicioId)
     .order("data", { ascending: false })
     .order("serie", { ascending: true });
@@ -467,7 +466,6 @@ export async function getHistoricoDetalhadoExercicio(exercicioId: string): Promi
         treinoId: r.treino_id,
         treinoNome: (r.treinos as unknown as { nome_treino: string } | null)?.nome_treino ?? "",
         data: r.data,
-        criadoEm: r.created_at,
         sets: [],
       };
       grupos.set(chave, grupo);

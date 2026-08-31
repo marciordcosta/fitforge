@@ -646,13 +646,13 @@
     cursor: pointer;
   }
   .menu-btn {
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
     flex-shrink: 0;
     border: none;
     background: none;
     color: var(--surface-muted);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-lg);
     line-height: 1;
     cursor: pointer;
   }
