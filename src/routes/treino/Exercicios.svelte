@@ -19,16 +19,16 @@
   let busca = $state("");
 
   /** Primeira rotina (na ordem de exibição das rotinas) que usa cada exercício. */
-  let rotinaPorExercicio = $state<Map<string, string>>(new Map());
+  let rotinaPorExercicio = $state<Map<string, { id: string; nome: string }>>(new Map());
 
   async function carregar() {
     loading = true;
     const [exs, treinos] = await Promise.all([listExercicios(), listTreinos()]);
     exercicios = exs;
-    const mapa = new Map<string, string>();
+    const mapa = new Map<string, { id: string; nome: string }>();
     for (const t of treinos) {
       for (const te of t.exercicios) {
-        if (!mapa.has(te.exercicio_id)) mapa.set(te.exercicio_id, t.nome_treino);
+        if (!mapa.has(te.exercicio_id)) mapa.set(te.exercicio_id, { id: t.id, nome: t.nome_treino });
       }
     }
     rotinaPorExercicio = mapa;
@@ -109,36 +109,47 @@
     <ul class="lista">
       {#each filtrados as ex (ex.id)}
         <li>
-          <button class="item" onclick={() => navigate(`/treino/exercicios/${ex.id}`)}>
-            <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
-              {#if rotinaPorExercicio.has(ex.id)}
-                <span class="avatar-rotina-texto">{rotinaPorExercicio.get(ex.id)}</span>
-              {:else}
-                {iniciais(ex.nome)}
-              {/if}
-            </span>
-            <span class="info">
-              <span class="nome">{ex.nome}</span>
-              {#if !ex.musculos.length}
-                <span class="sub">Sem músculo definido</span>
-              {:else}
-                <span class="musculos-linhas">
-                  {#each distribuicao(ex) as m (m.nome)}
-                    <span class="musculo-coluna">
-                      <span class="musculo-nome-mini">{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome}</span>
-                      <span class="musculo-linha-barra">
-                        <span class="musculo-barra-mini-wrap">
-                          <span class="musculo-barra-mini" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
+          <div class="item">
+            <button
+              class="avatar-btn"
+              onclick={() => {
+                const rotina = rotinaPorExercicio.get(ex.id);
+                navigate(rotina ? `/treino/rotina/${rotina.id}/ver` : `/treino/exercicios/${ex.id}`);
+              }}
+              aria-label={rotinaPorExercicio.has(ex.id) ? `Ver rotina ${rotinaPorExercicio.get(ex.id)?.nome}` : ex.nome}
+            >
+              <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
+                {#if rotinaPorExercicio.has(ex.id)}
+                  <span class="avatar-rotina-texto">{rotinaPorExercicio.get(ex.id)?.nome}</span>
+                {:else}
+                  {iniciais(ex.nome)}
+                {/if}
+              </span>
+            </button>
+            <button class="conteudo-btn" onclick={() => navigate(`/treino/exercicios/${ex.id}`)}>
+              <span class="info">
+                <span class="nome">{ex.nome}</span>
+                {#if !ex.musculos.length}
+                  <span class="sub">Sem músculo definido</span>
+                {:else}
+                  <span class="musculos-linhas">
+                    {#each distribuicao(ex) as m (m.nome)}
+                      <span class="musculo-coluna">
+                        <span class="musculo-nome-mini">{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome}</span>
+                        <span class="musculo-linha-barra">
+                          <span class="musculo-barra-mini-wrap">
+                            <span class="musculo-barra-mini" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
+                          </span>
+                          <span class="musculo-pct-mini">{m.pct.toFixed(0)}%</span>
                         </span>
-                        <span class="musculo-pct-mini">{m.pct.toFixed(0)}%</span>
                       </span>
-                    </span>
-                  {/each}
-                </span>
-              {/if}
-            </span>
-            <span class="chevron">›</span>
-          </button>
+                    {/each}
+                  </span>
+                {/if}
+              </span>
+              <span class="chevron">›</span>
+            </button>
+          </div>
         </li>
       {/each}
     </ul>
@@ -236,12 +247,27 @@
     gap: var(--space-3);
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--surface-border);
+  }
+  .avatar-btn {
+    flex-shrink: 0;
     background: none;
-    border-left: none;
-    border-right: none;
-    border-top: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .conteudo-btn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    background: none;
+    border: none;
+    padding: 0;
     cursor: pointer;
     text-align: left;
+    font: inherit;
+    color: inherit;
   }
   .avatar {
     width: 40px;
