@@ -56,6 +56,20 @@
     return parseISODate(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
   }
 
+  /**
+   * Distribuição percentual dos músculos do exercício: a soma dos peso_contribuicao de todos
+   * vira 100%, e cada músculo recebe a fatia proporcional. Ex: peito 1, tríceps 0.75, deltoide 0.25
+   * (soma 2) vira 50% / 38% / 12%.
+   */
+  const musculosDistribuicao = $derived.by(() => {
+    if (!exercicio) return [];
+    const total = exercicio.musculos.reduce((acc, m) => acc + m.peso_contribuicao, 0);
+    if (!total) return [];
+    return exercicio.musculos
+      .map((m) => ({ nome: m.musculo?.nome ?? "", pct: (m.peso_contribuicao / total) * 100 }))
+      .sort((a, b) => b.pct - a.pct);
+  });
+
   async function salvar() {
     if (!nome.trim()) {
       alert("Informe o nome do exercício.");
@@ -170,14 +184,20 @@
     {#if !exercicio}
     <p class="muted">Exercício não encontrado.</p>
   {:else if aba === "historico"}
-    <p class="musculos">
-      <strong>Músculos:</strong>
-      {exercicio.musculos
-        .slice()
-        .sort((a, b) => b.peso_contribuicao - a.peso_contribuicao)
-        .map((m) => `${m.musculo?.nome} (${m.peso_contribuicao})`)
-        .join(", ")}
-    </p>
+    {#if musculosDistribuicao.length}
+      <div class="musculos-dist">
+        <p class="musculos-dist-titulo">Músculos Envolvidos</p>
+        {#each musculosDistribuicao as m (m.nome)}
+          <div class="musculo-dist-item">
+            <span class="musculo-dist-nome">{m.nome}</span>
+            <div class="musculo-dist-barra-wrap">
+              <div class="musculo-dist-barra" style={`width: ${m.pct}%`}></div>
+            </div>
+            <span class="musculo-dist-pct">{m.pct.toFixed(0)}%</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
     <ExercicioChart {exercicioId} />
     {#if !historico.length}
       <p class="muted">Nenhum registro ainda.</p>
@@ -339,9 +359,45 @@
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
   }
-  .musculos {
-    color: var(--surface-muted);
+  .musculos-dist {
     margin: 0 0 var(--space-4);
+  }
+  .musculos-dist-titulo {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--surface-fg);
+  }
+  .musculo-dist-item {
+    display: grid;
+    grid-template-columns: 100px 1fr 40px;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-1) 0;
+  }
+  .musculo-dist-nome {
+    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .musculo-dist-barra-wrap {
+    height: 10px;
+    background: var(--surface-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .musculo-dist-barra {
+    height: 100%;
+    border-radius: 6px;
+    background: var(--color-primary);
+  }
+  .musculo-dist-pct {
+    text-align: right;
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .sessao-card {
     padding: var(--space-3) 0;
