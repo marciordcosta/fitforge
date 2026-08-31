@@ -403,12 +403,15 @@
     modalDetalheRotina = { titulo, itens, centroValor, centroLabel };
   }
 
-  /** Gráfico de uma rotina específica: dois anéis com o mesmo total de séries no centro —
-   * um pela contagem bruta de séries por músculo, outro ponderado pelo peso_contribuicao
-   * (o valor real de trabalho de cada músculo). */
+  /** Gráfico de uma rotina específica: dois anéis — um pela contagem bruta de séries por
+   * músculo (centro = total de séries da rotina), outro ponderado pelo peso_contribuicao,
+   * o valor real de trabalho de cada músculo (centro = soma desses valores ponderados,
+   * que é diferente do total de séries — cada série pesa menos que 1 quando dividida
+   * entre vários músculos). */
   let modalGraficoTreino = $state<{
     titulo: string;
     totalSeries: number;
+    totalTrabalho: number;
     porSerie: ItemDetalheRotina[];
     porTrabalho: ItemDetalheRotina[];
   } | null>(null);
@@ -421,7 +424,8 @@
       .sort((a, b) => b.valor - a.valor);
     const porSerie = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie, porTrabalho };
+    const totalTrabalho = Math.round(porTrabalho.reduce((acc, item) => acc + item.valor, 0));
+    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, totalTrabalho, porSerie, porTrabalho };
   }
 </script>
 
@@ -714,7 +718,7 @@
     <div class="pizza-wrap pizza-wrap-dupla">
       <PieChart
         dados={modalGraficoTreino.porTrabalho.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
-        centroValor={modalGraficoTreino.totalSeries}
+        centroValor={modalGraficoTreino.totalTrabalho}
         centroLabel="séries"
       />
     </div>

@@ -122,6 +122,7 @@
 
       return {
         nome: d.nome,
+        valor: d.valor,
         pct,
         linhasNome,
         dyInicial,
@@ -132,6 +133,15 @@
         ancora: ladoDireito ? "start" : "end",
       };
     });
+  });
+
+  /** Com uma fatia selecionada, o centro troca o total pelo valor daquele músculo. */
+  const centro = $derived.by(() => {
+    if (nomeDestacado) {
+      const f = fatias.find((f) => f.nome === nomeDestacado);
+      if (f) return { valor: f.valor, label: f.nome };
+    }
+    return { valor: centroValor, label: centroLabel };
   });
 </script>
 
@@ -148,10 +158,10 @@
       onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
     />
   {/each}
-  {#if centroValor != null}
-    <text x={CX} y={CY - 1.5} text-anchor="middle" class="centro-valor">{centroValor}</text>
-    {#if centroLabel}
-      <text x={CX} y={CY + 6.5} text-anchor="middle" class="centro-label">{centroLabel}</text>
+  {#if centro.valor != null}
+    <text x={CX} y={CY - 1} text-anchor="middle" class="centro-valor">{centro.valor}</text>
+    {#if centro.label}
+      <text x={CX} y={CY + 5} text-anchor="middle" class="centro-label">{centro.label}</text>
     {/if}
   {/if}
   {#each fatias as f (f.nome)}
@@ -226,12 +236,12 @@
     cursor: pointer;
   }
   .centro-valor {
-    font-size: 11px;
+    font-size: 15px;
     font-weight: 700;
     fill: var(--surface-fg);
   }
   .centro-label {
-    font-size: 4px;
+    font-size: 5.5px;
     font-weight: 400;
     fill: var(--surface-muted);
   }
