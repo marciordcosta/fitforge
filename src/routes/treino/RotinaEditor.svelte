@@ -198,6 +198,41 @@
   let menuExercicioAberto = $state<number | null>(null);
   let menuSerieAberto = $state<{ idx: number; setIdx: number } | null>(null);
   let mostrarConfirmCancelar = $state(false);
+  let substituindoIdx = $state<number | null>(null);
+  let buscaSubstituir = $state("");
+
+  function abrirSubstituir(idx: number) {
+    substituindoIdx = idx;
+  }
+
+  function fecharSubstituir() {
+    substituindoIdx = null;
+    buscaSubstituir = "";
+  }
+
+  const opcoesSubstituir = $derived(
+    todosExercicios.filter((e) => correspondeBusca(textoBuscavelExercicio(e), buscaSubstituir)),
+  );
+
+  /** Troca o exercício da linha mantendo a mesma quantidade de séries, com metas
+   * pré-preenchidas a partir do histórico do novo exercício (igual a construirLinha). */
+  async function substituirExercicio(novoEx: Exercicio) {
+    if (substituindoIdx == null) return;
+    const idx = substituindoIdx;
+    const linha = linhas[idx];
+    const anterior = await getAnteriorCached(novoEx.id);
+    const series: LinhaSerie[] = Array.from({ length: linha.series.length }, (_, i) => {
+      const ant = anterior.find((a) => a.serie === i + 1);
+      return {
+        serie: i + 1,
+        peso_alvo: ant?.peso ?? null,
+        rep_min: ant?.repeticoes ?? null,
+        rep_max: ant?.repeticoes ?? null,
+      };
+    });
+    linhas[idx] = { ...linha, exercicio_id: novoEx.id, nome: novoEx.nome, observacao: null, series };
+    fecharSubstituir();
+  }
   let descansoEditandoIdx = $state<number | null>(null);
   let reordenando = $state(false);
   let arrastandoIdx = $state<number | null>(null);
@@ -299,6 +334,14 @@
 {#snippet iconRemoverExercicio()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+{/snippet}
+{#snippet iconSubstituir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 2l4 4-4 4" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <path d="M7 22l-4-4 4-4" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
   </svg>
 {/snippet}
 {#snippet iconRemoverSerie()}
@@ -414,6 +457,7 @@
     onFechar={() => (menuExercicioAberto = null)}
     opcoes={[
       { label: "Reordenar Exercícios", icon: iconReordenar, onSelect: () => (reordenando = true) },
+      { label: "Substituir Exercício", icon: iconSubstituir, onSelect: () => abrirSubstituir(idxMenu) },
       { label: "Remover Exercício", icon: iconRemoverExercicio, destructive: true, onSelect: () => remover(idxMenu) },
     ]}
   />
@@ -460,6 +504,27 @@
     onSelecionar={(seg) => (linhas[idxDescanso].descanso_seg = seg)}
     onFechar={() => (descansoEditandoIdx = null)}
   />
+{/if}
+
+{#if substituindoIdx !== null}
+  <div class="tela-picker">
+    <div class="picker-conteudo">
+      <div class="header">
+        <button class="back" onclick={fecharSubstituir} aria-label="Cancelar">{@render iconVoltar()}</button>
+        <h1>Substituir por</h1>
+        <span class="header-spacer"></span>
+      </div>
+      <input class="search" type="text" placeholder="Procurar exercício" bind:value={buscaSubstituir} />
+      <ul class="picker-lista">
+        {#each opcoesSubstituir as ex (ex.id)}
+          <li><button class="picker-item-full" onclick={() => substituirExercicio(ex)}>{ex.nome}</button></li>
+        {/each}
+        {#if !opcoesSubstituir.length}
+          <li class="muted-item">Nenhum exercício encontrado.</li>
+        {/if}
+      </ul>
+    </div>
+  </div>
 {/if}
 
 {#if mostrarPicker}
@@ -760,9 +825,10 @@
     width: 100%;
     padding: var(--space-3);
     border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
-    color: var(--color-primary);
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-weight: 600;
     font-size: var(--font-size-sm);
     cursor: pointer;
     margin-top: var(--space-2);
@@ -875,6 +941,17 @@
     border-bottom: 1px solid var(--surface-border);
     color: var(--surface-fg);
     font-size: var(--font-size-base);
+  }
+  .picker-item-full {
+    width: 100%;
+    text-align: left;
+    padding: var(--space-3) 0;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--surface-border);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    cursor: pointer;
   }
   .picker-item .avatar {
     width: 40px;
