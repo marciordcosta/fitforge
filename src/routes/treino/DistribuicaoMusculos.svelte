@@ -234,6 +234,71 @@
       .sort((a, b) => b.valor - a.valor);
   });
 
+  interface LinhaSemanal {
+    chave: string;
+    nome: string;
+    valor: number;
+    feito: number;
+    /** Preenchido só quando a linha é um músculo avulso (sem agrupamento) — usado pra abrir os exercícios dele. */
+    musculo: Musculo | null;
+    /** null = músculo avulso; senão, os músculos que compõem o total do grupo. */
+    subItens: { musculo: Musculo; valor: number; feito: number }[] | null;
+  }
+
+  let gruposExpandidos = $state<Set<string>>(new Set());
+
+  function alternarGrupo(chave: string): void {
+    const copia = new Set(gruposExpandidos);
+    if (copia.has(chave)) copia.delete(chave);
+    else copia.add(chave);
+    gruposExpandidos = copia;
+  }
+
+  /** Junta na Distribuição Semanal os músculos que têm o mesmo agrupamento (ex: Deltoide
+   * Anterior/Lateral/Posterior somados em "Deltoide") — os músculos separados continuam
+   * disponíveis expandindo o grupo. Músculos sem agrupamento ficam como estão. */
+  const linhasSemanal = $derived.by(() => {
+    const porGrupo = new Map<string, { nome: string; itens: typeof distribuicaoSemanal }>();
+    const avulsos: typeof distribuicaoSemanal = [];
+    for (const item of distribuicaoSemanal) {
+      const agrupamento = item.musculo.agrupamento;
+      if (agrupamento) {
+        const grupo = porGrupo.get(agrupamento.id) ?? { nome: agrupamento.nome, itens: [] };
+        grupo.itens.push(item);
+        porGrupo.set(agrupamento.id, grupo);
+      } else {
+        avulsos.push(item);
+      }
+    }
+
+    const linhas: LinhaSemanal[] = [];
+    for (const [id, grupo] of porGrupo) {
+      linhas.push({
+        chave: id,
+        nome: grupo.nome,
+        valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
+        feito: grupo.itens.reduce((acc, i) => acc + (feitoPorMusculoSemanaAoVivo.get(i.musculo.id) ?? 0), 0),
+        musculo: null,
+        subItens: grupo.itens.map((i) => ({
+          musculo: i.musculo,
+          valor: i.valor,
+          feito: feitoPorMusculoSemanaAoVivo.get(i.musculo.id) ?? 0,
+        })),
+      });
+    }
+    for (const item of avulsos) {
+      linhas.push({
+        chave: item.musculo.id,
+        nome: item.musculo.nome,
+        valor: item.valor,
+        feito: feitoPorMusculoSemanaAoVivo.get(item.musculo.id) ?? 0,
+        musculo: item.musculo,
+        subItens: null,
+      });
+    }
+    return linhas.sort((a, b) => b.valor - a.valor);
+  });
+
   const MESES = [
     "Janeiro",
     "Fevereiro",
@@ -512,16 +577,40 @@
             <p class="muted">Nenhum volume planejado ainda.</p>
           {:else}
             <div class="lista">
-              {#each distribuicaoSemanal as item (item.musculo.id)}
-                {@const feito = feitoPorMusculoSemanaAoVivo.get(item.musculo.id) ?? 0}
-                {@const corSemanal = treinoLogSessao.atual != null ? "var(--color-success)" : corVolume(item.valor)}
+              {#each linhasSemanal as linha (linha.chave)}
+                {@const corSemanal = treinoLogSessao.atual != null ? "var(--color-success)" : corVolume(linha.valor)}
+                {@const aberto = linha.subItens != null && gruposExpandidos.has(linha.chave)}
                 <div class="item">
-                  <button class="nome-btn" onclick={() => abrirExercicios(treinos, item.musculo)}>{item.musculo.nome}</button>
+                  {#if linha.subItens}
+                    <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(linha.chave)}>
+                      <span class="chevron-grupo" class:aberto>›</span>
+                      {linha.nome}
+                    </button>
+                  {:else}
+                    <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(treinos, linha.musculo)}>{linha.nome}</button>
+                  {/if}
                   <div class="barra-wrap">
-                    <div class="barra" style={`width: ${Math.min((feito / item.valor) * 100, 100)}%; background: ${corSemanal};`}></div>
+                    <div class="barra" style={`width: ${Math.min((linha.feito / linha.valor) * 100, 100)}%; background: ${corSemanal};`}></div>
                   </div>
-                  <button class="valor-btn" style={`color: ${corSemanal};`} onclick={() => abrirGradeSemanal([item.musculo.id])}>{feito.toFixed(0)} / {item.valor}</button>
+                  <button
+                    class="valor-btn"
+                    style={`color: ${corSemanal};`}
+                    onclick={() =>
+                      abrirGradeSemanal(linha.subItens ? linha.subItens.map((s) => s.musculo.id) : [linha.chave])}
+                  >{linha.feito.toFixed(0)} / {linha.valor}</button>
                 </div>
+                {#if aberto && linha.subItens}
+                  {#each linha.subItens as sub (sub.musculo.id)}
+                    {@const corSub = treinoLogSessao.atual != null ? "var(--color-success)" : corVolume(sub.valor)}
+                    <div class="item item-sub">
+                      <button class="nome-btn" onclick={() => abrirExercicios(treinos, sub.musculo)}>{sub.musculo.nome}</button>
+                      <div class="barra-wrap">
+                        <div class="barra" style={`width: ${Math.min((sub.feito / sub.valor) * 100, 100)}%; background: ${corSub};`}></div>
+                      </div>
+                      <button class="valor-btn" style={`color: ${corSub};`} onclick={() => abrirGradeSemanal([sub.musculo.id])}>{sub.feito.toFixed(0)} / {sub.valor}</button>
+                    </div>
+                  {/each}
+                {/if}
               {/each}
             </div>
             <button class="rotina-totais rotina-totais-btn" onclick={() => abrirMenuSemanal()}>
@@ -926,6 +1015,25 @@
     text-align: right;
     font-weight: 600;
     font-size: var(--font-size-sm);
+  }
+  .nome-grupo {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--color-primary);
+    font-weight: 700;
+  }
+  .chevron-grupo {
+    display: inline-block;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .chevron-grupo.aberto {
+    transform: rotate(90deg);
+  }
+  .item-sub {
+    padding-left: var(--space-3);
+    opacity: 0.85;
   }
   .barra-wrap {
     height: 10px;

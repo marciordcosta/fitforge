@@ -152,6 +152,9 @@
     <path
       d={f.path}
       fill={f.cor}
+      stroke="#fff"
+      stroke-width="0.6"
+      stroke-linejoin="round"
       opacity={nomeDestacado && f.nome !== nomeDestacado ? 0.35 : 1}
       class="fatia-clicavel"
       role="button"
