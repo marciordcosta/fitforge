@@ -403,15 +403,15 @@
     modalDetalheRotina = { titulo, itens, centroValor, centroLabel };
   }
 
-  /** Gráfico de uma rotina específica: dois anéis — um pela contagem bruta de séries por
-   * músculo (centro = total de séries da rotina), outro ponderado pelo peso_contribuicao,
-   * o valor real de trabalho de cada músculo (centro = soma desses valores ponderados,
-   * que é diferente do total de séries — cada série pesa menos que 1 quando dividida
-   * entre vários músculos). */
+  /** Gráfico de uma rotina específica: dois anéis, ambos com o mesmo total literal de
+   * séries da rotina no centro por padrão (sem nada selecionado). Ao selecionar uma
+   * fatia, o centro passa a mostrar o valor daquele músculo específico — no anel "Por
+   * Série" é a contagem bruta (1 série conta pra cada músculo envolvido); no anel "Por
+   * Trabalho Real" é o valor ponderado por peso_contribuicao (o trabalho de fato daquele
+   * músculo no exercício). */
   let modalGraficoTreino = $state<{
     titulo: string;
     totalSeries: number;
-    totalTrabalho: number;
     porSerie: ItemDetalheRotina[];
     porTrabalho: ItemDetalheRotina[];
   } | null>(null);
@@ -424,8 +424,7 @@
       .sort((a, b) => b.valor - a.valor);
     const porSerie = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    const totalTrabalho = Math.round(porTrabalho.reduce((acc, item) => acc + item.valor, 0));
-    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, totalTrabalho, porSerie, porTrabalho };
+    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie, porTrabalho };
   }
 </script>
 
@@ -718,7 +717,7 @@
     <div class="pizza-wrap pizza-wrap-dupla">
       <PieChart
         dados={modalGraficoTreino.porTrabalho.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
-        centroValor={modalGraficoTreino.totalTrabalho}
+        centroValor={modalGraficoTreino.totalSeries}
         centroLabel="séries"
       />
     </div>

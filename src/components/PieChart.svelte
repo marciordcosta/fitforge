@@ -135,13 +135,11 @@
     });
   });
 
-  /** Com uma fatia selecionada, o centro troca o total pelo valor daquele músculo. */
+  /** Com uma fatia selecionada, o centro troca o total pelo valor daquele músculo — o rótulo
+   * (ex: "séries") continua o mesmo, só o número muda. */
   const centro = $derived.by(() => {
-    if (nomeDestacado) {
-      const f = fatias.find((f) => f.nome === nomeDestacado);
-      if (f) return { valor: f.valor, label: f.nome };
-    }
-    return { valor: centroValor, label: centroLabel };
+    const f = nomeDestacado ? fatias.find((f) => f.nome === nomeDestacado) : undefined;
+    return { valor: f ? f.valor : centroValor, label: centroLabel };
   });
 </script>
 
@@ -159,9 +157,9 @@
     />
   {/each}
   {#if centro.valor != null}
-    <text x={CX} y={CY - 1} text-anchor="middle" class="centro-valor">{centro.valor}</text>
+    <text x={CX} y={CY} text-anchor="middle" class="centro-valor">{centro.valor}</text>
     {#if centro.label}
-      <text x={CX} y={CY + 5} text-anchor="middle" class="centro-label">{centro.label}</text>
+      <text x={CX} y={CY + 6} text-anchor="middle" class="centro-label">{centro.label}</text>
     {/if}
   {/if}
   {#each fatias as f (f.nome)}
