@@ -2,6 +2,7 @@
   import { navigate, voltar } from "../../lib/router.svelte";
   import {
     listExercicios,
+    listTreinos,
     correspondeBusca,
     textoBuscavelExercicio,
     distribuicaoMusculosExercicio,
@@ -17,9 +18,20 @@
 
   let busca = $state("");
 
+  /** Primeira rotina (na ordem de exibição das rotinas) que usa cada exercício. */
+  let rotinaPorExercicio = $state<Map<string, string>>(new Map());
+
   async function carregar() {
     loading = true;
-    exercicios = await listExercicios();
+    const [exs, treinos] = await Promise.all([listExercicios(), listTreinos()]);
+    exercicios = exs;
+    const mapa = new Map<string, string>();
+    for (const t of treinos) {
+      for (const te of t.exercicios) {
+        if (!mapa.has(te.exercicio_id)) mapa.set(te.exercicio_id, t.nome_treino);
+      }
+    }
+    rotinaPorExercicio = mapa;
     loading = false;
   }
 
@@ -91,7 +103,13 @@
       {#each filtrados as ex (ex.id)}
         <li>
           <button class="item" onclick={() => navigate(`/treino/exercicios/${ex.id}`)}>
-            <span class="avatar">{iniciais(ex.nome)}</span>
+            <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
+              {#if rotinaPorExercicio.has(ex.id)}
+                <span class="avatar-rotina-texto">{rotinaPorExercicio.get(ex.id)}</span>
+              {:else}
+                {iniciais(ex.nome)}
+              {/if}
+            </span>
             <span class="info">
               <span class="nome">{ex.nome}</span>
               {#if !ex.musculos.length}
@@ -229,6 +247,23 @@
     font-size: var(--font-size-sm);
     font-weight: 600;
     flex-shrink: 0;
+  }
+  .avatar-rotina {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+  }
+  .avatar-rotina-texto {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    padding: 0 3px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+    word-break: break-word;
   }
   .info {
     flex: 1;
