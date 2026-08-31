@@ -191,7 +191,7 @@
         {/each}
       </div>
     {/if}
-    <ExercicioChart {exercicioId} />
+    <ExercicioChart {exercicio} />
     {#if !historico.length}
       <p class="muted">Nenhum registro ainda.</p>
     {:else}

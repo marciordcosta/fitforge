@@ -1,18 +1,20 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
-  import { getHistoricoExercicio, type HistoricoPonto } from "../../lib/treinoApi";
+  import { getHistoricoExercicio, type HistoricoPonto, type Exercicio } from "../../lib/treinoApi";
+  import ExercicioChartTelaCheia from "./ExercicioChartTelaCheia.svelte";
 
-  let { exercicioId }: { exercicioId: string } = $props();
+  let { exercicio }: { exercicio: Exercicio } = $props();
 
   let historico = $state<HistoricoPonto[]>([]);
   let loading = $state(true);
   let metrica = $state<"peso" | "1rm" | "volume">("1rm");
   let canvas = $state<HTMLCanvasElement | undefined>(undefined);
   let chart: Chart | null = null;
+  let mostrarTelaCheia = $state(false);
 
   async function carregar() {
     loading = true;
-    historico = await getHistoricoExercicio(exercicioId);
+    historico = await getHistoricoExercicio(exercicio.id);
     loading = false;
   }
 
@@ -68,9 +70,9 @@
 {:else if !historico.length}
   <p class="muted">Nenhum registro ainda. O gráfico aparece depois do primeiro treino logado.</p>
 {:else}
-  <div class="chart-wrap">
+  <button class="chart-wrap" onclick={() => (mostrarTelaCheia = true)} aria-label="Ver gráfico em tela cheia">
     <canvas bind:this={canvas}></canvas>
-  </div>
+  </button>
   <div class="toggle">
     <button class:active={metrica === "1rm"} onclick={() => (metrica = "1rm")}>Máximo 1RM</button>
     <button class:active={metrica === "peso"} onclick={() => (metrica = "peso")}>Maior Peso</button>
@@ -78,10 +80,20 @@
   </div>
 {/if}
 
+{#if mostrarTelaCheia}
+  <ExercicioChartTelaCheia {exercicio} metricaInicial={metrica} onFechar={() => (mostrarTelaCheia = false)} />
+{/if}
+
 <style>
   .chart-wrap {
+    display: block;
+    width: 100%;
     height: 220px;
     margin-bottom: var(--space-3);
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
   }
   .toggle {
     display: flex;
