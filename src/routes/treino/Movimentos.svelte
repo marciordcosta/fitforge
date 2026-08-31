@@ -1,10 +1,11 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { listPadroesMovimentoComMusculos, type PadraoMovimentoComMusculos } from "../../lib/treinoApi";
+  import { listPadroesMovimentoComMusculos, correspondeBusca, type PadraoMovimentoComMusculos } from "../../lib/treinoApi";
 
   let padroes = $state<PadraoMovimentoComMusculos[]>([]);
   let loading = $state(true);
   let erroCarregar = $state<string | null>(null);
+  let busca = $state("");
 
   async function carregar() {
     loading = true;
@@ -24,6 +25,8 @@
     if (!p.musculos.length) return "Sem músculo definido";
     return p.musculos.map((m) => m.nome).join(", ");
   }
+
+  const filtrados = $derived(padroes.filter((p) => correspondeBusca(`${p.nome} ${subtitulo(p)}`, busca)));
 </script>
 
 {#snippet iconVoltar()}
@@ -47,15 +50,19 @@
     </button>
   </div>
 
+  <input class="search" type="text" placeholder="Procurar movimento" bind:value={busca} />
+
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else if erroCarregar}
     <p class="erro">Erro ao carregar: {erroCarregar}</p>
   {:else if !padroes.length}
     <p class="muted">Nenhum movimento cadastrado.</p>
+  {:else if !filtrados.length}
+    <p class="muted">Nenhum movimento encontrado.</p>
   {:else}
     <ul class="lista">
-      {#each padroes as p (p.id)}
+      {#each filtrados as p (p.id)}
         <li>
           <button class="item" onclick={() => navigate(`/treino/movimentos/${p.id}`)}>
             <span class="info">
@@ -125,6 +132,17 @@
   .criar svg {
     width: 18px;
     height: 18px;
+  }
+  .search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-3);
   }
   .lista {
     list-style: none;

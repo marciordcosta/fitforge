@@ -70,6 +70,19 @@
     return mapa;
   }
 
+  /** Igual à anterior, mas ponderada pelo peso_contribuicao — o valor real de trabalho de cada músculo, não a simples contagem de séries que passam por ele. */
+  function contarSeriesTrabalhoPorMusculo(treino: TreinoComExercicios): Map<string, number> {
+    const mapa = new Map<string, number>();
+    for (const ex of treino.exercicios) {
+      const numSeries = ex.series.length;
+      if (!numSeries) continue;
+      for (const m of ex.exercicio?.musculos ?? []) {
+        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + numSeries * m.peso_contribuicao);
+      }
+    }
+    return mapa;
+  }
+
   /** Igual à lista de rotinas, mas com a rotina em sessão ao vivo (se houver) sempre na frente — as demais ficam opacas no card. */
   const distribuicaoPorTreino = $derived.by(() => {
     const base = treinos.map((t) => {
@@ -347,10 +360,9 @@
 
   const rotinaMenuOpcoes = $derived.by((): AcaoSheet[] => {
     if (!rotinaMenuUrl) return [];
-    const lista = distribuicaoPorTreino.find((d) => d.treino.id === rotinaMenuUrl!.id)?.lista ?? [];
     return [
       { label: "Editar Rotina", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${rotinaMenuUrl!.id}`) },
-      { label: "Visualizar Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(rotinaMenuUrl!.nome_treino, lista) },
+      { label: "Visualizar Gráfico", icon: iconGrafico, onSelect: () => abrirGraficoTreino(rotinaMenuUrl!) },
     ];
   });
 
@@ -359,7 +371,11 @@
       titulo: "Distribuição Semanal",
       opcoes: [
         { label: "Semana", icon: iconGrade, onSelect: () => abrirGradeSemanal(null) },
-        { label: "Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina("Distribuição Semanal", distribuicaoSemanal) },
+        {
+          label: "Gráfico",
+          icon: iconGrafico,
+          onSelect: () => abrirDetalheRotina("Distribuição Semanal", distribuicaoSemanal, totaisSemanais.series, "séries"),
+        },
       ],
     };
   }
@@ -371,10 +387,41 @@
     valor: number;
   }
 
-  let modalDetalheRotina = $state<{ titulo: string; itens: ItemDetalheRotina[] } | null>(null);
+  let modalDetalheRotina = $state<{
+    titulo: string;
+    itens: ItemDetalheRotina[];
+    centroValor?: number;
+    centroLabel?: string;
+  } | null>(null);
 
-  function abrirDetalheRotina(titulo: string, itens: { musculo: Musculo; valor: number }[]): void {
-    modalDetalheRotina = { titulo, itens };
+  function abrirDetalheRotina(
+    titulo: string,
+    itens: { musculo: Musculo; valor: number }[],
+    centroValor?: number,
+    centroLabel?: string,
+  ): void {
+    modalDetalheRotina = { titulo, itens, centroValor, centroLabel };
+  }
+
+  /** Gráfico de uma rotina específica: dois anéis com o mesmo total de séries no centro —
+   * um pela contagem bruta de séries por músculo, outro ponderado pelo peso_contribuicao
+   * (o valor real de trabalho de cada músculo). */
+  let modalGraficoTreino = $state<{
+    titulo: string;
+    totalSeries: number;
+    porSerie: ItemDetalheRotina[];
+    porTrabalho: ItemDetalheRotina[];
+  } | null>(null);
+
+  function abrirGraficoTreino(treino: TreinoComExercicios): void {
+    const mapaTrabalho = contarSeriesTrabalhoPorMusculo(treino);
+    const porTrabalho = musculos
+      .map((m) => ({ musculo: m, valor: Math.round(mapaTrabalho.get(m.id) ?? 0) }))
+      .filter((item) => item.valor > 0)
+      .sort((a, b) => b.valor - a.valor);
+    const porSerie = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
+    const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
+    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie, porTrabalho };
   }
 </script>
 
@@ -644,7 +691,32 @@
 {#if modalDetalheRotina}
   <Sheet titulo={modalDetalheRotina.titulo} onFechar={() => (modalDetalheRotina = null)}>
     <div class="pizza-wrap">
-      <PieChart dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))} />
+      <PieChart
+        dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
+        centroValor={modalDetalheRotina.centroValor}
+        centroLabel={modalDetalheRotina.centroLabel}
+      />
+    </div>
+  </Sheet>
+{/if}
+
+{#if modalGraficoTreino}
+  <Sheet titulo={modalGraficoTreino.titulo} onFechar={() => (modalGraficoTreino = null)}>
+    <p class="pizza-legenda">Por Série</p>
+    <div class="pizza-wrap pizza-wrap-dupla">
+      <PieChart
+        dados={modalGraficoTreino.porSerie.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
+        centroValor={modalGraficoTreino.totalSeries}
+        centroLabel="séries"
+      />
+    </div>
+    <p class="pizza-legenda">Por Trabalho Real</p>
+    <div class="pizza-wrap pizza-wrap-dupla">
+      <PieChart
+        dados={modalGraficoTreino.porTrabalho.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
+        centroValor={modalGraficoTreino.totalSeries}
+        centroLabel="séries"
+      />
     </div>
   </Sheet>
 {/if}
@@ -950,5 +1022,15 @@
     aspect-ratio: 1;
     overflow: hidden;
     margin: var(--space-2) auto 0;
+  }
+  .pizza-legenda {
+    margin: var(--space-4) 0 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--surface-fg);
+    text-align: center;
+  }
+  .pizza-wrap-dupla {
+    max-width: 260px;
   }
 </style>

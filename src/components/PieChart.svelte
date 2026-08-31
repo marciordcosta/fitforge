@@ -19,7 +19,8 @@
     valor: number;
   }
 
-  let { dados }: { dados: Fatia[] } = $props();
+  let { dados, centroValor, centroLabel }: { dados: Fatia[]; centroValor?: string | number; centroLabel?: string } =
+    $props();
 
   let nomeDestacado = $state<string | null>(null);
   let svgEl = $state<SVGSVGElement | undefined>();
@@ -47,6 +48,8 @@
   const CX = 50;
   const CY = 50;
   const R = 32;
+  /** Raio interno — o que faz o gráfico ser um anel (donut) em vez de uma pizza fechada. */
+  const R_INTERNO = 18;
   const COL_DIREITA = 78;
   const COL_ESQUERDA = 22;
   const MAX_CHARS_LINHA = 9;
@@ -87,15 +90,20 @@
       anguloAtual = fim;
       let path: string;
       if (angulo >= 359.99) {
-        const p0 = ponto(R, 0);
-        const p1 = ponto(R, 179.99);
-        const p2 = ponto(R, 359.98);
-        path = `M ${p0.x} ${p0.y} A ${R} ${R} 0 1 1 ${p1.x} ${p1.y} A ${R} ${R} 0 1 1 ${p2.x} ${p2.y} Z`;
+        const o0 = ponto(R, 0);
+        const o1 = ponto(R, 179.99);
+        const o2 = ponto(R, 359.98);
+        const i0 = ponto(R_INTERNO, 0);
+        const i1 = ponto(R_INTERNO, 179.99);
+        const i2 = ponto(R_INTERNO, 359.98);
+        path = `M ${o0.x} ${o0.y} A ${R} ${R} 0 1 1 ${o1.x} ${o1.y} A ${R} ${R} 0 1 1 ${o2.x} ${o2.y} L ${i2.x} ${i2.y} A ${R_INTERNO} ${R_INTERNO} 0 1 0 ${i1.x} ${i1.y} A ${R_INTERNO} ${R_INTERNO} 0 1 0 ${i0.x} ${i0.y} Z`;
       } else {
-        const p0 = ponto(R, inicio);
-        const p1 = ponto(R, fim);
+        const o0 = ponto(R, inicio);
+        const o1 = ponto(R, fim);
+        const i0 = ponto(R_INTERNO, inicio);
+        const i1 = ponto(R_INTERNO, fim);
         const largeArc = angulo > 180 ? 1 : 0;
-        path = `M ${CX} ${CY} L ${p0.x} ${p0.y} A ${R} ${R} 0 ${largeArc} 1 ${p1.x} ${p1.y} Z`;
+        path = `M ${o0.x} ${o0.y} A ${R} ${R} 0 ${largeArc} 1 ${o1.x} ${o1.y} L ${i1.x} ${i1.y} A ${R_INTERNO} ${R_INTERNO} 0 ${largeArc} 0 ${i0.x} ${i0.y} Z`;
       }
 
       const meio = (inicio + fim) / 2;
@@ -140,6 +148,12 @@
       onkeydown={(e) => e.key === "Enter" && aoClicarFatia(f)}
     />
   {/each}
+  {#if centroValor != null}
+    <text x={CX} y={CY - 1.5} text-anchor="middle" class="centro-valor">{centroValor}</text>
+    {#if centroLabel}
+      <text x={CX} y={CY + 6.5} text-anchor="middle" class="centro-label">{centroLabel}</text>
+    {/if}
+  {/if}
   {#each fatias as f (f.nome)}
     <path
       d={f.linha}
@@ -210,5 +224,15 @@
   }
   .fatia-clicavel {
     cursor: pointer;
+  }
+  .centro-valor {
+    font-size: 11px;
+    font-weight: 700;
+    fill: var(--surface-fg);
+  }
+  .centro-label {
+    font-size: 4px;
+    font-weight: 400;
+    fill: var(--surface-muted);
   }
 </style>

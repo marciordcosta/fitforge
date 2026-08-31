@@ -1,9 +1,10 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { listMusculos, type Musculo } from "../../lib/treinoApi";
+  import { listMusculos, correspondeBusca, type Musculo } from "../../lib/treinoApi";
 
   let musculos = $state<Musculo[]>([]);
   let loading = $state(true);
+  let busca = $state("");
 
   async function carregar() {
     loading = true;
@@ -12,6 +13,10 @@
   }
 
   void carregar();
+
+  const filtrados = $derived(
+    musculos.filter((m) => correspondeBusca(`${m.nome} ${m.agrupamento?.nome ?? ""}`, busca)),
+  );
 </script>
 
 {#snippet iconVoltar()}
@@ -35,13 +40,17 @@
     </button>
   </div>
 
+  <input class="search" type="text" placeholder="Procurar músculo" bind:value={busca} />
+
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else if !musculos.length}
     <p class="muted">Nenhum músculo cadastrado.</p>
+  {:else if !filtrados.length}
+    <p class="muted">Nenhum músculo encontrado.</p>
   {:else}
     <ul class="lista">
-      {#each musculos as m (m.id)}
+      {#each filtrados as m (m.id)}
         <li>
           <button class="item" onclick={() => navigate(`/treino/musculos/${m.id}`)}>
             <span class="nome">{m.nome}</span>
@@ -108,6 +117,17 @@
   .criar svg {
     width: 18px;
     height: 18px;
+  }
+  .search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-3);
   }
   .lista {
     list-style: none;
