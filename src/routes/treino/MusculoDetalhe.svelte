@@ -6,6 +6,7 @@
   let { musculoId }: { musculoId: string } = $props();
 
   let nome = $state("");
+  let grupoExibicao = $state("");
   let encontrado = $state(true);
   let loading = $state(true);
   let salvando = $state(false);
@@ -16,6 +17,7 @@
     const musculo = await getMusculo(musculoId);
     if (musculo) {
       nome = musculo.nome;
+      grupoExibicao = musculo.grupo_exibicao ?? "";
     } else {
       encontrado = false;
     }
@@ -31,7 +33,7 @@
     }
     salvando = true;
     try {
-      await updateMusculo(musculoId, nome);
+      await updateMusculo(musculoId, nome, grupoExibicao);
       voltar("/treino/musculos");
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
@@ -78,6 +80,16 @@
       <span>Nome</span>
       <input type="text" bind:value={nome} placeholder="Ex: Deltoide Posterior" />
     </label>
+
+    <label class="field">
+      <span>Grupo de Exibição (opcional)</span>
+      <input type="text" bind:value={grupoExibicao} placeholder="Ex: Ombro" />
+      <span class="ajuda">
+        Usado para somar músculos relacionados em totais futuros — ex: "Ombro Anterior", "Ombro
+        Lateral" e "Ombro Posterior" no grupo "Ombro". Deixe em branco se não precisar agrupar.
+      </span>
+    </label>
+
     <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Músculo</button>
   {/if}
 </div>
@@ -174,6 +186,10 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
     font-family: inherit;
+  }
+  .ajuda {
+    font-size: 12px;
+    color: var(--surface-muted);
   }
   .excluir-btn {
     width: 100%;

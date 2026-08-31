@@ -3,6 +3,7 @@
   import { findOrCreateMusculo } from "../../lib/treinoApi";
 
   let nome = $state("");
+  let grupoExibicao = $state("");
   let salvando = $state(false);
 
   async function salvar() {
@@ -12,7 +13,7 @@
     }
     salvando = true;
     try {
-      const musculo = await findOrCreateMusculo(nome);
+      const musculo = await findOrCreateMusculo(nome, grupoExibicao);
       navigate(`/treino/musculos/${musculo.id}`);
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
@@ -43,6 +44,15 @@
   <label class="field">
     <span>Nome</span>
     <input type="text" bind:value={nome} placeholder="Ex: Deltoide Posterior" />
+  </label>
+
+  <label class="field">
+    <span>Grupo de Exibição (opcional)</span>
+    <input type="text" bind:value={grupoExibicao} placeholder="Ex: Ombro" />
+    <span class="ajuda">
+      Usado para somar músculos relacionados em totais futuros — ex: "Ombro Anterior", "Ombro
+      Lateral" e "Ombro Posterior" no grupo "Ombro". Deixe em branco se não precisar agrupar.
+    </span>
   </label>
 </div>
 
@@ -125,5 +135,9 @@
     color: var(--surface-fg);
     font-size: var(--font-size-base);
     font-family: inherit;
+  }
+  .ajuda {
+    font-size: 12px;
+    color: var(--surface-muted);
   }
 </style>

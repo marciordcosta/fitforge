@@ -136,7 +136,11 @@ export async function listMusculos(): Promise<Musculo[]> {
   return data ?? [];
 }
 
-export async function findOrCreateMusculo(nome: string): Promise<Musculo> {
+/**
+ * Busca um músculo pelo nome ou cria um novo. `grupoExibicao` só é usado na criação (nunca
+ * sobrescreve o grupo de um músculo já existente que só está sendo referenciado por nome).
+ */
+export async function findOrCreateMusculo(nome: string, grupoExibicao?: string | null): Promise<Musculo> {
   const nomeTrim = nome.trim();
   const { data: existente } = await supabase
     .from("musculos")
@@ -148,7 +152,7 @@ export async function findOrCreateMusculo(nome: string): Promise<Musculo> {
 
   const { data, error } = await supabase
     .from("musculos")
-    .insert({ user_id: uid(), nome: nomeTrim, ordem: 0 })
+    .insert({ user_id: uid(), nome: nomeTrim, grupo_exibicao: grupoExibicao?.trim() || null, ordem: 0 })
     .select("id, nome, grupo_exibicao, ordem")
     .single();
   if (error) throw error;
@@ -165,8 +169,11 @@ export async function getMusculo(id: string): Promise<Musculo | null> {
   return data;
 }
 
-export async function updateMusculo(id: string, nome: string): Promise<void> {
-  const { error } = await supabase.from("musculos").update({ nome: nome.trim() }).eq("id", id);
+export async function updateMusculo(id: string, nome: string, grupoExibicao: string | null): Promise<void> {
+  const { error } = await supabase
+    .from("musculos")
+    .update({ nome: nome.trim(), grupo_exibicao: grupoExibicao?.trim() || null })
+    .eq("id", id);
   if (error) throw error;
 }
 
