@@ -1,7 +1,14 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { listExercicios, correspondeBusca, textoBuscavelExercicio, type Exercicio } from "../../lib/treinoApi";
+  import {
+    listExercicios,
+    correspondeBusca,
+    textoBuscavelExercicio,
+    distribuicaoMusculosExercicio,
+    type Exercicio,
+  } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import { PALETA } from "../../components/PieChart.svelte";
 
   let exercicios = $state<Exercicio[]>([]);
   let loading = $state(true);
@@ -22,12 +29,13 @@
     return (partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "");
   }
 
-  function subtitulo(ex: Exercicio): string {
-    if (!ex.musculos.length) return "Sem músculo definido";
-    return ex.musculos
-      .slice()
-      .sort((a, b) => b.peso_contribuicao - a.peso_contribuicao)
-      .map((m) => m.musculo?.nome)
+  function distribuicao(ex: Exercicio) {
+    return distribuicaoMusculosExercicio(ex).map((m, i) => ({ ...m, cor: PALETA[i % PALETA.length] }));
+  }
+
+  function subtituloAria(ex: Exercicio): string {
+    return distribuicao(ex)
+      .map((m) => `${m.nome} ${m.pct.toFixed(0)}%`)
       .join(", ");
   }
 
@@ -91,7 +99,15 @@
             <span class="avatar">{iniciais(ex.nome)}</span>
             <span class="info">
               <span class="nome">{ex.nome}</span>
-              <span class="sub">{subtitulo(ex)}</span>
+              {#if !ex.musculos.length}
+                <span class="sub">Sem músculo definido</span>
+              {:else}
+                <span class="musculos-barra" aria-label={subtituloAria(ex)}>
+                  {#each distribuicao(ex) as m (m.nome)}
+                    <span class="musculos-segmento" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
+                  {/each}
+                </span>
+              {/if}
             </span>
             <span class="chevron">›</span>
           </button>
@@ -224,6 +240,18 @@
   .sub {
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .musculos-barra {
+    display: flex;
+    width: 100%;
+    height: 8px;
+    margin-top: var(--space-1);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--surface-border);
+  }
+  .musculos-segmento {
+    height: 100%;
   }
   .chevron {
     color: var(--surface-muted);

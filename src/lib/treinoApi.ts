@@ -38,6 +38,18 @@ export interface Exercicio {
   musculos: ExercicioMusculo[];
 }
 
+/**
+ * Distribuição percentual de contribuição entre os músculos do exercício — a soma dos
+ * peso_contribuicao de todos vira 100%, cada músculo recebe a fatia proporcional (desc).
+ */
+export function distribuicaoMusculosExercicio(ex: Exercicio): { nome: string; pct: number }[] {
+  const total = ex.musculos.reduce((acc, m) => acc + m.peso_contribuicao, 0);
+  if (!total) return [];
+  return ex.musculos
+    .map((m) => ({ nome: m.musculo?.nome ?? "", pct: (m.peso_contribuicao / total) * 100 }))
+    .sort((a, b) => b.pct - a.pct);
+}
+
 export interface Treino {
   id: string;
   nome_treino: string;

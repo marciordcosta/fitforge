@@ -9,6 +9,7 @@
     excluirRegistroExercicioDia,
     construirMusculosInput,
     getHistoricoDetalhadoExercicio,
+    distribuicaoMusculosExercicio,
     type Exercicio,
     type SessaoHistorico,
     type LinhaMusculoInput,
@@ -57,19 +58,9 @@
     return parseISODate(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
   }
 
-  /**
-   * Distribuição percentual dos músculos do exercício: a soma dos peso_contribuicao de todos
-   * vira 100%, e cada músculo recebe a fatia proporcional. Ex: peito 1, tríceps 0.75, deltoide 0.25
-   * (soma 2) vira 50% / 38% / 12%.
-   */
   const musculosDistribuicao = $derived.by(() => {
     if (!exercicio) return [];
-    const total = exercicio.musculos.reduce((acc, m) => acc + m.peso_contribuicao, 0);
-    if (!total) return [];
-    return exercicio.musculos
-      .map((m) => ({ nome: m.musculo?.nome ?? "", pct: (m.peso_contribuicao / total) * 100 }))
-      .sort((a, b) => b.pct - a.pct)
-      .map((m, i) => ({ ...m, cor: PALETA[i % PALETA.length] }));
+    return distribuicaoMusculosExercicio(exercicio).map((m, i) => ({ ...m, cor: PALETA[i % PALETA.length] }));
   });
 
   async function salvar() {
