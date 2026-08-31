@@ -258,7 +258,7 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     padding: 0 3px;
-    font-size: 7px;
+    font-size: 5px;
     font-weight: 700;
     text-align: center;
   }
