@@ -95,13 +95,16 @@
   }
 
   /**
-   * Cor por faixa do percentual ACUMULADO (regra 80/20 — corte em 20%/30%), com margem
+   * Cor por faixa do percentual ACUMULADO (regra 80/20 — corte em 20%/50%), com margem
    * de tolerância pra não trocar de cor por pouca diferença perto do corte. A lista já
    * vem ordenada do músculo mais dominante pro menos — o acumulado soma na ordem, então
    * mostra visualmente quantos músculos concentram a maior parte do volume da rotina.
+   * Faixa B alargada (20-50, não 20-30): com poucos músculos por rotina, um salto de um
+   * músculo pro outro costuma passar de 10 pontos — numa janela estreita, o acumulado
+   * pula direto de A pra C sem nunca cair em B.
    */
   const CORTE_A = 20;
-  const CORTE_B = 30;
+  const CORTE_B = 50;
   const MARGEM_FAIXA = 5;
   const CORES_FAIXA = { a: "#60a5fa", b: "#fbbf24", c: "#f87171" };
 
