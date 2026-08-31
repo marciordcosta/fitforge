@@ -84,18 +84,19 @@
   }
 
   /**
-   * Cor por faixa de percentual (regra 80/20 — corte em 20%/30%), com margem de
-   * tolerância: um músculo com 23%, por exemplo, ainda passa como faixa A, já que o
-   * corte de 20% é aproximado, não uma linha rígida.
+   * Cor por faixa do percentual ACUMULADO (regra 80/20 — corte em 20%/30%), com margem
+   * de tolerância pra não trocar de cor por pouca diferença perto do corte. A lista já
+   * vem ordenada do músculo mais dominante pro menos — o acumulado soma na ordem, então
+   * mostra visualmente quantos músculos concentram a maior parte do volume da rotina.
    */
   const CORTE_A = 20;
   const CORTE_B = 30;
   const MARGEM_FAIXA = 5;
   const CORES_FAIXA = { a: "#60a5fa", b: "#fbbf24", c: "#f87171" };
 
-  function corPorFaixa(pct: number): string {
-    if (pct <= CORTE_A + MARGEM_FAIXA) return CORES_FAIXA.a;
-    if (pct <= CORTE_B + MARGEM_FAIXA) return CORES_FAIXA.b;
+  function corPorFaixa(acumulado: number): string {
+    if (acumulado <= CORTE_A + MARGEM_FAIXA) return CORES_FAIXA.a;
+    if (acumulado <= CORTE_B + MARGEM_FAIXA) return CORES_FAIXA.b;
     return CORES_FAIXA.c;
   }
 
@@ -112,9 +113,11 @@
         .filter((item) => item.valor > 0)
         .sort((a, b) => b.valor - a.valor);
       const total = bruto.reduce((acc, item) => acc + item.valor, 0);
+      let acumulado = 0;
       const lista = bruto.map((item) => {
         const pct = total > 0 ? (item.valor / total) * 100 : 0;
-        return { ...item, pct, cor: corPorFaixa(pct) };
+        acumulado += pct;
+        return { ...item, pct, cor: corPorFaixa(acumulado) };
       });
       return { treino: t, lista };
     });
