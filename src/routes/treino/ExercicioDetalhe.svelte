@@ -16,6 +16,7 @@
   import ExercicioChart from "./ExercicioChart.svelte";
   import ExercicioCampos from "./ExercicioCampos.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import { PALETA } from "../../components/PieChart.svelte";
 
   let { exercicioId }: { exercicioId: string } = $props();
 
@@ -67,7 +68,8 @@
     if (!total) return [];
     return exercicio.musculos
       .map((m) => ({ nome: m.musculo?.nome ?? "", pct: (m.peso_contribuicao / total) * 100 }))
-      .sort((a, b) => b.pct - a.pct);
+      .sort((a, b) => b.pct - a.pct)
+      .map((m, i) => ({ ...m, cor: PALETA[i % PALETA.length] }));
   });
 
   async function salvar() {
@@ -191,7 +193,7 @@
           <div class="musculo-dist-item">
             <span class="musculo-dist-nome">{m.nome}</span>
             <div class="musculo-dist-barra-wrap">
-              <div class="musculo-dist-barra" style={`width: ${m.pct}%`}></div>
+              <div class="musculo-dist-barra" style={`width: ${m.pct}%; background: ${m.cor};`}></div>
             </div>
             <span class="musculo-dist-pct">{m.pct.toFixed(0)}%</span>
           </div>
@@ -391,7 +393,6 @@
   .musculo-dist-barra {
     height: 100%;
     border-radius: 6px;
-    background: var(--color-primary);
   }
   .musculo-dist-pct {
     text-align: right;
