@@ -41,7 +41,13 @@
     .sort((a, b) => a - b)
     .map((p) => ({ valor: p, label: String(p) }));
 
-  const opcoesPadrao = $derived([{ valor: "", label: "Nenhum" }, ...padroes.map((p) => ({ valor: p.id, label: p.nome }))]);
+  const opcoesPadrao = $derived([
+    { valor: "", label: "Nenhum" },
+    ...padroes
+      .slice()
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+      .map((p) => ({ valor: p.id, label: p.nome })),
+  ]);
 
   let editandoIdx = $state<number | null>(null);
   let mostrarPadraoPicker = $state(false);
