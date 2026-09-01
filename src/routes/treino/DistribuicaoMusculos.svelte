@@ -1348,21 +1348,31 @@
 {/snippet}
 
 {#snippet barraFadiga(partes: Partes, valor: number, onClick: () => void)}
-  <div
-    class="barra-wrap-fadiga"
-    role="button"
-    tabindex="0"
-    onclick={onClick}
-    onkeydown={(e) => e.key === "Enter" && onClick()}
-    aria-label="Ver anel de distribuição da rotina"
-  >
-    <div class="barra-segmentos">
+  <div class="barra-wrap-fadiga-col">
+    <div class="barra-rotulos">
       {#each partesParaSegmentos(partes) as seg (seg.cor)}
         {@const pctSeg = valor > 0 ? (seg.valor / valor) * 100 : 0}
         {#if seg.valor > 0}
-          <div class="barra-seg" style={`width: ${pctSeg}%; background: ${seg.cor};`}></div>
+          <span class="barra-rotulo" style={`width: ${pctSeg}%;`}>{Math.round(pctSeg)}%</span>
         {/if}
       {/each}
+    </div>
+    <div
+      class="barra-wrap-fadiga"
+      role="button"
+      tabindex="0"
+      onclick={onClick}
+      onkeydown={(e) => e.key === "Enter" && onClick()}
+      aria-label="Ver anel de distribuição da rotina"
+    >
+      <div class="barra-segmentos">
+        {#each partesParaSegmentos(partes) as seg (seg.cor)}
+          {@const pctSeg = valor > 0 ? (seg.valor / valor) * 100 : 0}
+          {#if seg.valor > 0}
+            <div class="barra-seg" style={`width: ${pctSeg}%; background: ${seg.cor};`}></div>
+          {/if}
+        {/each}
+      </div>
     </div>
   </div>
 {/snippet}
@@ -2266,6 +2276,26 @@
     position: relative;
     height: 100%;
     border-radius: 6px;
+  }
+  .barra-wrap-fadiga-col {
+    position: relative;
+    min-width: 0;
+  }
+  .barra-rotulos {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    display: flex;
+    pointer-events: none;
+  }
+  .barra-rotulo {
+    font-size: 8px;
+    line-height: 1.3;
+    color: var(--surface-muted);
+    text-align: center;
+    overflow: hidden;
+    white-space: nowrap;
   }
   .barra-wrap-fadiga {
     height: 10px;
