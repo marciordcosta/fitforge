@@ -1247,6 +1247,9 @@
       "séries",
       coresAbcAcumulado(distribuicaoSemanal),
       itensGrupoRaw(treinos),
+      // Acompanha a visualização do card: ordenado por fadiga/efetivo abre no modo ABC
+      // (músculo individual), padrão abre no modo Grupo.
+      !semanalOrdenadaPorEfetivo,
     );
   }
 
@@ -1279,9 +1282,10 @@
     centroLabel?: string,
     cores?: string[],
     itensGrupo?: { nome: string; valor: number }[],
+    modoGrupoInicial = true,
   ): void {
     modalDetalheRotina = { titulo, itens, centroValor, centroLabel, cores, itensGrupo };
-    modoGrupoDetalhe = true;
+    modoGrupoDetalhe = modoGrupoInicial;
   }
 
   /** Cor de cada fatia pela faixa ABC do percentual acumulado (itens já precisam vir
@@ -1324,7 +1328,17 @@
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    abrirDetalheRotina(treino.nome_treino, itens, totalSeries, "séries", coresAbcAcumulado(itens), itensGrupoRaw([treino]));
+    abrirDetalheRotina(
+      treino.nome_treino,
+      itens,
+      totalSeries,
+      "séries",
+      coresAbcAcumulado(itens),
+      itensGrupoRaw([treino]),
+      // Acompanha a visualização do card: ordenado por fadiga abre no modo ABC (músculo
+      // individual), padrão abre no modo Grupo.
+      !treinosOrdenadosPorFadiga.has(treino.id),
+    );
   }
 </script>
 
