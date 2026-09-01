@@ -1828,15 +1828,17 @@
           {@const tendEx = tendenciaExercicio(item.exercicioId)}
           {@const variacaoPct = variacaoExercicioPct(item.exercicioId)}
           <button class="exercicio-musculo-item exercicio-musculo-item-btn" onclick={() => (menuExercicioMusculo = item)}>
-            <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
-            {#if variacaoPct != null}
-              <span
-                class="exercicio-musculo-variacao"
-                class:valor-subindo={variacaoPct > 0.02}
-                class:valor-estavel={variacaoPct >= -0.02 && variacaoPct <= 0.02}
-                class:valor-caindo={variacaoPct < -0.02}
-              >{variacaoPct > 0 ? "+" : ""}{Math.round(variacaoPct * 100)}%</span>
-            {/if}
+            <span class="exercicio-musculo-info">
+              <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
+              {#if variacaoPct != null}
+                <span
+                  class="exercicio-musculo-variacao"
+                  class:valor-subindo={variacaoPct > 0.02}
+                  class:valor-estavel={variacaoPct >= -0.02 && variacaoPct <= 0.02}
+                  class:valor-caindo={variacaoPct < -0.02}
+                >{variacaoPct > 0 ? "+" : ""}{Math.round(variacaoPct * 100)}%</span>
+              {/if}
+            </span>
             <span
               class="serie-texto-musculo"
               class:valor-subindo={tendEx === "subindo"}
@@ -2507,9 +2509,17 @@
     cursor: pointer;
     text-align: left;
   }
-  .exercicio-musculo-nome {
+  .exercicio-musculo-info {
     flex: 1;
     min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    overflow: hidden;
+  }
+  .exercicio-musculo-nome {
+    min-width: 0;
+    flex-shrink: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2524,8 +2534,8 @@
   }
   .exercicio-musculo-variacao {
     flex-shrink: 0;
-    font-size: var(--font-size-sm);
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 400;
     white-space: nowrap;
   }
   .exercicio-musculo-series {
