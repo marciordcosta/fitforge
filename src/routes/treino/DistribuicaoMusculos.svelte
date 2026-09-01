@@ -500,6 +500,11 @@
     return linhas.sort((a, b) => b.valor - a.valor);
   });
 
+  /** Maior valor entre as linhas da Distribuição Semanal — usado pra escalar o comprimento da
+   * barra na visualização padrão (cor única, proporcional ao volume), diferente da visualização
+   * por fadiga (largura cheia, dividida nas faixas A/B/C). */
+  const maxValorSemanal = $derived(Math.max(1, ...linhasSemanal.map((l) => l.valor)));
+
   const MESES = [
     "Janeiro",
     "Fevereiro",
@@ -1341,6 +1346,23 @@
   </div>
 {/snippet}
 
+{#snippet barraSemanal(partes: Partes, valor: number, maxValor: number)}
+  <div class="barra-wrap-fadiga">
+    <div class="barra-segmentos">
+      {#if semanalOrdenadaPorEfetivo}
+        {#each partesParaSegmentos(partes) as seg (seg.cor)}
+          {@const pctSeg = valor > 0 ? (seg.valor / valor) * 100 : 0}
+          {#if seg.valor > 0}
+            <div class="barra-seg" style={`width: ${pctSeg}%; background: ${seg.cor};`}></div>
+          {/if}
+        {/each}
+      {:else}
+        <div class="barra-seg" style={`width: ${maxValor > 0 ? (valor / maxValor) * 100 : 0}%; background: var(--color-primary);`}></div>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -1385,7 +1407,7 @@
                   {:else}
                     <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(treinos, linha.musculo)}>{linha.nome}</button>
                   {/if}
-                  {@render barraFadiga(linha.partes, linha.valor, () => abrirGraficoSemanal())}
+                  {@render barraSemanal(linha.partes, linha.valor, maxValorSemanal)}
                   <span
                     class="valor"
                     class:valor-subindo={tend === "subindo"}
@@ -1398,7 +1420,7 @@
                     {@const tendSub = tendenciaParaMusculos(treinos, [sub.musculo.id])}
                     <div class="item item-sub">
                       <button class="nome-btn" onclick={() => abrirExercicios(treinos, sub.musculo)}>{sub.musculo.nome}</button>
-                      {@render barraFadiga(sub.partes, sub.valor, () => abrirGraficoSemanal())}
+                      {@render barraSemanal(sub.partes, sub.valor, maxValorSemanal)}
                       <span
                         class="valor"
                         class:valor-subindo={tendSub === "subindo"}
@@ -1410,9 +1432,14 @@
                 {/if}
               {/each}
             </div>
-            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirGradeSemanal(null)}>
-              {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
-            </button>
+            <div class="rotina-rodape">
+              <button class="rotina-totais-texto" onclick={() => abrirGradeSemanal(null)}>
+                {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
+              </button>
+              <button class="rotina-grafico-btn" onclick={() => abrirGraficoSemanal()} aria-label="Ver anel por dominância">
+                {@render iconGrafico()}
+              </button>
+            </div>
           {/if}
         </div>
 
