@@ -1918,18 +1918,18 @@
           <p class="muted">Nenhum exercício ainda.</p>
         {/if}
       </div>
-      <div class="editor-rodape-fixo">
-        <div class="editor-totais">
-          <span>
-            {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
-              (acc, ex) => acc + ex.series.length,
-              0,
-            )} séries
-          </span>
-          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
-            {@render iconGrafico()}
-          </button>
-        </div>
+      <div class="editor-totais">
+        <span>
+          {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
+            (acc, ex) => acc + ex.series.length,
+            0,
+          )} séries
+        </span>
+        <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
+          {@render iconGrafico()}
+        </button>
+      </div>
+      <div class="editor-botoes-fixos">
         <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
         <button class="salvar-editor-btn" onclick={salvarEditor} disabled={salvandoEditor}>{salvandoEditor ? "Salvando…" : "Salvar"}</button>
       </div>
@@ -2546,7 +2546,6 @@
   .editor-lista {
     display: flex;
     flex-direction: column;
-    flex: 1;
     transition: opacity 0.15s;
   }
   .editor-lista.carregando {
@@ -2617,12 +2616,12 @@
     touch-action: none;
     padding: var(--space-2);
   }
-  .editor-rodape-fixo {
+  .editor-botoes-fixos {
     flex-shrink: 0;
     position: sticky;
     bottom: 0;
     background: var(--surface-bg);
-    padding-top: var(--space-3);
+    padding-top: var(--space-2);
   }
   .editor-totais {
     flex-shrink: 0;
@@ -2630,6 +2629,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
+    margin-top: var(--space-3);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
