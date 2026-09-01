@@ -517,12 +517,6 @@
     return linhas.sort((a, b) => b.valor - a.valor);
   });
 
-  /** Soma dos valores (já arredondados pro 0.5, mesmo arredondamento do número exibido) entre as
-   * linhas da Distribuição Semanal — usado pra escalar o comprimento da barra na visualização
-   * padrão como percentual do TOTAL da semana (nenhum músculo sozinho enche 100%), diferente da
-   * visualização por fadiga (largura cheia, dividida nas faixas A/B/C). */
-  const totalValorSemanal = $derived(Math.max(1, linhasSemanal.reduce((acc, l) => acc + arredondarValor(l.valor), 0)));
-
   const MESES = [
     "Janeiro",
     "Fevereiro",
@@ -1464,21 +1458,6 @@
   </div>
 {/snippet}
 
-{#snippet barraSemanal(partes: Partes, valor: number, totalValor: number)}
-  {#if semanalOrdenadaPorEfetivo}
-    <!-- Mesma barra (rótulo % em cima de cada faixa) das rotinas individuais — as partes já vêm
-         somadas de todas as rotinas da semana, então o denominador certo é a própria soma delas,
-         não o valor bruto arredondado (que pode não bater exatamente). -->
-    {@render barraFadiga(partes, partes.a + partes.b + partes.c)}
-  {:else}
-    {@const valorArred = arredondarValor(valor)}
-    <div class="barra-wrap-fadiga">
-      <div class="barra-segmentos">
-        <div class="barra-seg" style={`width: ${totalValor > 0 ? (valorArred / totalValor) * 100 : 0}%; background: var(--color-primary);`}></div>
-      </div>
-    </div>
-  {/if}
-{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -1524,7 +1503,7 @@
                   {:else}
                     <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(linha.musculo)}>{linha.nome}</button>
                   {/if}
-                  {@render barraSemanal(linha.partes, linha.valor, totalValorSemanal)}
+                  {@render barraFadiga(linha.partes, linha.partes.a + linha.partes.b + linha.partes.c)}
                   <span
                     class="valor"
                     class:valor-subindo={tend === "subindo"}
@@ -1537,7 +1516,7 @@
                     {@const tendSub = tendenciaParaMusculos(treinos, [sub.musculo.id])}
                     <div class="item item-sub">
                       <button class="nome-btn" onclick={() => abrirExercicios(sub.musculo)}>{sub.musculo.nome}</button>
-                      {@render barraSemanal(sub.partes, sub.valor, totalValorSemanal)}
+                      {@render barraFadiga(sub.partes, sub.partes.a + sub.partes.b + sub.partes.c)}
                       <span
                         class="valor"
                         class:valor-subindo={tendSub === "subindo"}
