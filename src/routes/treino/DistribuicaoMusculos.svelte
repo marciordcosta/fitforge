@@ -1074,6 +1074,10 @@
    * feita no rascunho local, mas ainda não foi gravada com o botão Salvar. */
   let editorSujo = $state(false);
   let confirmandoFecharEditor = $state(false);
+  /** Preenchido só quando o editor é aberto a partir de uma célula da grade "Distribuição na
+   * Semana" — o exercício que trabalha esse músculo fica destacado na cor primária, pra saber
+   * quais exercícios compõem as séries daquela célula clicada. */
+  let editorDestaqueMusculoId = $state<string | null>(null);
 
   /** Snapshot de séries por exercício e total bruto por músculo, capturado quando o editor é
    * aberto — base FIXA (não ao vivo) pros % de impacto mostrados após cada ajuste. Sem isso,
@@ -1121,8 +1125,11 @@
     editorSujo = false;
   }
 
-  /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o editor. */
-  function abrirEditorRotina(treino: TreinoComExercicios): void {
+  /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o
+   * editor. `destaqueMusculoId` (opcional) marca qual músculo destacar nos exercícios do editor —
+   * usado quando se chega ali pela célula de um músculo específico na grade semanal. */
+  function abrirEditorRotina(treino: TreinoComExercicios, destaqueMusculoId: string | null = null): void {
+    editorDestaqueMusculoId = destaqueMusculoId;
     navigate(`/treino/distribuicao/rotina/${treino.id}/editor`);
   }
 
@@ -1832,7 +1839,7 @@
                         if (treino) {
                           mostrarGradeSemanal = false;
                           modalMusculoRotina = null;
-                          abrirEditorRotina(treino);
+                          abrirEditorRotina(treino, linha.musculo.id);
                         }
                       }}
                     >{valor}</button>
@@ -1985,19 +1992,7 @@
           {@const variacaoPct = variacaoExercicioPct(item.exercicioId)}
           <button
             class="exercicio-musculo-item exercicio-musculo-item-btn"
-            onclick={() => {
-              // No modal multi-rotina (aberto pela Distribuição Semanal), vai direto pro editor
-              // completo da rotina desse item — no modal de uma rotina só, abre o menu Ver/Trocar.
-              if (modalMusculoRotina?.multiRotina) {
-                const treino = treinos.find((t) => t.id === item.treinoId);
-                if (treino) {
-                  modalMusculoRotina = null;
-                  abrirEditorRotina(treino);
-                }
-              } else {
-                menuExercicioMusculo = item;
-              }
-            }}
+            onclick={() => navigate(`/treino/exercicios/${item.exercicioId}`)}
           >
             <span class="exercicio-musculo-coluna">
               <span class="exercicio-musculo-info">
@@ -2193,6 +2188,7 @@
           {@const deltaTotal = deltaSeriesEditor(te)}
           {@const valorAnteriorSeries = baselineEditor?.seriesPorExercicio.get(te.id) ?? 0}
           {@const numeroExibidoSeries = baselineEditor?.seriesPorExercicio.has(te.id) ? valorAnteriorSeries : te.series.length}
+          {@const destacado = editorDestaqueMusculoId != null && te.exercicio?.musculos.some((m) => m.musculo_id === editorDestaqueMusculoId)}
           <div class="editor-item" class:arrastando={arrastandoIdxEditor === idx} bind:this={itemEditorRefs[idx]}>
             <button
               class="remover-circulo"
@@ -2211,7 +2207,7 @@
                   series: te.series.length,
                 })}
             >
-              <span class="editor-nome-texto">{te.exercicio?.nome ?? ""}</span>
+              <span class="editor-nome-texto" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
               {#if impacto.length}
                 <span class="editor-nome-impacto">
                   {#each impacto as imp, i (imp.nome)}
@@ -3043,6 +3039,10 @@
     white-space: nowrap;
     font-size: var(--font-size-base);
     color: var(--surface-fg);
+  }
+  .editor-nome-texto.editor-nome-destacado {
+    color: var(--color-primary);
+    font-weight: 700;
   }
   .editor-nome-impacto {
     max-width: 100%;
