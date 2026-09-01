@@ -3154,22 +3154,18 @@
     cursor: pointer;
   }
   .editor-meta-chip-ativo {
-    background: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 30%, var(--surface-card));
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
   }
   .editor-meta-nome {
     font-size: 10px;
     color: var(--surface-muted);
     white-space: nowrap;
   }
-  .editor-meta-chip-ativo .editor-meta-nome {
-    color: var(--color-primary-fg);
-  }
   .editor-meta-valor {
     font-size: var(--font-size-sm);
     font-weight: 700;
-  }
-  .editor-meta-chip-ativo .editor-meta-valor {
-    color: var(--color-primary-fg);
   }
   .editor-lista {
     display: flex;
