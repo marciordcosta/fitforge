@@ -18,6 +18,8 @@
     trocarExercicioTreinoExercicio,
     trocarExercicioEntreRotinas,
     renameTreino,
+    listMetasMusculo,
+    salvarMetaMusculo,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
     abreviarMusculo,
@@ -70,9 +72,14 @@
   }
 
   async function carregarBase() {
-    const [musculosCarregados, treinosCarregados] = await Promise.all([listMusculos(), listTreinos()]);
+    const [musculosCarregados, treinosCarregados, metasCarregadas] = await Promise.all([
+      listMusculos(),
+      listTreinos(),
+      listMetasMusculo(),
+    ]);
     musculos = musculosCarregados;
     treinos = ordenarPorDia(treinosCarregados);
+    metasMusculo = new Map(metasCarregadas.map((m) => [chaveMeta(m.treino_id, m.musculo_id), m.meta_series]));
     void carregarHistoricoTodos(treinosCarregados);
     await carregarRealizado();
   }
@@ -361,6 +368,42 @@
   function abrirGradeSemanal(musculoIds: string[] | null): void {
     filtroMusculosGrade = musculoIds ? new Set(musculoIds) : null;
     mostrarGradeSemanal = true;
+  }
+
+  /** Meta manual de séries por músculo dentro de uma rotina (opcional, célula a célula na grade
+   * "Distribuição na Semana"), chave `${treinoId}:${musculoId}`. Puramente informativa: some na
+   * grade como "atual/meta" e vira o saldo mostrado na edição de rotina — nada aqui trava a
+   * gravação se o saldo ficar negativo (o usuário só vê em vermelho). */
+  let metasMusculo = $state<Map<string, number>>(new Map());
+  let modoEdicaoMetas = $state(false);
+  let editandoMeta = $state<{ treinoId: string; musculo: Musculo; valorAtual: number | null } | null>(null);
+
+  function chaveMeta(treinoId: string, musculoId: string): string {
+    return `${treinoId}:${musculoId}`;
+  }
+
+  function abrirEditarMeta(treinoId: string, musculo: Musculo, valorSugerido: number): void {
+    editandoMeta = { treinoId, musculo, valorAtual: metasMusculo.get(chaveMeta(treinoId, musculo.id)) ?? valorSugerido };
+  }
+
+  const OPCOES_META: { valor: number | null; label: string }[] = [
+    { valor: null, label: "Sem meta" },
+    ...Array.from({ length: 31 }, (_, i) => ({ valor: i, label: String(i) })),
+  ];
+
+  async function salvarMetaSelecionada(valor: number | null): Promise<void> {
+    if (!editandoMeta) return;
+    const { treinoId, musculo } = editandoMeta;
+    try {
+      await salvarMetaMusculo(treinoId, musculo.id, valor);
+      const mapa = new Map(metasMusculo);
+      const chave = chaveMeta(treinoId, musculo.id);
+      if (valor == null) mapa.delete(chave);
+      else mapa.set(chave, valor);
+      metasMusculo = mapa;
+    } catch (e) {
+      alert("Erro ao salvar meta: " + (e as Error).message);
+    }
   }
 
   /** Dia (na roleta) e o próprio treino cujo dia está sendo movido, dentro da grade semanal. */
@@ -1093,6 +1136,21 @@
     return resultado;
   }
 
+  /** Metas manuais definidas pra essa rotina (só os músculos que têm uma), com o saldo AO VIVO —
+   * refeito a cada mutação do rascunho (adicionar/remover/ajustar série), igual pedido: "a medida
+   * que formos adicionando os exercícios, o sistema ia abatendo do saldo de cada músculo". */
+  const metasEditor = $derived.by(() => {
+    if (!modalEditorRotina) return [];
+    const atual = contarSeriesPorMusculo(modalEditorRotina);
+    const resultado: { musculo: Musculo; meta: number; atual: number }[] = [];
+    for (const m of musculos) {
+      const meta = metasMusculo.get(chaveMeta(modalEditorRotina.id, m.id));
+      if (meta == null) continue;
+      resultado.push({ musculo: m, meta, atual: atual.get(m.id) ?? 0 });
+    }
+    return resultado;
+  });
+
   function definirModalEditor(treino: TreinoComExercicios): void {
     modalEditorRotina = treino;
     capturarBaselineEditor(treino);
@@ -1716,6 +1774,17 @@
     <line x1="3" y1="10" x2="21" y2="10" />
   </svg>
 {/snippet}
+{#snippet iconEditarMeta()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+{/snippet}
+{#snippet iconConcluir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+{/snippet}
 
 {#snippet linkDistribuicao()}
   {#if modalMusculoRotina?.multiRotina}
@@ -1756,6 +1825,11 @@
     acaoTitulo={modalMusculoRotina?.multiRotina ? voltarGradeSemanal : undefined}
     acaoTituloLado="esquerda"
   >
+    <div class="grade-toolbar">
+      <button class="grade-editar-metas-btn" onclick={() => (modoEdicaoMetas = !modoEdicaoMetas)}>
+        {#if modoEdicaoMetas}{@render iconConcluir()} Concluir{:else}{@render iconEditarMeta()} Editar metas{/if}
+      </button>
+    </div>
     <div class="grade-scroll">
       <table class="grade-tabela">
         <thead>
@@ -1786,8 +1860,15 @@
               <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
               {#each linha.valores as valor, i (i)}
                 {@const treinoId = gradeSemanal.colunas[i].treinoId}
+                {@const meta = treinoId ? metasMusculo.get(chaveMeta(treinoId, linha.musculo.id)) : undefined}
                 <td class="grade-valor">
-                  {#if valor > 0 && treinoId}
+                  {#if modoEdicaoMetas && treinoId}
+                    <button
+                      class="grade-valor-caixa grade-valor-meta-edit"
+                      style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
+                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, meta ?? valor)}
+                    >{valor}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</button>
+                  {:else if valor > 0 && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-link"
                       style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
@@ -1799,12 +1880,17 @@
                           abrirEditorRotina(treino, linha.musculo.id);
                         }
                       }}
-                    >{valor}</button>
+                    >{valor}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</button>
                   {:else if valor > 0}
                     <span
                       class="grade-valor-caixa"
                       style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
-                    >{valor}</span>
+                    >{valor}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</span>
+                  {:else if meta != null}
+                    <span
+                      class="grade-valor-caixa grade-valor-vazio"
+                      style={`color: ${corVolume(0)}; background: color-mix(in srgb, ${corVolume(0)} 20%, transparent);`}
+                    >0<span class="grade-meta-sub">/{meta}</span></span>
                   {/if}
                 </td>
               {/each}
@@ -1828,6 +1914,21 @@
       valorAtual={movendoDiaTreino.diaAtual}
       onSelecionar={(v) => moverTreinoParaDia(v)}
       onFechar={() => (movendoDiaTreino = null)}
+    />
+  </div>
+{/if}
+
+{#if editandoMeta}
+  <!-- Precisa ficar acima da grade semanal (Sheet dentro de .acima-editor) — vem depois no DOM,
+       então já ganha por ordem mesmo com o mesmo z-index. -->
+  <div class="acima-editor">
+    <WheelPicker
+      titulo={editandoMeta.musculo.nome}
+      subtitulo="Meta de séries nessa rotina"
+      opcoes={OPCOES_META}
+      valorAtual={editandoMeta.valorAtual}
+      onSelecionar={(v) => salvarMetaSelecionada(v)}
+      onFechar={() => (editandoMeta = null)}
     />
   </div>
 {/if}
@@ -2138,6 +2239,21 @@
         <h1>{modalEditorRotina.nome_treino}</h1>
         <span class="spacer"></span>
       </div>
+      {#if metasEditor.length}
+        <div class="editor-metas-scroll">
+          {#each metasEditor as item (item.musculo.id)}
+            <div class="editor-meta-chip">
+              <span class="editor-meta-nome">{abreviarMusculo(item.musculo.nome)}</span>
+              <span
+                class="editor-meta-valor"
+                class:valor-caindo={item.atual > item.meta}
+                class:valor-subindo={item.atual === item.meta}
+                class:valor-estavel={item.atual < item.meta}
+              >{item.atual}/{item.meta}</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
       <div class="editor-lista" class:carregando={salvandoEditor}>
         {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
           {@const tendEx = tendenciaExercicio(te.exercicio_id)}
@@ -2665,6 +2781,44 @@
     font-family: inherit;
     cursor: pointer;
   }
+  .grade-valor-meta-edit {
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+    outline: 2px dashed currentColor;
+    outline-offset: 1px;
+  }
+  .grade-meta-sub {
+    font-size: 9px;
+    font-weight: 400;
+    opacity: 0.75;
+    margin-left: 1px;
+  }
+  .grade-valor-vazio {
+    opacity: 0.7;
+  }
+  .grade-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--space-2);
+  }
+  .grade-editar-metas-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px var(--space-2);
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+  .grade-editar-metas-btn :global(svg) {
+    width: 14px;
+    height: 14px;
+  }
   .grade-tabela tbody tr:not(:last-child) td {
     border-bottom: 1px solid var(--surface-border);
   }
@@ -2953,6 +3107,32 @@
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
+  }
+  .editor-metas-scroll {
+    display: flex;
+    gap: var(--space-2);
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .editor-meta-chip {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    background: var(--surface-card);
+  }
+  .editor-meta-nome {
+    font-size: 10px;
+    color: var(--surface-muted);
+    white-space: nowrap;
+  }
+  .editor-meta-valor {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
   }
   .editor-lista {
     display: flex;

@@ -1085,6 +1085,40 @@ export async function getVolumeRealizadoBruto(
   return data ?? [];
 }
 
+export interface MetaMusculo {
+  treino_id: string;
+  musculo_id: string;
+  meta_series: number;
+}
+
+/** Todas as metas manuais de séries por músculo (de todas as rotinas do usuário) — usado pra
+ * mostrar tanto a meta na grade "Distribuição na Semana" quanto o saldo na edição de rotina. */
+export async function listMetasMusculo(): Promise<MetaMusculo[]> {
+  const { data, error } = await supabase.from("treino_metas_musculo").select("treino_id, musculo_id, meta_series");
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Cria/atualiza a meta de um músculo dentro de uma rotina; `metaSeries` null remove a meta (célula volta a não ter meta definida). */
+export async function salvarMetaMusculo(treinoId: string, musculoId: string, metaSeries: number | null): Promise<void> {
+  if (metaSeries == null) {
+    const { error } = await supabase
+      .from("treino_metas_musculo")
+      .delete()
+      .eq("treino_id", treinoId)
+      .eq("musculo_id", musculoId);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase
+    .from("treino_metas_musculo")
+    .upsert(
+      { user_id: uid(), treino_id: treinoId, musculo_id: musculoId, meta_series: metaSeries },
+      { onConflict: "treino_id,musculo_id" },
+    );
+  if (error) throw error;
+}
+
 /** Uma linha por série registrada (rotina + exercício) no período — base pra contar tanto o total por rotina quanto o detalhamento por músculo de cada rotina. */
 export async function getRegistrosPorTreinoPeriodo(
   dataInicio: string,
