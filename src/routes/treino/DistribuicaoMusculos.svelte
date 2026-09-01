@@ -674,57 +674,27 @@
     };
   }
 
-  // ---------------- Modal: exercícios/rotinas que trabalham um músculo ----------------
+  // ---------------- Modal: menu simples (usado só pelo "Realizado") ----------------
 
   let modalAberto = $state<{
     titulo: string;
     opcoes: AcaoSheet[];
-    musculoParaGrade?: Musculo;
   } | null>(null);
-
-  /** Um item por (rotina, exercício) — o mesmo exercício pode aparecer em rotinas diferentes. */
-  function exerciciosDoMusculo(
-    lista: TreinoComExercicios[],
-    musculoId: string,
-  ): { exercicioNome: string; treino: TreinoComExercicios; series: number }[] {
-    const resultado: { exercicioNome: string; treino: TreinoComExercicios; series: number }[] = [];
-    for (const t of lista) {
-      for (const ex of t.exercicios) {
-        if (!ex.exercicio) continue;
-        if (ex.exercicio.musculos.some((m) => m.musculo_id === musculoId)) {
-          resultado.push({ exercicioNome: ex.exercicio.nome, treino: t, series: ex.series.length });
-        }
-      }
-    }
-    return resultado;
-  }
-
-  function abrirExercicios(lista: TreinoComExercicios[], musculo: Musculo): void {
-    modalAberto = {
-      titulo: musculo.nome,
-      // Abre o editor completo da rotina (arrastar pra reordenar, trocar exercício, % de
-      // impacto etc.) em vez da tela básica de edição — bem mais completo pra ajustar daqui.
-      opcoes: exerciciosDoMusculo(lista, musculo.id).map((e) => ({
-        label: e.exercicioNome,
-        subtitulo: e.treino.nome_treino,
-        valor: `${e.series} ${e.series === 1 ? "série" : "séries"}`,
-        onSelect: () => abrirEditorRotina(e.treino),
-      })),
-      musculoParaGrade: musculo,
-    };
-  }
 
   // ---------------- Modal: exercícios de um músculo dentro de uma rotina específica, com séries editáveis ----------------
 
   interface ItemMusculoRotina {
     treinoId: string;
+    treinoNome: string;
     treinoExercicioId: string;
     exercicioId: string;
     exercicioNome: string;
     series: number;
   }
 
-  let modalMusculoRotina = $state<{ treino: TreinoComExercicios; musculo: Musculo; itens: ItemMusculoRotina[] } | null>(null);
+  /** multiRotina=true quando aberto a partir da Distribuição Semanal (agrega várias rotinas
+   * que trabalham o músculo); false quando aberto a partir do card de uma rotina específica. */
+  let modalMusculoRotina = $state<{ musculo: Musculo; itens: ItemMusculoRotina[]; multiRotina: boolean } | null>(null);
   /** Feedback visível no modal sobre o resultado da última troca de exercício. */
   let statusAjusteMusculo = $state<{ tipo: "ok" | "info" | "erro"; texto: string } | null>(null);
   /** Item cujo menu "Ver Exercício / Trocar Exercício" está aberto — usado tanto pelo modal
@@ -741,6 +711,7 @@
       .filter((te) => te.exercicio?.musculos.some((m) => m.musculo_id === musculoId))
       .map((te) => ({
         treinoId: treino.id,
+        treinoNome: treino.nome_treino,
         treinoExercicioId: te.id,
         exercicioId: te.exercicio_id,
         exercicioNome: te.exercicio?.nome ?? "",
@@ -748,9 +719,22 @@
       }));
   }
 
+  /** Mesmo item, mas juntando TODAS as rotinas que trabalham o músculo — usado pelo modal
+   * aberto a partir da Distribuição Semanal (não fica preso a uma rotina só). */
+  function itensMusculoTodasRotinas(musculoId: string): ItemMusculoRotina[] {
+    return treinos.flatMap((t) => itensMusculoRotina(t, musculoId));
+  }
+
   function definirModalMusculo(treino: TreinoComExercicios, musculo: Musculo): void {
     if (modalMusculoRotina?.musculo.id !== musculo.id) statusAjusteMusculo = null;
-    modalMusculoRotina = { treino, musculo, itens: itensMusculoRotina(treino, musculo.id) };
+    modalMusculoRotina = { musculo, itens: itensMusculoRotina(treino, musculo.id), multiRotina: false };
+  }
+
+  /** Abre o mesmo modal por músculo, mas agregando exercícios de todas as rotinas que o
+   * trabalham — usado ao clicar num músculo na Distribuição Semanal. */
+  function abrirExercicios(musculo: Musculo): void {
+    if (modalMusculoRotina?.musculo.id !== musculo.id) statusAjusteMusculo = null;
+    modalMusculoRotina = { musculo, itens: itensMusculoTodasRotinas(musculo.id), multiRotina: true };
   }
 
   /** As 3 leituras do volume desse músculo na rotina: total bruto (1 série por músculo que ela
@@ -758,11 +742,19 @@
    * (válidas descontadas pela faixa de fadiga: A=1, B=0.7, C=0.4). */
   const resumoMusculoModal = $derived.by(() => {
     if (!modalMusculoRotina) return null;
-    const { treino, musculo } = modalMusculoRotina;
-    const totalBruto = contarSeriesPorMusculo(treino).get(musculo.id) ?? 0;
-    const totalValido = contarSeriesPorMusculoPonderado(treino).get(musculo.id) ?? 0;
-    const partes = contarSeriesPorFaixaDePosicao(treino).get(musculo.id) ?? partesVazias();
-    const totalAcumulado = valorEfetivoFadiga(partes);
+    const { musculo, itens } = modalMusculoRotina;
+    // Soma sobre todas as rotinas envolvidas nos itens (1 só, no caso do modal por rotina; várias, no caso do modal aberto pela Distribuição Semanal).
+    const treinoIds = new Set(itens.map((i) => i.treinoId));
+    let totalBruto = 0;
+    let totalValido = 0;
+    let totalAcumulado = 0;
+    for (const treino of treinos) {
+      if (!treinoIds.has(treino.id)) continue;
+      totalBruto += contarSeriesPorMusculo(treino).get(musculo.id) ?? 0;
+      totalValido += contarSeriesPorMusculoPonderado(treino).get(musculo.id) ?? 0;
+      const partes = contarSeriesPorFaixaDePosicao(treino).get(musculo.id) ?? partesVazias();
+      totalAcumulado += valorEfetivoFadiga(partes);
+    }
     return { totalBruto, totalValido, totalAcumulado };
   });
 
@@ -891,12 +883,11 @@
     const atualizado = await getTreino(treinoId);
     if (!atualizado) return;
     treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
-    if (modalMusculoRotina?.treino.id === treinoId) {
-      modalMusculoRotina = {
-        treino: atualizado,
-        musculo: modalMusculoRotina.musculo,
-        itens: itensMusculoRotina(atualizado, modalMusculoRotina.musculo.id),
-      };
+    if (modalMusculoRotina?.multiRotina) {
+      // `treinos` já está atualizado acima — recalcula juntando todas as rotinas de novo.
+      modalMusculoRotina = { ...modalMusculoRotina, itens: itensMusculoTodasRotinas(modalMusculoRotina.musculo.id) };
+    } else if (modalMusculoRotina && modalMusculoRotina.itens.some((i) => i.treinoId === treinoId)) {
+      modalMusculoRotina = { ...modalMusculoRotina, itens: itensMusculoRotina(atualizado, modalMusculoRotina.musculo.id) };
     }
     // NÃO sincroniza modalEditorRotina aqui: o editor completo agora é um rascunho local
     // (só grava no banco ao Salvar) — sobrescrever apagaria alterações ainda não salvas.
@@ -1436,7 +1427,7 @@
                       <span class="chevron-grupo" class:aberto>›</span>
                     </button>
                   {:else}
-                    <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(treinos, linha.musculo)}>{linha.nome}</button>
+                    <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(linha.musculo)}>{linha.nome}</button>
                   {/if}
                   {@render barraSemanal(linha.partes, linha.valor, totalValorSemanal)}
                   <span
@@ -1450,7 +1441,7 @@
                   {#each linha.subItens as sub (sub.musculo.id)}
                     {@const tendSub = tendenciaParaMusculos(treinos, [sub.musculo.id])}
                     <div class="item item-sub">
-                      <button class="nome-btn" onclick={() => abrirExercicios(treinos, sub.musculo)}>{sub.musculo.nome}</button>
+                      <button class="nome-btn" onclick={() => abrirExercicios(sub.musculo)}>{sub.musculo.nome}</button>
                       {@render barraSemanal(sub.partes, sub.valor, totalValorSemanal)}
                       <span
                         class="valor"
@@ -1646,10 +1637,10 @@
 {/snippet}
 
 {#snippet linkDistribuicao()}
-  {#if modalAberto?.musculoParaGrade}
+  {#if modalMusculoRotina?.multiRotina}
     <button
       class="link-distribuicao"
-      onclick={() => abrirGradeSemanal([modalAberto!.musculoParaGrade!.id])}
+      onclick={() => abrirGradeSemanal([modalMusculoRotina!.musculo.id])}
       aria-label="Ver distribuição na semana"
     >{@render iconGrade()}</button>
   {/if}
@@ -1668,19 +1659,17 @@
 {/snippet}
 
 {#if modalAberto}
-  <ActionSheet
-    titulo={modalAberto.titulo}
-    opcoes={modalAberto.opcoes}
-    onFechar={() => (modalAberto = null)}
-    acaoTitulo={modalAberto.musculoParaGrade ? linkDistribuicao : undefined}
-  />
+  <ActionSheet titulo={modalAberto.titulo} opcoes={modalAberto.opcoes} onFechar={() => (modalAberto = null)} />
 {/if}
 
 {#if mostrarGradeSemanal}
   <Sheet
     titulo="Distribuição na Semana"
-    onFechar={() => { mostrarGradeSemanal = false; modalAberto = null; }}
-    acaoTitulo={modalAberto ? voltarGradeSemanal : undefined}
+    onFechar={() => {
+      mostrarGradeSemanal = false;
+      if (modalMusculoRotina?.multiRotina) modalMusculoRotina = null;
+    }}
+    acaoTitulo={modalMusculoRotina?.multiRotina ? voltarGradeSemanal : undefined}
     acaoTituloLado="esquerda"
   >
     <div class="grade-scroll">
@@ -1820,6 +1809,7 @@
       modalMusculoRotina = null;
       if (musculoUrlContexto) window.history.back();
     }}
+    acaoTitulo={modalMusculoRotina.multiRotina ? linkDistribuicao : undefined}
   >
     {#if carregandoTendencia}
       <p class="tendencia-musculo muted">Verificando progressão…</p>
@@ -1837,15 +1827,20 @@
           {@const tendEx = tendenciaExercicio(item.exercicioId)}
           {@const variacaoPct = variacaoExercicioPct(item.exercicioId)}
           <button class="exercicio-musculo-item exercicio-musculo-item-btn" onclick={() => (menuExercicioMusculo = item)}>
-            <span class="exercicio-musculo-info">
-              <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
-              {#if variacaoPct != null}
-                <span
-                  class="exercicio-musculo-variacao"
-                  class:valor-subindo={variacaoPct > 0.02}
-                  class:valor-estavel={variacaoPct >= -0.02 && variacaoPct <= 0.02}
-                  class:valor-caindo={variacaoPct < -0.02}
-                >{variacaoPct > 0 ? "+" : ""}{Math.round(variacaoPct * 100)}%</span>
+            <span class="exercicio-musculo-coluna">
+              <span class="exercicio-musculo-info">
+                <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
+                {#if variacaoPct != null}
+                  <span
+                    class="exercicio-musculo-variacao"
+                    class:valor-subindo={variacaoPct > 0.02}
+                    class:valor-estavel={variacaoPct >= -0.02 && variacaoPct <= 0.02}
+                    class:valor-caindo={variacaoPct < -0.02}
+                  >{variacaoPct > 0 ? "+" : ""}{Math.round(variacaoPct * 100)}%</span>
+                {/if}
+              </span>
+              {#if modalMusculoRotina.multiRotina}
+                <span class="exercicio-musculo-rotina">{item.treinoNome}</span>
               {/if}
             </span>
             <span
@@ -1943,6 +1938,7 @@
               onclick={() =>
                 (menuExercicioMusculo = {
                   treinoId: modalEditorRotina!.id,
+                  treinoNome: modalEditorRotina!.nome_treino,
                   treinoExercicioId: te.id,
                   exercicioId: te.exercicio_id,
                   exercicioNome: te.exercicio?.nome ?? "",
@@ -2518,13 +2514,27 @@
     cursor: pointer;
     text-align: left;
   }
-  .exercicio-musculo-info {
+  .exercicio-musculo-coluna {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+  }
+  .exercicio-musculo-info {
     min-width: 0;
     display: flex;
     align-items: baseline;
     gap: var(--space-2);
     overflow: hidden;
+  }
+  .exercicio-musculo-rotina {
+    font-size: 12px;
+    color: var(--surface-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .exercicio-musculo-nome {
     min-width: 0;
