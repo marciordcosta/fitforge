@@ -53,14 +53,14 @@ export function abreviarMusculo(nome: string): string {
 }
 
 /**
- * Distribuição percentual de contribuição entre os músculos do exercício — a soma dos
- * peso_contribuicao de todos vira 100%, cada músculo recebe a fatia proporcional (desc).
+ * % de trabalho real de cada músculo do exercício — o próprio peso_contribuicao configurado na
+ * edição (0 a 1), sem renormalizar pra somar 100%. Um supino que só afeta peito mostra 100%
+ * mesmo sozinho; um que divide entre peito/ombro/tríceps mostra o peso de cada um igual foi
+ * digitado (ex: 100/50/50), não uma fatia proporcional entre os três.
  */
 export function distribuicaoMusculosExercicio(ex: Exercicio): { musculo_id: string; nome: string; pct: number }[] {
-  const total = ex.musculos.reduce((acc, m) => acc + m.peso_contribuicao, 0);
-  if (!total) return [];
   return ex.musculos
-    .map((m) => ({ musculo_id: m.musculo_id, nome: m.musculo?.nome ?? "", pct: (m.peso_contribuicao / total) * 100 }))
+    .map((m) => ({ musculo_id: m.musculo_id, nome: m.musculo?.nome ?? "", pct: m.peso_contribuicao * 100 }))
     .sort((a, b) => b.pct - a.pct);
 }
 
