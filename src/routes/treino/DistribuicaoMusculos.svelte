@@ -1894,11 +1894,8 @@
             </button>
             <div class="editor-serie-col">
               {#if deltaTotal !== 0}
-                <span class="editor-serie-soma">
-                  {valorAnteriorSeries}
-                  <span class="editor-serie-delta" class:valor-subindo={deltaTotal > 0} class:valor-caindo={deltaTotal < 0}
-                  >{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
-                </span>
+                <span class="editor-serie-badge" class:editor-serie-badge-mais={deltaTotal > 0} class:editor-serie-badge-menos={deltaTotal < 0}
+                >{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
               {/if}
               <button
                 class="exercicio-musculo-series"
@@ -2493,19 +2490,27 @@
     color: var(--surface-muted);
   }
   .editor-serie-col {
+    position: relative;
     flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 1px;
   }
-  .editor-serie-soma {
-    font-size: 11px;
-    color: var(--surface-muted);
+  .editor-serie-badge {
+    position: absolute;
+    top: -8px;
+    right: -4px;
+    z-index: 1;
+    padding: 1px 5px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.3;
     white-space: nowrap;
+    color: #fff;
   }
-  .editor-serie-delta {
-    font-weight: 700;
+  .editor-serie-badge-mais {
+    background: var(--color-success);
+  }
+  .editor-serie-badge-menos {
+    background: var(--color-negative);
   }
   .serie-texto-musculo {
     flex-shrink: 0;
