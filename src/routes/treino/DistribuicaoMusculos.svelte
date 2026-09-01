@@ -325,7 +325,11 @@
    * músculo mais forte pro mais fraco) — mesma regra do anel semanal (coresAbcAcumulado), não por
    * posição no treino: a semana não tem uma sequência única de fadiga como uma rotina tem. Cada
    * músculo recebe uma cor só (não se divide entre faixas), igual ao anel. */
-  function contarSeriesPorFaixaDominanciaSemanal(): Map<string, Partes> {
+  /** Só a faixa (a/b/c) de cada músculo pela dominância acumulada — a classificação usa os valores
+   * "crus" (sem arredondar) pra o corte 20/30/50 ficar preciso, mas quem monta a barra (partes)
+   * usa o valor já arredondado exibido, senão a soma das partes fica menor que o valor mostrado
+   * e a barra não preenche 100%. */
+  function faixaDominanciaSemanal(): Map<string, "a" | "b" | "c"> {
     const mapa = new Map<string, number>();
     for (const t of treinos) {
       for (const ex of t.exercicios) {
@@ -341,16 +345,12 @@
       .sort((a, b) => b.valor - a.valor);
     const total = itens.reduce((acc, i) => acc + i.valor, 0);
     let acumulado = 0;
-    const resultado = new Map<string, Partes>();
+    const resultado = new Map<string, "a" | "b" | "c">();
     for (const item of itens) {
       const pct = total > 0 ? (item.valor / total) * 100 : 0;
       acumulado += pct;
       const cor = corPorFaixa(acumulado);
-      const p = partesVazias();
-      if (cor === CORES_FAIXA.a) p.a = item.valor;
-      else if (cor === CORES_FAIXA.b) p.b = item.valor;
-      else p.c = item.valor;
-      resultado.set(item.musculo_id, p);
+      resultado.set(item.musculo_id, cor === CORES_FAIXA.a ? "a" : cor === CORES_FAIXA.b ? "b" : "c");
     }
     return resultado;
   }
@@ -366,9 +366,15 @@
         }
       }
     }
-    const partesPorMusculo = contarSeriesPorFaixaDominanciaSemanal();
+    const faixaPorMusculo = faixaDominanciaSemanal();
     return musculos
-      .map((m) => ({ musculo: m, valor: Math.round(mapa.get(m.id) ?? 0), partes: partesPorMusculo.get(m.id) ?? partesVazias() }))
+      .map((m) => {
+        const valor = Math.round(mapa.get(m.id) ?? 0);
+        const partes = partesVazias();
+        const faixa = faixaPorMusculo.get(m.id) ?? "c";
+        partes[faixa] = valor;
+        return { musculo: m, valor, partes };
+      })
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
   });
