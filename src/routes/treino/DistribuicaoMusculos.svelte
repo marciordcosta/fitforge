@@ -1827,7 +1827,7 @@
   >
     <div class="grade-toolbar">
       <button class="grade-editar-metas-btn" onclick={() => (modoEdicaoMetas = !modoEdicaoMetas)}>
-        {#if modoEdicaoMetas}{@render iconConcluir()} Concluir{:else}{@render iconEditarMeta()} Editar metas{/if}
+        {#if modoEdicaoMetas}{@render iconConcluir()} Concluir{:else}{@render iconEditarMeta()} Editar{/if}
       </button>
     </div>
     <div class="grade-scroll">
@@ -1837,7 +1837,7 @@
             <th class="grade-col-musculo"></th>
             {#each gradeSemanal.colunas as col (col.dia)}
               <th>
-                {#if col.treinoId && col.treinoNome}
+                {#if col.treinoId && col.treinoNome && modoEdicaoMetas}
                   <button
                     class="grade-cabecalho-btn"
                     onclick={() => abrirMoverDiaTreino(col.treinoId!, col.treinoNome!, col.dia)}
@@ -1846,6 +1846,9 @@
                     <span class="grade-dia com-treino">{DIAS_SEMANA_ABREV[col.dia]}</span>
                     <span class="grade-rotina-nome">{col.treinoNome}</span>
                   </button>
+                {:else if col.treinoId && col.treinoNome}
+                  <div class="grade-dia com-treino">{DIAS_SEMANA_ABREV[col.dia]}</div>
+                  <div class="grade-rotina-nome">{col.treinoNome}</div>
                 {:else}
                   <div class="grade-dia">{DIAS_SEMANA_ABREV[col.dia]}</div>
                   <div class="grade-rotina-nome">💤</div>
