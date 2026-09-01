@@ -2367,7 +2367,7 @@
             </button>
             <div class="editor-serie-col">
               {#if deltaTotal !== 0}
-                <span class="editor-serie-badge" class:editor-serie-badge-mais={deltaTotal > 0} class:editor-serie-badge-menos={deltaTotal < 0}
+                <span class="editor-serie-badge"
                 >{valorAnteriorSeries}{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
               {/if}
               <button
@@ -3137,12 +3137,7 @@
     font-weight: 800;
     line-height: 1.3;
     white-space: nowrap;
-  }
-  .editor-serie-badge-mais {
-    color: var(--color-success);
-  }
-  .editor-serie-badge-menos {
-    color: var(--color-negative);
+    color: #fff;
   }
   .serie-texto-musculo {
     flex-shrink: 0;
