@@ -20,6 +20,7 @@
     renameTreino,
     listMetasMusculo,
     salvarMetaMusculo,
+    limparMetasMusculoRotina,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
     abreviarMusculo,
@@ -1243,6 +1244,15 @@
             series: te.series.map((s) => ({ serie: s.serie, peso_alvo: s.peso_alvo, rep_min: s.rep_min, rep_max: s.rep_max })),
           })),
       );
+      // A meta é um alvo pra guiar o ajuste — uma vez salvo o resultado, ela deixa de fazer
+      // sentido e some, até o usuário definir um novo alvo na grade.
+      await limparMetasMusculoRotina(treinoId);
+      const prefixo = `${treinoId}:`;
+      const mapaMetas = new Map(metasMusculo);
+      for (const chave of mapaMetas.keys()) {
+        if (chave.startsWith(prefixo)) mapaMetas.delete(chave);
+      }
+      metasMusculo = mapaMetas;
       const atualizado = await getTreino(treinoId);
       if (atualizado) treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
       editorSujo = false;

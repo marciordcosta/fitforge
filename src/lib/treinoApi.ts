@@ -1124,6 +1124,14 @@ export async function salvarMetaMusculo(treinoId: string, musculoId: string, met
   if (error) throw error;
 }
 
+/** Apaga TODAS as metas manuais de séries de uma rotina de uma vez — usado ao salvar o editor
+ * completo: a meta é um alvo pra guiar o ajuste, uma vez salvo o resultado ela deixa de fazer
+ * sentido e some, até o usuário definir um novo alvo na grade. */
+export async function limparMetasMusculoRotina(treinoId: string): Promise<void> {
+  const { error } = await supabase.from("treino_metas_musculo").delete().eq("treino_id", treinoId);
+  if (error) throw error;
+}
+
 /** Uma linha por série registrada (rotina + exercício) no período — base pra contar tanto o total por rotina quanto o detalhamento por músculo de cada rotina. */
 export async function getRegistrosPorTreinoPeriodo(
   dataInicio: string,
