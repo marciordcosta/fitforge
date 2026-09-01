@@ -677,6 +677,8 @@
   let modalMusculoRotina = $state<{ treino: TreinoComExercicios; musculo: Musculo; itens: ItemMusculoRotina[] } | null>(null);
   let editandoSerieItem = $state<ItemMusculoRotina | null>(null);
   let salvandoSeries = $state(false);
+  /** Feedback visível no modal sobre o que aconteceu no último ajuste de série (sucesso, nada mudou, ou erro). */
+  let statusAjusteMusculo = $state<{ tipo: "ok" | "info" | "erro"; texto: string } | null>(null);
   let mostrarPickerMusculo = $state(false);
   let buscaPickerMusculo = $state("");
   let adicionandoIdMusculo = $state<string | null>(null);
@@ -688,6 +690,7 @@
   }
 
   function definirModalMusculo(treino: TreinoComExercicios, musculo: Musculo): void {
+    if (modalMusculoRotina?.musculo.id !== musculo.id) statusAjusteMusculo = null;
     modalMusculoRotina = { treino, musculo, itens: itensMusculoRotina(treino, musculo.id) };
   }
 
@@ -851,6 +854,11 @@
     if (!editandoSerieItem || !modalMusculoRotina) return;
     const item = editandoSerieItem;
     const treino = modalMusculoRotina.treino;
+    const valorAtualReal = modalMusculoRotina.itens.find((i) => i.treinoExercicioId === item.treinoExercicioId)?.series ?? item.series;
+    if (novoNumero === valorAtualReal) {
+      statusAjusteMusculo = { tipo: "info", texto: `"${item.exercicioNome}" já estava em ${novoNumero} ${novoNumero === 1 ? "série" : "séries"} — nada foi alterado.` };
+      return;
+    }
     try {
       confirmarSeSeguro(treino, item.treinoExercicioId, novoNumero, () => {
         void (async () => {
@@ -858,15 +866,16 @@
           try {
             await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
             await refrescarTreinoMusculo(treino.id);
+            statusAjusteMusculo = { tipo: "ok", texto: `"${item.exercicioNome}" atualizado de ${valorAtualReal} para ${novoNumero}.` };
           } catch (e) {
-            alert("Erro ao ajustar séries: " + (e as Error).message);
+            statusAjusteMusculo = { tipo: "erro", texto: "Erro ao gravar: " + (e as Error).message };
           } finally {
             salvandoSeries = false;
           }
         })();
       });
     } catch (e) {
-      alert("Erro ao calcular impacto do ajuste: " + (e as Error).message);
+      statusAjusteMusculo = { tipo: "erro", texto: "Erro ao calcular impacto: " + (e as Error).message };
     }
   }
 
@@ -1558,6 +1567,9 @@
     {:else if tendenciaMusculo}
       <p class="tendencia-musculo tendencia-{tendenciaMusculo.status}">{TEXTO_TENDENCIA[tendenciaMusculo.status]}</p>
     {/if}
+    {#if statusAjusteMusculo}
+      <p class="status-ajuste status-ajuste-{statusAjusteMusculo.tipo}">{statusAjusteMusculo.texto}</p>
+    {/if}
     {#if !modalMusculoRotina.itens.length}
       <p class="muted">Nenhum exercício encontrado.</p>
     {:else}
@@ -2118,6 +2130,22 @@
     color: var(--color-neutral);
   }
   .tendencia-caindo {
+    color: var(--color-negative);
+  }
+  .status-ajuste {
+    margin: 0 0 var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    font-size: var(--font-size-sm);
+  }
+  .status-ajuste-ok {
+    color: var(--color-success);
+  }
+  .status-ajuste-info {
+    color: var(--surface-muted);
+  }
+  .status-ajuste-erro {
     color: var(--color-negative);
   }
   .lista-exercicios-musculo {
