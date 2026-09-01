@@ -263,6 +263,13 @@
     return linha.valor > 0 ? (linha.partes.b + linha.partes.c * 2) / linha.valor : 0;
   }
 
+  /** Número de séries "efetivo" no modo por fadiga: desconta pela faixa em que cada série caiu
+   * (A = fresco, conta cheio; B = meio, 70%; C = mais fatigado, 40%) — uma forma de aproximar
+   * quanto do volume bruto realmente equivale a estímulo de qualidade. */
+  function valorEfetivoFadiga(partes: Partes): number {
+    return partes.a * 1 + partes.b * 0.7 + partes.c * 0.4;
+  }
+
   function ordenarPorMelhorEstimulo<T extends { valor: number; partes: Partes; subItens: { valor: number; partes: Partes }[] | null }>(
     lista: T[],
   ): T[] {
@@ -1107,14 +1114,14 @@
                       <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                     {/if}
                     {@render barraFadiga(linha.partes, linha.valor, () => abrirGraficoTreino(treino))}
-                    <span class="valor">{formatValor(linha.valor)}</span>
+                    <span class="valor">{formatValor(porFadiga ? valorEfetivoFadiga(linha.partes) : linha.valor)}</span>
                   </div>
                   {#if aberto && linha.subItens}
                     {#each linha.subItens as sub (sub.musculo.id)}
                       <div class="item item-sub">
                         <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                         {@render barraFadiga(sub.partes, sub.valor, () => abrirGraficoTreino(treino))}
-                        <span class="valor">{formatValor(sub.valor)}</span>
+                        <span class="valor">{formatValor(porFadiga ? valorEfetivoFadiga(sub.partes) : sub.valor)}</span>
                       </div>
                     {/each}
                   {/if}
