@@ -4,11 +4,14 @@
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import PieChart from "../../components/PieChart.svelte";
+  import WheelPicker from "../../components/WheelPicker.svelte";
   import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import {
     listMusculos,
     listTreinos,
+    getTreino,
     getVolumeRealizadoBruto,
+    updateSeriesCountTreinoExercicio,
     DIAS_SEMANA_ABREV,
     abreviarMusculo,
     type Musculo,
@@ -607,6 +610,54 @@
     navigate(`/treino/distribuicao/rotina/${treino.id}`);
   }
 
+  // ---------------- Modal: exercícios de um músculo dentro de uma rotina específica, com séries editáveis ----------------
+
+  interface ItemMusculoRotina {
+    treinoExercicioId: string;
+    exercicioNome: string;
+    series: number;
+  }
+
+  let modalMusculoRotina = $state<{ treino: TreinoComExercicios; musculo: Musculo; itens: ItemMusculoRotina[] } | null>(null);
+  let editandoSerieItem = $state<ItemMusculoRotina | null>(null);
+  let salvandoSeries = $state(false);
+
+  function itensMusculoRotina(treino: TreinoComExercicios, musculoId: string): ItemMusculoRotina[] {
+    return treino.exercicios
+      .filter((te) => te.exercicio?.musculos.some((m) => m.musculo_id === musculoId))
+      .map((te) => ({ treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length }));
+  }
+
+  /** Exercícios dessa rotina específica que trabalham o músculo, com o número de séries editável
+   * (abre a roleta) — ajustar aqui atualiza a rotina de verdade, as duas telas ficam ligadas. */
+  function abrirExerciciosDaRotina(treino: TreinoComExercicios, musculo: Musculo): void {
+    modalMusculoRotina = { treino, musculo, itens: itensMusculoRotina(treino, musculo.id) };
+  }
+
+  const opcoesSeries = Array.from({ length: 10 }, (_, i) => ({ valor: i + 1, label: String(i + 1) }));
+
+  async function ajustarSeries(novoNumero: number): Promise<void> {
+    if (!editandoSerieItem || !modalMusculoRotina) return;
+    const item = editandoSerieItem;
+    const treinoId = modalMusculoRotina.treino.id;
+    salvandoSeries = true;
+    try {
+      await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
+      const atualizado = await getTreino(treinoId);
+      if (atualizado) {
+        treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
+        modalMusculoRotina = {
+          treino: atualizado,
+          musculo: modalMusculoRotina.musculo,
+          itens: itensMusculoRotina(atualizado, modalMusculoRotina.musculo.id),
+        };
+      }
+    } finally {
+      salvandoSeries = false;
+      editandoSerieItem = null;
+    }
+  }
+
   /** Deriva do path pra que "voltar" do navegador feche o menu, ou reabra ao voltar de "Editar Rotina". */
   const rotinaMenuUrl = $derived.by(() => {
     const m = router.path.match(/^\/treino\/distribuicao\/rotina\/([^/]+)$/);
@@ -806,7 +857,7 @@
                         {linha.nome}
                       </button>
                     {:else}
-                      <span class="nome">{linha.nome}</span>
+                      <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                     {/if}
                     <div class="barra-wrap">
                       <div class="barra" style={`width: ${Math.min(linha.pct, 100)}%;`}>
@@ -828,7 +879,7 @@
                   {#if aberto && linha.subItens}
                     {#each linha.subItens as sub (sub.musculo.id)}
                       <div class="item item-sub">
-                        <span class="nome">{sub.musculo.nome}</span>
+                        <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                         <div class="barra-wrap">
                           <div class="barra" style={`width: ${linha.valor > 0 ? (sub.valor / linha.valor) * 100 : 0}%;`}>
                             <div class="barra-segmentos">
@@ -1094,6 +1145,36 @@
       />
     </div>
   </Sheet>
+{/if}
+
+{#if modalMusculoRotina}
+  <Sheet titulo={modalMusculoRotina.musculo.nome} onFechar={() => (modalMusculoRotina = null)}>
+    {#if !modalMusculoRotina.itens.length}
+      <p class="muted">Nenhum exercício encontrado.</p>
+    {:else}
+      <div class="lista-exercicios-musculo" class:carregando={salvandoSeries}>
+        {#each modalMusculoRotina.itens as item (item.treinoExercicioId)}
+          <div class="exercicio-musculo-item">
+            <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
+            <button class="exercicio-musculo-series" onclick={() => (editandoSerieItem = item)}>
+              {item.series} {item.series === 1 ? "série" : "séries"}
+            </button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </Sheet>
+{/if}
+
+{#if editandoSerieItem}
+  <WheelPicker
+    titulo={editandoSerieItem.exercicioNome}
+    subtitulo="Número de séries"
+    opcoes={opcoesSeries}
+    valorAtual={editandoSerieItem.series}
+    onSelecionar={(v) => ajustarSeries(v)}
+    onFechar={() => (editandoSerieItem = null)}
+  />
 {/if}
 
 <style>
@@ -1428,5 +1509,46 @@
     aspect-ratio: 1;
     overflow: hidden;
     margin: var(--space-2) auto 0;
+  }
+  .lista-exercicios-musculo {
+    display: flex;
+    flex-direction: column;
+    transition: opacity 0.15s;
+  }
+  .lista-exercicios-musculo.carregando {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .exercicio-musculo-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .exercicio-musculo-item:last-child {
+    border-bottom: none;
+  }
+  .exercicio-musculo-nome {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-base);
+  }
+  .exercicio-musculo-series {
+    flex-shrink: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-2);
+    background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+    color: var(--color-primary);
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    white-space: nowrap;
+    cursor: pointer;
   }
 </style>

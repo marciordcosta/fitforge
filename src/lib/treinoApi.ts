@@ -738,6 +738,37 @@ export async function updateObservacaoTreinoExercicio(treinoExercicioId: string,
   if (error) throw error;
 }
 
+/** Ajusta o número de séries de um exercício dentro de uma rotina já salva (ex: pela tela de
+ * Distribuição Muscular), sem reescrever a rotina inteira — adiciona ou remove linhas em
+ * treino_exercicio_series preservando as que já existem; séries novas repetem peso/reps da
+ * última existente. */
+export async function updateSeriesCountTreinoExercicio(treinoExercicioId: string, novoNumero: number): Promise<void> {
+  const { data: atuais, error: selError } = await supabase
+    .from("treino_exercicio_series")
+    .select("id, serie, peso_alvo, rep_min, rep_max")
+    .eq("treino_exercicio_id", treinoExercicioId)
+    .order("serie");
+  if (selError) throw selError;
+  const lista = atuais ?? [];
+
+  if (novoNumero < lista.length) {
+    const remover = lista.slice(novoNumero).map((s) => s.id);
+    const { error } = await supabase.from("treino_exercicio_series").delete().in("id", remover);
+    if (error) throw error;
+  } else if (novoNumero > lista.length) {
+    const ultima = lista[lista.length - 1];
+    const novas = Array.from({ length: novoNumero - lista.length }, (_, i) => ({
+      treino_exercicio_id: treinoExercicioId,
+      serie: lista.length + i + 1,
+      peso_alvo: ultima?.peso_alvo ?? null,
+      rep_min: ultima?.rep_min ?? null,
+      rep_max: ultima?.rep_max ?? null,
+    }));
+    const { error } = await supabase.from("treino_exercicio_series").insert(novas);
+    if (error) throw error;
+  }
+}
+
 // ---------------- Log de treino (registros) ----------------
 
 export interface SetRegistro {
