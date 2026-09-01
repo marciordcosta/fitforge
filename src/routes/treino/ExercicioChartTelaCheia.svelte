@@ -8,6 +8,7 @@
     type HistoricoPonto,
     type Exercicio,
   } from "../../lib/treinoApi";
+  import { chaveSemana, parseISODate } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
 
@@ -127,10 +128,16 @@
   /** Só entram na comparação os registros dentro da mesma janela de datas do exercício principal (já filtrado). */
   const comparaveisNaJanela = $derived.by(() => {
     if (!comparando || !historicoFiltrado.length) return [];
-    const dataMin = historicoFiltrado[0].data;
-    const dataMax = historicoFiltrado[historicoFiltrado.length - 1].data;
+    /** Semana ancorada em terça (mesma convenção do resto do app) de cada registro do
+     * exercício principal — um exercício comparável só entra se tiver registro na MESMA
+     * semana de alguma sessão do principal, não só dentro do intervalo min/max (que podia
+     * incluir semanas inteiras sem nenhuma sessão do principal). */
+    const semanasPrincipal = new Set(historicoFiltrado.map((h) => chaveSemana(parseISODate(h.data))));
     return comparaveis
-      .map((c) => ({ ...c, historico: c.historico.filter((h) => h.data >= dataMin && h.data <= dataMax) }))
+      .map((c) => ({
+        ...c,
+        historico: c.historico.filter((h) => semanasPrincipal.has(chaveSemana(parseISODate(h.data)))),
+      }))
       .filter((c) => c.historico.length > 0);
   });
 
@@ -247,7 +254,13 @@
             ticks: { color: "#9aa0ab", maxTicksLimit: 6, autoSkip: true, font: { size: 10 } },
           },
           y: comparando
-            ? { display: false, min: 0, max: 1 }
+            ? {
+                min: 0,
+                max: 1,
+                ticks: { display: false },
+                grid: { color: "rgba(255, 255, 255, 0.08)" },
+                border: { display: false },
+              }
             : { ticks: { color: "#9aa0ab" }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
         },
       },
