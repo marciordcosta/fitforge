@@ -851,17 +851,23 @@
     if (!editandoSerieItem || !modalMusculoRotina) return;
     const item = editandoSerieItem;
     const treino = modalMusculoRotina.treino;
-    confirmarSeSeguro(treino, item.treinoExercicioId, novoNumero, () => {
-      void (async () => {
-        salvandoSeries = true;
-        try {
-          await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
-          await refrescarTreinoMusculo(treino.id);
-        } finally {
-          salvandoSeries = false;
-        }
-      })();
-    });
+    try {
+      confirmarSeSeguro(treino, item.treinoExercicioId, novoNumero, () => {
+        void (async () => {
+          salvandoSeries = true;
+          try {
+            await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
+            await refrescarTreinoMusculo(treino.id);
+          } catch (e) {
+            alert("Erro ao ajustar séries: " + (e as Error).message);
+          } finally {
+            salvandoSeries = false;
+          }
+        })();
+      });
+    } catch (e) {
+      alert("Erro ao calcular impacto do ajuste: " + (e as Error).message);
+    }
   }
 
   /** Confirmação antes de remover um exercício da rotina (editor completo ou modal por músculo) — evita tirar por engano. */
@@ -1035,17 +1041,23 @@
     if (!editandoSerieEditor || !modalEditorRotina) return;
     const item = editandoSerieEditor;
     const treino = modalEditorRotina;
-    confirmarSeSeguro(treino, item.treinoExercicioId, novoNumero, () => {
-      void (async () => {
-        salvandoEditor = true;
-        try {
-          await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
-          await refrescarTreinoEditor(treino.id);
-        } finally {
-          salvandoEditor = false;
-        }
-      })();
-    });
+    try {
+      confirmarSeSeguro(treino, item.treinoExercicioId, novoNumero, () => {
+        void (async () => {
+          salvandoEditor = true;
+          try {
+            await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
+            await refrescarTreinoEditor(treino.id);
+          } catch (e) {
+            alert("Erro ao ajustar séries: " + (e as Error).message);
+          } finally {
+            salvandoEditor = false;
+          }
+        })();
+      });
+    } catch (e) {
+      alert("Erro ao calcular impacto do ajuste: " + (e as Error).message);
+    }
   }
 
   /** Abre o gráfico direto (sem passar por menu) quando se entra em
