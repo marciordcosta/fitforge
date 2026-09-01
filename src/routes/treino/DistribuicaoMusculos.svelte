@@ -3,6 +3,7 @@
   import { toISODate, parseISODate } from "../../lib/dates";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import PieChart from "../../components/PieChart.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
   import {
@@ -697,6 +698,20 @@
     }
   }
 
+  /** Confirmação antes de remover um exercício da rotina (editor completo ou modal por músculo) — evita tirar por engano. */
+  let confirmandoRemover = $state<{ nome: string; onConfirmar: () => void } | null>(null);
+
+  function pedirConfirmacaoRemover(nome: string, onConfirmar: () => void): void {
+    confirmandoRemover = { nome, onConfirmar };
+  }
+
+  function confirmarRemocao(): void {
+    if (!confirmandoRemover) return;
+    const fn = confirmandoRemover.onConfirmar;
+    confirmandoRemover = null;
+    fn();
+  }
+
   async function removerExercicioMusculo(item: ItemMusculoRotina): Promise<void> {
     if (!modalMusculoRotina) return;
     const treinoId = modalMusculoRotina.treino.id;
@@ -1350,7 +1365,11 @@
       <div class="lista-exercicios-musculo" class:carregando={salvandoSeries}>
         {#each modalMusculoRotina.itens as item (item.treinoExercicioId)}
           <div class="exercicio-musculo-item">
-            <button class="remover-circulo" onclick={() => removerExercicioMusculo(item)} aria-label="Remover">−</button>
+            <button
+              class="remover-circulo"
+              onclick={() => pedirConfirmacaoRemover(item.exercicioNome, () => removerExercicioMusculo(item))}
+              aria-label="Remover"
+            >−</button>
             <button class="exercicio-musculo-nome" onclick={() => navigate(`/treino/exercicios/${item.exercicioId}`)}>{item.exercicioNome}</button>
             <button class="exercicio-musculo-series" onclick={() => (editandoSerieItem = item)}>
               {item.series} {item.series === 1 ? "série" : "séries"}
@@ -1424,7 +1443,11 @@
       <div class="editor-lista" class:carregando={salvandoEditor}>
         {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
           <div class="editor-item" class:arrastando={arrastandoIdxEditor === idx} bind:this={itemEditorRefs[idx]}>
-            <button class="remover-circulo" onclick={() => removerExercicioEditor(te.id)} aria-label="Remover">−</button>
+            <button
+              class="remover-circulo"
+              onclick={() => pedirConfirmacaoRemover(te.exercicio?.nome ?? "", () => removerExercicioEditor(te.id))}
+              aria-label="Remover"
+            >−</button>
             <button class="editor-nome" onclick={() => navigate(`/treino/exercicios/${te.exercicio_id}`)}>{te.exercicio?.nome ?? ""}</button>
             <button
               class="exercicio-musculo-series"
@@ -1438,6 +1461,12 @@
           <p class="muted">Nenhum exercício ainda.</p>
         {/if}
       </div>
+      <p class="editor-totais">
+        {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
+          (acc, ex) => acc + ex.series.length,
+          0,
+        )} séries
+      </p>
       <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
     </div>
   </div>
@@ -1483,6 +1512,15 @@
     valorAtual={editandoSerieEditor.series}
     onSelecionar={(v) => ajustarSeriesEditor(v)}
     onFechar={() => (editandoSerieEditor = null)}
+  />
+{/if}
+
+{#if confirmandoRemover}
+  <ConfirmDialog
+    titulo={`Remover "${confirmandoRemover.nome}" da rotina?`}
+    textoConfirmar="Remover"
+    onConfirmar={confirmarRemocao}
+    onCancelar={() => (confirmandoRemover = null)}
   />
 {/if}
 
@@ -1956,6 +1994,14 @@
     cursor: grab;
     touch-action: none;
     padding: var(--space-2);
+  }
+  .editor-totais {
+    flex-shrink: 0;
+    margin: var(--space-3) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--surface-border);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .adicionar-exercicio-editor-btn {
     flex-shrink: 0;
