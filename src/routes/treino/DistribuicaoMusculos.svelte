@@ -794,6 +794,14 @@
     return "estavel";
   }
 
+  /** Variação % bruta (não só a faixa) de um exercício específico — mostrada ao lado do nome no
+   * modal por músculo (read-only), reaproveitando o histórico já pré-carregado. */
+  function variacaoExercicioPct(exercicioId: string): number | null {
+    const pontos = historicoPorExercicio.get(exercicioId);
+    if (!pontos) return null;
+    return variacaoExercicio(pontos);
+  }
+
   /** Setinha discreta no card: mesma lógica de tendência (variacaoExercicio), mas usando o
    * histórico já pré-carregado (historicoPorExercicio) pra não refazer a consulta por linha. */
   function tendenciaParaMusculos(listaTreinos: TreinoComExercicios[], musculoIds: string[]): "subindo" | "estavel" | "caindo" | null {
@@ -857,9 +865,9 @@
   });
 
   const TEXTO_TENDENCIA = {
-    subindo: "Tendência de alta — manter ou aumentar as séries pode ser uma boa escolha.",
-    estavel: "Tendência estável — aumentar as séries pode ajudar a sair do platô.",
-    caindo: "Tendência de queda — considere reduzir o volume desse músculo.",
+    subindo: "Progredindo",
+    estavel: "Estagnado",
+    caindo: "Regredindo",
   };
 
   /** Exercícios dessa rotina específica que trabalham o músculo, com o número de séries editável
@@ -1820,8 +1828,17 @@
       <div class="lista-exercicios-musculo">
         {#each modalMusculoRotina.itens as item (item.treinoExercicioId)}
           {@const tendEx = tendenciaExercicio(item.exercicioId)}
+          {@const variacaoPct = variacaoExercicioPct(item.exercicioId)}
           <button class="exercicio-musculo-item exercicio-musculo-item-btn" onclick={() => (menuExercicioMusculo = item)}>
             <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
+            {#if variacaoPct != null}
+              <span
+                class="exercicio-musculo-variacao"
+                class:valor-subindo={variacaoPct > 0.02}
+                class:valor-estavel={variacaoPct >= -0.02 && variacaoPct <= 0.02}
+                class:valor-caindo={variacaoPct < -0.02}
+              >{variacaoPct > 0 ? "+" : ""}{Math.round(variacaoPct * 100)}%</span>
+            {/if}
             <span
               class="serie-texto-musculo"
               class:valor-subindo={tendEx === "subindo"}
@@ -2490,6 +2507,12 @@
     font-family: inherit;
     color: var(--surface-fg);
     cursor: pointer;
+  }
+  .exercicio-musculo-variacao {
+    flex-shrink: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    white-space: nowrap;
   }
   .exercicio-musculo-series {
     flex-shrink: 0;
