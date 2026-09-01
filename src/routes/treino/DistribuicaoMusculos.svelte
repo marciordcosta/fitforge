@@ -1666,6 +1666,9 @@
 {/if}
 
 {#if mostrarGradeSemanal}
+  <!-- Precisa ficar acima do modal por músculo (Sheet, z-index 100), que pode continuar aberto
+       por baixo quando essa grade abre a partir do ícone de calendário dele. -->
+  <div class="acima-editor">
   <Sheet
     titulo="Distribuição na Semana"
     onFechar={() => {
@@ -1699,7 +1702,14 @@
                     <button
                       class="grade-valor-caixa grade-valor-link"
                       style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
-                      onclick={() => { mostrarGradeSemanal = false; navigate(`/treino/rotina/${treinoId}`); }}
+                      onclick={() => {
+                        const treino = treinos.find((t) => t.id === treinoId);
+                        if (treino) {
+                          mostrarGradeSemanal = false;
+                          modalMusculoRotina = null;
+                          abrirEditorRotina(treino);
+                        }
+                      }}
                     >{valor}</button>
                   {:else if valor > 0}
                     <span
@@ -1715,6 +1725,7 @@
       </table>
     </div>
   </Sheet>
+  </div>
 {/if}
 
 {#if mostrarGradeRealizado}
@@ -1829,7 +1840,22 @@
         {#each modalMusculoRotina.itens as item (item.treinoExercicioId)}
           {@const tendEx = tendenciaExercicio(item.exercicioId)}
           {@const variacaoPct = variacaoExercicioPct(item.exercicioId)}
-          <button class="exercicio-musculo-item exercicio-musculo-item-btn" onclick={() => (menuExercicioMusculo = item)}>
+          <button
+            class="exercicio-musculo-item exercicio-musculo-item-btn"
+            onclick={() => {
+              // No modal multi-rotina (aberto pela Distribuição Semanal), vai direto pro editor
+              // completo da rotina desse item — no modal de uma rotina só, abre o menu Ver/Trocar.
+              if (modalMusculoRotina?.multiRotina) {
+                const treino = treinos.find((t) => t.id === item.treinoId);
+                if (treino) {
+                  modalMusculoRotina = null;
+                  abrirEditorRotina(treino);
+                }
+              } else {
+                menuExercicioMusculo = item;
+              }
+            }}
+          >
             <span class="exercicio-musculo-coluna">
               <span class="exercicio-musculo-info">
                 <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
