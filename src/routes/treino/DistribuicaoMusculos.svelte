@@ -1607,9 +1607,15 @@
     {:else}
       <div class="lista-exercicios-musculo">
         {#each modalMusculoRotina.itens as item (item.treinoExercicioId)}
+          {@const tendEx = tendenciaExercicio(item.exercicioId)}
           <button class="exercicio-musculo-item exercicio-musculo-item-btn" onclick={() => (menuExercicioMusculo = item)}>
             <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
-            <span class="exercicio-musculo-series">{item.series} {item.series === 1 ? "série" : "séries"}</span>
+            <span
+              class="serie-texto-musculo"
+              class:valor-subindo={tendEx === "subindo"}
+              class:valor-estavel={tendEx === "estavel"}
+              class:valor-caindo={tendEx === "caindo"}
+            >{item.series} {item.series === 1 ? "série" : "séries"}</span>
           </button>
         {/each}
       </div>
@@ -2209,6 +2215,12 @@
     font-family: inherit;
     white-space: nowrap;
     cursor: pointer;
+  }
+  .serie-texto-musculo {
+    flex-shrink: 0;
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
   }
   .serie-pill-subindo {
     background: color-mix(in srgb, var(--color-success) 18%, transparent);
