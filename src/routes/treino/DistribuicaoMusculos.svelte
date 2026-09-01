@@ -1890,26 +1890,23 @@
                 </span>
               {/if}
             </button>
-            <div class="editor-serie-col">
+            <button
+              class="exercicio-musculo-series"
+              onclick={() =>
+                (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
+            >
+              <span
+                class="editor-serie-numero"
+                class:valor-subindo={tendEx === "subindo"}
+                class:valor-estavel={tendEx === "estavel"}
+                class:valor-caindo={tendEx === "caindo"}
+              >{te.series.length}</span>
+              <span class="editor-serie-label">{te.series.length === 1 ? "série" : "séries"}</span>
               {#if deltaTotal !== 0}
-                <span class="editor-serie-delta" class:valor-subindo={deltaTotal > 0} class:valor-caindo={deltaTotal < 0}>
-                  {deltaTotal > 0 ? "+" : ""}{deltaTotal}
-                </span>
+                <span class="editor-serie-delta" class:valor-subindo={deltaTotal > 0} class:valor-caindo={deltaTotal < 0}
+                >{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
               {/if}
-              <button
-                class="exercicio-musculo-series"
-                onclick={() =>
-                  (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
-              >
-                <span
-                  class="editor-serie-numero"
-                  class:valor-subindo={tendEx === "subindo"}
-                  class:valor-estavel={tendEx === "estavel"}
-                  class:valor-caindo={tendEx === "caindo"}
-                >{te.series.length}</span>
-                <span class="editor-serie-label">{te.series.length === 1 ? "série" : "séries"}</span>
-              </button>
-            </div>
+            </button>
             <button class="handle-arraste" onpointerdown={(e) => iniciarArrasteEditor(e, idx)} aria-label="Arrastar para reordenar">☰</button>
           </div>
         {/each}
@@ -2486,15 +2483,8 @@
     font-size: 11px;
     color: var(--surface-muted);
   }
-  .editor-serie-col {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 1px;
-  }
   .editor-serie-delta {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
   }
   .serie-texto-musculo {
@@ -2612,8 +2602,6 @@
     justify-content: space-between;
     gap: var(--space-2);
     margin: var(--space-3) 0 0;
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--surface-border);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
