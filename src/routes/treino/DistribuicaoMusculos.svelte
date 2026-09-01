@@ -16,10 +16,12 @@
     getHistoricoExercicio,
     salvarExerciciosRotina,
     trocarExercicioTreinoExercicio,
+    trocarExercicioEntreRotinas,
     DIAS_SEMANA_ABREV,
     abreviarMusculo,
     type Musculo,
     type TreinoComExercicios,
+    type TreinoExercicio,
     type Exercicio,
   } from "../../lib/treinoApi";
 
@@ -955,6 +957,82 @@
     }
   }
 
+  // ---------------- Mover exercício pra outra rotina (troca de lugar com um exercício de lá) ----------------
+
+  /** Item cujo submenu "Ir para Lista / Ir para Rotinas" (dentro de Trocar Exercício) está aberto. */
+  let menuTrocarSubmenu = $state<ItemMusculoRotina | null>(null);
+  /** Item sendo movido — o fluxo abre a lista de rotinas, depois os exercícios da rotina
+   * escolhida, pra trocar de lugar com um deles. Sempre é uma ação IMEDIATA (grava na hora),
+   * mesmo se aberta a partir do editor completo — envolve DUAS rotinas, uma delas nunca está
+   * no rascunho local aberto no momento. */
+  let movendoItem = $state<ItemMusculoRotina | null>(null);
+  let mostrarPickerMover = $state(false);
+  let rotinaMoverEscolhida = $state<TreinoComExercicios | null>(null);
+  let trocandoComTreinoExercicioId = $state<string | null>(null);
+
+  function abrirSubmenuTrocar(item: ItemMusculoRotina): void {
+    menuTrocarSubmenu = item;
+    menuExercicioMusculo = null;
+  }
+
+  function abrirMoverExercicio(item: ItemMusculoRotina): void {
+    movendoItem = item;
+    rotinaMoverEscolhida = null;
+    mostrarPickerMover = true;
+    menuExercicioMusculo = null;
+    menuTrocarSubmenu = null;
+  }
+
+  /** Só rotinas diferentes da atual e que ainda não têm esse exercício — trocar de lugar com
+   * uma que já tem duplicaria o exercício nela. */
+  const rotinasParaMover = $derived(
+    movendoItem
+      ? treinos.filter(
+          (t) => t.id !== movendoItem!.treinoId && !t.exercicios.some((te) => te.exercicio_id === movendoItem!.exercicioId),
+        )
+      : [],
+  );
+
+  function fecharMover(): void {
+    mostrarPickerMover = false;
+    movendoItem = null;
+    rotinaMoverEscolhida = null;
+  }
+
+  async function trocarComExercicioDaRotina(destino: TreinoExercicio): Promise<void> {
+    if (!movendoItem) return;
+    const origem = movendoItem;
+    trocandoComTreinoExercicioId = destino.id;
+    try {
+      await trocarExercicioEntreRotinas(origem.treinoExercicioId, origem.exercicioId, destino.id, destino.exercicio_id);
+      await refrescarTreinoMusculo(origem.treinoId);
+      await refrescarTreinoMusculo(destino.treino_id);
+      // O editor completo é um rascunho local (não sincroniza sozinho) — se a rotina de origem
+      // é a que está aberta nele, atualiza a linha ali também (é uma TROCA — a linha continua
+      // existindo na rotina, só passa a apontar pro exercício que veio de lá), senão o rascunho
+      // fica desatualizado (e Salvar poderia gravar o exercício antigo de volta sem querer).
+      if (modalEditorRotina?.id === origem.treinoId) {
+        modalEditorRotina = {
+          ...modalEditorRotina,
+          exercicios: modalEditorRotina.exercicios.map((te) =>
+            te.id === origem.treinoExercicioId ? { ...te, exercicio_id: destino.exercicio_id, exercicio: destino.exercicio } : te,
+          ),
+        };
+      }
+      if (modalMusculoRotina) {
+        statusAjusteMusculo = {
+          tipo: "ok",
+          texto: `"${origem.exercicioNome}" trocou de lugar com "${destino.exercicio?.nome ?? ""}".`,
+        };
+      }
+      fecharMover();
+    } catch (e) {
+      alert("Erro ao mover exercício: " + (e as Error).message);
+    } finally {
+      trocandoComTreinoExercicioId = null;
+    }
+  }
+
   // ---------------- Modal: edição visual da rotina inteira (add/remover/reordenar exercícios) ----------------
 
   let modalEditorRotina = $state<TreinoComExercicios | null>(null);
@@ -1630,6 +1708,13 @@
     <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
   </svg>
 {/snippet}
+{#snippet iconMover()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="16 3 21 3 21 8" />
+    <line x1="21" y1="3" x2="13" y2="11" />
+    <path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" />
+  </svg>
+{/snippet}
 {#snippet iconGrade()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -1918,7 +2003,37 @@
         {
           label: "Trocar Exercício",
           icon: iconTrocarExercicio,
-          onSelect: () => abrirTrocarExercicioMusculo(item, modalMusculoRotina?.musculo.nome ?? ""),
+          onSelect: () => abrirSubmenuTrocar(item),
+        },
+        {
+          label: "Mover",
+          icon: iconMover,
+          onSelect: () => abrirMoverExercicio(item),
+        },
+      ]}
+    />
+  </div>
+{/if}
+
+{#if menuTrocarSubmenu}
+  {@const item = menuTrocarSubmenu}
+  <div class="acima-editor">
+    <ActionSheet
+      titulo={item.exercicioNome}
+      onFechar={() => (menuTrocarSubmenu = null)}
+      opcoes={[
+        {
+          label: "Ir para Lista",
+          icon: iconGrade,
+          onSelect: () => {
+            menuTrocarSubmenu = null;
+            abrirTrocarExercicioMusculo(item, modalMusculoRotina?.musculo.nome ?? "");
+          },
+        },
+        {
+          label: "Ir para Rotinas",
+          icon: iconMover,
+          onSelect: () => abrirMoverExercicio(item),
         },
       ]}
     />
@@ -1939,6 +2054,73 @@
       trocandoItemMusculo = null;
     }}
   />
+{/if}
+
+{#if mostrarPickerMover && movendoItem && !rotinaMoverEscolhida}
+  <div class="acima-editor">
+    <div class="tela-editor-rotina">
+      <div class="editor-conteudo">
+        <div class="header">
+          <button class="back" onclick={fecharMover} aria-label="Voltar">{@render iconVoltar()}</button>
+          <h1>Mover "{movendoItem.exercicioNome}"</h1>
+          <span class="spacer"></span>
+        </div>
+        {#if !rotinasParaMover.length}
+          <p class="muted">Nenhuma rotina disponível — todas as outras já têm esse exercício.</p>
+        {:else}
+          <ul class="picker-lista-mover">
+            {#each rotinasParaMover as treinoOpcao (treinoOpcao.id)}
+              <li>
+                <button class="picker-item-mover" onclick={() => (rotinaMoverEscolhida = treinoOpcao)}>
+                  <span class="picker-item-mover-nome">{treinoOpcao.nome_treino}</span>
+                  <span class="picker-item-mover-sub"
+                  >{treinoOpcao.exercicios.length} {treinoOpcao.exercicios.length === 1 ? "exercício" : "exercícios"}</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if mostrarPickerMover && movendoItem && rotinaMoverEscolhida}
+  {@const rotina = rotinaMoverEscolhida}
+  {@const treinoOrigem = treinos.find((t) => t.id === movendoItem!.treinoId)}
+  {@const exerciciosDisponiveis = rotina.exercicios
+    .slice()
+    .filter((te) => !treinoOrigem?.exercicios.some((oe) => oe.exercicio_id === te.exercicio_id))
+    .sort((a, b) => a.ordem - b.ordem)}
+  <div class="acima-editor">
+    <div class="tela-editor-rotina">
+      <div class="editor-conteudo">
+        <div class="header">
+          <button class="back" onclick={() => (rotinaMoverEscolhida = null)} aria-label="Voltar">{@render iconVoltar()}</button>
+          <h1>{rotina.nome_treino}</h1>
+          <span class="spacer"></span>
+        </div>
+        {#if !exerciciosDisponiveis.length}
+          <p class="muted">Nenhum exercício disponível — todos já existem na rotina de origem também.</p>
+        {:else}
+          <ul class="picker-lista-mover">
+            {#each exerciciosDisponiveis as te (te.id)}
+              <li class="picker-item-mover-linha">
+                <span class="picker-item-mover-nome">{te.exercicio?.nome ?? ""}</span>
+                <span class="picker-item-mover-series">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
+                <button
+                  class="picker-item-mover-icone"
+                  onclick={() => trocarComExercicioDaRotina(te)}
+                  disabled={trocandoComTreinoExercicioId === te.id}
+                  aria-label={`Trocar de lugar com ${te.exercicio?.nome ?? ""}`}
+                >{@render iconTrocarExercicio()}</button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    </div>
+  </div>
 {/if}
 
 {#if modalEditorRotina}
@@ -2657,6 +2839,74 @@
     font-size: var(--font-size-sm);
     white-space: nowrap;
   }
+  .picker-lista-mover {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .picker-item-mover {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    text-align: left;
+    padding: var(--space-3) 0;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--surface-border);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+    cursor: pointer;
+  }
+  .picker-item-mover-sub {
+    flex-shrink: 0;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .picker-item-mover-linha {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .picker-item-mover-nome {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+  }
+  .picker-item-mover-series {
+    flex-shrink: 0;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .picker-item-mover-icone {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-card);
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .picker-item-mover-icone svg {
+    width: 16px;
+    height: 16px;
+  }
+  .picker-item-mover-icone:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
   .adicionar-exercicio-musculo-btn {
     width: 100%;
     margin-top: var(--space-4);
@@ -2760,6 +3010,11 @@
   }
   .editor-botoes-fixos {
     flex-shrink: 0;
+    /* margin-top:auto empurra pro fundo da tela quando a lista é curta (sobra espaço no
+       flex-column, já que .editor-conteudo tem min-height:100%); position:sticky mantém
+       colado no fundo da tela ao rolar quando a lista é longa. As duas regras juntas cobrem
+       os dois casos, sem precisar saber de antemão se a lista cabe na tela ou não. */
+    margin-top: auto;
     position: sticky;
     bottom: 0;
     background: var(--surface-bg);

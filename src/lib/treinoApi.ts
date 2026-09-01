@@ -830,6 +830,27 @@ export async function trocarExercicioTreinoExercicio(treinoExercicioId: string, 
   if (error) throw error;
 }
 
+/** "Move" um exercício de uma rotina pra outra trocando de lugar com um exercício da rotina de
+ * destino — cada linha mantém seu próprio lugar (ordem, séries, descanso), só troca qual
+ * exercicio_id ela aponta. Sem isso teríamos que desmontar/remontar as duas linhas inteiras. */
+export async function trocarExercicioEntreRotinas(
+  treinoExercicioIdOrigem: string,
+  exercicioIdOrigem: string,
+  treinoExercicioIdDestino: string,
+  exercicioIdDestino: string,
+): Promise<void> {
+  const { error: e1 } = await supabase
+    .from("treino_exercicios")
+    .update({ exercicio_id: exercicioIdDestino })
+    .eq("id", treinoExercicioIdOrigem);
+  if (e1) throw e1;
+  const { error: e2 } = await supabase
+    .from("treino_exercicios")
+    .update({ exercicio_id: exercicioIdOrigem })
+    .eq("id", treinoExercicioIdDestino);
+  if (e2) throw e2;
+}
+
 // ---------------- Log de treino (registros) ----------------
 
 export interface SetRegistro {
