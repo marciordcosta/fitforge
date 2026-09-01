@@ -1047,7 +1047,7 @@
                 {/if}
               {/each}
             </div>
-            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirGraficoSemanal()}>
+            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirGradeSemanal(null)}>
               {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
             </button>
           {/if}
