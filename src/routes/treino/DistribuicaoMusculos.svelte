@@ -938,8 +938,43 @@
   let arrastandoIdxEditor = $state<number | null>(null);
   let itemEditorRefs: (HTMLElement | null)[] = [];
 
+  /** Snapshot de séries por exercício e total bruto por músculo, capturado quando o editor é
+   * aberto — base FIXA (não ao vivo) pros % de impacto mostrados após cada ajuste. Sem isso,
+   * baixar as séries e depois voltar ao número original mostraria um "aumento" (relativo ao
+   * valor intermediário) em vez de simplesmente sumir. */
+  let baselineEditor = $state<{ seriesPorExercicio: Map<string, number>; totalPorMusculo: Map<string, number> } | null>(null);
+
+  function capturarBaselineEditor(treino: TreinoComExercicios): void {
+    const seriesPorExercicio = new Map<string, number>();
+    for (const te of treino.exercicios) seriesPorExercicio.set(te.id, te.series.length);
+    baselineEditor = { seriesPorExercicio, totalPorMusculo: contarSeriesPorMusculo(treino) };
+  }
+
+  /** % de impacto de um exercício em cada músculo que ele trabalha, comparando as séries ATUAIS
+   * com a baseline fixa: delta de séries (ponderado por peso_contribuicao) sobre o total bruto
+   * ORIGINAL daquele músculo na rotina — ex: supino de 3 pra 4 séries, com peito em 10 séries
+   * base e peso_contribuicao 1.0, mostra +10% pro peito. Vazio se não há baseline, se o
+   * exercício não existia nela (adicionado depois) ou se voltou pro número original. */
+  function calcularImpactoEditor(te: TreinoComExercicios["exercicios"][number]): { nome: string; deltaPct: number }[] {
+    if (!baselineEditor) return [];
+    const baseSeries = baselineEditor.seriesPorExercicio.get(te.id);
+    if (baseSeries == null) return [];
+    const deltaSeries = te.series.length - baseSeries;
+    if (deltaSeries === 0) return [];
+    const resultado: { nome: string; deltaPct: number }[] = [];
+    for (const m of te.exercicio?.musculos ?? []) {
+      const totalBase = baselineEditor.totalPorMusculo.get(m.musculo_id) ?? 0;
+      if (totalBase <= 0) continue;
+      const pct = ((deltaSeries * m.peso_contribuicao) / totalBase) * 100;
+      const nome = musculos.find((mu) => mu.id === m.musculo_id)?.nome;
+      if (nome) resultado.push({ nome, deltaPct: pct });
+    }
+    return resultado;
+  }
+
   function definirModalEditor(treino: TreinoComExercicios): void {
     modalEditorRotina = treino;
+    capturarBaselineEditor(treino);
   }
 
   /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o editor. */
@@ -1752,6 +1787,7 @@
       <div class="editor-lista" class:carregando={salvandoEditor}>
         {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
           {@const tendEx = tendenciaExercicio(te.exercicio_id)}
+          {@const impacto = calcularImpactoEditor(te)}
           <div class="editor-item" class:arrastando={arrastandoIdxEditor === idx} bind:this={itemEditorRefs[idx]}>
             <button
               class="remover-circulo"
@@ -1768,15 +1804,29 @@
                   exercicioNome: te.exercicio?.nome ?? "",
                   series: te.series.length,
                 })}
-            >{te.exercicio?.nome ?? ""}</button>
+            >
+              <span class="editor-nome-texto">{te.exercicio?.nome ?? ""}</span>
+              {#if impacto.length}
+                <span class="editor-nome-impacto">
+                  {#each impacto as imp, i (imp.nome)}{i > 0 ? " · " : ""}{imp.nome} {imp.deltaPct > 0
+                      ? "+"
+                      : ""}{Math.round(imp.deltaPct)}%{/each}
+                </span>
+              {/if}
+            </button>
             <button
               class="exercicio-musculo-series"
-              class:serie-pill-subindo={tendEx === "subindo"}
-              class:serie-pill-estavel={tendEx === "estavel"}
-              class:serie-pill-caindo={tendEx === "caindo"}
               onclick={() =>
                 (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
-            >{te.series.length} {te.series.length === 1 ? "série" : "séries"}</button>
+            >
+              <span
+                class="editor-serie-numero"
+                class:valor-subindo={tendEx === "subindo"}
+                class:valor-estavel={tendEx === "estavel"}
+                class:valor-caindo={tendEx === "caindo"}
+              >{te.series.length}</span>
+              <span class="editor-serie-label">{te.series.length === 1 ? "série" : "séries"}</span>
+            </button>
             <button class="handle-arraste" onpointerdown={(e) => iniciarArrasteEditor(e, idx)} aria-label="Arrastar para reordenar">☰</button>
           </div>
         {/each}
@@ -2317,34 +2367,31 @@
   }
   .exercicio-musculo-series {
     flex-shrink: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
     border: none;
-    border-radius: var(--radius-sm);
-    padding: var(--space-1) var(--space-2);
-    background: color-mix(in srgb, var(--color-primary) 18%, transparent);
-    color: var(--color-primary);
-    font-weight: 600;
-    font-size: var(--font-size-sm);
+    background: none;
+    padding: 0;
     font-family: inherit;
     white-space: nowrap;
     cursor: pointer;
+  }
+  .editor-serie-numero {
+    font-weight: 700;
+    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+  }
+  .editor-serie-label {
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--surface-muted);
   }
   .serie-texto-musculo {
     flex-shrink: 0;
     font-weight: 600;
     font-size: var(--font-size-sm);
     white-space: nowrap;
-  }
-  .serie-pill-subindo {
-    background: color-mix(in srgb, var(--color-success) 18%, transparent);
-    color: var(--color-success);
-  }
-  .serie-pill-estavel {
-    background: color-mix(in srgb, var(--color-neutral) 18%, transparent);
-    color: var(--color-neutral);
-  }
-  .serie-pill-caindo {
-    background: color-mix(in srgb, var(--color-negative) 18%, transparent);
-    color: var(--color-negative);
   }
   .adicionar-exercicio-musculo-btn {
     width: 100%;
@@ -2399,17 +2446,32 @@
   .editor-nome {
     flex: 1;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
     text-align: left;
     background: none;
     border: none;
     padding: 0;
     font-family: inherit;
+    cursor: pointer;
+  }
+  .editor-nome-texto {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: var(--font-size-base);
     color: var(--surface-fg);
-    cursor: pointer;
+  }
+  .editor-nome-impacto {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--surface-muted);
   }
   .remover-circulo {
     width: 24px;
