@@ -2273,12 +2273,12 @@
   }
   .abc-toggle-btn {
     flex-shrink: 0;
-    padding: 6px 14px;
+    padding: 3px 9px;
     border-radius: 999px;
     border: 1px solid var(--surface-fg);
     background: none;
     color: var(--surface-fg);
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.3px;
     cursor: pointer;
