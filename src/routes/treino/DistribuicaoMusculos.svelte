@@ -1861,6 +1861,8 @@
           {@const tendEx = tendenciaExercicio(te.exercicio_id)}
           {@const impacto = calcularImpactoEditor(te)}
           {@const deltaTotal = deltaSeriesEditor(te)}
+          {@const valorAnteriorSeries = baselineEditor?.seriesPorExercicio.get(te.id) ?? 0}
+          {@const numeroExibidoSeries = baselineEditor?.seriesPorExercicio.has(te.id) ? valorAnteriorSeries : te.series.length}
           <div class="editor-item" class:arrastando={arrastandoIdxEditor === idx} bind:this={itemEditorRefs[idx]}>
             <button
               class="remover-circulo"
@@ -1890,23 +1892,28 @@
                 </span>
               {/if}
             </button>
-            <button
-              class="exercicio-musculo-series"
-              onclick={() =>
-                (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
-            >
-              <span
-                class="editor-serie-numero"
-                class:valor-subindo={tendEx === "subindo"}
-                class:valor-estavel={tendEx === "estavel"}
-                class:valor-caindo={tendEx === "caindo"}
-              >{te.series.length}</span>
-              <span class="editor-serie-label">{te.series.length === 1 ? "série" : "séries"}</span>
+            <div class="editor-serie-col">
               {#if deltaTotal !== 0}
-                <span class="editor-serie-delta" class:valor-subindo={deltaTotal > 0} class:valor-caindo={deltaTotal < 0}
-                >{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
+                <span class="editor-serie-soma">
+                  {valorAnteriorSeries}
+                  <span class="editor-serie-delta" class:valor-subindo={deltaTotal > 0} class:valor-caindo={deltaTotal < 0}
+                  >{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
+                </span>
               {/if}
-            </button>
+              <button
+                class="exercicio-musculo-series"
+                onclick={() =>
+                  (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
+              >
+                <span
+                  class="editor-serie-numero"
+                  class:valor-subindo={tendEx === "subindo"}
+                  class:valor-estavel={tendEx === "estavel"}
+                  class:valor-caindo={tendEx === "caindo"}
+                >{numeroExibidoSeries}</span>
+                <span class="editor-serie-label">{numeroExibidoSeries === 1 ? "série" : "séries"}</span>
+              </button>
+            </div>
             <button class="handle-arraste" onpointerdown={(e) => iniciarArrasteEditor(e, idx)} aria-label="Arrastar para reordenar">☰</button>
           </div>
         {/each}
@@ -1914,19 +1921,21 @@
           <p class="muted">Nenhum exercício ainda.</p>
         {/if}
       </div>
-      <div class="editor-totais">
-        <span>
-          {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
-            (acc, ex) => acc + ex.series.length,
-            0,
-          )} séries
-        </span>
-        <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
-          {@render iconGrafico()}
-        </button>
+      <div class="editor-rodape-fixo">
+        <div class="editor-totais">
+          <span>
+            {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
+              (acc, ex) => acc + ex.series.length,
+              0,
+            )} séries
+          </span>
+          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
+            {@render iconGrafico()}
+          </button>
+        </div>
+        <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
+        <button class="salvar-editor-btn" onclick={salvarEditor} disabled={salvandoEditor}>{salvandoEditor ? "Salvando…" : "Salvar"}</button>
       </div>
-      <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
-      <button class="salvar-editor-btn" onclick={salvarEditor} disabled={salvandoEditor}>{salvandoEditor ? "Salvando…" : "Salvar"}</button>
     </div>
   </div>
 {/if}
@@ -2483,8 +2492,19 @@
     font-size: 11px;
     color: var(--surface-muted);
   }
-  .editor-serie-delta {
+  .editor-serie-col {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+  }
+  .editor-serie-soma {
     font-size: 11px;
+    color: var(--surface-muted);
+    white-space: nowrap;
+  }
+  .editor-serie-delta {
     font-weight: 700;
   }
   .serie-texto-musculo {
@@ -2516,7 +2536,7 @@
     max-width: 480px;
     min-height: 100%;
     margin: 0 auto;
-    padding: var(--space-4);
+    padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -2595,13 +2615,19 @@
     touch-action: none;
     padding: var(--space-2);
   }
+  .editor-rodape-fixo {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: var(--surface-bg);
+    padding-top: var(--space-3);
+  }
   .editor-totais {
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    margin: var(--space-3) 0 0;
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
@@ -2658,8 +2684,6 @@
   }
   .salvar-editor-btn {
     flex-shrink: 0;
-    position: sticky;
-    bottom: 0;
     margin-top: var(--space-4);
     width: 100%;
     padding: var(--space-3);
