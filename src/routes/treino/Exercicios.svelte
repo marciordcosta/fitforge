@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import {
     listExercicios,
@@ -12,11 +13,28 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
 
+  let {
+    modoSelecao = false,
+    tituloSelecao = "Adicionar Exercício",
+    buscaInicial = "",
+    excluirIds = [],
+    onSelecionar,
+    onFechar,
+  }: {
+    modoSelecao?: boolean;
+    tituloSelecao?: string;
+    buscaInicial?: string;
+    excluirIds?: string[];
+    onSelecionar?: (ex: Exercicio) => void | Promise<void>;
+    onFechar?: () => void;
+  } = $props();
+
   let exercicios = $state<Exercicio[]>([]);
   let loading = $state(true);
   let mostrarCriarMenu = $state(false);
+  let selecionandoId = $state<string | null>(null);
 
-  let busca = $state("");
+  let busca = $state(untrack(() => buscaInicial));
 
   /** Primeira rotina (na ordem de exibição das rotinas) que usa cada exercício. */
   let rotinaPorExercicio = $state<Map<string, { id: string; nome: string }>>(new Map());
@@ -46,7 +64,21 @@
     return distribuicaoMusculosExercicio(ex).map((m, i) => ({ ...m, cor: PALETA[i % PALETA.length] }));
   }
 
-  const filtrados = $derived(exercicios.filter((ex) => correspondeBusca(textoBuscavelExercicio(ex), busca)));
+  const filtrados = $derived(
+    exercicios
+      .filter((ex) => correspondeBusca(textoBuscavelExercicio(ex), busca))
+      .filter((ex) => !modoSelecao || !excluirIds.includes(ex.id)),
+  );
+
+  async function selecionar(ex: Exercicio): Promise<void> {
+    if (!onSelecionar || selecionandoId) return;
+    selecionandoId = ex.id;
+    try {
+      await onSelecionar(ex);
+    } finally {
+      selecionandoId = null;
+    }
+  }
 </script>
 
 {#snippet iconVoltar()}
@@ -91,12 +123,48 @@
     <polyline points="2 12 12 17 22 12" />
   </svg>
 {/snippet}
+{#snippet iconMaisPeq()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+{/snippet}
 
-<div class="container has-bottom-nav">
+{#snippet infoExercicio(ex: Exercicio)}
+  <span class="info">
+    <span class="nome">{ex.nome}</span>
+    {#if !ex.musculos.length}
+      <span class="sub">Sem músculo definido</span>
+    {:else}
+      <span class="musculos-linhas">
+        {#each distribuicao(ex) as m (m.nome)}
+          <span class="musculo-coluna">
+            <span class="musculo-nome-mini">{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome}</span>
+            <span class="musculo-linha-barra">
+              <span class="musculo-barra-mini-wrap">
+                <span class="musculo-barra-mini" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
+              </span>
+              <span class="musculo-pct-mini">{m.pct.toFixed(0)}%</span>
+            </span>
+          </span>
+        {/each}
+      </span>
+    {/if}
+  </span>
+{/snippet}
+
+<div class="container" class:has-bottom-nav={!modoSelecao} class:modo-selecao={modoSelecao}>
   <div class="header">
-    <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
-    <h1>Exercícios</h1>
-    <button class="criar" onclick={() => (mostrarCriarMenu = true)} aria-label="Criar">{@render iconMaisCriar()}</button>
+    <button
+      class="back"
+      onclick={() => (modoSelecao ? onFechar?.() : voltar("/treino"))}
+      aria-label="Voltar"
+    >{@render iconVoltar()}</button>
+    <h1>{modoSelecao ? tituloSelecao : "Exercícios"}</h1>
+    {#if modoSelecao}
+      <span class="header-spacer"></span>
+    {:else}
+      <button class="criar" onclick={() => (mostrarCriarMenu = true)} aria-label="Criar">{@render iconMaisCriar()}</button>
+    {/if}
   </div>
 
   <input class="search" type="text" placeholder="Procurar exercício" bind:value={busca} />
@@ -110,14 +178,7 @@
       {#each filtrados as ex (ex.id)}
         <li>
           <div class="item">
-            <button
-              class="avatar-btn"
-              onclick={() => {
-                const rotina = rotinaPorExercicio.get(ex.id);
-                navigate(rotina ? `/treino/rotina/${rotina.id}/ver` : `/treino/exercicios/${ex.id}`);
-              }}
-              aria-label={rotinaPorExercicio.has(ex.id) ? `Ver rotina ${rotinaPorExercicio.get(ex.id)?.nome}` : ex.nome}
-            >
+            {#if modoSelecao}
               <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
                 {#if rotinaPorExercicio.has(ex.id)}
                   <span class="avatar-rotina-texto">{rotinaPorExercicio.get(ex.id)?.nome}</span>
@@ -125,30 +186,37 @@
                   {iniciais(ex.nome)}
                 {/if}
               </span>
-            </button>
-            <button class="conteudo-btn" onclick={() => navigate(`/treino/exercicios/${ex.id}`)}>
-              <span class="info">
-                <span class="nome">{ex.nome}</span>
-                {#if !ex.musculos.length}
-                  <span class="sub">Sem músculo definido</span>
-                {:else}
-                  <span class="musculos-linhas">
-                    {#each distribuicao(ex) as m (m.nome)}
-                      <span class="musculo-coluna">
-                        <span class="musculo-nome-mini">{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome}</span>
-                        <span class="musculo-linha-barra">
-                          <span class="musculo-barra-mini-wrap">
-                            <span class="musculo-barra-mini" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
-                          </span>
-                          <span class="musculo-pct-mini">{m.pct.toFixed(0)}%</span>
-                        </span>
-                      </span>
-                    {/each}
-                  </span>
-                {/if}
-              </span>
-              <span class="chevron">›</span>
-            </button>
+              <span class="conteudo-btn">{@render infoExercicio(ex)}</span>
+              <button
+                class="selecionar-btn"
+                onclick={() => selecionar(ex)}
+                disabled={selecionandoId === ex.id}
+                aria-label={`Adicionar ${ex.nome}`}
+              >
+                {@render iconMaisPeq()}
+              </button>
+            {:else}
+              <button
+                class="avatar-btn"
+                onclick={() => {
+                  const rotina = rotinaPorExercicio.get(ex.id);
+                  navigate(rotina ? `/treino/rotina/${rotina.id}/ver` : `/treino/exercicios/${ex.id}`);
+                }}
+                aria-label={rotinaPorExercicio.has(ex.id) ? `Ver rotina ${rotinaPorExercicio.get(ex.id)?.nome}` : ex.nome}
+              >
+                <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
+                  {#if rotinaPorExercicio.has(ex.id)}
+                    <span class="avatar-rotina-texto">{rotinaPorExercicio.get(ex.id)?.nome}</span>
+                  {:else}
+                    {iniciais(ex.nome)}
+                  {/if}
+                </span>
+              </button>
+              <button class="conteudo-btn" onclick={() => navigate(`/treino/exercicios/${ex.id}`)}>
+                {@render infoExercicio(ex)}
+                <span class="chevron">›</span>
+              </button>
+            {/if}
           </div>
         </li>
       {/each}
@@ -175,6 +243,18 @@
     padding-top: var(--space-4);
     padding-left: var(--space-4);
     padding-right: var(--space-4);
+  }
+  .container.modo-selecao {
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    background: var(--surface-bg);
+    overflow-y: auto;
+    padding-bottom: var(--space-4);
+  }
+  .header-spacer {
+    width: 36px;
+    flex-shrink: 0;
   }
   .header {
     display: flex;
@@ -354,6 +434,28 @@
   .chevron {
     color: var(--surface-muted);
     font-size: var(--font-size-lg);
+  }
+  .selecionar-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .selecionar-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .selecionar-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .muted {
     color: var(--surface-muted);

@@ -6,10 +6,10 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import PieChart from "../../components/PieChart.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
+  import Exercicios from "./Exercicios.svelte";
   import {
     listMusculos,
     listTreinos,
-    listExercicios,
     getTreino,
     getVolumeRealizadoBruto,
     getUltimoRegistro,
@@ -19,8 +19,6 @@
     atualizarOrdemTreinoExercicios,
     adicionarTreinoExercicio,
     trocarExercicioTreinoExercicio,
-    correspondeBusca,
-    textoBuscavelExercicio,
     DIAS_SEMANA_ABREV,
     abreviarMusculo,
     type Musculo,
@@ -31,7 +29,6 @@
   let aba = $state<"planejado" | "realizado">("planejado");
   let musculos = $state<Musculo[]>([]);
   let treinos = $state<TreinoComExercicios[]>([]);
-  let todosExercicios = $state<Exercicio[]>([]);
 
   let mesBase = $state(new Date());
   let linhasRealizadoMes = $state<{ data: string; musculo_id: string; series_equivalentes: number }[]>([]);
@@ -72,14 +69,9 @@
   }
 
   async function carregarBase() {
-    const [musculosCarregados, treinosCarregados, exerciciosCarregados] = await Promise.all([
-      listMusculos(),
-      listTreinos(),
-      listExercicios(),
-    ]);
+    const [musculosCarregados, treinosCarregados] = await Promise.all([listMusculos(), listTreinos()]);
     musculos = musculosCarregados;
     treinos = ordenarPorDia(treinosCarregados);
-    todosExercicios = exerciciosCarregados;
     void carregarHistoricoTodos(treinosCarregados);
     await carregarRealizado();
   }
@@ -706,8 +698,6 @@
   /** Item sendo trocado (o picker abre pra escolher o exercício que vai entrar no lugar dele). */
   let trocandoItemMusculo = $state<ItemMusculoRotina | null>(null);
   let mostrarPickerMusculo = $state(false);
-  let buscaPickerMusculo = $state("");
-  let adicionandoIdMusculo = $state<string | null>(null);
 
   function itensMusculoRotina(treino: TreinoComExercicios, musculoId: string): ItemMusculoRotina[] {
     return treino.exercicios
@@ -881,35 +871,22 @@
   function abrirTrocarExercicioMusculo(item: ItemMusculoRotina): void {
     if (!modalMusculoRotina) return;
     trocandoItemMusculo = item;
-    buscaPickerMusculo = modalMusculoRotina.musculo.nome;
     mostrarPickerMusculo = true;
     menuExercicioMusculo = null;
   }
-
-  const opcoesPickerMusculo = $derived(
-    todosExercicios.filter(
-      (e) =>
-        !modalMusculoRotina?.treino.exercicios.some((te) => te.exercicio_id === e.id) &&
-        correspondeBusca(textoBuscavelExercicio(e), buscaPickerMusculo),
-    ),
-  );
 
   async function trocarExercicioMusculo(ex: Exercicio): Promise<void> {
     if (!modalMusculoRotina || !trocandoItemMusculo) return;
     const treinoId = modalMusculoRotina.treino.id;
     const anterior = trocandoItemMusculo;
-    adicionandoIdMusculo = ex.id;
     try {
       await trocarExercicioTreinoExercicio(anterior.treinoExercicioId, ex.id);
       await refrescarTreinoMusculo(treinoId);
       mostrarPickerMusculo = false;
-      buscaPickerMusculo = "";
       trocandoItemMusculo = null;
       statusAjusteMusculo = { tipo: "ok", texto: `"${anterior.exercicioNome}" foi trocado por "${ex.nome}".` };
     } catch (e) {
       statusAjusteMusculo = { tipo: "erro", texto: "Erro ao trocar exercício: " + (e as Error).message };
-    } finally {
-      adicionandoIdMusculo = null;
     }
   }
 
@@ -919,8 +896,6 @@
   let editandoSerieEditor = $state<{ treinoExercicioId: string; exercicioNome: string; series: number } | null>(null);
   let salvandoEditor = $state(false);
   let mostrarPickerEditor = $state(false);
-  let buscaPickerEditor = $state("");
-  let adicionandoIdEditor = $state<string | null>(null);
   let arrastandoIdxEditor = $state<number | null>(null);
   let itemEditorRefs: (HTMLElement | null)[] = [];
 
@@ -1003,24 +978,16 @@
     };
   });
 
-  const opcoesPickerEditor = $derived(
-    todosExercicios.filter(
-      (e) => !modalEditorRotina?.exercicios.some((te) => te.exercicio_id === e.id) && correspondeBusca(textoBuscavelExercicio(e), buscaPickerEditor),
-    ),
-  );
-
   async function adicionarExercicioEditor(ex: Exercicio): Promise<void> {
     if (!modalEditorRotina) return;
     const treinoId = modalEditorRotina.id;
-    adicionandoIdEditor = ex.id;
     try {
       const anterior = await getUltimoRegistro(ex.id);
       await adicionarTreinoExercicio(treinoId, ex.id, 3, anterior);
       await refrescarTreinoEditor(treinoId);
       mostrarPickerEditor = false;
-      buscaPickerEditor = "";
-    } finally {
-      adicionandoIdEditor = null;
+    } catch (e) {
+      alert("Erro ao adicionar exercício: " + (e as Error).message);
     }
   }
 
@@ -1450,11 +1417,6 @@
     <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
   </svg>
 {/snippet}
-{#snippet iconMaisPeq()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-{/snippet}
 {#snippet iconGrade()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -1675,42 +1637,18 @@
   />
 {/if}
 
-{#if mostrarPickerMusculo}
-  <div class="tela-editor-rotina">
-    <div class="editor-conteudo">
-      <div class="header">
-        <button
-          class="back"
-          onclick={() => {
-            mostrarPickerMusculo = false;
-            buscaPickerMusculo = "";
-            trocandoItemMusculo = null;
-          }}
-          aria-label="Voltar"
-        >{@render iconVoltar()}</button>
-        <h1>Trocar Exercício</h1>
-        <span class="spacer"></span>
-      </div>
-      <input class="busca-editor" type="text" placeholder="Procurar exercício" bind:value={buscaPickerMusculo} />
-      <ul class="picker-lista-editor">
-        {#each opcoesPickerMusculo as ex (ex.id)}
-          <li>
-            <button
-              class="picker-item-editor picker-item-editor-trocar"
-              onclick={() => trocarExercicioMusculo(ex)}
-              disabled={adicionandoIdMusculo === ex.id}
-            >
-              <span class="picker-item-editor-nome">{ex.nome}</span>
-              <span class="picker-item-editor-mais" aria-hidden="true">{@render iconMaisPeq()}</span>
-            </button>
-          </li>
-        {/each}
-        {#if !opcoesPickerMusculo.length}
-          <li class="muted-item">Nenhum exercício encontrado.</li>
-        {/if}
-      </ul>
-    </div>
-  </div>
+{#if mostrarPickerMusculo && modalMusculoRotina}
+  <Exercicios
+    modoSelecao
+    tituloSelecao="Trocar Exercício"
+    buscaInicial={modalMusculoRotina.musculo.nome}
+    excluirIds={modalMusculoRotina.treino.exercicios.map((te) => te.exercicio_id)}
+    onSelecionar={(ex) => trocarExercicioMusculo(ex)}
+    onFechar={() => {
+      mostrarPickerMusculo = false;
+      trocandoItemMusculo = null;
+    }}
+  />
 {/if}
 
 {#if modalEditorRotina}
@@ -1769,36 +1707,14 @@
   </div>
 {/if}
 
-{#if mostrarPickerEditor}
-  <div class="tela-editor-rotina">
-    <div class="editor-conteudo">
-      <div class="header">
-        <button
-          class="back"
-          onclick={() => {
-            mostrarPickerEditor = false;
-            buscaPickerEditor = "";
-          }}
-          aria-label="Voltar"
-        >{@render iconVoltar()}</button>
-        <h1>Adicionar Exercício</h1>
-        <span class="spacer"></span>
-      </div>
-      <input class="busca-editor" type="text" placeholder="Procurar exercício" bind:value={buscaPickerEditor} />
-      <ul class="picker-lista-editor">
-        {#each opcoesPickerEditor as ex (ex.id)}
-          <li>
-            <button class="picker-item-editor" onclick={() => adicionarExercicioEditor(ex)} disabled={adicionandoIdEditor === ex.id}>
-              {ex.nome}
-            </button>
-          </li>
-        {/each}
-        {#if !opcoesPickerEditor.length}
-          <li class="muted-item">Nenhum exercício encontrado.</li>
-        {/if}
-      </ul>
-    </div>
-  </div>
+{#if mostrarPickerEditor && modalEditorRotina}
+  <Exercicios
+    modoSelecao
+    tituloSelecao="Adicionar Exercício"
+    excluirIds={modalEditorRotina.exercicios.map((te) => te.exercicio_id)}
+    onSelecionar={(ex) => adicionarExercicioEditor(ex)}
+    onFechar={() => (mostrarPickerEditor = false)}
+  />
 {/if}
 
 {#if editandoSerieEditor}
@@ -2455,68 +2371,5 @@
     font-size: var(--font-size-base);
     font-weight: 600;
     cursor: pointer;
-  }
-  .busca-editor {
-    box-sizing: border-box;
-    width: 100%;
-    padding: var(--space-3);
-    margin-bottom: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    font-family: inherit;
-  }
-  .picker-lista-editor {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .picker-item-editor {
-    width: 100%;
-    text-align: left;
-    padding: var(--space-3) 0;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--surface-border);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    cursor: pointer;
-  }
-  .picker-item-editor:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .picker-item-editor-trocar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-  }
-  .picker-item-editor-nome {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .picker-item-editor-mais {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: var(--surface-card);
-    color: var(--color-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .picker-item-editor-mais svg {
-    width: 14px;
-    height: 14px;
-  }
-  .muted-item {
-    color: var(--surface-muted);
-    font-size: var(--font-size-base);
   }
 </style>
