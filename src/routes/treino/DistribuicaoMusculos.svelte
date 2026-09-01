@@ -91,6 +91,27 @@
     return mapa;
   }
 
+  /** Modo alternativo dos anéis de dominância: soma total de séries por GRUPO muscular
+   * (agrupamento_id — Ombro junta Deltoide Anterior/Lateral/Posterior, Costas junta
+   * Superiores/Latíssimo etc.), cru (mesma contagem de contarSeriesPorMusculo, sem
+   * ponderar por peso_contribuicao) e sem separar por posição/fadiga — só quantidade. Um
+   * músculo sem agrupamento cadastrado fica sozinho no próprio grupo. */
+  function itensGrupoRaw(treinosLista: TreinoComExercicios[]): { nome: string; valor: number }[] {
+    const porGrupo = new Map<string, { nome: string; valor: number }>();
+    for (const t of treinosLista) {
+      const mapaRaw = contarSeriesPorMusculo(t);
+      for (const m of musculos) {
+        const valor = mapaRaw.get(m.id) ?? 0;
+        if (valor <= 0) continue;
+        const chave = m.agrupamento_id ?? `solo:${m.id}`;
+        const atual = porGrupo.get(chave) ?? { nome: m.agrupamento?.nome ?? m.nome, valor: 0 };
+        atual.valor += valor;
+        porGrupo.set(chave, atual);
+      }
+    }
+    return Array.from(porGrupo.values()).sort((a, b) => b.valor - a.valor);
+  }
+
   /** Modo de contribuição: cada série soma peso_contribuicao (0.25 a 1) pra cada músculo que
    * trabalha — igual à Distribuição Semanal — em vez de contar a série inteira pra todo mundo.
    * Um músculo secundário (ex: tríceps no supino, peso 0.25) aparece proporcional ao quanto ele
@@ -1081,6 +1102,7 @@
       totaisSemanais.series,
       "séries",
       coresAbcAcumulado(distribuicaoSemanal),
+      itensGrupoRaw(treinos),
     );
   }
 
@@ -1098,7 +1120,13 @@
     centroValor?: number;
     centroLabel?: string;
     cores?: string[];
+    itensGrupo?: { nome: string; valor: number }[];
   } | null>(null);
+
+  /** Alterna entre o anel por músculo individual (dominância, cores A/B/C) e o anel por
+   * grupo muscular (Ombro, Costas etc. — soma bruta, uma cor por grupo). Reseta pro modo
+   * padrão sempre que um anel novo é aberto. */
+  let modoGrupoDetalhe = $state(false);
 
   function abrirDetalheRotina(
     titulo: string,
@@ -1106,8 +1134,10 @@
     centroValor?: number,
     centroLabel?: string,
     cores?: string[],
+    itensGrupo?: { nome: string; valor: number }[],
   ): void {
-    modalDetalheRotina = { titulo, itens, centroValor, centroLabel, cores };
+    modalDetalheRotina = { titulo, itens, centroValor, centroLabel, cores, itensGrupo };
+    modoGrupoDetalhe = false;
   }
 
   /** Cor de cada fatia pela faixa ABC do percentual acumulado (itens já precisam vir
@@ -1150,7 +1180,7 @@
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    abrirDetalheRotina(treino.nome_treino, itens, totalSeries, "séries", coresAbcAcumulado(itens));
+    abrirDetalheRotina(treino.nome_treino, itens, totalSeries, "séries", coresAbcAcumulado(itens), itensGrupoRaw([treino]));
   }
 </script>
 
@@ -1440,6 +1470,24 @@
   <button class="grade-voltar" onclick={() => (mostrarGradeSemanal = false)} aria-label="Voltar">{@render iconVoltar()}</button>
 {/snippet}
 
+{#snippet iconAlternarGrupo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 3l4 4-4 4" />
+    <path d="M21 7H7a4 4 0 0 0-4 4v1" />
+    <path d="M7 21l-4-4 4-4" />
+    <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
+  </svg>
+{/snippet}
+
+{#snippet alternarModoDetalhe()}
+  <button
+    class="link-distribuicao"
+    class:ativo={modoGrupoDetalhe}
+    onclick={() => (modoGrupoDetalhe = !modoGrupoDetalhe)}
+    aria-label={modoGrupoDetalhe ? "Ver por músculo" : "Ver por grupo muscular"}
+  >{@render iconAlternarGrupo()}</button>
+{/snippet}
+
 {#if modalAberto}
   <ActionSheet
     titulo={modalAberto.titulo}
@@ -1536,14 +1584,26 @@
 {/if}
 
 {#if modalDetalheRotina}
-  <Sheet titulo={modalDetalheRotina.titulo} onFechar={() => (modalDetalheRotina = null)}>
+  <Sheet
+    titulo={modalDetalheRotina.titulo}
+    onFechar={() => (modalDetalheRotina = null)}
+    acaoTitulo={modalDetalheRotina.itensGrupo?.length ? alternarModoDetalhe : undefined}
+  >
     <div class="pizza-wrap">
-      <PieChart
-        dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
-        cores={modalDetalheRotina.cores}
-        centroValor={modalDetalheRotina.centroValor}
-        centroLabel={modalDetalheRotina.centroLabel}
-      />
+      {#if modoGrupoDetalhe && modalDetalheRotina.itensGrupo}
+        <PieChart
+          dados={modalDetalheRotina.itensGrupo.map((i) => ({ nome: i.nome, valor: i.valor }))}
+          centroValor={modalDetalheRotina.centroValor}
+          centroLabel={modalDetalheRotina.centroLabel}
+        />
+      {:else}
+        <PieChart
+          dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
+          cores={modalDetalheRotina.cores}
+          centroValor={modalDetalheRotina.centroValor}
+          centroLabel={modalDetalheRotina.centroLabel}
+        />
+      {/if}
     </div>
   </Sheet>
 {/if}
@@ -2017,6 +2077,11 @@
   .link-distribuicao svg {
     width: 20px;
     height: 20px;
+  }
+  .link-distribuicao.ativo {
+    color: var(--color-primary-fg);
+    background: var(--color-primary);
+    border-radius: 50%;
   }
   .grade-voltar {
     background: none;
