@@ -57,7 +57,7 @@
 
   void carregarBase();
 
-  /** 1 série conta 1 para cada músculo trabalhado no exercício, sem ponderar por papel/peso (visão da sessão, não semanal). */
+  /** 1 série conta 1 para cada músculo trabalhado no exercício, sem ponderar por papel/peso — usado só na grade semanal (quantidade por dia), que fica de fora do modo de contribuição de propósito. */
   function contarSeriesPorMusculo(treino: TreinoComExercicios): Map<string, number> {
     const mapa = new Map<string, number>();
     for (const ex of treino.exercicios) {
@@ -68,6 +68,29 @@
       }
     }
     return mapa;
+  }
+
+  /** Modo de contribuição: cada série soma peso_contribuicao (0.25 a 1) pra cada músculo que
+   * trabalha — igual à Distribuição Semanal — em vez de contar a série inteira pra todo mundo.
+   * Um músculo secundário (ex: tríceps no supino, peso 0.25) aparece proporcional ao quanto ele
+   * realmente participa, não como se tivesse recebido o mesmo estímulo do músculo primário. Sem
+   * normalizar pra somar 1 (o primário mantém quase o valor cheio); a soma por músculo pode ficar
+   * abaixo do total de séries da rotina, mas não mais inflada como na contagem bruta. */
+  function contarSeriesPorMusculoPonderado(treino: TreinoComExercicios): Map<string, number> {
+    const mapa = new Map<string, number>();
+    for (const ex of treino.exercicios) {
+      const numSeries = ex.series.length;
+      if (!numSeries) continue;
+      for (const m of ex.exercicio?.musculos ?? []) {
+        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + numSeries * m.peso_contribuicao);
+      }
+    }
+    return mapa;
+  }
+
+  /** Números do modo de contribuição costumam vir com decimais (0.25, 4.5...) — mostra inteiro quando cai redondo, senão 1 casa. */
+  function formatValor(valor: number): string {
+    return Number.isInteger(valor) ? String(valor) : valor.toFixed(1);
   }
 
   /**
@@ -116,8 +139,9 @@
    * Classifica cada série da rotina pela POSIÇÃO no treino (não pelo músculo) — a fadiga
    * acumula ao longo do treino, então uma série no início vale mais que uma no fim. Usa a
    * mesma regra 80/20 (corPorFaixa) sobre o percentual acumulado de séries já feitas na
-   * ordem dos exercícios. Contagem bruta (1 série conta 1 pra cada músculo que ela
-   * trabalha), igual contarSeriesPorMusculo — sem dividir por peso_contribuicao.
+   * ordem dos exercícios. Modo de contribuição: cada série soma peso_contribuicao (não 1
+   * inteiro) pra cada músculo que ela trabalha, igual contarSeriesPorMusculoPonderado — as
+   * partes de cada músculo somam o mesmo total ponderado dele.
    */
   function contarSeriesPorFaixaDePosicao(treino: TreinoComExercicios): Map<string, Partes> {
     const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
@@ -133,9 +157,9 @@
         const cor = corPorFaixa((posicao / totalSeries) * 100);
         for (const m of musculosEx) {
           const atual = mapa.get(m.musculo_id) ?? partesVazias();
-          if (cor === CORES_FAIXA.a) atual.a += 1;
-          else if (cor === CORES_FAIXA.b) atual.b += 1;
-          else atual.c += 1;
+          if (cor === CORES_FAIXA.a) atual.a += m.peso_contribuicao;
+          else if (cor === CORES_FAIXA.b) atual.b += m.peso_contribuicao;
+          else atual.c += m.peso_contribuicao;
           mapa.set(m.musculo_id, atual);
         }
       }
@@ -145,11 +169,11 @@
 
   /**
    * Distribuição estática de cada rotina (sem acompanhamento ao vivo — isso fica só no
-   * card semanal). Contagem bruta: 1 série conta 1 pra cada músculo que o exercício
-   * trabalha (mesma regra do gráfico/anel) — sem dividir por peso_contribuicao, então a
-   * soma pode passar do total de séries da rotina quando um exercício trabalha vários
-   * músculos. A barra é dividida nas faixas A/B/C por POSIÇÃO no treino
-   * (contarSeriesPorFaixaDePosicao) — não pela dominância do músculo.
+   * card semanal). Modo de contribuição: cada série soma peso_contribuicao pra cada
+   * músculo que o exercício trabalha (mesma regra do gráfico/anel), não a série inteira —
+   * um músculo secundário aparece proporcional ao quanto participa, não como se tivesse
+   * o mesmo estímulo do primário. A barra é dividida nas faixas A/B/C por POSIÇÃO no
+   * treino (contarSeriesPorFaixaDePosicao) — não pela dominância do músculo.
    */
   interface LinhaRotina {
     chave: string;
@@ -164,7 +188,7 @@
   const distribuicaoPorTreino = $derived.by(() => {
     return treinos.map((t) => {
       const totalSeries = t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-      const mapaValor = contarSeriesPorMusculo(t);
+      const mapaValor = contarSeriesPorMusculoPonderado(t);
       const mapaFaixaPosicao = contarSeriesPorFaixaDePosicao(t);
       const bruto = musculos
         .map((m) => ({
@@ -799,7 +823,7 @@
                         <span class="barra-pct">{linha.pct.toFixed(0)}%</span>
                       </div>
                     </div>
-                    <span class="valor">{linha.valor}</span>
+                    <span class="valor">{formatValor(linha.valor)}</span>
                   </div>
                   {#if aberto && linha.subItens}
                     {#each linha.subItens as sub (sub.musculo.id)}
@@ -819,7 +843,7 @@
                             </div>
                           </div>
                         </div>
-                        <span class="valor">{sub.valor}</span>
+                        <span class="valor">{formatValor(sub.valor)}</span>
                       </div>
                     {/each}
                   {/if}
