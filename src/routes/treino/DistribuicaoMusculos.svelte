@@ -311,6 +311,16 @@
     treinosOrdenadosPorFadiga = copia;
   }
 
+  /** Cards de rotina começam ocultos (só o cabeçalho) — tocar no cabeçalho expande/recolhe. */
+  let treinosExpandidos = $state<Set<string>>(new Set());
+
+  function alternarExpandidoTreino(treinoId: string): void {
+    const copia = new Set(treinosExpandidos);
+    if (copia.has(treinoId)) copia.delete(treinoId);
+    else copia.add(treinoId);
+    treinosExpandidos = copia;
+  }
+
   /** Média ponderada da faixa de fadiga (A=0, B=1, C=2) das séries do músculo — quanto menor,
    * mais séries dele caíram no início do treino (menos fadiga acumulada, melhor estímulo). */
   function scoreFadiga(linha: { valor: number; partes: Partes }): number {
@@ -1627,74 +1637,93 @@
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
           {@const porFadiga = treinosOrdenadosPorFadiga.has(treino.id)}
           {@const listaExibida = porFadiga ? ordenarPorMelhorEstimulo(lista) : lista}
+          {@const expandido = treinosExpandidos.has(treino.id)}
           <div class="rotina-card">
-            <div class="rotina-cabecalho">
-              <h2 class="rotina-nome">
-                <button
-                  class="rotina-nome-btn"
-                  class:ativo={porFadiga}
-                  onclick={() => alternarOrdemFadiga(treino.id)}
-                >{treino.nome_treino}</button>
-              </h2>
+            <div
+              class="rotina-cabecalho-clicavel"
+              class:colapsado={!expandido}
+              role="button"
+              tabindex="0"
+              onclick={() => alternarExpandidoTreino(treino.id)}
+              onkeydown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  alternarExpandidoTreino(treino.id);
+                }
+              }}
+            >
+              <h2 class="rotina-nome">{treino.nome_treino}</h2>
               {#if treino.dia_semana != null}
                 <span class="dia-tag">{DIAS_SEMANA_ABREV[treino.dia_semana]}</span>
               {/if}
+              <button
+                class="ordenar-fadiga-btn"
+                class:ativo={porFadiga}
+                onclick={(e) => {
+                  e.stopPropagation();
+                  alternarOrdemFadiga(treino.id);
+                }}
+                aria-label="Ordenar por fadiga"
+              >{@render iconOrdenarFadiga()}</button>
+              <span class="chevron-rotina" class:aberto={expandido}>›</span>
             </div>
-            {#if !lista.length}
-              <p class="muted">Nenhuma série definida ainda.</p>
-            {:else}
-              <div class="lista">
-                {#each listaExibida as linha (linha.chave)}
-                  {@const grupoChave = `${treino.id}:${linha.chave}`}
-                  {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
-                  {@const musculoIds = linha.musculo ? [linha.musculo.id] : (linha.subItens ?? []).map((s) => s.musculo.id)}
-                  {@const tend = tendenciaParaMusculos([treino], musculoIds)}
-                  <div class="item">
-                    {#if linha.subItens}
-                      <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
-                        <span class="nome-grupo-texto">{linha.nome}</span>
-                        <span class="chevron-grupo" class:aberto>›</span>
-                      </button>
-                    {:else}
-                      <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
+            {#if expandido}
+              {#if !lista.length}
+                <p class="muted">Nenhuma série definida ainda.</p>
+              {:else}
+                <div class="lista">
+                  {#each listaExibida as linha (linha.chave)}
+                    {@const grupoChave = `${treino.id}:${linha.chave}`}
+                    {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
+                    {@const musculoIds = linha.musculo ? [linha.musculo.id] : (linha.subItens ?? []).map((s) => s.musculo.id)}
+                    {@const tend = tendenciaParaMusculos([treino], musculoIds)}
+                    <div class="item">
+                      {#if linha.subItens}
+                        <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
+                          <span class="nome-grupo-texto">{linha.nome}</span>
+                          <span class="chevron-grupo" class:aberto>›</span>
+                        </button>
+                      {:else}
+                        <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
+                      {/if}
+                      {@render barraFadiga(linha.partes, linha.valor)}
+                      <span
+                        class="valor"
+                        class:valor-subindo={tend === "subindo"}
+                        class:valor-estavel={tend === "estavel"}
+                        class:valor-caindo={tend === "caindo"}
+                      >{formatValor(porFadiga ? valorEfetivoFadiga(linha.partes) : linha.valor)}</span>
+                    </div>
+                    {#if aberto && linha.subItens}
+                      {#each linha.subItens as sub (sub.musculo.id)}
+                        {@const tendSub = tendenciaParaMusculos([treino], [sub.musculo.id])}
+                        <div class="item item-sub">
+                          <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
+                          {@render barraFadiga(sub.partes, sub.valor)}
+                          <span
+                            class="valor"
+                            class:valor-subindo={tendSub === "subindo"}
+                            class:valor-estavel={tendSub === "estavel"}
+                            class:valor-caindo={tendSub === "caindo"}
+                          >{formatValor(porFadiga ? valorEfetivoFadiga(sub.partes) : sub.valor)}</span>
+                        </div>
+                      {/each}
                     {/if}
-                    {@render barraFadiga(linha.partes, linha.valor)}
-                    <span
-                      class="valor"
-                      class:valor-subindo={tend === "subindo"}
-                      class:valor-estavel={tend === "estavel"}
-                      class:valor-caindo={tend === "caindo"}
-                    >{formatValor(porFadiga ? valorEfetivoFadiga(linha.partes) : linha.valor)}</span>
-                  </div>
-                  {#if aberto && linha.subItens}
-                    {#each linha.subItens as sub (sub.musculo.id)}
-                      {@const tendSub = tendenciaParaMusculos([treino], [sub.musculo.id])}
-                      <div class="item item-sub">
-                        <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
-                        {@render barraFadiga(sub.partes, sub.valor)}
-                        <span
-                          class="valor"
-                          class:valor-subindo={tendSub === "subindo"}
-                          class:valor-estavel={tendSub === "estavel"}
-                          class:valor-caindo={tendSub === "caindo"}
-                        >{formatValor(porFadiga ? valorEfetivoFadiga(sub.partes) : sub.valor)}</span>
-                      </div>
-                    {/each}
-                  {/if}
-                {/each}
+                  {/each}
+                </div>
+              {/if}
+              <div class="rotina-rodape">
+                <button class="rotina-totais-texto" onclick={() => abrirEditorRotina(treino)}>
+                  {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
+                    (acc, ex) => acc + ex.series.length,
+                    0,
+                  )} séries
+                </button>
+                <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino)} aria-label="Ver anel por dominância">
+                  {@render iconGrafico()}
+                </button>
               </div>
             {/if}
-            <div class="rotina-rodape">
-              <button class="rotina-totais-texto" onclick={() => abrirEditorRotina(treino)}>
-                {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
-                  (acc, ex) => acc + ex.series.length,
-                  0,
-                )} séries
-              </button>
-              <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino)} aria-label="Ver anel por dominância">
-                {@render iconGrafico()}
-              </button>
-            </div>
           </div>
         {/each}
       </div>
@@ -1766,6 +1795,13 @@
   {/if}
 </div>
 
+{#snippet iconOrdenarFadiga()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="4" y1="19" x2="4" y2="13" />
+    <line x1="12" y1="19" x2="12" y2="9" />
+    <line x1="20" y1="19" x2="20" y2="5" />
+  </svg>
+{/snippet}
 {#snippet iconGrafico()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
@@ -2518,6 +2554,59 @@
   }
   .rotina-cabecalho .rotina-nome {
     flex: 1;
+  }
+  /* Cabeçalho dos cards de rotina (não o Semanal): sangra até a borda do card (compensa o
+     padding dele com margem negativa) e fica com o fundo padrão de card — vira o único conteúdo
+     visível quando recolhido, com cantos arredondados nos 4 lados; expandido, só os de cima. */
+  .rotina-cabecalho-clicavel {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-3);
+    padding: var(--space-4);
+    background: var(--surface-card);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    cursor: pointer;
+  }
+  .rotina-cabecalho-clicavel.colapsado {
+    margin-bottom: calc(-1 * var(--space-4));
+    border-radius: var(--radius-lg);
+  }
+  .rotina-cabecalho-clicavel .rotina-nome {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ordenar-fadiga-btn {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: var(--surface-muted);
+    padding: 0;
+    cursor: pointer;
+  }
+  .ordenar-fadiga-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  .ordenar-fadiga-btn.ativo {
+    color: var(--color-primary);
+  }
+  .chevron-rotina {
+    flex-shrink: 0;
+    display: inline-block;
+    color: var(--surface-muted);
+    transition: transform 0.15s;
+  }
+  .chevron-rotina.aberto {
+    transform: rotate(90deg);
   }
   .rotina-nome {
     font-size: var(--font-size-base);
