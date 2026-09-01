@@ -160,6 +160,9 @@
           {/if}
         </div>
       {/each}
+      <button class="iniciar-rotina-btn" onclick={() => navigate(`/treino/log/${treino!.id}`)}>
+        {@render iconIniciar()} Iniciar Rotina
+      </button>
     {/if}
   {/if}
 </div>
@@ -169,11 +172,10 @@
     onFechar={() => (menuAberto = false)}
     opcoes={[
       { label: "Editar", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${treino!.id}`) },
-      { label: "Iniciar", icon: iconIniciar, onSelect: () => navigate(`/treino/log/${treino!.id}`) },
       {
         label: "Distribuição",
         icon: iconDistribuicao,
-        onSelect: () => navigate(`/treino/distribuicao/rotina/${treino!.id}/grafico`),
+        onSelect: () => navigate(`/treino/distribuicao/rotina/${treino!.id}/editor`),
       },
       { label: "Duplicar", icon: iconDuplicar, onSelect: duplicar },
       { label: "Remover", icon: iconExcluir, destructive: true, onSelect: () => (confirmandoExclusao = true) },
@@ -318,5 +320,26 @@
   }
   .muted {
     color: var(--surface-muted);
+  }
+  .iniciar-rotina-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    width: 100%;
+    margin-top: var(--space-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .iniciar-rotina-btn :global(svg) {
+    width: 18px;
+    height: 18px;
   }
 </style>
