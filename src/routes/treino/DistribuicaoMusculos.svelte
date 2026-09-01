@@ -1322,7 +1322,7 @@
         {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
           <div class="editor-item" class:arrastando={arrastandoIdxEditor === idx} bind:this={itemEditorRefs[idx]}>
             <button class="remover-circulo" onclick={() => removerExercicioEditor(te.id)} aria-label="Remover">−</button>
-            <span class="editor-nome">{te.exercicio?.nome ?? ""}</span>
+            <button class="editor-nome" onclick={() => navigate(`/treino/exercicios/${te.exercicio_id}`)}>{te.exercicio?.nome ?? ""}</button>
             <button
               class="exercicio-musculo-series"
               onclick={() =>
@@ -1812,6 +1812,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+    cursor: pointer;
   }
   .remover-circulo {
     width: 24px;
