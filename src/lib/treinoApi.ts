@@ -118,11 +118,16 @@ function uid(): string {
   return id;
 }
 
-/** Busca "AND de termos": cada palavra digitada precisa aparecer em algum lugar do texto, em qualquer ordem. */
+/** Remove acentos ("á" -> "a", "ç" -> "c" etc.) pra busca não depender de digitar acento certo. */
+function semAcento(texto: string): string {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/** Busca "AND de termos": cada palavra digitada precisa aparecer em algum lugar do texto, em qualquer ordem — sem diferenciar maiúscula/minúscula nem acento. */
 export function correspondeBusca(texto: string, busca: string): boolean {
-  const termos = busca.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const termos = semAcento(busca.trim().toLowerCase()).split(/\s+/).filter(Boolean);
   if (!termos.length) return true;
-  const textoLower = texto.toLowerCase();
+  const textoLower = semAcento(texto.toLowerCase());
   return termos.every((t) => textoLower.includes(t));
 }
 
