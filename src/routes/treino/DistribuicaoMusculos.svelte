@@ -261,6 +261,30 @@
     });
   });
 
+  /** Rotinas cujo card está ordenado por fadiga (clicou no nome) em vez de quantidade de séries. */
+  let treinosOrdenadosPorFadiga = $state<Set<string>>(new Set());
+
+  function alternarOrdemFadiga(treinoId: string): void {
+    const copia = new Set(treinosOrdenadosPorFadiga);
+    if (copia.has(treinoId)) copia.delete(treinoId);
+    else copia.add(treinoId);
+    treinosOrdenadosPorFadiga = copia;
+  }
+
+  /** Média ponderada da faixa de fadiga (A=0, B=1, C=2) das séries do músculo — quanto menor,
+   * mais séries dele caíram no início do treino (menos fadiga acumulada, melhor estímulo). */
+  function scoreFadiga(linha: { valor: number; partes: Partes }): number {
+    return linha.valor > 0 ? (linha.partes.b + linha.partes.c * 2) / linha.valor : 0;
+  }
+
+  function ordenarPorMelhorEstimulo<T extends { valor: number; partes: Partes; subItens: { valor: number; partes: Partes }[] | null }>(
+    lista: T[],
+  ): T[] {
+    return lista
+      .map((item) => (item.subItens ? { ...item, subItens: item.subItens.slice().sort((a, b) => scoreFadiga(a) - scoreFadiga(b)) } : item))
+      .sort((a, b) => scoreFadiga(a) - scoreFadiga(b));
+  }
+
   /**
    * Séries já marcadas como concluídas na sessão ao vivo (treinoLogSessao), contadas por músculo.
    * ponderado=true usa o peso_contribuicao (pra somar junto com o card semanal, que é ponderado);
@@ -974,9 +998,17 @@
         </div>
 
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
+          {@const porFadiga = treinosOrdenadosPorFadiga.has(treino.id)}
+          {@const listaExibida = porFadiga ? ordenarPorMelhorEstimulo(lista) : lista}
           <div class="rotina-card">
             <div class="rotina-cabecalho">
-              <h2 class="rotina-nome">{treino.nome_treino}</h2>
+              <h2 class="rotina-nome">
+                <button
+                  class="rotina-nome-btn"
+                  class:ativo={porFadiga}
+                  onclick={() => alternarOrdemFadiga(treino.id)}
+                >{treino.nome_treino}</button>
+              </h2>
               {#if treino.dia_semana != null}
                 <span class="dia-tag">{DIAS_SEMANA_ABREV[treino.dia_semana]}</span>
               {/if}
@@ -985,7 +1017,7 @@
               <p class="muted">Nenhuma série definida ainda.</p>
             {:else}
               <div class="lista">
-                {#each lista as linha (linha.chave)}
+                {#each listaExibida as linha (linha.chave)}
                   {@const grupoChave = `${treino.id}:${linha.chave}`}
                   {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
                   <div class="item">
@@ -1436,6 +1468,22 @@
   .rotina-nome {
     font-size: var(--font-size-base);
     margin: 0;
+  }
+  .rotina-nome-btn {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .rotina-nome-btn.ativo {
+    color: var(--color-primary);
   }
   .dia-tag {
     font-size: 11px;
