@@ -129,8 +129,15 @@
 
   /** Números do modo de contribuição costumam vir com decimais (0.25, 4.3...) — arredonda pro
    * 0.5 mais próximo pra não mostrar frações estranhas tipo 0.3, e mostra inteiro quando cai redondo. */
+  /** Arredonda pro 0.5 mais próximo — usado tanto pro texto (formatValor) quanto pro cálculo da
+   * largura das barras da Distribuição Semanal, pra dois valores que mostram o mesmo número
+   * exibido (ex: os dois "6" arredondados de 5.8 e 6.2) renderizarem a MESMA largura de barra. */
+  function arredondarValor(valor: number): number {
+    return Math.round(valor * 2) / 2;
+  }
+
   function formatValor(valor: number): string {
-    const arred = Math.round(valor * 2) / 2;
+    const arred = arredondarValor(valor);
     return Number.isInteger(arred) ? String(arred) : arred.toFixed(1);
   }
 
@@ -500,10 +507,11 @@
     return linhas.sort((a, b) => b.valor - a.valor);
   });
 
-  /** Maior valor entre as linhas da Distribuição Semanal — usado pra escalar o comprimento da
-   * barra na visualização padrão (cor única, proporcional ao volume), diferente da visualização
-   * por fadiga (largura cheia, dividida nas faixas A/B/C). */
-  const maxValorSemanal = $derived(Math.max(1, ...linhasSemanal.map((l) => l.valor)));
+  /** Soma dos valores (já arredondados pro 0.5, mesmo arredondamento do número exibido) entre as
+   * linhas da Distribuição Semanal — usado pra escalar o comprimento da barra na visualização
+   * padrão como percentual do TOTAL da semana (nenhum músculo sozinho enche 100%), diferente da
+   * visualização por fadiga (largura cheia, dividida nas faixas A/B/C). */
+  const totalValorSemanal = $derived(Math.max(1, linhasSemanal.reduce((acc, l) => acc + arredondarValor(l.valor), 0)));
 
   const MESES = [
     "Janeiro",
@@ -1368,7 +1376,7 @@
   </div>
 {/snippet}
 
-{#snippet barraSemanal(partes: Partes, valor: number, maxValor: number)}
+{#snippet barraSemanal(partes: Partes, valor: number, totalValor: number)}
   <div class="barra-wrap-fadiga">
     <div class="barra-segmentos">
       {#if semanalOrdenadaPorEfetivo}
@@ -1379,7 +1387,8 @@
           {/if}
         {/each}
       {:else}
-        <div class="barra-seg" style={`width: ${maxValor > 0 ? (valor / maxValor) * 100 : 0}%; background: var(--color-primary);`}></div>
+        {@const valorArred = arredondarValor(valor)}
+        <div class="barra-seg" style={`width: ${totalValor > 0 ? (valorArred / totalValor) * 100 : 0}%; background: var(--color-primary);`}></div>
       {/if}
     </div>
   </div>
@@ -1429,7 +1438,7 @@
                   {:else}
                     <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(treinos, linha.musculo)}>{linha.nome}</button>
                   {/if}
-                  {@render barraSemanal(linha.partes, linha.valor, maxValorSemanal)}
+                  {@render barraSemanal(linha.partes, linha.valor, totalValorSemanal)}
                   <span
                     class="valor"
                     class:valor-subindo={tend === "subindo"}
@@ -1442,7 +1451,7 @@
                     {@const tendSub = tendenciaParaMusculos(treinos, [sub.musculo.id])}
                     <div class="item item-sub">
                       <button class="nome-btn" onclick={() => abrirExercicios(treinos, sub.musculo)}>{sub.musculo.nome}</button>
-                      {@render barraSemanal(sub.partes, sub.valor, maxValorSemanal)}
+                      {@render barraSemanal(sub.partes, sub.valor, totalValorSemanal)}
                       <span
                         class="valor"
                         class:valor-subindo={tendSub === "subindo"}
