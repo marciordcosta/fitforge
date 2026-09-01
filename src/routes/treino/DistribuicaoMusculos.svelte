@@ -13,6 +13,7 @@
     getTreino,
     getVolumeRealizadoBruto,
     getUltimoRegistro,
+    getHistoricoExercicio,
     updateSeriesCountTreinoExercicio,
     removerTreinoExercicio,
     atualizarOrdemTreinoExercicios,
@@ -670,6 +671,80 @@
 
   function definirModalMusculo(treino: TreinoComExercicios, musculo: Musculo): void {
     modalMusculoRotina = { treino, musculo, itens: itensMusculoRotina(treino, musculo.id) };
+  }
+
+  // ---------------- Tendência de progressão do músculo (1RM médio das últimas sessões) ----------------
+
+  interface TendenciaMusculo {
+    status: "subindo" | "estavel" | "caindo";
+    delta: number;
+  }
+
+  let tendenciaMusculo = $state<TendenciaMusculo | null>(null);
+  let carregandoTendencia = $state(false);
+  let musculoIdTendenciaCarregada = $state<string | null>(null);
+
+  /** Variação % do 1RM médio das últimas 3 sessões vs as 3 anteriores a essas — null se não há
+   * histórico suficiente pra comparar. */
+  function variacaoExercicio(pontos: { melhor1rm: number }[]): number | null {
+    const N = 3;
+    if (pontos.length < N + 2) return null;
+    const recentes = pontos.slice(-N);
+    const anteriores = pontos.slice(-2 * N, -N);
+    if (anteriores.length < 2) return null;
+    const mediaRecente = recentes.reduce((acc, p) => acc + p.melhor1rm, 0) / recentes.length;
+    const mediaAnterior = anteriores.reduce((acc, p) => acc + p.melhor1rm, 0) / anteriores.length;
+    if (mediaAnterior <= 0) return null;
+    return (mediaRecente - mediaAnterior) / mediaAnterior;
+  }
+
+  /** Tendência do músculo = média da variação de 1RM de cada exercício que o trabalha (nessa
+   * rotina). Caindo sugere reduzir séries, estável sugere tentar aumentar (pra sair do platô),
+   * subindo sugere manter (já está funcionando). */
+  async function carregarTendenciaMusculo(itens: ItemMusculoRotina[]): Promise<void> {
+    carregandoTendencia = true;
+    tendenciaMusculo = null;
+    try {
+      const variacoes: number[] = [];
+      for (const item of itens) {
+        const pontos = await getHistoricoExercicio(item.exercicioId);
+        const v = variacaoExercicio(pontos);
+        if (v != null) variacoes.push(v);
+      }
+      if (!variacoes.length) return;
+      const media = variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
+      if (media > 0.02) tendenciaMusculo = { status: "subindo", delta: 0 };
+      else if (media < -0.02) tendenciaMusculo = { status: "caindo", delta: -1 };
+      else tendenciaMusculo = { status: "estavel", delta: 1 };
+    } finally {
+      carregandoTendencia = false;
+    }
+  }
+
+  /** Carrega a tendência só quando o músculo aberto muda (não a cada ajuste de série). */
+  $effect(() => {
+    const musculo = modalMusculoRotina?.musculo;
+    const itens = modalMusculoRotina?.itens;
+    if (!musculo || !itens) {
+      musculoIdTendenciaCarregada = null;
+      return;
+    }
+    if (musculoIdTendenciaCarregada === musculo.id) return;
+    musculoIdTendenciaCarregada = musculo.id;
+    void carregarTendenciaMusculo(itens);
+  });
+
+  const TEXTO_TENDENCIA = {
+    subindo: "Tendência de alta — manter ou aumentar as séries pode ser uma boa escolha.",
+    estavel: "Tendência estável — aumentar as séries pode ajudar a sair do platô.",
+    caindo: "Tendência de queda — considere reduzir o volume desse músculo.",
+  };
+
+  /** Abre a roleta de séries já pré-posicionada na sugestão da tendência (o usuário ainda precisa confirmar). */
+  function abrirSerieComSugestao(item: ItemMusculoRotina): void {
+    const delta = tendenciaMusculo?.delta ?? 0;
+    const sugerido = Math.max(1, Math.min(10, item.series + delta));
+    editandoSerieItem = { ...item, series: sugerido };
   }
 
   /** Exercícios dessa rotina específica que trabalham o músculo, com o número de séries editável
@@ -1372,6 +1447,11 @@
       if (musculoUrlContexto) window.history.back();
     }}
   >
+    {#if carregandoTendencia}
+      <p class="tendencia-musculo muted">Verificando progressão…</p>
+    {:else if tendenciaMusculo}
+      <p class="tendencia-musculo tendencia-{tendenciaMusculo.status}">{TEXTO_TENDENCIA[tendenciaMusculo.status]}</p>
+    {/if}
     {#if !modalMusculoRotina.itens.length}
       <p class="muted">Nenhum exercício encontrado.</p>
     {:else}
@@ -1384,7 +1464,7 @@
               aria-label="Remover"
             >−</button>
             <button class="exercicio-musculo-nome" onclick={() => navigate(`/treino/exercicios/${item.exercicioId}`)}>{item.exercicioNome}</button>
-            <button class="exercicio-musculo-series" onclick={() => (editandoSerieItem = item)}>
+            <button class="exercicio-musculo-series" onclick={() => abrirSerieComSugestao(item)}>
               {item.series} {item.series === 1 ? "série" : "séries"}
             </button>
           </div>
@@ -1874,6 +1954,22 @@
     aspect-ratio: 1;
     overflow: hidden;
     margin: var(--space-2) auto 0;
+  }
+  .tendencia-musculo {
+    margin: 0 0 var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    font-size: var(--font-size-sm);
+  }
+  .tendencia-subindo {
+    color: var(--color-success);
+  }
+  .tendencia-estavel {
+    color: var(--color-neutral);
+  }
+  .tendencia-caindo {
+    color: var(--color-negative);
   }
   .lista-exercicios-musculo {
     display: flex;
