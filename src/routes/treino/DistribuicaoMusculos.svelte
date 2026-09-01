@@ -3171,9 +3171,6 @@
   .editor-meta-chip-ativo .editor-meta-valor {
     color: var(--color-primary-fg);
   }
-  .editor-item-oculto {
-    display: none;
-  }
   .editor-lista {
     display: flex;
     flex-direction: column;
@@ -3194,6 +3191,11 @@
   .editor-item.arrastando {
     background: var(--surface-card);
     opacity: 0.8;
+  }
+  /* Compound (2 classes) de propósito: precisa vencer o display:flex de .editor-item acima
+     mesmo estando definida antes dela no arquivo — mesma pegadinha de cascata de sempre. */
+  .editor-item.editor-item-oculto {
+    display: none;
   }
   .editor-nome {
     flex: 1;
