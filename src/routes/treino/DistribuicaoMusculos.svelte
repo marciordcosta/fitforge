@@ -1450,6 +1450,11 @@
     <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
   </svg>
 {/snippet}
+{#snippet iconMaisPeq()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+{/snippet}
 {#snippet iconGrade()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -1690,8 +1695,13 @@
       <ul class="picker-lista-editor">
         {#each opcoesPickerMusculo as ex (ex.id)}
           <li>
-            <button class="picker-item-editor" onclick={() => trocarExercicioMusculo(ex)} disabled={adicionandoIdMusculo === ex.id}>
-              {ex.nome}
+            <button
+              class="picker-item-editor picker-item-editor-trocar"
+              onclick={() => trocarExercicioMusculo(ex)}
+              disabled={adicionandoIdMusculo === ex.id}
+            >
+              <span class="picker-item-editor-nome">{ex.nome}</span>
+              <span class="picker-item-editor-mais" aria-hidden="true">{@render iconMaisPeq()}</span>
             </button>
           </li>
         {/each}
@@ -2312,7 +2322,7 @@
     position: fixed;
     inset: 0;
     background: var(--surface-bg);
-    z-index: 90;
+    z-index: 110;
     overflow-y: auto;
   }
   .editor-conteudo {
@@ -2477,6 +2487,33 @@
   .picker-item-editor:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  .picker-item-editor-trocar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .picker-item-editor-nome {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .picker-item-editor-mais {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .picker-item-editor-mais svg {
+    width: 14px;
+    height: 14px;
   }
   .muted-item {
     color: var(--surface-muted);
