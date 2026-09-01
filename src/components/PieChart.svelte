@@ -70,9 +70,10 @@
     return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
   }
 
-  /** Número inteiro sem casas decimais soltas; fracionário com 1 casa. */
+  /** Arredonda pro 0.5 mais próximo (evita fração estranha tipo 0.3) e mostra inteiro sem casas soltas. */
   function formatValor(valor: number): string {
-    return Number.isInteger(valor) ? String(valor) : valor.toFixed(1);
+    const arred = Math.round(valor * 2) / 2;
+    return Number.isInteger(arred) ? String(arred) : arred.toFixed(1);
   }
 
   /** Quebra o nome em linhas curtas pra nunca ultrapassar a largura reservada pro rótulo. */
@@ -208,7 +209,9 @@
       />
       {#if seg.rotuloVisivel && f.nome === nomeDestacado}
         <text x={seg.rotuloX} y={seg.rotuloY} text-anchor="middle" class="seg-texto" style="pointer-events: none;">
-          <tspan x={seg.rotuloX} dy="-0.9" class="seg-valor">{formatValor(seg.valor)}</tspan>
+          <tspan x={seg.rotuloX} dy="-0.9" class="seg-valor"
+            >{formatValor(seg.valor)} {formatValor(seg.valor) === "1" ? "série" : "séries"}</tspan
+          >
           <tspan x={seg.rotuloX} dy="2.6" class="seg-pct">{seg.pct}%</tspan>
         </text>
       {/if}
@@ -303,8 +306,8 @@
     font-weight: 800;
   }
   .seg-pct {
-    font-size: 2.4px;
-    font-weight: 600;
+    font-size: 3.4px;
+    font-weight: 700;
   }
   .centro-valor {
     font-size: 15px;

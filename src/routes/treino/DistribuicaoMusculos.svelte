@@ -899,11 +899,7 @@
       {#each partesParaSegmentos(partes) as seg (seg.cor)}
         {@const pctSeg = valor > 0 ? (seg.valor / valor) * 100 : 0}
         {#if seg.valor > 0}
-          <div class="barra-seg" style={`width: ${pctSeg}%; background: ${seg.cor};`}>
-            {#if pctSeg >= 25}
-              <span class="barra-seg-texto">{formatValor(seg.valor)} · {pctSeg.toFixed(0)}%</span>
-            {/if}
-          </div>
+          <div class="barra-seg" style={`width: ${pctSeg}%; background: ${seg.cor};`}></div>
         {/if}
       {/each}
     </div>
@@ -1567,20 +1563,6 @@
   }
   .barra-seg {
     height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-  .barra-seg-texto {
-    color: #fff;
-    font-size: 6px;
-    font-weight: 700;
-    white-space: nowrap;
-    padding: 0 2px;
-    text-shadow:
-      0 0 2px rgba(0, 0, 0, 0.7),
-      0 0 3px rgba(0, 0, 0, 0.5);
   }
   .pct-total {
     text-align: right;
@@ -1755,7 +1737,7 @@
     position: fixed;
     inset: 0;
     background: var(--surface-bg);
-    z-index: 150;
+    z-index: 90;
     overflow-y: auto;
   }
   .editor-conteudo {
