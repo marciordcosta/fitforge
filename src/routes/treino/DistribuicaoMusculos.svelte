@@ -5,7 +5,6 @@
   import Sheet from "../../components/Sheet.svelte";
   import PieChart from "../../components/PieChart.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
-  import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import {
     listMusculos,
     listTreinos,
@@ -35,14 +34,6 @@
   let linhasRealizadoMes = $state<{ data: string; musculo_id: string; series_equivalentes: number }[]>([]);
   let carregandoRealizado = $state(false);
   let carregouRealizadoAlgumaVez = $state(false);
-  let feitoPorMusculoSemana = $state<Map<string, number>>(new Map());
-
-  /** Semana ancorada em segunda-feira (exceção proposital, igual à tela inicial de Treino — o resto do app usa terça, ver inicioSemana em dates.ts). Vai virar parametrizável. */
-  function segundaISO(): string {
-    const hoje = new Date();
-    const delta = (hoje.getDay() + 6) % 7;
-    return toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - delta));
-  }
 
   /** Rotinas com dia informado sobem pro topo, ordenadas pelo dia mais próximo; sem dia, mantém a ordenação manual (mesma lógica da tela inicial de Treino). */
   function ordenarPorDia(lista: TreinoComExercicios[]): TreinoComExercicios[] {
@@ -63,13 +54,7 @@
     musculos = musculosCarregados;
     treinos = ordenarPorDia(treinosCarregados);
     todosExercicios = exerciciosCarregados;
-    const hojeIso = toISODate(new Date());
-    const [, volumeSemana] = await Promise.all([carregarRealizado(), getVolumeRealizadoBruto(segundaISO(), hojeIso)]);
-    const mapa = new Map<string, number>();
-    for (const l of volumeSemana) {
-      mapa.set(l.musculo_id, (mapa.get(l.musculo_id) ?? 0) + Number(l.series_equivalentes));
-    }
-    feitoPorMusculoSemana = mapa;
+    await carregarRealizado();
   }
 
   void carregarBase();
@@ -285,36 +270,6 @@
       .sort((a, b) => scoreFadiga(a) - scoreFadiga(b));
   }
 
-  /**
-   * Séries já marcadas como concluídas na sessão ao vivo (treinoLogSessao), contadas por músculo.
-   * ponderado=true usa o peso_contribuicao (pra somar junto com o card semanal, que é ponderado);
-   * ponderado=false é a contagem bruta (pra comparar com o volume da própria rotina, também bruto).
-   */
-  function contarFeitoAoVivo(treino: TreinoComExercicios, ponderado: boolean): Map<string, number> {
-    const musculosPorExercicio = new Map(treino.exercicios.map((ex) => [ex.exercicio_id, ex.exercicio?.musculos ?? []]));
-    const mapa = new Map<string, number>();
-    for (const exSessao of treinoLogSessao.atual?.sessao ?? []) {
-      const concluidas = exSessao.sets.filter((s) => s.concluida).length;
-      if (!concluidas) continue;
-      for (const m of musculosPorExercicio.get(exSessao.exercicio_id) ?? []) {
-        const incremento = ponderado ? concluidas * m.peso_contribuicao : concluidas;
-        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + incremento);
-      }
-    }
-    return mapa;
-  }
-
-  /** Card semanal ao vivo: soma o que já está salvo (treino_registros dessa semana) com o que ainda está sendo feito agora na sessão ativa, se houver — só reinicia na virada da semana (segunda). */
-  const feitoPorMusculoSemanaAoVivo = $derived.by(() => {
-    const sessaoTreino = treinos.find((t) => t.id === treinoLogSessao.atual?.treinoId);
-    if (!sessaoTreino) return feitoPorMusculoSemana;
-    const mapa = new Map(feitoPorMusculoSemana);
-    for (const [musculoId, valor] of contarFeitoAoVivo(sessaoTreino, true)) {
-      mapa.set(musculoId, (mapa.get(musculoId) ?? 0) + valor);
-    }
-    return mapa;
-  });
-
   const totaisSemanais = $derived.by(() => {
     let exercicios = 0;
     let series = 0;
@@ -365,6 +320,35 @@
   });
 
   /** Distribuição semanal (todas as rotinas somadas), ponderada pelo peso de contribuição parametrizado de cada músculo. */
+  /** Faixas A/B/C de fadiga por posição, tratando a semana inteira como uma sequência única
+   * (rotinas na ordem exibida, exercícios pela própria ordem) — mesma regra usada por rotina
+   * (contarSeriesPorFaixaDePosicao), estendida pra semana toda. */
+  function contarSeriesPorFaixaDePosicaoSemanal(): Map<string, Partes> {
+    const totalSeries = treinos.reduce((acc, t) => acc + t.exercicios.reduce((a, ex) => a + ex.series.length, 0), 0);
+    const mapa = new Map<string, Partes>();
+    if (!totalSeries) return mapa;
+
+    let posicao = 0;
+    for (const t of treinos) {
+      const exerciciosOrdenados = t.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+      for (const ex of exerciciosOrdenados) {
+        const musculosEx = ex.exercicio?.musculos ?? [];
+        for (let s = 0; s < ex.series.length; s++) {
+          posicao += 1;
+          const cor = corPorFaixa((posicao / totalSeries) * 100);
+          for (const m of musculosEx) {
+            const atual = mapa.get(m.musculo_id) ?? partesVazias();
+            if (cor === CORES_FAIXA.a) atual.a += m.peso_contribuicao;
+            else if (cor === CORES_FAIXA.b) atual.b += m.peso_contribuicao;
+            else atual.c += m.peso_contribuicao;
+            mapa.set(m.musculo_id, atual);
+          }
+        }
+      }
+    }
+    return mapa;
+  }
+
   const distribuicaoSemanal = $derived.by(() => {
     const mapa = new Map<string, number>();
     for (const t of treinos) {
@@ -376,8 +360,9 @@
         }
       }
     }
+    const partesPorMusculo = contarSeriesPorFaixaDePosicaoSemanal();
     return musculos
-      .map((m) => ({ musculo: m, valor: Math.round(mapa.get(m.id) ?? 0) }))
+      .map((m) => ({ musculo: m, valor: Math.round(mapa.get(m.id) ?? 0), partes: partesPorMusculo.get(m.id) ?? partesVazias() }))
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
   });
@@ -386,11 +371,11 @@
     chave: string;
     nome: string;
     valor: number;
-    feito: number;
+    partes: Partes;
     /** Preenchido só quando a linha é um músculo avulso (sem agrupamento) — usado pra abrir os exercícios dele. */
     musculo: Musculo | null;
     /** null = músculo avulso; senão, os músculos que compõem o total do grupo. */
-    subItens: { musculo: Musculo; valor: number; feito: number }[] | null;
+    subItens: { musculo: Musculo; valor: number; partes: Partes }[] | null;
   }
 
   let gruposExpandidos = $state<Set<string>>(new Set());
@@ -425,13 +410,9 @@
         chave: id,
         nome: grupo.nome,
         valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
-        feito: grupo.itens.reduce((acc, i) => acc + (feitoPorMusculoSemanaAoVivo.get(i.musculo.id) ?? 0), 0),
+        partes: somarPartes(...grupo.itens.map((i) => i.partes)),
         musculo: null,
-        subItens: grupo.itens.map((i) => ({
-          musculo: i.musculo,
-          valor: i.valor,
-          feito: feitoPorMusculoSemanaAoVivo.get(i.musculo.id) ?? 0,
-        })),
+        subItens: grupo.itens.map((i) => ({ musculo: i.musculo, valor: i.valor, partes: i.partes })),
       });
     }
     for (const item of avulsos) {
@@ -439,7 +420,7 @@
         chave: item.musculo.id,
         nome: item.musculo.nome,
         valor: item.valor,
-        feito: feitoPorMusculoSemanaAoVivo.get(item.musculo.id) ?? 0,
+        partes: item.partes,
         musculo: item.musculo,
         subItens: null,
       });
@@ -828,6 +809,17 @@
     if (graficoUrlTreino) abrirGraficoTreino(graficoUrlTreino);
   });
 
+  /** Abre o anel da Distribuição Semanal direto — mesmo padrão do anel por rotina (bar clicável, sem menu). */
+  function abrirGraficoSemanal(): void {
+    abrirDetalheRotina(
+      "Distribuição Semanal",
+      distribuicaoSemanal,
+      totaisSemanais.series,
+      "séries",
+      coresAbcAcumulado(distribuicaoSemanal),
+    );
+  }
+
   function abrirMenuSemanal(): void {
     modalAberto = {
       titulo: "Distribuição Semanal",
@@ -836,14 +828,7 @@
         {
           label: "Gráfico",
           icon: iconGrafico,
-          onSelect: () =>
-            abrirDetalheRotina(
-              "Distribuição Semanal",
-              distribuicaoSemanal,
-              totaisSemanais.series,
-              "séries",
-              coresAbcAcumulado(distribuicaoSemanal),
-            ),
+          onSelect: () => abrirGraficoSemanal(),
         },
       ],
     };
@@ -956,7 +941,6 @@
           {:else}
             <div class="lista">
               {#each linhasSemanal as linha (linha.chave)}
-                {@const corSemanal = treinoLogSessao.atual != null ? "var(--color-success)" : corVolume(linha.valor)}
                 {@const aberto = linha.subItens != null && gruposExpandidos.has(linha.chave)}
                 <div class="item">
                   {#if linha.subItens}
@@ -967,25 +951,15 @@
                   {:else}
                     <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(treinos, linha.musculo)}>{linha.nome}</button>
                   {/if}
-                  <div class="barra-wrap">
-                    <div class="barra" style={`width: ${Math.min((linha.feito / linha.valor) * 100, 100)}%; background: ${corSemanal};`}></div>
-                  </div>
-                  <button
-                    class="valor-btn"
-                    style={`color: ${corSemanal};`}
-                    onclick={() =>
-                      abrirGradeSemanal(linha.subItens ? linha.subItens.map((s) => s.musculo.id) : [linha.chave])}
-                  >{linha.feito.toFixed(0)} / {linha.valor}</button>
+                  {@render barraFadiga(linha.partes, linha.valor, () => abrirGraficoSemanal())}
+                  <span class="valor">{formatValor(linha.valor)}</span>
                 </div>
                 {#if aberto && linha.subItens}
                   {#each linha.subItens as sub (sub.musculo.id)}
-                    {@const corSub = treinoLogSessao.atual != null ? "var(--color-success)" : corVolume(sub.valor)}
                     <div class="item item-sub">
                       <button class="nome-btn" onclick={() => abrirExercicios(treinos, sub.musculo)}>{sub.musculo.nome}</button>
-                      <div class="barra-wrap">
-                        <div class="barra" style={`width: ${Math.min((sub.feito / sub.valor) * 100, 100)}%; background: ${corSub};`}></div>
-                      </div>
-                      <button class="valor-btn" style={`color: ${corSub};`} onclick={() => abrirGradeSemanal([sub.musculo.id])}>{sub.feito.toFixed(0)} / {sub.valor}</button>
+                      {@render barraFadiga(sub.partes, sub.valor, () => abrirGraficoSemanal())}
+                      <span class="valor">{formatValor(sub.valor)}</span>
                     </div>
                   {/each}
                 {/if}
@@ -1540,26 +1514,18 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .nome-btn,
-  .valor-btn {
+  .nome-btn {
     background: none;
     border: none;
     padding: 0;
     font-family: inherit;
     cursor: pointer;
-  }
-  .nome-btn {
     font-size: var(--font-size-sm);
     color: var(--surface-fg);
     text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .valor-btn {
-    text-align: right;
-    font-weight: 600;
-    font-size: var(--font-size-sm);
   }
   .nome-grupo {
     display: flex;
