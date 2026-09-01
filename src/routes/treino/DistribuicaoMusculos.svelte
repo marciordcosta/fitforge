@@ -2496,21 +2496,18 @@
   .editor-serie-badge {
     position: absolute;
     top: -8px;
-    right: -4px;
+    right: -2px;
     z-index: 1;
-    padding: 1px 5px;
-    border-radius: 999px;
     font-size: 10px;
     font-weight: 800;
     line-height: 1.3;
     white-space: nowrap;
-    color: #fff;
   }
   .editor-serie-badge-mais {
-    background: var(--color-success);
+    color: var(--color-success);
   }
   .editor-serie-badge-menos {
-    background: var(--color-negative);
+    color: var(--color-negative);
   }
   .serie-texto-musculo {
     flex-shrink: 0;
