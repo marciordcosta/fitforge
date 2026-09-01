@@ -1803,22 +1803,6 @@
     {:else if tendenciaMusculo}
       <p class="tendencia-musculo tendencia-{tendenciaMusculo.status}">{TEXTO_TENDENCIA[tendenciaMusculo.status]}</p>
     {/if}
-    {#if resumoMusculoModal}
-      <div class="resumo-musculo">
-        <div class="resumo-item">
-          <span class="resumo-valor">{formatValor(resumoMusculoModal.totalBruto)}</span>
-          <span class="resumo-label">Séries Totais</span>
-        </div>
-        <div class="resumo-item">
-          <span class="resumo-valor">{formatValor(resumoMusculoModal.totalValido)}</span>
-          <span class="resumo-label">Séries Válidas</span>
-        </div>
-        <div class="resumo-item">
-          <span class="resumo-valor">{formatValor(resumoMusculoModal.totalAcumulado)}</span>
-          <span class="resumo-label">Séries Acumuladas</span>
-        </div>
-      </div>
-    {/if}
     {#if statusAjusteMusculo}
       <p class="status-ajuste status-ajuste-{statusAjusteMusculo.tipo}">{statusAjusteMusculo.texto}</p>
     {/if}
@@ -1847,6 +1831,22 @@
             >{item.series} {item.series === 1 ? "série" : "séries"}</span>
           </button>
         {/each}
+      </div>
+    {/if}
+    {#if resumoMusculoModal}
+      <div class="resumo-musculo">
+        <div class="resumo-item">
+          <span class="resumo-valor">{formatValor(resumoMusculoModal.totalBruto)}</span>
+          <span class="resumo-label">Séries Totais</span>
+        </div>
+        <div class="resumo-item">
+          <span class="resumo-valor">{formatValor(resumoMusculoModal.totalValido)}</span>
+          <span class="resumo-label">Séries Válidas</span>
+        </div>
+        <div class="resumo-item">
+          <span class="resumo-valor">{formatValor(resumoMusculoModal.totalAcumulado)}</span>
+          <span class="resumo-label">Séries Acumuladas</span>
+        </div>
       </div>
     {/if}
   </Sheet>
@@ -2423,7 +2423,7 @@
   .resumo-musculo {
     display: flex;
     gap: var(--space-2);
-    margin: 0 0 var(--space-3);
+    margin: var(--space-3) 0 0;
   }
   .resumo-item {
     flex: 1;
@@ -2434,7 +2434,7 @@
     gap: 2px;
     padding: var(--space-3) var(--space-1);
     border-radius: var(--radius-lg);
-    background: var(--surface-bg);
+    background: #232a3b;
     box-shadow: var(--shadow-card);
   }
   .resumo-valor {
