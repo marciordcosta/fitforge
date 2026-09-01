@@ -252,13 +252,13 @@
   {/if}
 
   <div class="quick-actions">
-    <button class="quick-btn" onclick={() => navigate("/treino/exercicios")}>
-      <span class="quick-btn-label">Exercícios</span>
-      {@render iconExercicios()}
-    </button>
     <button class="quick-btn" onclick={() => navigate("/treino/distribuicao")}>
       <span class="quick-btn-label">Distribuição</span>
       {@render iconDistribuicao()}
+    </button>
+    <button class="quick-btn" onclick={() => navigate("/treino/exercicios")}>
+      <span class="quick-btn-label">Exercícios</span>
+      {@render iconExercicios()}
     </button>
     <button class="quick-btn" onclick={() => navigate("/treino/historico")}>
       <span class="quick-btn-label">Histórico</span>
