@@ -367,6 +367,7 @@
 
   function abrirGradeSemanal(musculoIds: string[] | null): void {
     filtroMusculosGrade = musculoIds ? new Set(musculoIds) : null;
+    modoEdicaoMetas = false;
     mostrarGradeSemanal = true;
   }
 
@@ -1155,6 +1156,15 @@
   /** Metas manuais definidas pra essa rotina (só os músculos que têm uma), com o saldo AO VIVO —
    * refeito a cada mutação do rascunho (adicionar/remover/ajustar série), igual pedido: "a medida
    * que formos adicionando os exercícios, o sistema ia abatendo do saldo de cada músculo". */
+  /** Quantos exercícios do rascunho passam pelo filtro ativo (editorFiltroMusculoId) — usado só
+   * pra saber se a lista "vazia" é porque não tem NADA na rotina, ou porque o filtro escondeu
+   * tudo (ex: removeu o último exercício daquele músculo com o filtro ainda ligado). */
+  const exerciciosVisiveisEditor = $derived.by(() => {
+    if (!modalEditorRotina) return 0;
+    if (!editorFiltroMusculoId) return modalEditorRotina.exercicios.length;
+    return modalEditorRotina.exercicios.filter((te) => te.exercicio?.musculos.some((m) => m.musculo_id === editorFiltroMusculoId)).length;
+  });
+
   const metasEditor = $derived.by(() => {
     if (!modalEditorRotina) return [];
     const atual = contarSeriesPorMusculo(modalEditorRotina);
@@ -2352,6 +2362,8 @@
         {/each}
         {#if !modalEditorRotina.exercicios.length}
           <p class="muted">Nenhum exercício ainda.</p>
+        {:else if exerciciosVisiveisEditor === 0}
+          <p class="muted">Nenhum exercício desse músculo — o filtro ainda está ativo, toca de novo no card pra limpar.</p>
         {/if}
       </div>
       <div class="editor-totais">
