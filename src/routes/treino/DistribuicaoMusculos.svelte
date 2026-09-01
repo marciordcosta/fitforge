@@ -2489,6 +2489,7 @@
   .rotina-card {
     border-radius: var(--radius-lg);
     padding: var(--space-4);
+    border: 1px solid var(--surface-border);
   }
   /* Só o card da Distribuição Semanal mantém fundo/sombra, pra se diferenciar dos demais. */
   .rotina-card.rotina-card-semanal {
