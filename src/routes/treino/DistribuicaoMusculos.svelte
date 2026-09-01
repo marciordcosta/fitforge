@@ -1347,7 +1347,7 @@
   </svg>
 {/snippet}
 
-{#snippet barraFadiga(partes: Partes, valor: number, onClick: () => void)}
+{#snippet barraFadiga(partes: Partes, valor: number)}
   <div class="barra-wrap-fadiga-col">
     <div class="barra-rotulos">
       {#each partesParaSegmentos(partes) as seg (seg.cor)}
@@ -1357,14 +1357,7 @@
         {/if}
       {/each}
     </div>
-    <div
-      class="barra-wrap-fadiga"
-      role="button"
-      tabindex="0"
-      onclick={onClick}
-      onkeydown={(e) => e.key === "Enter" && onClick()}
-      aria-label="Ver anel de distribuição da rotina"
-    >
+    <div class="barra-wrap-fadiga">
       <div class="barra-segmentos">
         {#each partesParaSegmentos(partes) as seg (seg.cor)}
           {@const pctSeg = valor > 0 ? (seg.valor / valor) * 100 : 0}
@@ -1509,7 +1502,7 @@
                     {:else}
                       <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                     {/if}
-                    {@render barraFadiga(linha.partes, linha.valor, () => abrirGraficoTreino(treino))}
+                    {@render barraFadiga(linha.partes, linha.valor)}
                     <span
                       class="valor"
                       class:valor-subindo={tend === "subindo"}
@@ -1522,7 +1515,7 @@
                       {@const tendSub = tendenciaParaMusculos([treino], [sub.musculo.id])}
                       <div class="item item-sub">
                         <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
-                        {@render barraFadiga(sub.partes, sub.valor, () => abrirGraficoTreino(treino))}
+                        {@render barraFadiga(sub.partes, sub.valor)}
                         <span
                           class="valor"
                           class:valor-subindo={tendSub === "subindo"}
