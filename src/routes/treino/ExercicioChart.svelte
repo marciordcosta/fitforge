@@ -59,6 +59,18 @@
     return `${d}/${m}/${y.slice(2)}`;
   }
 
+  function formatNumero(v: number): string {
+    return Number.isInteger(v) ? String(v) : v.toFixed(1);
+  }
+
+  /** No modo "Todos" os pontos são normalizados (0 a 1, só a forma da curva) — sem isso o
+   * tooltip mostraria "0.42" em vez do 1RM/peso/volume real. */
+  function tooltipValorReal(ctx: { dataset: { rawData?: (number | null)[]; label?: string }; dataIndex: number; parsed: { y: number | null } }): string {
+    const bruto = ctx.dataset.rawData?.[ctx.dataIndex];
+    const valor = bruto ?? ctx.parsed.y;
+    return `${ctx.dataset.label ?? ""}${ctx.dataset.label ? ": " : ""}${valor == null ? "-" : formatNumero(valor)}`;
+  }
+
   function desenharGrafico() {
     if (!canvas || !historicoFiltrado.length) return;
     chart?.destroy();
@@ -72,16 +84,20 @@
       data: {
         labels: historicoFiltrado.map((h) => formatData(h.data)),
         datasets: modoTodos
-          ? METRICAS_TODOS.map((m) => ({
-              label: m.label,
-              data: normalizar(historicoFiltrado.map((h) => valorPorChave(h, m.chave))),
-              borderColor: m.cor,
-              backgroundColor: m.cor,
-              tension: 0.3,
-              pointRadius: 2,
-              // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
-              hidden: m.chave === "peso",
-            }))
+          ? METRICAS_TODOS.map((m) => {
+              const bruto = historicoFiltrado.map((h) => valorPorChave(h, m.chave));
+              return {
+                label: m.label,
+                data: normalizar(bruto),
+                rawData: bruto,
+                borderColor: m.cor,
+                backgroundColor: m.cor,
+                tension: 0.3,
+                pointRadius: 2,
+                // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
+                hidden: m.chave === "peso",
+              };
+            })
           : [
               {
                 data: valores,
@@ -99,6 +115,7 @@
           legend: modoTodos
             ? { display: true, position: "bottom", labels: { color: "#9aa0ab", boxWidth: 10, font: { size: 9 } } }
             : { display: false },
+          tooltip: modoTodos ? { callbacks: { label: tooltipValorReal } } : {},
         },
         scales: {
           x: {

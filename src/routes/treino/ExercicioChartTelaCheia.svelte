@@ -109,6 +109,18 @@
     return `${d}/${m}/${y.slice(2)}`;
   }
 
+  function formatNumero(v: number): string {
+    return Number.isInteger(v) ? String(v) : v.toFixed(1);
+  }
+
+  /** Nos modos "Todos" e comparação, os pontos do gráfico são normalizados (0 a 1, só a forma
+   * da curva) — sem isso o tooltip mostraria "0.42" em vez do valor real (1RM/peso/volume). */
+  function tooltipValorReal(ctx: { dataset: { rawData?: (number | null)[]; label?: string }; dataIndex: number; parsed: { y: number | null } }): string {
+    const bruto = ctx.dataset.rawData?.[ctx.dataIndex];
+    const valor = bruto ?? ctx.parsed.y;
+    return `${ctx.dataset.label}: ${valor == null ? "-" : formatNumero(valor)}`;
+  }
+
   function valorMetrica(h: HistoricoPonto): number {
     return metrica === "peso" ? h.maiorPeso : metrica === "1rm" ? Math.round(h.melhor1rm * 10) / 10 : h.volumeTotal;
   }
@@ -153,17 +165,21 @@
         type: "line",
         data: {
           labels: historicoFiltrado.map((h) => formatData(h.data)),
-          datasets: METRICAS_TODOS.map((m) => ({
-            label: m.label,
-            data: normalizar(historicoFiltrado.map((h) => valorPorChave(h, m.chave))),
-            borderColor: m.cor,
-            backgroundColor: m.cor,
-            tension: 0.3,
-            pointRadius: 3,
-            spanGaps: true,
-            // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
-            hidden: m.chave === "peso",
-          })),
+          datasets: METRICAS_TODOS.map((m) => {
+            const bruto = historicoFiltrado.map((h) => valorPorChave(h, m.chave));
+            return {
+              label: m.label,
+              data: normalizar(bruto),
+              rawData: bruto,
+              borderColor: m.cor,
+              backgroundColor: m.cor,
+              tension: 0.3,
+              pointRadius: 3,
+              spanGaps: true,
+              // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
+              hidden: m.chave === "peso",
+            };
+          }),
         },
         options: {
           responsive: true,
@@ -171,6 +187,7 @@
           layout: { padding: { top: 20 } },
           plugins: {
             legend: { display: true, position: "bottom", labels: { color: "#9aa0ab", boxWidth: 12, font: { size: 11 } } },
+            tooltip: { callbacks: { label: tooltipValorReal } },
           },
           scales: {
             x: {
@@ -209,10 +226,12 @@
 
     const ajustar = (s: (number | null)[]) => (comparando ? normalizar(s) : s);
 
-    const datasets: ChartDataset<"line", (number | null)[]>[] = [
+    const brutoPrincipal = serie(historicoFiltrado);
+    const datasets: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[] })[] = [
       {
         label: exercicio.nome,
-        data: ajustar(serie(historicoFiltrado)),
+        data: ajustar(brutoPrincipal),
+        rawData: brutoPrincipal,
         borderColor: COR_PRINCIPAL,
         backgroundColor: COR_PRINCIPAL,
         tension: 0.3,
@@ -221,9 +240,11 @@
       },
       ...comparaveisNaJanela.map((c, i) => {
         const cor = PALETA[i % PALETA.length];
+        const brutoComparavel = serie(c.historico);
         return {
           label: c.exercicio.nome,
-          data: ajustar(serie(c.historico)),
+          data: ajustar(brutoComparavel),
+          rawData: brutoComparavel,
           borderColor: cor,
           backgroundColor: cor,
           tension: 0.3,
@@ -247,6 +268,7 @@
             position: "bottom",
             labels: { color: "#9aa0ab", boxWidth: 12, font: { size: 11 } },
           },
+          tooltip: { callbacks: { label: tooltipValorReal } },
         },
         scales: {
           x: {
