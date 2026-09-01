@@ -47,6 +47,23 @@
     return [...comDia, ...semDia];
   }
 
+  /** 1RM histórico de cada exercício usado em alguma rotina — carregado uma vez, em paralelo,
+   * pra alimentar a setinha de tendência de cada músculo sem precisar reconsultar por linha. */
+  let historicoPorExercicio = $state<Map<string, { melhor1rm: number }[]>>(new Map());
+
+  async function carregarHistoricoTodos(treinosCarregados: TreinoComExercicios[]): Promise<void> {
+    const ids = new Set<string>();
+    for (const t of treinosCarregados) {
+      for (const ex of t.exercicios) ids.add(ex.exercicio_id);
+    }
+    const resultados = await Promise.all(
+      Array.from(ids).map(async (id) => [id, await getHistoricoExercicio(id)] as const),
+    );
+    const mapa = new Map(historicoPorExercicio);
+    for (const [id, pontos] of resultados) mapa.set(id, pontos);
+    historicoPorExercicio = mapa;
+  }
+
   async function carregarBase() {
     const [musculosCarregados, treinosCarregados, exerciciosCarregados] = await Promise.all([
       listMusculos(),
@@ -56,6 +73,7 @@
     musculos = musculosCarregados;
     treinos = ordenarPorDia(treinosCarregados);
     todosExercicios = exerciciosCarregados;
+    void carregarHistoricoTodos(treinosCarregados);
     await carregarRealizado();
   }
 
@@ -698,6 +716,28 @@
     return (mediaRecente - mediaAnterior) / mediaAnterior;
   }
 
+  /** Setinha discreta no card: mesma lógica de tendência (variacaoExercicio), mas usando o
+   * histórico já pré-carregado (historicoPorExercicio) pra não refazer a consulta por linha. */
+  function tendenciaParaMusculos(treino: TreinoComExercicios, musculoIds: string[]): "subindo" | "estavel" | "caindo" | null {
+    const idsSet = new Set(musculoIds);
+    const exercicioIds = new Set<string>();
+    for (const te of treino.exercicios) {
+      if (te.exercicio?.musculos.some((m) => idsSet.has(m.musculo_id))) exercicioIds.add(te.exercicio_id);
+    }
+    const variacoes: number[] = [];
+    for (const id of exercicioIds) {
+      const pontos = historicoPorExercicio.get(id);
+      if (!pontos) continue;
+      const v = variacaoExercicio(pontos);
+      if (v != null) variacoes.push(v);
+    }
+    if (!variacoes.length) return null;
+    const media = variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
+    if (media > 0.02) return "subindo";
+    if (media < -0.02) return "caindo";
+    return "estavel";
+  }
+
   /** Tendência do músculo = média da variação de 1RM de cada exercício que o trabalha (nessa
    * rotina). Caindo sugere reduzir séries, estável sugere tentar aumentar (pra sair do platô),
    * subindo sugere manter (já está funcionando). */
@@ -1100,6 +1140,16 @@
   </div>
 {/snippet}
 
+{#snippet setaTendencia(status: "subindo" | "estavel" | "caindo" | null)}
+  {#if status === "subindo"}
+    <span class="seta-tendencia seta-subindo" title="Tendência de alta">↑</span>
+  {:else if status === "caindo"}
+    <span class="seta-tendencia seta-caindo" title="Tendência de queda">↓</span>
+  {:else if status === "estavel"}
+    <span class="seta-tendencia seta-estavel" title="Tendência estável">→</span>
+  {/if}
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -1179,7 +1229,8 @@
                 {#each listaExibida as linha (linha.chave)}
                   {@const grupoChave = `${treino.id}:${linha.chave}`}
                   {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
-                  <div class="item">
+                  {@const musculoIds = linha.musculo ? [linha.musculo.id] : (linha.subItens ?? []).map((s) => s.musculo.id)}
+                  <div class="item item-tendencia">
                     {#if linha.subItens}
                       <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
                         <span class="chevron-grupo" class:aberto>›</span>
@@ -1189,13 +1240,15 @@
                       <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                     {/if}
                     {@render barraFadiga(linha.partes, linha.valor, () => abrirGraficoTreino(treino))}
+                    {@render setaTendencia(tendenciaParaMusculos(treino, musculoIds))}
                     <span class="valor">{formatValor(porFadiga ? valorEfetivoFadiga(linha.partes) : linha.valor)}</span>
                   </div>
                   {#if aberto && linha.subItens}
                     {#each linha.subItens as sub (sub.musculo.id)}
-                      <div class="item item-sub">
+                      <div class="item item-tendencia item-sub">
                         <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                         {@render barraFadiga(sub.partes, sub.valor, () => abrirGraficoTreino(treino))}
+                        {@render setaTendencia(tendenciaParaMusculos(treino, [sub.musculo.id]))}
                         <span class="valor">{formatValor(porFadiga ? valorEfetivoFadiga(sub.partes) : sub.valor)}</span>
                       </div>
                     {/each}
@@ -1807,6 +1860,24 @@
   .item-sub {
     padding-left: var(--space-3);
     opacity: 0.85;
+  }
+  .item-tendencia {
+    grid-template-columns: 100px 1fr 14px 44px;
+  }
+  .seta-tendencia {
+    justify-self: center;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .seta-subindo {
+    color: var(--color-success);
+  }
+  .seta-estavel {
+    color: var(--color-neutral);
+  }
+  .seta-caindo {
+    color: var(--color-negative);
   }
   .barra-wrap {
     height: 10px;
