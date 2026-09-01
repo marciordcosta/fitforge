@@ -14,10 +14,7 @@
     getVolumeRealizadoBruto,
     getUltimoRegistro,
     getHistoricoExercicio,
-    updateSeriesCountTreinoExercicio,
-    removerTreinoExercicio,
-    atualizarOrdemTreinoExercicios,
-    adicionarTreinoExercicio,
+    salvarExerciciosRotina,
     trocarExercicioTreinoExercicio,
     DIAS_SEMANA_ABREV,
     abreviarMusculo,
@@ -880,7 +877,8 @@
         itens: itensMusculoRotina(atualizado, modalMusculoRotina.musculo.id),
       };
     }
-    if (modalEditorRotina?.id === treinoId) modalEditorRotina = atualizado;
+    // NÃO sincroniza modalEditorRotina aqui: o editor completo agora é um rascunho local
+    // (só grava no banco ao Salvar) — sobrescrever apagaria alterações ainda não salvas.
   }
 
   const opcoesSeries = Array.from({ length: 10 }, (_, i) => ({ valor: i + 1, label: String(i + 1) }));
@@ -913,6 +911,20 @@
   async function trocarExercicioMusculo(ex: Exercicio): Promise<void> {
     if (!trocandoItemMusculo) return;
     const anterior = trocandoItemMusculo;
+    // Vindo do editor completo (rascunho local): só troca no rascunho, sem gravar — a gravação
+    // de verdade só acontece quando o botão Salvar é tocado.
+    if (modalEditorRotina?.id === anterior.treinoId && !modalMusculoRotina) {
+      modalEditorRotina = {
+        ...modalEditorRotina,
+        exercicios: modalEditorRotina.exercicios.map((te) =>
+          te.id === anterior.treinoExercicioId ? { ...te, exercicio_id: ex.id, exercicio: ex } : te,
+        ),
+      };
+      editorSujo = true;
+      mostrarPickerMusculo = false;
+      trocandoItemMusculo = null;
+      return;
+    }
     try {
       await trocarExercicioTreinoExercicio(anterior.treinoExercicioId, ex.id);
       await refrescarTreinoMusculo(anterior.treinoId);
@@ -939,6 +951,10 @@
   let mostrarPickerEditor = $state(false);
   let arrastandoIdxEditor = $state<number | null>(null);
   let itemEditorRefs: (HTMLElement | null)[] = [];
+  /** true assim que alguma alteração (remover/reordenar/ajustar séries/trocar/adicionar) foi
+   * feita no rascunho local, mas ainda não foi gravada com o botão Salvar. */
+  let editorSujo = $state(false);
+  let confirmandoFecharEditor = $state(false);
 
   /** Snapshot de séries por exercício e total bruto por músculo, capturado quando o editor é
    * aberto — base FIXA (não ao vivo) pros % de impacto mostrados após cada ajuste. Sem isso,
@@ -952,16 +968,22 @@
     baselineEditor = { seriesPorExercicio, totalPorMusculo: contarSeriesPorMusculo(treino) };
   }
 
+  /** Delta de séries de um exercício comparado à baseline (0 se ele não existia nela, ou seja,
+   * foi adicionado depois de abrir o editor — nesse caso o total atual conta como "adicionado"). */
+  function deltaSeriesEditor(te: TreinoComExercicios["exercicios"][number]): number {
+    if (!baselineEditor) return 0;
+    const baseSeries = baselineEditor.seriesPorExercicio.get(te.id) ?? 0;
+    return te.series.length - baseSeries;
+  }
+
   /** % de impacto de um exercício em cada músculo que ele trabalha, comparando as séries ATUAIS
    * com a baseline fixa: delta de séries (ponderado por peso_contribuicao) sobre o total bruto
    * ORIGINAL daquele músculo na rotina — ex: supino de 3 pra 4 séries, com peito em 10 séries
-   * base e peso_contribuicao 1.0, mostra +10% pro peito. Vazio se não há baseline, se o
-   * exercício não existia nela (adicionado depois) ou se voltou pro número original. */
+   * base e peso_contribuicao 1.0, mostra +10% pro peito. Vazio se não há baseline ou se voltou
+   * pro número original (delta zero). */
   function calcularImpactoEditor(te: TreinoComExercicios["exercicios"][number]): { nome: string; deltaPct: number }[] {
     if (!baselineEditor) return [];
-    const baseSeries = baselineEditor.seriesPorExercicio.get(te.id);
-    if (baseSeries == null) return [];
-    const deltaSeries = te.series.length - baseSeries;
+    const deltaSeries = deltaSeriesEditor(te);
     if (deltaSeries === 0) return [];
     const resultado: { nome: string; deltaPct: number }[] = [];
     for (const m of te.exercicio?.musculos ?? []) {
@@ -977,6 +999,7 @@
   function definirModalEditor(treino: TreinoComExercicios): void {
     modalEditorRotina = treino;
     capturarBaselineEditor(treino);
+    editorSujo = false;
   }
 
   /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o editor. */
@@ -984,25 +1007,60 @@
     navigate(`/treino/distribuicao/rotina/${treino.id}/editor`);
   }
 
-  /** Recarrega a rotina do banco após qualquer alteração e propaga pro card/lista e pro
-   * próprio modal do editor — mantém tudo ligado sem precisar de um botão Salvar. */
-  async function refrescarTreinoEditor(treinoId: string): Promise<void> {
-    const atualizado = await getTreino(treinoId);
-    if (!atualizado) return;
-    treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
-    if (modalEditorRotina?.id === treinoId) modalEditorRotina = atualizado;
+  /** Fecha o editor sem gravar nada (rascunho é descartado) — usado direto quando não há
+   * alteração pendente, ou depois de confirmar o descarte quando há. */
+  function fecharEditorSemSalvar(): void {
+    modalEditorRotina = null;
+    editorSujo = false;
+    if (editorUrlTreino) window.history.back();
   }
 
-  async function removerExercicioEditor(treinoExercicioId: string): Promise<void> {
+  /** Botão/gesto de voltar do editor: se há alteração não salva, confirma antes de descartar. */
+  function tentarFecharEditor(): void {
+    if (editorSujo) confirmandoFecharEditor = true;
+    else fecharEditorSemSalvar();
+  }
+
+  /** Grava o rascunho inteiro de uma vez (substitui a composição da rotina — mesma função usada
+   * pela tela básica de edição) e recarrega a lista principal, refletindo nos cards. Só agora,
+   * ao Salvar, é que qualquer chamada à API acontece — todas as ações do editor até aqui mexem
+   * só no rascunho local. */
+  async function salvarEditor(): Promise<void> {
     if (!modalEditorRotina) return;
     const treinoId = modalEditorRotina.id;
     salvandoEditor = true;
     try {
-      await removerTreinoExercicio(treinoExercicioId);
-      await refrescarTreinoEditor(treinoId);
+      await salvarExerciciosRotina(
+        treinoId,
+        modalEditorRotina.exercicios
+          .slice()
+          .sort((a, b) => a.ordem - b.ordem)
+          .map((te) => ({
+            exercicio_id: te.exercicio_id,
+            descanso_seg: te.descanso_seg,
+            observacao: te.observacao,
+            series: te.series.map((s) => ({ serie: s.serie, peso_alvo: s.peso_alvo, rep_min: s.rep_min, rep_max: s.rep_max })),
+          })),
+      );
+      const atualizado = await getTreino(treinoId);
+      if (atualizado) treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
+      editorSujo = false;
+      modalEditorRotina = null;
+      if (editorUrlTreino) window.history.back();
+    } catch (e) {
+      alert("Erro ao salvar rotina: " + (e as Error).message);
     } finally {
       salvandoEditor = false;
     }
+  }
+
+  function removerExercicioEditor(treinoExercicioId: string): void {
+    if (!modalEditorRotina) return;
+    modalEditorRotina = {
+      ...modalEditorRotina,
+      exercicios: modalEditorRotina.exercicios.filter((te) => te.id !== treinoExercicioId),
+    };
+    editorSujo = true;
   }
 
   function iniciarArrasteEditor(e: PointerEvent, idx: number): void {
@@ -1027,21 +1085,14 @@
           exercicios: ordenados.map((te, idx2) => ({ ...te, ordem: idx2 })),
         };
         arrastandoIdxEditor = i;
+        editorSujo = true;
         break;
       }
     }
   }
 
-  async function finalizarArrasteEditor(): Promise<void> {
-    if (arrastandoIdxEditor === null || !modalEditorRotina) {
-      arrastandoIdxEditor = null;
-      return;
-    }
+  function finalizarArrasteEditor(): void {
     arrastandoIdxEditor = null;
-    const treinoId = modalEditorRotina.id;
-    const idsOrdenados = modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem).map((te) => te.id);
-    await atualizarOrdemTreinoExercicios(idsOrdenados);
-    await refrescarTreinoEditor(treinoId);
   }
 
   $effect(() => {
@@ -1056,30 +1107,55 @@
 
   async function adicionarExercicioEditor(ex: Exercicio): Promise<void> {
     if (!modalEditorRotina) return;
-    const treinoId = modalEditorRotina.id;
     try {
+      // Só o histórico é consultado aqui (leitura) — grava nada ainda, é pra pré-preencher a
+      // meta das séries novas com o que foi feito da última vez.
       const anterior = await getUltimoRegistro(ex.id);
-      await adicionarTreinoExercicio(treinoId, ex.id, 3, anterior);
-      await refrescarTreinoEditor(treinoId);
+      const proximaOrdem = modalEditorRotina.exercicios.reduce((acc, te) => Math.max(acc, te.ordem), -1) + 1;
+      const novoItem: TreinoComExercicios["exercicios"][number] = {
+        id: `novo:${crypto.randomUUID()}`,
+        treino_id: modalEditorRotina.id,
+        exercicio_id: ex.id,
+        descanso_seg: null,
+        observacao: null,
+        ordem: proximaOrdem,
+        exercicio: ex,
+        series: Array.from({ length: 3 }, (_, i) => {
+          const ant = anterior.find((a) => a.serie === i + 1);
+          return { id: `novo:${crypto.randomUUID()}`, serie: i + 1, peso_alvo: ant?.peso ?? null, rep_min: ant?.repeticoes ?? null, rep_max: ant?.repeticoes ?? null };
+        }),
+      };
+      modalEditorRotina = { ...modalEditorRotina, exercicios: [...modalEditorRotina.exercicios, novoItem] };
+      editorSujo = true;
       mostrarPickerEditor = false;
     } catch (e) {
       alert("Erro ao adicionar exercício: " + (e as Error).message);
     }
   }
 
-  async function ajustarSeriesEditor(novoNumero: number): Promise<void> {
+  function ajustarSeriesEditor(novoNumero: number): void {
     if (!editandoSerieEditor || !modalEditorRotina) return;
     const item = editandoSerieEditor;
-    const treino = modalEditorRotina;
-    salvandoEditor = true;
-    try {
-      await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
-      await refrescarTreinoEditor(treino.id);
-    } catch (e) {
-      alert("Erro ao ajustar séries: " + (e as Error).message);
-    } finally {
-      salvandoEditor = false;
-    }
+    modalEditorRotina = {
+      ...modalEditorRotina,
+      exercicios: modalEditorRotina.exercicios.map((te) => {
+        if (te.id !== item.treinoExercicioId) return te;
+        if (novoNumero < te.series.length) return { ...te, series: te.series.slice(0, novoNumero) };
+        if (novoNumero > te.series.length) {
+          const ultima = te.series[te.series.length - 1];
+          const novas = Array.from({ length: novoNumero - te.series.length }, (_, i) => ({
+            id: `novo:${crypto.randomUUID()}`,
+            serie: te.series.length + i + 1,
+            peso_alvo: ultima?.peso_alvo ?? null,
+            rep_min: ultima?.rep_min ?? null,
+            rep_max: ultima?.rep_max ?? null,
+          }));
+          return { ...te, series: [...te.series, ...novas] };
+        }
+        return te;
+      }),
+    };
+    editorSujo = true;
   }
 
   /** Abre o gráfico direto (sem passar por menu) quando se entra em
@@ -1757,7 +1833,8 @@
 {/if}
 
 {#if mostrarPickerMusculo && trocandoItemMusculo}
-  {@const treinoTroca = treinos.find((t) => t.id === trocandoItemMusculo!.treinoId)}
+  {@const treinoTroca =
+    modalEditorRotina?.id === trocandoItemMusculo!.treinoId ? modalEditorRotina : treinos.find((t) => t.id === trocandoItemMusculo!.treinoId)}
   <Exercicios
     modoSelecao
     tituloSelecao="Trocar Exercício"
@@ -1775,14 +1852,7 @@
   <div class="tela-editor-rotina">
     <div class="editor-conteudo">
       <div class="header">
-        <button
-          class="back"
-          onclick={() => {
-            modalEditorRotina = null;
-            if (editorUrlTreino) window.history.back();
-          }}
-          aria-label="Voltar"
-        >{@render iconVoltar()}</button>
+        <button class="back" onclick={tentarFecharEditor} aria-label="Voltar">{@render iconVoltar()}</button>
         <h1>{modalEditorRotina.nome_treino}</h1>
         <span class="spacer"></span>
       </div>
@@ -1790,6 +1860,7 @@
         {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
           {@const tendEx = tendenciaExercicio(te.exercicio_id)}
           {@const impacto = calcularImpactoEditor(te)}
+          {@const deltaTotal = deltaSeriesEditor(te)}
           <div class="editor-item" class:arrastando={arrastandoIdxEditor === idx} bind:this={itemEditorRefs[idx]}>
             <button
               class="remover-circulo"
@@ -1810,25 +1881,35 @@
               <span class="editor-nome-texto">{te.exercicio?.nome ?? ""}</span>
               {#if impacto.length}
                 <span class="editor-nome-impacto">
-                  {#each impacto as imp, i (imp.nome)}{i > 0 ? " · " : ""}{imp.nome} {imp.deltaPct > 0
-                      ? "+"
-                      : ""}{Math.round(imp.deltaPct)}%{/each}
+                  {#each impacto as imp, i (imp.nome)}
+                    {#if i > 0}<span class="impacto-sep"> · </span>{/if}<span>{imp.nome} </span><span
+                      class:valor-subindo={imp.deltaPct > 0}
+                      class:valor-caindo={imp.deltaPct < 0}
+                    >{imp.deltaPct > 0 ? "+" : ""}{Math.round(imp.deltaPct)}%</span>
+                  {/each}
                 </span>
               {/if}
             </button>
-            <button
-              class="exercicio-musculo-series"
-              onclick={() =>
-                (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
-            >
-              <span
-                class="editor-serie-numero"
-                class:valor-subindo={tendEx === "subindo"}
-                class:valor-estavel={tendEx === "estavel"}
-                class:valor-caindo={tendEx === "caindo"}
-              >{te.series.length}</span>
-              <span class="editor-serie-label">{te.series.length === 1 ? "série" : "séries"}</span>
-            </button>
+            <div class="editor-serie-col">
+              {#if deltaTotal !== 0}
+                <span class="editor-serie-delta" class:valor-subindo={deltaTotal > 0} class:valor-caindo={deltaTotal < 0}>
+                  {deltaTotal > 0 ? "+" : ""}{deltaTotal}
+                </span>
+              {/if}
+              <button
+                class="exercicio-musculo-series"
+                onclick={() =>
+                  (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
+              >
+                <span
+                  class="editor-serie-numero"
+                  class:valor-subindo={tendEx === "subindo"}
+                  class:valor-estavel={tendEx === "estavel"}
+                  class:valor-caindo={tendEx === "caindo"}
+                >{te.series.length}</span>
+                <span class="editor-serie-label">{te.series.length === 1 ? "série" : "séries"}</span>
+              </button>
+            </div>
             <button class="handle-arraste" onpointerdown={(e) => iniciarArrasteEditor(e, idx)} aria-label="Arrastar para reordenar">☰</button>
           </div>
         {/each}
@@ -1836,6 +1917,7 @@
           <p class="muted">Nenhum exercício ainda.</p>
         {/if}
       </div>
+      <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
       <div class="editor-totais">
         <span>
           {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
@@ -1847,9 +1929,21 @@
           {@render iconGrafico()}
         </button>
       </div>
-      <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
+      <button class="salvar-editor-btn" onclick={salvarEditor} disabled={salvandoEditor}>{salvandoEditor ? "Salvando…" : "Salvar"}</button>
     </div>
   </div>
+{/if}
+
+{#if confirmandoFecharEditor}
+  <ConfirmDialog
+    titulo="Descartar as alterações não salvas?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoFecharEditor = false;
+      fecharEditorSemSalvar();
+    }}
+    onCancelar={() => (confirmandoFecharEditor = false)}
+  />
 {/if}
 
 {#if mostrarPickerEditor && modalEditorRotina}
@@ -2382,7 +2476,7 @@
   }
   .editor-serie-numero {
     font-weight: 700;
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     /* Sem color aqui: herda var(--surface-fg) do botão pai por padrão, e .valor-subindo/
        -estavel/-caindo (aplicada como classe extra) sobrescreve — uma declaração direta
        sempre vence a herdada, então não importa a ordem das regras no arquivo. */
@@ -2391,6 +2485,17 @@
     font-weight: 400;
     font-size: 11px;
     color: var(--surface-muted);
+  }
+  .editor-serie-col {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+  }
+  .editor-serie-delta {
+    font-size: 10px;
+    font-weight: 700;
   }
   .serie-texto-musculo {
     flex-shrink: 0;
@@ -2507,6 +2612,8 @@
     justify-content: space-between;
     gap: var(--space-2);
     margin: var(--space-3) 0 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--surface-border);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
@@ -2550,6 +2657,19 @@
   }
   .adicionar-exercicio-editor-btn {
     flex-shrink: 0;
+    margin-top: var(--space-4);
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .salvar-editor-btn {
+    flex-shrink: 0;
     position: sticky;
     bottom: 0;
     margin-top: var(--space-4);
@@ -2560,7 +2680,11 @@
     background: var(--color-primary);
     color: var(--color-primary-fg);
     font-size: var(--font-size-base);
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
+  }
+  .salvar-editor-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 </style>
