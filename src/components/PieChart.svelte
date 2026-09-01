@@ -209,9 +209,8 @@
       />
       {#if seg.rotuloVisivel && f.nome === nomeDestacado}
         <text x={seg.rotuloX} y={seg.rotuloY} text-anchor="middle" class="seg-texto" style="pointer-events: none;">
-          <tspan x={seg.rotuloX} dy="-0.9" class="seg-valor"
-            >{formatValor(seg.valor)} {formatValor(seg.valor) === "1" ? "série" : "séries"}</tspan
-          >
+          <tspan x={seg.rotuloX} dy="-0.9" class="seg-valor">{formatValor(seg.valor)}</tspan
+          ><tspan class="seg-unidade"> {formatValor(seg.valor) === "1" ? "série" : "séries"}</tspan>
           <tspan x={seg.rotuloX} dy="2.6" class="seg-pct">{seg.pct}%</tspan>
         </text>
       {/if}
@@ -304,6 +303,10 @@
   .seg-valor {
     font-size: 3.6px;
     font-weight: 800;
+  }
+  .seg-unidade {
+    font-size: 2.2px;
+    font-weight: 400;
   }
   .seg-pct {
     font-size: 3.4px;
