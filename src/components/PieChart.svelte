@@ -63,7 +63,7 @@
   const MAX_CHARS_LINHA = 9;
   const ALTURA_LINHA = 5.4;
   /** Espaço vazio (graus) entre fatias de músculos diferentes, no lugar de uma linha. */
-  const GAP_GRAUS = 2.5;
+  const GAP_GRAUS = 4.5;
 
   function ponto(r: number, anguloGraus: number): { x: number; y: number } {
     const rad = ((anguloGraus - 90) * Math.PI) / 180;
