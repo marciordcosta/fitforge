@@ -948,6 +948,7 @@
     buscaInicialTroca = buscaInicial;
     mostrarPickerMusculo = true;
     menuExercicioMusculo = null;
+    menuTrocarSubmenu = null;
   }
 
   async function trocarExercicioMusculo(ex: Exercicio): Promise<void> {
@@ -2079,10 +2080,7 @@
         {
           label: "Ir para Lista",
           icon: iconGrade,
-          onSelect: () => {
-            menuTrocarSubmenu = null;
-            abrirTrocarExercicioMusculo(item, modalMusculoRotina?.musculo.nome ?? "");
-          },
+          onSelect: () => abrirTrocarExercicioMusculo(item, modalMusculoRotina?.musculo.nome ?? ""),
         },
         {
           label: "Ir para Rotinas",
