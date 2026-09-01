@@ -2330,7 +2330,7 @@
           {@const impacto = calcularImpactoEditor(te)}
           {@const deltaTotal = deltaSeriesEditor(te)}
           {@const valorAnteriorSeries = baselineEditor?.seriesPorExercicio.get(te.id) ?? 0}
-          {@const numeroExibidoSeries = baselineEditor?.seriesPorExercicio.has(te.id) ? valorAnteriorSeries : te.series.length}
+          {@const numeroExibidoSeries = te.series.length}
           {@const destacado = editorDestaqueMusculoId != null && te.exercicio?.musculos.some((m) => m.musculo_id === editorDestaqueMusculoId)}
           {@const foraDoFiltro = editorFiltroMusculoId != null && !te.exercicio?.musculos.some((m) => m.musculo_id === editorFiltroMusculoId)}
           <div
@@ -2371,7 +2371,7 @@
             <div class="editor-serie-col">
               {#if deltaTotal !== 0}
                 <span class="editor-serie-badge" class:editor-serie-badge-mais={deltaTotal > 0} class:editor-serie-badge-menos={deltaTotal < 0}
-                >{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
+                >{valorAnteriorSeries}{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
               {/if}
               <button
                 class="exercicio-musculo-series"
@@ -3117,7 +3117,7 @@
   }
   .editor-serie-numero {
     font-weight: 700;
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-lg);
     /* Sem color aqui: herda var(--surface-fg) do botão pai por padrão, e .valor-subindo/
        -estavel/-caindo (aplicada como classe extra) sobrescreve — uma declaração direta
        sempre vence a herdada, então não importa a ordem das regras no arquivo. */
