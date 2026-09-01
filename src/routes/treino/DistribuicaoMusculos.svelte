@@ -988,7 +988,7 @@
                 {#each lista as linha (linha.chave)}
                   {@const grupoChave = `${treino.id}:${linha.chave}`}
                   {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
-                  <div class="item item-fadiga">
+                  <div class="item">
                     {#if linha.subItens}
                       <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
                         <span class="chevron-grupo" class:aberto>›</span>
@@ -998,16 +998,13 @@
                       <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                     {/if}
                     {@render barraFadiga(linha.partes, linha.valor, () => abrirGraficoTreino(treino))}
-                    <span class="pct-total">{linha.pct.toFixed(0)}%</span>
                     <span class="valor">{formatValor(linha.valor)}</span>
                   </div>
                   {#if aberto && linha.subItens}
                     {#each linha.subItens as sub (sub.musculo.id)}
-                      {@const pctSub = linha.valor > 0 ? (sub.valor / linha.valor) * linha.pct : 0}
-                      <div class="item item-fadiga item-sub">
+                      <div class="item item-sub">
                         <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                         {@render barraFadiga(sub.partes, sub.valor, () => abrirGraficoTreino(treino))}
-                        <span class="pct-total">{pctSub.toFixed(0)}%</span>
                         <span class="valor">{formatValor(sub.valor)}</span>
                       </div>
                     {/each}
@@ -1535,10 +1532,6 @@
     padding-left: var(--space-3);
     opacity: 0.85;
   }
-  .item-fadiga {
-    grid-template-columns: 100px 1fr 40px 48px;
-    gap: var(--space-2);
-  }
   .barra-wrap {
     height: 10px;
     background: var(--surface-border);
@@ -1563,12 +1556,6 @@
   }
   .barra-seg {
     height: 100%;
-  }
-  .pct-total {
-    text-align: right;
-    font-size: 10px;
-    color: var(--surface-muted);
-    font-weight: 600;
   }
   .item .valor {
     text-align: right;
