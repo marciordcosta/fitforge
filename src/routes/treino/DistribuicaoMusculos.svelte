@@ -1592,28 +1592,32 @@
 {/if}
 
 {#if modalDetalheRotina}
-  <Sheet
-    titulo={modalDetalheRotina.titulo}
-    onFechar={() => (modalDetalheRotina = null)}
-    acaoTitulo={modalDetalheRotina.itensGrupo?.length ? alternarModoDetalhe : undefined}
-  >
-    <div class="pizza-wrap">
-      {#if modoGrupoDetalhe && modalDetalheRotina.itensGrupo}
-        <PieChart
-          dados={modalDetalheRotina.itensGrupo.map((i) => ({ nome: i.nome, valor: i.valor }))}
-          centroValor={modalDetalheRotina.centroValor}
-          centroLabel={modalDetalheRotina.centroLabel}
-        />
-      {:else}
-        <PieChart
-          dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
-          cores={modalDetalheRotina.cores}
-          centroValor={modalDetalheRotina.centroValor}
-          centroLabel={modalDetalheRotina.centroLabel}
-        />
-      {/if}
-    </div>
-  </Sheet>
+  <!-- Pode abrir a partir do rodapé do editor completo (.tela-editor-rotina, z-index 110) —
+       precisa ficar por cima dele, não só do resto da página. -->
+  <div class="acima-editor">
+    <Sheet
+      titulo={modalDetalheRotina.titulo}
+      onFechar={() => (modalDetalheRotina = null)}
+      acaoTitulo={modalDetalheRotina.itensGrupo?.length ? alternarModoDetalhe : undefined}
+    >
+      <div class="pizza-wrap">
+        {#if modoGrupoDetalhe && modalDetalheRotina.itensGrupo}
+          <PieChart
+            dados={modalDetalheRotina.itensGrupo.map((i) => ({ nome: i.nome, valor: i.valor }))}
+            centroValor={modalDetalheRotina.centroValor}
+            centroLabel={modalDetalheRotina.centroLabel}
+          />
+        {:else}
+          <PieChart
+            dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
+            cores={modalDetalheRotina.cores}
+            centroValor={modalDetalheRotina.centroValor}
+            centroLabel={modalDetalheRotina.centroLabel}
+          />
+        {/if}
+      </div>
+    </Sheet>
+  </div>
 {/if}
 
 {#if modalGraficoTreino}
@@ -1695,7 +1699,7 @@
   {@const item = menuExercicioMusculo}
   <!-- Precisa ficar acima do editor completo (.tela-editor-rotina, z-index 110) além do
        modal por músculo (Sheet, z-index 100) — pode abrir a partir de qualquer um dos dois. -->
-  <div class="menu-exercicio-acima">
+  <div class="acima-editor">
     <ActionSheet
       titulo={item.exercicioNome}
       onFechar={() => (menuExercicioMusculo = null)}
@@ -1807,14 +1811,18 @@
 {/if}
 
 {#if editandoSerieEditor}
-  <WheelPicker
-    titulo={editandoSerieEditor.exercicioNome}
-    subtitulo="Número de séries"
-    opcoes={opcoesSeries}
-    valorAtual={editandoSerieEditor.series}
-    onSelecionar={(v) => ajustarSeriesEditor(v)}
-    onFechar={() => (editandoSerieEditor = null)}
-  />
+  <!-- Abre por cima do editor completo (.tela-editor-rotina, z-index 110) — sem isso o
+       WheelPicker (Sheet, z-index 100) ficava escondido atrás da tela cheia. -->
+  <div class="acima-editor">
+    <WheelPicker
+      titulo={editandoSerieEditor.exercicioNome}
+      subtitulo="Número de séries"
+      opcoes={opcoesSeries}
+      valorAtual={editandoSerieEditor.series}
+      onSelecionar={(v) => ajustarSeriesEditor(v)}
+      onFechar={() => (editandoSerieEditor = null)}
+    />
+  </div>
 {/if}
 
 {#if confirmandoRemover}
@@ -2126,7 +2134,7 @@
     letter-spacing: 0.3px;
     cursor: pointer;
   }
-  .menu-exercicio-acima {
+  .acima-editor {
     position: relative;
     z-index: 115;
   }
