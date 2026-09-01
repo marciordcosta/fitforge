@@ -1551,7 +1551,7 @@
       <p class="muted">Nenhuma rotina cadastrada ainda.</p>
     {:else}
       <div class="lista-rotinas">
-        <div class="rotina-card">
+        <div class="rotina-card rotina-card-semanal">
           <div class="rotina-cabecalho">
             <h2 class="rotina-nome">
               <button
@@ -2491,6 +2491,11 @@
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     box-shadow: var(--shadow-card);
+  }
+  /* Experimento: sem fundo, pra diferenciar do resto dos cards de rotina. */
+  .rotina-card.rotina-card-semanal {
+    background: none;
+    box-shadow: none;
   }
   .rotina-cabecalho {
     display: flex;
