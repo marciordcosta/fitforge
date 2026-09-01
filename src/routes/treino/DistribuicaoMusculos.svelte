@@ -418,38 +418,20 @@
   });
 
   /** Distribuição semanal (todas as rotinas somadas), ponderada pelo peso de contribuição parametrizado de cada músculo. */
-  /** Faixas A/B/C por DOMINÂNCIA acumulada (20/30/50 do total de séries da semana, ordenado do
-   * músculo mais forte pro mais fraco) — mesma regra do anel semanal (coresAbcAcumulado), não por
-   * posição no treino: a semana não tem uma sequência única de fadiga como uma rotina tem. Cada
-   * músculo recebe uma cor só (não se divide entre faixas), igual ao anel. */
-  /** Só a faixa (a/b/c) de cada músculo pela dominância acumulada — a classificação usa os valores
-   * "crus" (sem arredondar) pra o corte 20/30/50 ficar preciso, mas quem monta a barra (partes)
-   * usa o valor já arredondado exibido, senão a soma das partes fica menor que o valor mostrado
-   * e a barra não preenche 100%. */
-  function faixaDominanciaSemanal(): Map<string, "a" | "b" | "c"> {
-    const mapa = new Map<string, number>();
+  /** Partes (A/B/C por POSIÇÃO no treino — igual às rotinas individuais) de cada músculo, somadas
+   * entre TODAS as rotinas da semana: cada rotina já classifica suas próprias séries pela posição
+   * dela mesma (contarSeriesPorFaixaDePosicao) — aqui só soma isso músculo a músculo entre as
+   * rotinas, sem tentar achar uma "posição única" entre rotinas diferentes (que não existiria).
+   * Mesma regra 20/30/50 das barras de cada rotina, agora funcionando com rotinas diferentes
+   * porque a soma acontece DEPOIS de cada rotina já ter feito sua própria classificação. */
+  function partesFadigaSemanal(): Map<string, Partes> {
+    const mapa = new Map<string, Partes>();
     for (const t of treinos) {
-      for (const ex of t.exercicios) {
-        const numSeries = ex.series.length;
-        if (!numSeries) continue;
-        for (const m of ex.exercicio?.musculos ?? []) {
-          mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + numSeries * m.peso_contribuicao);
-        }
+      for (const [musculoId, partes] of contarSeriesPorFaixaDePosicao(t)) {
+        mapa.set(musculoId, somarPartes(mapa.get(musculoId) ?? partesVazias(), partes));
       }
     }
-    const itens = Array.from(mapa.entries())
-      .map(([musculo_id, valor]) => ({ musculo_id, valor }))
-      .sort((a, b) => b.valor - a.valor);
-    const total = itens.reduce((acc, i) => acc + i.valor, 0);
-    let acumulado = 0;
-    const resultado = new Map<string, "a" | "b" | "c">();
-    for (const item of itens) {
-      const pct = total > 0 ? (item.valor / total) * 100 : 0;
-      acumulado += pct;
-      const cor = corPorFaixa(acumulado);
-      resultado.set(item.musculo_id, cor === CORES_FAIXA.a ? "a" : cor === CORES_FAIXA.b ? "b" : "c");
-    }
-    return resultado;
+    return mapa;
   }
 
   const distribuicaoSemanal = $derived.by(() => {
@@ -463,13 +445,11 @@
         }
       }
     }
-    const faixaPorMusculo = faixaDominanciaSemanal();
+    const partesPorMusculo = partesFadigaSemanal();
     return musculos
       .map((m) => {
         const valor = Math.round(mapa.get(m.id) ?? 0);
-        const partes = partesVazias();
-        const faixa = faixaPorMusculo.get(m.id) ?? "c";
-        partes[faixa] = valor;
+        const partes = partesPorMusculo.get(m.id) ?? partesVazias();
         return { musculo: m, valor, partes };
       })
       .filter((item) => item.valor > 0)
@@ -1485,21 +1465,19 @@
 {/snippet}
 
 {#snippet barraSemanal(partes: Partes, valor: number, totalValor: number)}
-  <div class="barra-wrap-fadiga">
-    <div class="barra-segmentos">
-      {#if semanalOrdenadaPorEfetivo}
-        {#each partesParaSegmentos(partes) as seg (seg.cor)}
-          {@const pctSeg = valor > 0 ? (seg.valor / valor) * 100 : 0}
-          {#if seg.valor > 0}
-            <div class="barra-seg" style={`width: ${pctSeg}%; background: ${seg.cor};`}></div>
-          {/if}
-        {/each}
-      {:else}
-        {@const valorArred = arredondarValor(valor)}
+  {#if semanalOrdenadaPorEfetivo}
+    <!-- Mesma barra (rótulo % em cima de cada faixa) das rotinas individuais — as partes já vêm
+         somadas de todas as rotinas da semana, então o denominador certo é a própria soma delas,
+         não o valor bruto arredondado (que pode não bater exatamente). -->
+    {@render barraFadiga(partes, partes.a + partes.b + partes.c)}
+  {:else}
+    {@const valorArred = arredondarValor(valor)}
+    <div class="barra-wrap-fadiga">
+      <div class="barra-segmentos">
         <div class="barra-seg" style={`width: ${totalValor > 0 ? (valorArred / totalValor) * 100 : 0}%; background: var(--color-primary);`}></div>
-      {/if}
+      </div>
     </div>
-  </div>
+  {/if}
 {/snippet}
 
 <div class="container has-bottom-nav">
@@ -2550,8 +2528,8 @@
     white-space: nowrap;
   }
   .barra-wrap-fadiga {
-    height: 10px;
-    border-radius: 6px;
+    height: 6px;
+    border-radius: 4px;
     overflow: hidden;
     background: var(--surface-border);
   }
