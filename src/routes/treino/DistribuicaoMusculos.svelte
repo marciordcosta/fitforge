@@ -3154,9 +3154,8 @@
     cursor: pointer;
   }
   .editor-meta-chip-ativo {
-    background: color-mix(in srgb, var(--color-primary) 30%, var(--surface-card));
     outline: 2px solid var(--color-primary);
-    outline-offset: -2px;
+    outline-offset: 2px;
   }
   .editor-meta-nome {
     font-size: 10px;
