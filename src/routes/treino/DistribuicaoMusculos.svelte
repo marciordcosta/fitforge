@@ -606,10 +606,6 @@
     };
   }
 
-  function abrirMenuCardRotina(treino: TreinoComExercicios): void {
-    navigate(`/treino/distribuicao/rotina/${treino.id}`);
-  }
-
   // ---------------- Modal: exercícios de um músculo dentro de uma rotina específica, com séries editáveis ----------------
 
   interface ItemMusculoRotina {
@@ -658,16 +654,10 @@
     }
   }
 
-  /** Deriva do path pra que "voltar" do navegador feche o menu, ou reabra ao voltar de "Editar Rotina". */
-  const rotinaMenuUrl = $derived.by(() => {
-    const m = router.path.match(/^\/treino\/distribuicao\/rotina\/([^/]+)$/);
-    if (!m) return null;
-    return treinos.find((t) => t.id === m[1]) ?? null;
-  });
-
-  /** Abre o gráfico direto (sem passar pelo menu) quando se entra em
+  /** Abre o gráfico direto (sem passar por menu) quando se entra em
    * /treino/distribuicao/rotina/:id/grafico — usado pela opção "Distribuição" no menu de
-   * Visualizar Rotina. "Voltar" do navegador fecha o gráfico e sai dessa rota. */
+   * Visualizar Rotina, e pelo rodapé do card da rotina. "Voltar" do navegador fecha o gráfico
+   * e sai dessa rota. */
   const graficoUrlTreino = $derived.by(() => {
     const m = router.path.match(/^\/treino\/distribuicao\/rotina\/([^/]+)\/grafico$/);
     if (!m) return null;
@@ -676,14 +666,6 @@
 
   $effect(() => {
     if (graficoUrlTreino) abrirGraficoTreino(graficoUrlTreino);
-  });
-
-  const rotinaMenuOpcoes = $derived.by((): AcaoSheet[] => {
-    if (!rotinaMenuUrl) return [];
-    return [
-      { label: "Editar Rotina", icon: iconEditar, onSelect: () => navigate(`/treino/rotina/${rotinaMenuUrl!.id}`) },
-      { label: "Visualizar Gráfico", icon: iconGrafico, onSelect: () => abrirGraficoTreino(rotinaMenuUrl!) },
-    ];
   });
 
   function abrirMenuSemanal(): void {
@@ -768,6 +750,23 @@
   </svg>
 {/snippet}
 
+{#snippet barraFadiga(partes: Partes, valor: number)}
+  <div class="barra-wrap-fadiga">
+    <div class="barra-segmentos">
+      {#each partesParaSegmentos(partes) as seg (seg.cor)}
+        {@const pctSeg = valor > 0 ? (seg.valor / valor) * 100 : 0}
+        {#if seg.valor > 0}
+          <div class="barra-seg" style={`width: ${pctSeg}%; background: ${seg.cor};`}>
+            {#if pctSeg >= 18}
+              <span class="barra-seg-texto">{formatValor(seg.valor)} · {pctSeg.toFixed(0)}%</span>
+            {/if}
+          </div>
+        {/if}
+      {/each}
+    </div>
+  </div>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -850,7 +849,7 @@
                 {#each lista as linha (linha.chave)}
                   {@const grupoChave = `${treino.id}:${linha.chave}`}
                   {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
-                  <div class="item">
+                  <div class="item item-fadiga">
                     {#if linha.subItens}
                       <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
                         <span class="chevron-grupo" class:aberto>›</span>
@@ -859,41 +858,17 @@
                     {:else}
                       <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                     {/if}
-                    <div class="barra-wrap">
-                      <div class="barra" style={`width: ${Math.min(linha.pct, 100)}%;`}>
-                        <div class="barra-segmentos">
-                          {#each partesParaSegmentos(linha.partes) as seg (seg.cor)}
-                            {#if seg.valor > 0}
-                              <div
-                                class="barra-seg"
-                                style={`width: ${linha.valor > 0 ? (seg.valor / linha.valor) * 100 : 0}%; background: ${seg.cor};`}
-                              ></div>
-                            {/if}
-                          {/each}
-                        </div>
-                        <span class="barra-pct">{linha.pct.toFixed(0)}%</span>
-                      </div>
-                    </div>
+                    {@render barraFadiga(linha.partes, linha.valor)}
+                    <span class="pct-total">{linha.pct.toFixed(0)}%</span>
                     <span class="valor">{formatValor(linha.valor)}</span>
                   </div>
                   {#if aberto && linha.subItens}
                     {#each linha.subItens as sub (sub.musculo.id)}
-                      <div class="item item-sub">
+                      {@const pctSub = linha.valor > 0 ? (sub.valor / linha.valor) * linha.pct : 0}
+                      <div class="item item-fadiga item-sub">
                         <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
-                        <div class="barra-wrap">
-                          <div class="barra" style={`width: ${linha.valor > 0 ? (sub.valor / linha.valor) * 100 : 0}%;`}>
-                            <div class="barra-segmentos">
-                              {#each partesParaSegmentos(sub.partes) as seg (seg.cor)}
-                                {#if seg.valor > 0}
-                                  <div
-                                    class="barra-seg"
-                                    style={`width: ${sub.valor > 0 ? (seg.valor / sub.valor) * 100 : 0}%; background: ${seg.cor};`}
-                                  ></div>
-                                {/if}
-                              {/each}
-                            </div>
-                          </div>
-                        </div>
+                        {@render barraFadiga(sub.partes, sub.valor)}
+                        <span class="pct-total">{pctSub.toFixed(0)}%</span>
                         <span class="valor">{formatValor(sub.valor)}</span>
                       </div>
                     {/each}
@@ -901,7 +876,7 @@
                 {/each}
               </div>
             {/if}
-            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirMenuCardRotina(treino)}>
+            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirGraficoTreino(treino)}>
               {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
                 (acc, ex) => acc + ex.series.length,
                 0,
@@ -978,12 +953,6 @@
   {/if}
 </div>
 
-{#snippet iconEditar()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-  </svg>
-{/snippet}
 {#snippet iconGrafico()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
@@ -1020,10 +989,6 @@
     onFechar={() => (modalAberto = null)}
     acaoTitulo={modalAberto.musculoParaGrade ? linkDistribuicao : undefined}
   />
-{/if}
-
-{#if rotinaMenuUrl}
-  <ActionSheet titulo={rotinaMenuUrl.nome_treino} opcoes={rotinaMenuOpcoes} onFechar={() => window.history.back()} />
 {/if}
 
 {#if mostrarGradeSemanal}
@@ -1358,6 +1323,10 @@
     padding-left: var(--space-3);
     opacity: 0.85;
   }
+  .item-fadiga {
+    grid-template-columns: 100px 1fr 40px 48px;
+    gap: var(--space-2);
+  }
   .barra-wrap {
     height: 10px;
     background: var(--surface-border);
@@ -1368,6 +1337,12 @@
     height: 100%;
     border-radius: 6px;
   }
+  .barra-wrap-fadiga {
+    height: 22px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface-border);
+  }
   .barra-segmentos {
     display: flex;
     height: 100%;
@@ -1376,17 +1351,26 @@
   }
   .barra-seg {
     height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
-  .barra-pct {
-    position: absolute;
-    left: 100%;
-    top: 50%;
-    transform: translateY(-50%);
-    margin-left: var(--space-1);
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--surface-muted);
+  .barra-seg-texto {
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
     white-space: nowrap;
+    padding: 0 2px;
+    text-shadow:
+      0 0 2px rgba(0, 0, 0, 0.7),
+      0 0 3px rgba(0, 0, 0, 0.5);
+  }
+  .pct-total {
+    text-align: right;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+    font-weight: 600;
   }
   .item .valor {
     text-align: right;
