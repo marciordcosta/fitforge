@@ -769,6 +769,60 @@ export async function updateSeriesCountTreinoExercicio(treinoExercicioId: string
   }
 }
 
+/** Remove um exercício de uma rotina já salva (a exclusão em cascata cuida das séries dele). */
+export async function removerTreinoExercicio(treinoExercicioId: string): Promise<void> {
+  const { error } = await supabase.from("treino_exercicios").delete().eq("id", treinoExercicioId);
+  if (error) throw error;
+}
+
+/** Atualiza a ordem dos exercícios dentro de uma rotina já salva, na sequência dos ids informados. */
+export async function atualizarOrdemTreinoExercicios(idsOrdenados: string[]): Promise<void> {
+  await Promise.all(
+    idsOrdenados.map((id, ordem) => supabase.from("treino_exercicios").update({ ordem }).eq("id", id)),
+  );
+}
+
+/** Adiciona um exercício a uma rotina já salva, no fim da ordem — usado pela edição visual na
+ * tela de Distribuição Muscular, grava direto sem passar pelo rascunho do editor de rotina. */
+export async function adicionarTreinoExercicio(
+  treinoId: string,
+  exercicioId: string,
+  numSeries: number,
+  anterior: SetRegistro[],
+): Promise<string> {
+  const { data: existentes, error: ordError } = await supabase
+    .from("treino_exercicios")
+    .select("ordem")
+    .eq("treino_id", treinoId)
+    .order("ordem", { ascending: false })
+    .limit(1);
+  if (ordError) throw ordError;
+  const proximaOrdem = existentes?.length ? existentes[0].ordem + 1 : 0;
+
+  const { data: te, error: insError } = await supabase
+    .from("treino_exercicios")
+    .insert({ user_id: uid(), treino_id: treinoId, exercicio_id: exercicioId, ordem: proximaOrdem })
+    .select("id")
+    .single();
+  if (insError) throw insError;
+
+  const series = Array.from({ length: numSeries }, (_, i) => {
+    const ant = anterior.find((a) => a.serie === i + 1);
+    return {
+      treino_exercicio_id: te.id,
+      serie: i + 1,
+      peso_alvo: ant?.peso ?? null,
+      rep_min: ant?.repeticoes ?? null,
+      rep_max: ant?.repeticoes ?? null,
+    };
+  });
+  if (series.length) {
+    const { error: seriesError } = await supabase.from("treino_exercicio_series").insert(series);
+    if (seriesError) throw seriesError;
+  }
+  return te.id;
+}
+
 // ---------------- Log de treino (registros) ----------------
 
 export interface SetRegistro {

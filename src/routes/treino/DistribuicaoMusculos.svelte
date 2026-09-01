@@ -9,18 +9,27 @@
   import {
     listMusculos,
     listTreinos,
+    listExercicios,
     getTreino,
     getVolumeRealizadoBruto,
+    getUltimoRegistro,
     updateSeriesCountTreinoExercicio,
+    removerTreinoExercicio,
+    atualizarOrdemTreinoExercicios,
+    adicionarTreinoExercicio,
+    correspondeBusca,
+    textoBuscavelExercicio,
     DIAS_SEMANA_ABREV,
     abreviarMusculo,
     type Musculo,
     type TreinoComExercicios,
+    type Exercicio,
   } from "../../lib/treinoApi";
 
   let aba = $state<"planejado" | "realizado">("planejado");
   let musculos = $state<Musculo[]>([]);
   let treinos = $state<TreinoComExercicios[]>([]);
+  let todosExercicios = $state<Exercicio[]>([]);
 
   let mesBase = $state(new Date());
   let linhasRealizadoMes = $state<{ data: string; musculo_id: string; series_equivalentes: number }[]>([]);
@@ -46,9 +55,14 @@
   }
 
   async function carregarBase() {
-    const [musculosCarregados, treinosCarregados] = await Promise.all([listMusculos(), listTreinos()]);
+    const [musculosCarregados, treinosCarregados, exerciciosCarregados] = await Promise.all([
+      listMusculos(),
+      listTreinos(),
+      listExercicios(),
+    ]);
     musculos = musculosCarregados;
     treinos = ordenarPorDia(treinosCarregados);
+    todosExercicios = exerciciosCarregados;
     const hojeIso = toISODate(new Date());
     const [, volumeSemana] = await Promise.all([carregarRealizado(), getVolumeRealizadoBruto(segundaISO(), hojeIso)]);
     const mapa = new Map<string, number>();
@@ -91,9 +105,11 @@
     return mapa;
   }
 
-  /** Números do modo de contribuição costumam vir com decimais (0.25, 4.5...) — mostra inteiro quando cai redondo, senão 1 casa. */
+  /** Números do modo de contribuição costumam vir com decimais (0.25, 4.3...) — arredonda pro
+   * 0.5 mais próximo pra não mostrar frações estranhas tipo 0.3, e mostra inteiro quando cai redondo. */
   function formatValor(valor: number): string {
-    return Number.isInteger(valor) ? String(valor) : valor.toFixed(1);
+    const arred = Math.round(valor * 2) / 2;
+    return Number.isInteger(arred) ? String(arred) : arred.toFixed(1);
   }
 
   /**
@@ -654,6 +670,126 @@
     }
   }
 
+  // ---------------- Modal: edição visual da rotina inteira (add/remover/reordenar exercícios) ----------------
+
+  let modalEditorRotina = $state<TreinoComExercicios | null>(null);
+  let editandoSerieEditor = $state<{ treinoExercicioId: string; exercicioNome: string; series: number } | null>(null);
+  let salvandoEditor = $state(false);
+  let mostrarPickerEditor = $state(false);
+  let buscaPickerEditor = $state("");
+  let adicionandoIdEditor = $state<string | null>(null);
+  let arrastandoIdxEditor = $state<number | null>(null);
+  let itemEditorRefs: (HTMLElement | null)[] = [];
+
+  function abrirEditorRotina(treino: TreinoComExercicios): void {
+    modalEditorRotina = treino;
+  }
+
+  /** Recarrega a rotina do banco após qualquer alteração e propaga pro card/lista e pro
+   * próprio modal do editor — mantém tudo ligado sem precisar de um botão Salvar. */
+  async function refrescarTreinoEditor(treinoId: string): Promise<void> {
+    const atualizado = await getTreino(treinoId);
+    if (!atualizado) return;
+    treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
+    if (modalEditorRotina?.id === treinoId) modalEditorRotina = atualizado;
+  }
+
+  async function removerExercicioEditor(treinoExercicioId: string): Promise<void> {
+    if (!modalEditorRotina) return;
+    const treinoId = modalEditorRotina.id;
+    salvandoEditor = true;
+    try {
+      await removerTreinoExercicio(treinoExercicioId);
+      await refrescarTreinoEditor(treinoId);
+    } finally {
+      salvandoEditor = false;
+    }
+  }
+
+  function iniciarArrasteEditor(e: PointerEvent, idx: number): void {
+    arrastandoIdxEditor = idx;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function moverDuranteArrasteEditor(e: PointerEvent): void {
+    if (arrastandoIdxEditor === null || !modalEditorRotina) return;
+    const y = e.clientY;
+    for (let i = 0; i < itemEditorRefs.length; i++) {
+      const el = itemEditorRefs[i];
+      if (!el || i === arrastandoIdxEditor) continue;
+      const rect = el.getBoundingClientRect();
+      const meio = rect.top + rect.height / 2;
+      if ((i < arrastandoIdxEditor && y < meio) || (i > arrastandoIdxEditor && y > meio)) {
+        const ordenados = modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+        const [item] = ordenados.splice(arrastandoIdxEditor, 1);
+        ordenados.splice(i, 0, item);
+        modalEditorRotina = {
+          ...modalEditorRotina,
+          exercicios: ordenados.map((te, idx2) => ({ ...te, ordem: idx2 })),
+        };
+        arrastandoIdxEditor = i;
+        break;
+      }
+    }
+  }
+
+  async function finalizarArrasteEditor(): Promise<void> {
+    if (arrastandoIdxEditor === null || !modalEditorRotina) {
+      arrastandoIdxEditor = null;
+      return;
+    }
+    arrastandoIdxEditor = null;
+    const treinoId = modalEditorRotina.id;
+    const idsOrdenados = modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem).map((te) => te.id);
+    await atualizarOrdemTreinoExercicios(idsOrdenados);
+    await refrescarTreinoEditor(treinoId);
+  }
+
+  $effect(() => {
+    if (arrastandoIdxEditor === null) return;
+    window.addEventListener("pointermove", moverDuranteArrasteEditor);
+    window.addEventListener("pointerup", finalizarArrasteEditor);
+    return () => {
+      window.removeEventListener("pointermove", moverDuranteArrasteEditor);
+      window.removeEventListener("pointerup", finalizarArrasteEditor);
+    };
+  });
+
+  const opcoesPickerEditor = $derived(
+    todosExercicios.filter(
+      (e) => !modalEditorRotina?.exercicios.some((te) => te.exercicio_id === e.id) && correspondeBusca(textoBuscavelExercicio(e), buscaPickerEditor),
+    ),
+  );
+
+  async function adicionarExercicioEditor(ex: Exercicio): Promise<void> {
+    if (!modalEditorRotina) return;
+    const treinoId = modalEditorRotina.id;
+    adicionandoIdEditor = ex.id;
+    try {
+      const anterior = await getUltimoRegistro(ex.id);
+      await adicionarTreinoExercicio(treinoId, ex.id, 3, anterior);
+      await refrescarTreinoEditor(treinoId);
+      mostrarPickerEditor = false;
+      buscaPickerEditor = "";
+    } finally {
+      adicionandoIdEditor = null;
+    }
+  }
+
+  async function ajustarSeriesEditor(novoNumero: number): Promise<void> {
+    if (!editandoSerieEditor || !modalEditorRotina) return;
+    const item = editandoSerieEditor;
+    const treinoId = modalEditorRotina.id;
+    salvandoEditor = true;
+    try {
+      await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
+      await refrescarTreinoEditor(treinoId);
+    } finally {
+      salvandoEditor = false;
+      editandoSerieEditor = null;
+    }
+  }
+
   /** Abre o gráfico direto (sem passar por menu) quando se entra em
    * /treino/distribuicao/rotina/:id/grafico — usado pela opção "Distribuição" no menu de
    * Visualizar Rotina, e pelo rodapé do card da rotina. "Voltar" do navegador fecha o gráfico
@@ -750,14 +886,21 @@
   </svg>
 {/snippet}
 
-{#snippet barraFadiga(partes: Partes, valor: number)}
-  <div class="barra-wrap-fadiga">
+{#snippet barraFadiga(partes: Partes, valor: number, onClick: () => void)}
+  <div
+    class="barra-wrap-fadiga"
+    role="button"
+    tabindex="0"
+    onclick={onClick}
+    onkeydown={(e) => e.key === "Enter" && onClick()}
+    aria-label="Ver anel de distribuição da rotina"
+  >
     <div class="barra-segmentos">
       {#each partesParaSegmentos(partes) as seg (seg.cor)}
         {@const pctSeg = valor > 0 ? (seg.valor / valor) * 100 : 0}
         {#if seg.valor > 0}
           <div class="barra-seg" style={`width: ${pctSeg}%; background: ${seg.cor};`}>
-            {#if pctSeg >= 18}
+            {#if pctSeg >= 25}
               <span class="barra-seg-texto">{formatValor(seg.valor)} · {pctSeg.toFixed(0)}%</span>
             {/if}
           </div>
@@ -858,7 +1001,7 @@
                     {:else}
                       <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                     {/if}
-                    {@render barraFadiga(linha.partes, linha.valor)}
+                    {@render barraFadiga(linha.partes, linha.valor, () => abrirGraficoTreino(treino))}
                     <span class="pct-total">{linha.pct.toFixed(0)}%</span>
                     <span class="valor">{formatValor(linha.valor)}</span>
                   </div>
@@ -867,7 +1010,7 @@
                       {@const pctSub = linha.valor > 0 ? (sub.valor / linha.valor) * linha.pct : 0}
                       <div class="item item-fadiga item-sub">
                         <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
-                        {@render barraFadiga(sub.partes, sub.valor)}
+                        {@render barraFadiga(sub.partes, sub.valor, () => abrirGraficoTreino(treino))}
                         <span class="pct-total">{pctSub.toFixed(0)}%</span>
                         <span class="valor">{formatValor(sub.valor)}</span>
                       </div>
@@ -876,7 +1019,7 @@
                 {/each}
               </div>
             {/if}
-            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirGraficoTreino(treino)}>
+            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirEditorRotina(treino)}>
               {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
                 (acc, ex) => acc + ex.series.length,
                 0,
@@ -1142,6 +1285,79 @@
   />
 {/if}
 
+{#if modalEditorRotina}
+  <div class="tela-editor-rotina">
+    <div class="editor-conteudo">
+      <div class="header">
+        <button class="back" onclick={() => (modalEditorRotina = null)} aria-label="Voltar">{@render iconVoltar()}</button>
+        <h1>{modalEditorRotina.nome_treino}</h1>
+        <span class="spacer"></span>
+      </div>
+      <div class="editor-lista" class:carregando={salvandoEditor}>
+        {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
+          <div class="editor-item" class:arrastando={arrastandoIdxEditor === idx} bind:this={itemEditorRefs[idx]}>
+            <button class="remover-circulo" onclick={() => removerExercicioEditor(te.id)} aria-label="Remover">−</button>
+            <span class="editor-nome">{te.exercicio?.nome ?? ""}</span>
+            <button
+              class="exercicio-musculo-series"
+              onclick={() =>
+                (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
+            >{te.series.length} {te.series.length === 1 ? "série" : "séries"}</button>
+            <button class="handle-arraste" onpointerdown={(e) => iniciarArrasteEditor(e, idx)} aria-label="Arrastar para reordenar">☰</button>
+          </div>
+        {/each}
+        {#if !modalEditorRotina.exercicios.length}
+          <p class="muted">Nenhum exercício ainda.</p>
+        {/if}
+      </div>
+      <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
+    </div>
+  </div>
+{/if}
+
+{#if mostrarPickerEditor}
+  <div class="tela-editor-rotina">
+    <div class="editor-conteudo">
+      <div class="header">
+        <button
+          class="back"
+          onclick={() => {
+            mostrarPickerEditor = false;
+            buscaPickerEditor = "";
+          }}
+          aria-label="Voltar"
+        >{@render iconVoltar()}</button>
+        <h1>Adicionar Exercício</h1>
+        <span class="spacer"></span>
+      </div>
+      <input class="busca-editor" type="text" placeholder="Procurar exercício" bind:value={buscaPickerEditor} />
+      <ul class="picker-lista-editor">
+        {#each opcoesPickerEditor as ex (ex.id)}
+          <li>
+            <button class="picker-item-editor" onclick={() => adicionarExercicioEditor(ex)} disabled={adicionandoIdEditor === ex.id}>
+              {ex.nome}
+            </button>
+          </li>
+        {/each}
+        {#if !opcoesPickerEditor.length}
+          <li class="muted-item">Nenhum exercício encontrado.</li>
+        {/if}
+      </ul>
+    </div>
+  </div>
+{/if}
+
+{#if editandoSerieEditor}
+  <WheelPicker
+    titulo={editandoSerieEditor.exercicioNome}
+    subtitulo="Número de séries"
+    opcoes={opcoesSeries}
+    valorAtual={editandoSerieEditor.series}
+    onSelecionar={(v) => ajustarSeriesEditor(v)}
+    onFechar={() => (editandoSerieEditor = null)}
+  />
+{/if}
+
 <style>
   .container {
     max-width: 480px;
@@ -1338,7 +1554,7 @@
     border-radius: 6px;
   }
   .barra-wrap-fadiga {
-    height: 22px;
+    height: 10px;
     border-radius: 6px;
     overflow: hidden;
     background: var(--surface-border);
@@ -1358,7 +1574,7 @@
   }
   .barra-seg-texto {
     color: #fff;
-    font-size: 9px;
+    font-size: 6px;
     font-weight: 700;
     white-space: nowrap;
     padding: 0 2px;
@@ -1368,7 +1584,7 @@
   }
   .pct-total {
     text-align: right;
-    font-size: var(--font-size-sm);
+    font-size: 10px;
     color: var(--surface-muted);
     font-weight: 600;
   }
@@ -1534,5 +1750,120 @@
     font-family: inherit;
     white-space: nowrap;
     cursor: pointer;
+  }
+  .tela-editor-rotina {
+    position: fixed;
+    inset: 0;
+    background: var(--surface-bg);
+    z-index: 150;
+    overflow-y: auto;
+  }
+  .editor-conteudo {
+    max-width: 480px;
+    min-height: 100%;
+    margin: 0 auto;
+    padding: var(--space-4);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+  }
+  .editor-lista {
+    display: flex;
+    flex-direction: column;
+    transition: opacity 0.15s;
+  }
+  .editor-lista.carregando {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .editor-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--surface-border);
+    touch-action: none;
+  }
+  .editor-item.arrastando {
+    background: var(--surface-card);
+    opacity: 0.8;
+  }
+  .editor-nome {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .remover-circulo {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-danger);
+    color: #fff;
+    font-size: var(--font-size-base);
+    line-height: 1;
+    cursor: pointer;
+  }
+  .handle-arraste {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--surface-muted);
+    font-size: var(--font-size-lg);
+    cursor: grab;
+    touch-action: none;
+    padding: var(--space-2);
+  }
+  .adicionar-exercicio-editor-btn {
+    flex-shrink: 0;
+    margin-top: var(--space-4);
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .busca-editor {
+    box-sizing: border-box;
+    width: 100%;
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+  }
+  .picker-lista-editor {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .picker-item-editor {
+    width: 100%;
+    text-align: left;
+    padding: var(--space-3) 0;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--surface-border);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+  }
+  .picker-item-editor:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .muted-item {
+    color: var(--surface-muted);
+    font-size: var(--font-size-base);
   }
 </style>
