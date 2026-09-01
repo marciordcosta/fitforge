@@ -18,6 +18,7 @@
     removerTreinoExercicio,
     atualizarOrdemTreinoExercicios,
     adicionarTreinoExercicio,
+    trocarExercicioTreinoExercicio,
     correspondeBusca,
     textoBuscavelExercicio,
     DIAS_SEMANA_ABREV,
@@ -698,10 +699,12 @@
   }
 
   let modalMusculoRotina = $state<{ treino: TreinoComExercicios; musculo: Musculo; itens: ItemMusculoRotina[] } | null>(null);
-  let editandoSerieItem = $state<ItemMusculoRotina | null>(null);
-  let salvandoSeries = $state(false);
-  /** Feedback visível no modal sobre o que aconteceu no último ajuste de série (sucesso, nada mudou, ou erro). */
+  /** Feedback visível no modal sobre o resultado da última troca de exercício. */
   let statusAjusteMusculo = $state<{ tipo: "ok" | "info" | "erro"; texto: string } | null>(null);
+  /** Item cujo menu "Ver Exercício / Trocar Exercício" está aberto. */
+  let menuExercicioMusculo = $state<ItemMusculoRotina | null>(null);
+  /** Item sendo trocado (o picker abre pra escolher o exercício que vai entrar no lugar dele). */
+  let trocandoItemMusculo = $state<ItemMusculoRotina | null>(null);
   let mostrarPickerMusculo = $state(false);
   let buscaPickerMusculo = $state("");
   let adicionandoIdMusculo = $state<string | null>(null);
@@ -716,6 +719,19 @@
     if (modalMusculoRotina?.musculo.id !== musculo.id) statusAjusteMusculo = null;
     modalMusculoRotina = { treino, musculo, itens: itensMusculoRotina(treino, musculo.id) };
   }
+
+  /** As 3 leituras do volume desse músculo na rotina: total bruto (1 série por músculo que ela
+   * toca), válidas (ponderado por peso_contribuicao — quanto realmente trabalha) e acumuladas
+   * (válidas descontadas pela faixa de fadiga: A=1, B=0.7, C=0.4). */
+  const resumoMusculoModal = $derived.by(() => {
+    if (!modalMusculoRotina) return null;
+    const { treino, musculo } = modalMusculoRotina;
+    const totalBruto = contarSeriesPorMusculo(treino).get(musculo.id) ?? 0;
+    const totalValido = contarSeriesPorMusculoPonderado(treino).get(musculo.id) ?? 0;
+    const partes = contarSeriesPorFaixaDePosicao(treino).get(musculo.id) ?? partesVazias();
+    const totalAcumulado = valorEfetivoFadiga(partes);
+    return { totalBruto, totalValido, totalAcumulado };
+  });
 
   // ---------------- Tendência de progressão do músculo (1RM médio das últimas sessões) ----------------
 
@@ -846,62 +862,7 @@
 
   const opcoesSeries = Array.from({ length: 10 }, (_, i) => ({ valor: i + 1, label: String(i + 1) }));
 
-  interface ImpactoMusculo {
-    nome: string;
-    pct: number;
-  }
-
-  /** % de variação que um ajuste de série representa pra cada músculo tocado pelo exercício
-   * (ponderado por peso_contribuicao) — um supino, por exemplo, mexe em peito/tríceps/ombro ao
-   * mesmo tempo, cada um com um impacto % diferente sobre o volume que já tinha na rotina. */
-  function calcularImpactoAjuste(treino: TreinoComExercicios, treinoExercicioId: string, novoNumero: number): ImpactoMusculo[] {
-    const te = treino.exercicios.find((e) => e.id === treinoExercicioId);
-    if (!te?.exercicio) return [];
-    const delta = novoNumero - te.series.length;
-    if (delta === 0) return [];
-    const mapaBase = contarSeriesPorMusculoPonderado(treino);
-    return te.exercicio.musculos.map((m) => {
-      const deltaContrib = delta * m.peso_contribuicao;
-      const base = mapaBase.get(m.musculo_id) ?? 0;
-      const pct = base > 0 ? (deltaContrib / base) * 100 : deltaContrib > 0 ? 999 : -999;
-      // TREINO_EXERCICIO_SELECT não traz o nome do músculo aninhado (só musculo_id) — busca na lista já carregada.
-      const nome = musculos.find((mu) => mu.id === m.musculo_id)?.nome ?? "";
-      return { nome, pct };
-    });
-  }
-
-  /** Aplica direto (sem modal bloqueando) — se algum músculo passar de ±20%, o aviso vem junto
-   * na mesma linha de status, sem impedir o ajuste. */
-  async function ajustarSeries(novoNumero: number): Promise<void> {
-    if (!editandoSerieItem || !modalMusculoRotina) return;
-    const item = editandoSerieItem;
-    const treino = modalMusculoRotina.treino;
-    const valorAtualReal = modalMusculoRotina.itens.find((i) => i.treinoExercicioId === item.treinoExercicioId)?.series ?? item.series;
-    if (novoNumero === valorAtualReal) {
-      statusAjusteMusculo = { tipo: "info", texto: `"${item.exercicioNome}" já estava em ${novoNumero} ${novoNumero === 1 ? "série" : "séries"} — nada foi alterado.` };
-      return;
-    }
-    salvandoSeries = true;
-    try {
-      const impacto = calcularImpactoAjuste(treino, item.treinoExercicioId, novoNumero);
-      await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
-      await refrescarTreinoMusculo(treino.id);
-      const grandes = impacto.filter((i) => Math.abs(i.pct) > 20);
-      const aviso = grandes.length
-        ? ` Atenção: ${grandes.map((i) => `${i.nome} ${i.pct > 0 ? "+" : ""}${i.pct.toFixed(0)}%`).join(", ")} — acima do recomendado (10-20%).`
-        : "";
-      statusAjusteMusculo = {
-        tipo: grandes.length ? "erro" : "ok",
-        texto: `"${item.exercicioNome}" atualizado de ${valorAtualReal} para ${novoNumero}.${aviso}`,
-      };
-    } catch (e) {
-      statusAjusteMusculo = { tipo: "erro", texto: "Erro ao gravar: " + (e as Error).message };
-    } finally {
-      salvandoSeries = false;
-    }
-  }
-
-  /** Confirmação antes de remover um exercício da rotina (editor completo ou modal por músculo) — evita tirar por engano. */
+  /** Confirmação antes de remover um exercício da rotina (só o editor completo usa isso hoje). */
   let confirmandoRemover = $state<{ nome: string; onConfirmar: () => void } | null>(null);
 
   function pedirConfirmacaoRemover(nome: string, onConfirmar: () => void): void {
@@ -915,23 +876,14 @@
     fn();
   }
 
-  async function removerExercicioMusculo(item: ItemMusculoRotina): Promise<void> {
+  /** Abre o picker de exercícios já com o nome do músculo no campo de busca, pra filtrar —
+   * selecionar um exercício TROCA o item.treinoExercicioId no lugar (mantém ordem/séries). */
+  function abrirTrocarExercicioMusculo(item: ItemMusculoRotina): void {
     if (!modalMusculoRotina) return;
-    const treinoId = modalMusculoRotina.treino.id;
-    salvandoSeries = true;
-    try {
-      await removerTreinoExercicio(item.treinoExercicioId);
-      await refrescarTreinoMusculo(treinoId);
-    } finally {
-      salvandoSeries = false;
-    }
-  }
-
-  /** Abre o picker de exercícios já com o nome do músculo no campo de busca, pra filtrar. */
-  function abrirPickerMusculo(): void {
-    if (!modalMusculoRotina) return;
+    trocandoItemMusculo = item;
     buscaPickerMusculo = modalMusculoRotina.musculo.nome;
     mostrarPickerMusculo = true;
+    menuExercicioMusculo = null;
   }
 
   const opcoesPickerMusculo = $derived(
@@ -942,16 +894,20 @@
     ),
   );
 
-  async function adicionarExercicioMusculo(ex: Exercicio): Promise<void> {
-    if (!modalMusculoRotina) return;
+  async function trocarExercicioMusculo(ex: Exercicio): Promise<void> {
+    if (!modalMusculoRotina || !trocandoItemMusculo) return;
     const treinoId = modalMusculoRotina.treino.id;
+    const anterior = trocandoItemMusculo;
     adicionandoIdMusculo = ex.id;
     try {
-      const anterior = await getUltimoRegistro(ex.id);
-      await adicionarTreinoExercicio(treinoId, ex.id, 3, anterior);
+      await trocarExercicioTreinoExercicio(anterior.treinoExercicioId, ex.id);
       await refrescarTreinoMusculo(treinoId);
       mostrarPickerMusculo = false;
       buscaPickerMusculo = "";
+      trocandoItemMusculo = null;
+      statusAjusteMusculo = { tipo: "ok", texto: `"${anterior.exercicioNome}" foi trocado por "${ex.nome}".` };
+    } catch (e) {
+      statusAjusteMusculo = { tipo: "erro", texto: "Erro ao trocar exercício: " + (e as Error).message };
     } finally {
       adicionandoIdMusculo = null;
     }
@@ -1215,6 +1171,20 @@
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
     modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie: lista };
   }
+
+  /** Anel por dominância (mesma conta da Distribuição Semanal, coresAbcAcumulado), só que
+   * dessa rotina isolada: séries válidas (ponderadas por peso_contribuicao) por músculo,
+   * coloridas pela faixa 20/30/50 de dominância — diferente do anel por posição/fadiga
+   * (abrirGraficoTreino), que é o que a barra já abre. */
+  function abrirGraficoTreinoDominancia(treino: TreinoComExercicios): void {
+    const mapa = contarSeriesPorMusculoPonderado(treino);
+    const itens = musculos
+      .map((m) => ({ musculo: m, valor: mapa.get(m.id) ?? 0 }))
+      .filter((item) => item.valor > 0)
+      .sort((a, b) => b.valor - a.valor);
+    const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
+    abrirDetalheRotina(treino.nome_treino, itens, totalSeries, "séries", coresAbcAcumulado(itens));
+  }
 </script>
 
 {#snippet iconVoltar()}
@@ -1378,12 +1348,17 @@
                 {/each}
               </div>
             {/if}
-            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirEditorRotina(treino)}>
-              {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
-                (acc, ex) => acc + ex.series.length,
-                0,
-              )} séries
-            </button>
+            <div class="rotina-rodape">
+              <button class="rotina-totais-texto" onclick={() => abrirEditorRotina(treino)}>
+                {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
+                  (acc, ex) => acc + ex.series.length,
+                  0,
+                )} séries
+              </button>
+              <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino)} aria-label="Ver anel por dominância">
+                {@render iconGrafico()}
+              </button>
+            </div>
           </div>
         {/each}
       </div>
@@ -1459,6 +1434,20 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
     <path d="M22 12A10 10 0 0 0 12 2v10z" />
+  </svg>
+{/snippet}
+{#snippet iconVerExercicio()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+{/snippet}
+{#snippet iconTrocarExercicio()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 3l4 4-4 4" />
+    <path d="M21 7H7a4 4 0 0 0-4 4v1" />
+    <path d="M7 21l-4-4 4-4" />
+    <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
   </svg>
 {/snippet}
 {#snippet iconGrade()}
@@ -1627,30 +1616,58 @@
     {:else if tendenciaMusculo}
       <p class="tendencia-musculo tendencia-{tendenciaMusculo.status}">{TEXTO_TENDENCIA[tendenciaMusculo.status]}</p>
     {/if}
+    {#if resumoMusculoModal}
+      <div class="resumo-musculo">
+        <div class="resumo-item">
+          <span class="resumo-valor">{formatValor(resumoMusculoModal.totalBruto)}</span>
+          <span class="resumo-label">Séries Totais</span>
+        </div>
+        <div class="resumo-item">
+          <span class="resumo-valor">{formatValor(resumoMusculoModal.totalValido)}</span>
+          <span class="resumo-label">Séries Válidas</span>
+        </div>
+        <div class="resumo-item">
+          <span class="resumo-valor">{formatValor(resumoMusculoModal.totalAcumulado)}</span>
+          <span class="resumo-label">Séries Acumuladas</span>
+        </div>
+      </div>
+    {/if}
     {#if statusAjusteMusculo}
       <p class="status-ajuste status-ajuste-{statusAjusteMusculo.tipo}">{statusAjusteMusculo.texto}</p>
     {/if}
     {#if !modalMusculoRotina.itens.length}
       <p class="muted">Nenhum exercício encontrado.</p>
     {:else}
-      <div class="lista-exercicios-musculo" class:carregando={salvandoSeries}>
+      <div class="lista-exercicios-musculo">
         {#each modalMusculoRotina.itens as item (item.treinoExercicioId)}
-          <div class="exercicio-musculo-item">
-            <button
-              class="remover-circulo"
-              onclick={() => pedirConfirmacaoRemover(item.exercicioNome, () => removerExercicioMusculo(item))}
-              aria-label="Remover"
-            >−</button>
-            <button class="exercicio-musculo-nome" onclick={() => navigate(`/treino/exercicios/${item.exercicioId}`)}>{item.exercicioNome}</button>
-            <button class="exercicio-musculo-series" onclick={() => (editandoSerieItem = item)}>
-              {item.series} {item.series === 1 ? "série" : "séries"}
-            </button>
-          </div>
+          <button class="exercicio-musculo-item exercicio-musculo-item-btn" onclick={() => (menuExercicioMusculo = item)}>
+            <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
+            <span class="exercicio-musculo-series">{item.series} {item.series === 1 ? "série" : "séries"}</span>
+          </button>
         {/each}
       </div>
     {/if}
-    <button class="adicionar-exercicio-musculo-btn" onclick={abrirPickerMusculo}>+ Adicionar Exercício</button>
   </Sheet>
+{/if}
+
+{#if menuExercicioMusculo}
+  {@const item = menuExercicioMusculo}
+  <ActionSheet
+    titulo={item.exercicioNome}
+    onFechar={() => (menuExercicioMusculo = null)}
+    opcoes={[
+      {
+        label: "Ver Exercício",
+        icon: iconVerExercicio,
+        onSelect: () => navigate(`/treino/exercicios/${item.exercicioId}`),
+      },
+      {
+        label: "Trocar Exercício",
+        icon: iconTrocarExercicio,
+        onSelect: () => abrirTrocarExercicioMusculo(item),
+      },
+    ]}
+  />
 {/if}
 
 {#if mostrarPickerMusculo}
@@ -1662,17 +1679,18 @@
           onclick={() => {
             mostrarPickerMusculo = false;
             buscaPickerMusculo = "";
+            trocandoItemMusculo = null;
           }}
           aria-label="Voltar"
         >{@render iconVoltar()}</button>
-        <h1>Adicionar Exercício</h1>
+        <h1>Trocar Exercício</h1>
         <span class="spacer"></span>
       </div>
       <input class="busca-editor" type="text" placeholder="Procurar exercício" bind:value={buscaPickerMusculo} />
       <ul class="picker-lista-editor">
         {#each opcoesPickerMusculo as ex (ex.id)}
           <li>
-            <button class="picker-item-editor" onclick={() => adicionarExercicioMusculo(ex)} disabled={adicionandoIdMusculo === ex.id}>
+            <button class="picker-item-editor" onclick={() => trocarExercicioMusculo(ex)} disabled={adicionandoIdMusculo === ex.id}>
               {ex.nome}
             </button>
           </li>
@@ -1683,17 +1701,6 @@
       </ul>
     </div>
   </div>
-{/if}
-
-{#if editandoSerieItem}
-  <WheelPicker
-    titulo={editandoSerieItem.exercicioNome}
-    subtitulo="Número de séries"
-    opcoes={opcoesSeries}
-    valorAtual={editandoSerieItem.series}
-    onSelecionar={(v) => ajustarSeries(v)}
-    onFechar={() => (editandoSerieItem = null)}
-  />
 {/if}
 
 {#if modalEditorRotina}
@@ -1736,12 +1743,17 @@
           <p class="muted">Nenhum exercício ainda.</p>
         {/if}
       </div>
-      <p class="editor-totais">
-        {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
-          (acc, ex) => acc + ex.series.length,
-          0,
-        )} séries
-      </p>
+      <div class="editor-totais">
+        <span>
+          {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
+            (acc, ex) => acc + ex.series.length,
+            0,
+          )} séries
+        </span>
+        <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
+          {@render iconGrafico()}
+        </button>
+      </div>
       <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
     </div>
   </div>
@@ -2168,6 +2180,33 @@
   .tendencia-caindo {
     color: var(--color-negative);
   }
+  .resumo-musculo {
+    display: flex;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-3);
+  }
+  .resumo-item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+  }
+  .resumo-valor {
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    color: var(--surface-fg);
+  }
+  .resumo-label {
+    font-size: 10px;
+    color: var(--surface-muted);
+    text-align: center;
+    line-height: 1.2;
+  }
   .status-ajuste {
     margin: 0 0 var(--space-3);
     padding: var(--space-2) var(--space-3);
@@ -2203,6 +2242,15 @@
   }
   .exercicio-musculo-item:last-child {
     border-bottom: none;
+  }
+  .exercicio-musculo-item-btn {
+    width: 100%;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--surface-border);
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
   }
   .exercicio-musculo-nome {
     flex: 1;
@@ -2333,9 +2381,51 @@
   }
   .editor-totais {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
     margin: var(--space-3) 0 0;
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .rotina-rodape {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--surface-border);
+  }
+  .rotina-totais-texto {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+    cursor: pointer;
+  }
+  .rotina-grafico-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: var(--surface-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+  }
+  .rotina-grafico-btn svg {
+    width: 18px;
+    height: 18px;
   }
   .adicionar-exercicio-editor-btn {
     flex-shrink: 0;

@@ -823,6 +823,13 @@ export async function adicionarTreinoExercicio(
   return te.id;
 }
 
+/** Troca o exercício de um treino_exercicio já salvo, mantendo o mesmo lugar (ordem, séries,
+ * descanso, observação) — usado pra trocar sem desmontar/remontar a linha inteira. */
+export async function trocarExercicioTreinoExercicio(treinoExercicioId: string, novoExercicioId: string): Promise<void> {
+  const { error } = await supabase.from("treino_exercicios").update({ exercicio_id: novoExercicioId }).eq("id", treinoExercicioId);
+  if (error) throw error;
+}
+
 // ---------------- Log de treino (registros) ----------------
 
 export interface SetRegistro {
