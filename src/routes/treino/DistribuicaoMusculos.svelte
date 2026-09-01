@@ -1143,24 +1143,25 @@
     return te.series.length - baseSeries;
   }
 
-  /** % de impacto de um exercício em cada músculo que ele trabalha, comparando as séries ATUAIS
-   * com a baseline fixa: delta de séries (ponderado por peso_contribuicao) sobre o total bruto
-   * ORIGINAL daquele músculo na rotina — ex: supino de 3 pra 4 séries, com peito em 10 séries
-   * base e peso_contribuicao 1.0, mostra +10% pro peito. Vazio se não há baseline ou se voltou
-   * pro número original (delta zero). */
-  function calcularImpactoEditor(te: TreinoComExercicios["exercicios"][number]): { nome: string; deltaPct: number }[] {
-    if (!baselineEditor) return [];
-    const deltaSeries = deltaSeriesEditor(te);
-    if (deltaSeries === 0) return [];
-    const resultado: { nome: string; deltaPct: number }[] = [];
-    for (const m of te.exercicio?.musculos ?? []) {
-      const totalBase = baselineEditor.totalPorMusculo.get(m.musculo_id) ?? 0;
-      if (totalBase <= 0) continue;
-      const pct = ((deltaSeries * m.peso_contribuicao) / totalBase) * 100;
-      const nome = musculos.find((mu) => mu.id === m.musculo_id)?.nome;
-      if (nome) resultado.push({ nome, deltaPct: pct });
+  /** % de impacto de TODO o rascunho num músculo, comparando as séries ATUAIS com a baseline
+   * fixa: soma o delta de séries (ponderado por peso_contribuicao) de TODOS os exercícios que
+   * trabalham esse músculo, sobre o total bruto ORIGINAL dele na rotina — ex: supino de 3 pra 4
+   * séries junto com um ajuste de -1 numa remada, ambos afetando o peito, somam antes de dividir
+   * pelo total base. Mostrado nos cards de meta no topo (não mais por exercício). 0 se não há
+   * baseline ou se as mudanças voltaram a se cancelar. */
+  function impactoTotalMusculo(musculoId: string): number {
+    if (!baselineEditor || !modalEditorRotina) return 0;
+    const totalBase = baselineEditor.totalPorMusculo.get(musculoId) ?? 0;
+    if (totalBase <= 0) return 0;
+    let deltaPonderado = 0;
+    for (const te of modalEditorRotina.exercicios) {
+      const deltaSeries = deltaSeriesEditor(te);
+      if (deltaSeries === 0) continue;
+      const m = te.exercicio?.musculos.find((mm) => mm.musculo_id === musculoId);
+      if (!m) continue;
+      deltaPonderado += deltaSeries * m.peso_contribuicao;
     }
-    return resultado;
+    return (deltaPonderado / totalBase) * 100;
   }
 
   /** Metas manuais definidas pra essa rotina (só os músculos que têm uma), com o saldo AO VIVO —
@@ -1178,11 +1179,11 @@
   const metasEditor = $derived.by(() => {
     if (!modalEditorRotina) return [];
     const atual = contarSeriesPorMusculo(modalEditorRotina);
-    const resultado: { musculo: Musculo; meta: number; atual: number }[] = [];
+    const resultado: { musculo: Musculo; meta: number; atual: number; impactoPct: number }[] = [];
     for (const m of musculos) {
       const meta = metasMusculo.get(chaveMeta(modalEditorRotina.id, m.id));
       if (meta == null) continue;
-      resultado.push({ musculo: m, meta, atual: atual.get(m.id) ?? 0 });
+      resultado.push({ musculo: m, meta, atual: atual.get(m.id) ?? 0, impactoPct: impactoTotalMusculo(m.id) });
     }
     return resultado;
   });
@@ -2320,6 +2321,13 @@
                 class:valor-subindo={item.atual === item.meta}
                 class:valor-estavel={item.atual < item.meta}
               >{item.atual}/{item.meta}</span>
+              {#if item.impactoPct !== 0}
+                <span
+                  class="editor-meta-impacto"
+                  class:valor-subindo={item.impactoPct > 0}
+                  class:valor-caindo={item.impactoPct < 0}
+                >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
+              {/if}
             </button>
           {/each}
         </div>
@@ -2327,7 +2335,6 @@
       <div class="editor-lista" class:carregando={salvandoEditor}>
         {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
           {@const tendEx = tendenciaExercicio(te.exercicio_id)}
-          {@const impacto = calcularImpactoEditor(te)}
           {@const deltaTotal = deltaSeriesEditor(te)}
           {@const valorAnteriorSeries = baselineEditor?.seriesPorExercicio.get(te.id) ?? 0}
           {@const numeroExibidoSeries = te.series.length}
@@ -2357,16 +2364,6 @@
                 })}
             >
               <span class="editor-nome-texto" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
-              {#if impacto.length}
-                <span class="editor-nome-impacto">
-                  {#each impacto as imp, i (imp.nome)}
-                    {#if i > 0}<span class="impacto-sep"> · </span>{/if}<span>{imp.nome} </span><span
-                      class:valor-subindo={imp.deltaPct > 0}
-                      class:valor-caindo={imp.deltaPct < 0}
-                    >{imp.deltaPct > 0 ? "+" : ""}{Math.round(imp.deltaPct)}%</span>
-                  {/each}
-                </span>
-              {/if}
             </button>
             <div class="editor-serie-col">
               {#if deltaTotal !== 0}
@@ -3289,6 +3286,10 @@
     font-size: var(--font-size-sm);
     font-weight: 700;
   }
+  .editor-meta-impacto {
+    font-size: 9px;
+    font-weight: 600;
+  }
   .editor-lista {
     display: flex;
     flex-direction: column;
@@ -3340,14 +3341,6 @@
   .editor-nome-texto.editor-nome-destacado {
     color: var(--color-primary);
     font-weight: 700;
-  }
-  .editor-nome-impacto {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 11px;
-    color: var(--surface-muted);
   }
   .remover-circulo {
     width: 24px;
