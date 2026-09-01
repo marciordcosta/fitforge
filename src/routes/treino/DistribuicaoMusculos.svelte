@@ -1956,7 +1956,10 @@
   </Sheet>
 {/if}
 
-{#if modalMusculoRotina}
+{#if modalMusculoRotina && !mostrarGradeSemanal}
+  <!-- Some da tela (sem perder o estado) enquanto a grade semanal está aberta por cima — dois
+       Sheets sobrepostos ao mesmo tempo (mesmo com z-index certo) podia deixar cliques na grade
+       sem efeito em alguns casos. Volta a aparecer sozinho quando a grade fecha. -->
   <Sheet
     titulo={modalMusculoRotina.musculo.nome}
     onFechar={() => {
