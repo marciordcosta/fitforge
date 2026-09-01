@@ -303,6 +303,23 @@
       .sort((a, b) => scoreFadiga(a) - scoreFadiga(b));
   }
 
+  /** Rotinas cujo card está ordenado por distribuição de séries (20/30/50, mesmo peso 1/0.7/0.4). */
+  let semanalOrdenadaPorEfetivo = $state(false);
+
+  /** Ordena pelo valor "efetivo" (mesma regra 1/0.7/0.4 por faixa) em vez do bruto — usado na
+   * Distribuição Semanal, onde a faixa é por dominância (20/30/50), não por fadiga de posição. */
+  function ordenarPorEfetivo<T extends { valor: number; partes: Partes; subItens: { valor: number; partes: Partes }[] | null }>(
+    lista: T[],
+  ): T[] {
+    return lista
+      .map((item) =>
+        item.subItens
+          ? { ...item, subItens: item.subItens.slice().sort((a, b) => valorEfetivoFadiga(b.partes) - valorEfetivoFadiga(a.partes)) }
+          : item,
+      )
+      .sort((a, b) => valorEfetivoFadiga(b.partes) - valorEfetivoFadiga(a.partes));
+  }
+
   const totaisSemanais = $derived.by(() => {
     let exercicios = 0;
     let series = 0;
@@ -724,13 +741,27 @@
     return (mediaRecente - mediaAnterior) / mediaAnterior;
   }
 
+  /** Tendência de um exercício específico (não agregada por músculo) — usada pra colorir a
+   * pílula de séries no editor completo da rotina. */
+  function tendenciaExercicio(exercicioId: string): "subindo" | "estavel" | "caindo" | null {
+    const pontos = historicoPorExercicio.get(exercicioId);
+    if (!pontos) return null;
+    const v = variacaoExercicio(pontos);
+    if (v == null) return null;
+    if (v > 0.02) return "subindo";
+    if (v < -0.02) return "caindo";
+    return "estavel";
+  }
+
   /** Setinha discreta no card: mesma lógica de tendência (variacaoExercicio), mas usando o
    * histórico já pré-carregado (historicoPorExercicio) pra não refazer a consulta por linha. */
-  function tendenciaParaMusculos(treino: TreinoComExercicios, musculoIds: string[]): "subindo" | "estavel" | "caindo" | null {
+  function tendenciaParaMusculos(listaTreinos: TreinoComExercicios[], musculoIds: string[]): "subindo" | "estavel" | "caindo" | null {
     const idsSet = new Set(musculoIds);
     const exercicioIds = new Set<string>();
-    for (const te of treino.exercicios) {
-      if (te.exercicio?.musculos.some((m) => idsSet.has(m.musculo_id))) exercicioIds.add(te.exercicio_id);
+    for (const t of listaTreinos) {
+      for (const te of t.exercicios) {
+        if (te.exercicio?.musculos.some((m) => idsSet.has(m.musculo_id))) exercicioIds.add(te.exercicio_id);
+      }
     }
     const variacoes: number[] = [];
     for (const id of exercicioIds) {
@@ -1212,16 +1243,6 @@
   </div>
 {/snippet}
 
-{#snippet setaTendencia(status: "subindo" | "estavel" | "caindo" | null)}
-  {#if status === "subindo"}
-    <span class="seta-tendencia seta-subindo" title="Tendência de alta">↑</span>
-  {:else if status === "caindo"}
-    <span class="seta-tendencia seta-caindo" title="Tendência de queda">↓</span>
-  {:else if status === "estavel"}
-    <span class="seta-tendencia seta-estavel" title="Tendência estável">→</span>
-  {/if}
-{/snippet}
-
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -1241,32 +1262,51 @@
       <div class="lista-rotinas">
         <div class="rotina-card">
           <div class="rotina-cabecalho">
-            <h2 class="rotina-nome">Distribuição Semanal</h2>
+            <h2 class="rotina-nome">
+              <button
+                class="rotina-nome-btn"
+                class:ativo={semanalOrdenadaPorEfetivo}
+                onclick={() => (semanalOrdenadaPorEfetivo = !semanalOrdenadaPorEfetivo)}
+              >Distribuição Semanal</button>
+            </h2>
           </div>
           {#if !distribuicaoSemanal.length}
             <p class="muted">Nenhum volume planejado ainda.</p>
           {:else}
             <div class="lista">
-              {#each linhasSemanal as linha (linha.chave)}
+              {#each (semanalOrdenadaPorEfetivo ? ordenarPorEfetivo(linhasSemanal) : linhasSemanal) as linha (linha.chave)}
                 {@const aberto = linha.subItens != null && gruposExpandidos.has(linha.chave)}
+                {@const musculoIds = linha.musculo ? [linha.musculo.id] : (linha.subItens ?? []).map((s) => s.musculo.id)}
+                {@const tend = tendenciaParaMusculos(treinos, musculoIds)}
                 <div class="item">
                   {#if linha.subItens}
                     <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(linha.chave)}>
+                      <span class="nome-grupo-texto">{linha.nome}</span>
                       <span class="chevron-grupo" class:aberto>›</span>
-                      {linha.nome}
                     </button>
                   {:else}
                     <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(treinos, linha.musculo)}>{linha.nome}</button>
                   {/if}
                   {@render barraFadiga(linha.partes, linha.valor, () => abrirGraficoSemanal())}
-                  <span class="valor">{formatValor(linha.valor)}</span>
+                  <span
+                    class="valor"
+                    class:valor-subindo={tend === "subindo"}
+                    class:valor-estavel={tend === "estavel"}
+                    class:valor-caindo={tend === "caindo"}
+                  >{formatValor(semanalOrdenadaPorEfetivo ? valorEfetivoFadiga(linha.partes) : linha.valor)}</span>
                 </div>
                 {#if aberto && linha.subItens}
                   {#each linha.subItens as sub (sub.musculo.id)}
+                    {@const tendSub = tendenciaParaMusculos(treinos, [sub.musculo.id])}
                     <div class="item item-sub">
                       <button class="nome-btn" onclick={() => abrirExercicios(treinos, sub.musculo)}>{sub.musculo.nome}</button>
                       {@render barraFadiga(sub.partes, sub.valor, () => abrirGraficoSemanal())}
-                      <span class="valor">{formatValor(sub.valor)}</span>
+                      <span
+                        class="valor"
+                        class:valor-subindo={tendSub === "subindo"}
+                        class:valor-estavel={tendSub === "estavel"}
+                        class:valor-caindo={tendSub === "caindo"}
+                      >{formatValor(semanalOrdenadaPorEfetivo ? valorEfetivoFadiga(sub.partes) : sub.valor)}</span>
                     </div>
                   {/each}
                 {/if}
@@ -1302,26 +1342,36 @@
                   {@const grupoChave = `${treino.id}:${linha.chave}`}
                   {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
                   {@const musculoIds = linha.musculo ? [linha.musculo.id] : (linha.subItens ?? []).map((s) => s.musculo.id)}
-                  <div class="item item-tendencia">
+                  {@const tend = tendenciaParaMusculos([treino], musculoIds)}
+                  <div class="item">
                     {#if linha.subItens}
                       <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
+                        <span class="nome-grupo-texto">{linha.nome}</span>
                         <span class="chevron-grupo" class:aberto>›</span>
-                        {linha.nome}
                       </button>
                     {:else}
                       <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                     {/if}
                     {@render barraFadiga(linha.partes, linha.valor, () => abrirGraficoTreino(treino))}
-                    {@render setaTendencia(tendenciaParaMusculos(treino, musculoIds))}
-                    <span class="valor">{formatValor(porFadiga ? valorEfetivoFadiga(linha.partes) : linha.valor)}</span>
+                    <span
+                      class="valor"
+                      class:valor-subindo={tend === "subindo"}
+                      class:valor-estavel={tend === "estavel"}
+                      class:valor-caindo={tend === "caindo"}
+                    >{formatValor(porFadiga ? valorEfetivoFadiga(linha.partes) : linha.valor)}</span>
                   </div>
                   {#if aberto && linha.subItens}
                     {#each linha.subItens as sub (sub.musculo.id)}
-                      <div class="item item-tendencia item-sub">
+                      {@const tendSub = tendenciaParaMusculos([treino], [sub.musculo.id])}
+                      <div class="item item-sub">
                         <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                         {@render barraFadiga(sub.partes, sub.valor, () => abrirGraficoTreino(treino))}
-                        {@render setaTendencia(tendenciaParaMusculos(treino, [sub.musculo.id]))}
-                        <span class="valor">{formatValor(porFadiga ? valorEfetivoFadiga(sub.partes) : sub.valor)}</span>
+                        <span
+                          class="valor"
+                          class:valor-subindo={tendSub === "subindo"}
+                          class:valor-estavel={tendSub === "estavel"}
+                          class:valor-caindo={tendSub === "caindo"}
+                        >{formatValor(porFadiga ? valorEfetivoFadiga(sub.partes) : sub.valor)}</span>
                       </div>
                     {/each}
                   {/if}
@@ -1362,8 +1412,8 @@
             <div class="item">
               {#if linha.subItens}
                 <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
+                  <span class="nome-grupo-texto">{linha.nome}</span>
                   <span class="chevron-grupo" class:aberto>›</span>
-                  {linha.nome}
                 </button>
               {:else}
                 <span class="nome">{linha.nome}</span>
@@ -1663,6 +1713,7 @@
       </div>
       <div class="editor-lista" class:carregando={salvandoEditor}>
         {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
+          {@const tendEx = tendenciaExercicio(te.exercicio_id)}
           <div class="editor-item" class:arrastando={arrastandoIdxEditor === idx} bind:this={itemEditorRefs[idx]}>
             <button
               class="remover-circulo"
@@ -1672,6 +1723,9 @@
             <button class="editor-nome" onclick={() => navigate(`/treino/exercicios/${te.exercicio_id}`)}>{te.exercicio?.nome ?? ""}</button>
             <button
               class="exercicio-musculo-series"
+              class:serie-pill-subindo={tendEx === "subindo"}
+              class:serie-pill-estavel={tendEx === "estavel"}
+              class:serie-pill-caindo={tendEx === "caindo"}
               onclick={() =>
                 (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
             >{te.series.length} {te.series.length === 1 ? "série" : "séries"}</button>
@@ -1920,9 +1974,15 @@
   .nome-grupo {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 2px;
-    color: var(--color-primary);
     font-weight: 700;
+  }
+  .nome-grupo-texto {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .chevron-grupo {
     display: inline-block;
@@ -1936,22 +1996,13 @@
     padding-left: var(--space-3);
     opacity: 0.85;
   }
-  .item-tendencia {
-    grid-template-columns: 100px 1fr 14px 44px;
-  }
-  .seta-tendencia {
-    justify-self: center;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-  }
-  .seta-subindo {
+  .valor-subindo {
     color: var(--color-success);
   }
-  .seta-estavel {
+  .valor-estavel {
     color: var(--color-neutral);
   }
-  .seta-caindo {
+  .valor-caindo {
     color: var(--color-negative);
   }
   .barra-wrap {
@@ -2180,6 +2231,18 @@
     font-family: inherit;
     white-space: nowrap;
     cursor: pointer;
+  }
+  .serie-pill-subindo {
+    background: color-mix(in srgb, var(--color-success) 18%, transparent);
+    color: var(--color-success);
+  }
+  .serie-pill-estavel {
+    background: color-mix(in srgb, var(--color-neutral) 18%, transparent);
+    color: var(--color-neutral);
+  }
+  .serie-pill-caindo {
+    background: color-mix(in srgb, var(--color-negative) 18%, transparent);
+    color: var(--color-negative);
   }
   .adicionar-exercicio-musculo-btn {
     width: 100%;
