@@ -248,6 +248,7 @@
 
   /** Rotinas cujo card está ordenado por fadiga (clicou no nome) em vez de quantidade de séries. */
   let treinosOrdenadosPorFadiga = $state<Set<string>>(new Set());
+  let semanalOrdenadaPorFadiga = $state(false);
 
   function alternarOrdemFadiga(treinoId: string): void {
     const copia = new Set(treinosOrdenadosPorFadiga);
@@ -874,19 +875,6 @@
     );
   }
 
-  function abrirMenuSemanal(): void {
-    modalAberto = {
-      titulo: "Distribuição Semanal",
-      opcoes: [
-        { label: "Semana", icon: iconGrade, onSelect: () => abrirGradeSemanal(null) },
-        {
-          label: "Gráfico",
-          icon: iconGrafico,
-          onSelect: () => abrirGraficoSemanal(),
-        },
-      ],
-    };
-  }
 
   // ---------------- Modal: gráfico de pizza da distribuição de uma rotina ----------------
 
@@ -988,13 +976,19 @@
       <div class="lista-rotinas">
         <div class="rotina-card">
           <div class="rotina-cabecalho">
-            <h2 class="rotina-nome">Distribuição Semanal</h2>
+            <h2 class="rotina-nome">
+              <button
+                class="rotina-nome-btn"
+                class:ativo={semanalOrdenadaPorFadiga}
+                onclick={() => (semanalOrdenadaPorFadiga = !semanalOrdenadaPorFadiga)}
+              >Distribuição Semanal</button>
+            </h2>
           </div>
           {#if !distribuicaoSemanal.length}
             <p class="muted">Nenhum volume planejado ainda.</p>
           {:else}
             <div class="lista">
-              {#each linhasSemanal as linha (linha.chave)}
+              {#each (semanalOrdenadaPorFadiga ? ordenarPorMelhorEstimulo(linhasSemanal) : linhasSemanal) as linha (linha.chave)}
                 {@const aberto = linha.subItens != null && gruposExpandidos.has(linha.chave)}
                 <div class="item">
                   {#if linha.subItens}
@@ -1019,7 +1013,7 @@
                 {/if}
               {/each}
             </div>
-            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirMenuSemanal()}>
+            <button class="rotina-totais rotina-totais-btn" onclick={() => abrirGraficoSemanal()}>
               {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
             </button>
           {/if}
