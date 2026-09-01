@@ -17,7 +17,9 @@
     salvarExerciciosRotina,
     trocarExercicioTreinoExercicio,
     trocarExercicioEntreRotinas,
+    renameTreino,
     DIAS_SEMANA_ABREV,
+    DIAS_SEMANA_COMPLETO,
     abreviarMusculo,
     type Musculo,
     type TreinoComExercicios,
@@ -359,6 +361,32 @@
   function abrirGradeSemanal(musculoIds: string[] | null): void {
     filtroMusculosGrade = musculoIds ? new Set(musculoIds) : null;
     mostrarGradeSemanal = true;
+  }
+
+  /** Dia (na roleta) e o próprio treino cujo dia está sendo movido, dentro da grade semanal. */
+  let movendoDiaTreino = $state<{ treinoId: string; treinoNome: string; diaAtual: number } | null>(null);
+  let salvandoDiaTreino = $state(false);
+
+  function abrirMoverDiaTreino(treinoId: string, treinoNome: string, diaAtual: number): void {
+    movendoDiaTreino = { treinoId, treinoNome, diaAtual };
+  }
+
+  const opcoesDiaSemana = ORDEM_DIAS.map((dia) => ({ valor: dia, label: DIAS_SEMANA_COMPLETO[dia] }));
+
+  async function moverTreinoParaDia(novoDia: number): Promise<void> {
+    if (!movendoDiaTreino) return;
+    const { treinoId, treinoNome } = movendoDiaTreino;
+    salvandoDiaTreino = true;
+    try {
+      await renameTreino(treinoId, treinoNome, novoDia);
+      const atualizado = await getTreino(treinoId);
+      if (atualizado) treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
+      movendoDiaTreino = null;
+    } catch (e) {
+      alert("Erro ao mover rotina de dia: " + (e as Error).message);
+    } finally {
+      salvandoDiaTreino = false;
+    }
   }
 
   /** Grade semanal: uma coluna por dia (seg→dom), com a rotina daquele dia (ou descanso) e as séries por músculo. */
@@ -1770,8 +1798,19 @@
             <th class="grade-col-musculo"></th>
             {#each gradeSemanal.colunas as col (col.dia)}
               <th>
-                <div class="grade-dia" class:com-treino={col.treinoNome != null}>{DIAS_SEMANA_ABREV[col.dia]}</div>
-                <div class="grade-rotina-nome">{col.treinoNome ?? "💤"}</div>
+                {#if col.treinoId && col.treinoNome}
+                  <button
+                    class="grade-cabecalho-btn"
+                    onclick={() => abrirMoverDiaTreino(col.treinoId!, col.treinoNome!, col.dia)}
+                    aria-label={`Mover ${col.treinoNome} pra outro dia`}
+                  >
+                    <span class="grade-dia com-treino">{DIAS_SEMANA_ABREV[col.dia]}</span>
+                    <span class="grade-rotina-nome">{col.treinoNome}</span>
+                  </button>
+                {:else}
+                  <div class="grade-dia">{DIAS_SEMANA_ABREV[col.dia]}</div>
+                  <div class="grade-rotina-nome">💤</div>
+                {/if}
               </th>
             {/each}
           </tr>
@@ -1810,6 +1849,21 @@
       </table>
     </div>
   </Sheet>
+  </div>
+{/if}
+
+{#if movendoDiaTreino}
+  <!-- Precisa ficar acima da grade semanal (Sheet dentro de .acima-editor) — vem depois no DOM,
+       então já ganha por ordem mesmo com o mesmo z-index. -->
+  <div class="acima-editor">
+    <WheelPicker
+      titulo={movendoDiaTreino.treinoNome}
+      subtitulo="Mover pra qual dia?"
+      opcoes={opcoesDiaSemana}
+      valorAtual={movendoDiaTreino.diaAtual}
+      onSelecionar={(v) => moverTreinoParaDia(v)}
+      onFechar={() => (movendoDiaTreino = null)}
+    />
   </div>
 {/if}
 
@@ -2601,6 +2655,17 @@
   .grade-tabela th:not(:first-child),
   .grade-tabela td:not(:first-child) {
     border-left: 1px solid var(--surface-border);
+  }
+  .grade-cabecalho-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    cursor: pointer;
   }
   .grade-dia {
     font-size: var(--font-size-sm);
