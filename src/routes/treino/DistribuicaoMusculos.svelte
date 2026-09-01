@@ -3137,16 +3137,20 @@
     display: flex;
     gap: var(--space-2);
     overflow-x: auto;
-    padding-bottom: var(--space-2);
+    /* Espaço extra além do padding-bottom normal: sem isso o contorno do card ativo
+       (outline-offset positivo) ficava cortado pelo próprio scroll (overflow-x:auto vira
+       overflow-y:auto também, por padrão do CSS). */
+    padding: 4px 4px var(--space-2);
     margin-bottom: var(--space-2);
   }
   .editor-meta-chip {
     flex-shrink: 0;
+    width: 72px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-1) 2px;
     border-radius: var(--radius-sm);
     background: var(--surface-card);
     border: none;
@@ -3161,6 +3165,9 @@
     font-size: 10px;
     color: var(--surface-muted);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
   .editor-meta-valor {
     font-size: var(--font-size-sm);
