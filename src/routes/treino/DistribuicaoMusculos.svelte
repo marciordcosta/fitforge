@@ -2178,9 +2178,9 @@
     flex-shrink: 0;
     padding: 6px 14px;
     border-radius: 999px;
-    border: none;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
+    border: 1px solid var(--surface-fg);
+    background: none;
+    color: var(--surface-fg);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.3px;
