@@ -833,7 +833,9 @@
       const deltaContrib = delta * m.peso_contribuicao;
       const base = mapaBase.get(m.musculo_id) ?? 0;
       const pct = base > 0 ? (deltaContrib / base) * 100 : deltaContrib > 0 ? 999 : -999;
-      return { nome: m.musculo?.nome ?? "", pct };
+      // TREINO_EXERCICIO_SELECT não traz o nome do músculo aninhado (só musculo_id) — busca na lista já carregada.
+      const nome = musculos.find((mu) => mu.id === m.musculo_id)?.nome ?? "";
+      return { nome, pct };
     });
   }
 
