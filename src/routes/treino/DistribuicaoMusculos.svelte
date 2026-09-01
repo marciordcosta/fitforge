@@ -684,10 +684,10 @@
   let carregandoTendencia = $state(false);
   let musculoIdTendenciaCarregada = $state<string | null>(null);
 
-  /** Variação % do 1RM médio das últimas 3 sessões vs as 3 anteriores a essas — null se não há
+  /** Variação % do 1RM médio das últimas 4 sessões vs as 4 anteriores a essas — null se não há
    * histórico suficiente pra comparar. */
   function variacaoExercicio(pontos: { melhor1rm: number }[]): number | null {
-    const N = 3;
+    const N = 4;
     if (pontos.length < N + 2) return null;
     const recentes = pontos.slice(-N);
     const anteriores = pontos.slice(-2 * N, -N);
