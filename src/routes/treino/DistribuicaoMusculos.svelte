@@ -956,6 +956,17 @@
     fn();
   }
 
+  /** Nome do músculo PRIMÁRIO do exercício de um item do editor (cai pro primeiro músculo se
+   * nenhum estiver marcado como primário) — usado pra pré-preencher a busca em "Ir para Lista"
+   * com algo parecido, em vez de abrir a lista inteira sem filtro. */
+  function grupoMuscularPrincipal(treinoExercicioId: string): string {
+    const te = modalEditorRotina?.exercicios.find((e) => e.id === treinoExercicioId);
+    const musculosEx = te?.exercicio?.musculos ?? [];
+    const principal = musculosEx.find((m) => m.papel === "primario") ?? musculosEx[0];
+    if (!principal) return "";
+    return musculos.find((m) => m.id === principal.musculo_id)?.nome ?? "";
+  }
+
   /** Abre o picker de exercícios (opcionalmente já com um nome no campo de busca, pra filtrar —
    * usado quando parte do modal por músculo) — selecionar um exercício TROCA o
    * item.treinoExercicioId no lugar (mantém ordem/séries). Funciona tanto a partir do modal por
@@ -2145,7 +2156,7 @@
         {
           label: "Ir para Lista",
           icon: iconGrade,
-          onSelect: () => abrirTrocarExercicioMusculo(item, modalMusculoRotina?.musculo.nome ?? ""),
+          onSelect: () => abrirTrocarExercicioMusculo(item, grupoMuscularPrincipal(item.treinoExercicioId)),
         },
         {
           label: "Ir para Rotinas",
@@ -3158,7 +3169,7 @@
     cursor: pointer;
   }
   .editor-meta-chip-ativo {
-    outline: 2px solid var(--color-primary);
+    outline: 1px solid var(--color-primary);
     outline-offset: 2px;
   }
   .editor-meta-nome {
