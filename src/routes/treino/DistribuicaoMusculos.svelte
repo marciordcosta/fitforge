@@ -2376,13 +2376,16 @@
     background: none;
     padding: 0;
     font-family: inherit;
+    color: var(--surface-fg);
     white-space: nowrap;
     cursor: pointer;
   }
   .editor-serie-numero {
     font-weight: 700;
     font-size: var(--font-size-sm);
-    color: var(--surface-fg);
+    /* Sem color aqui: herda var(--surface-fg) do botão pai por padrão, e .valor-subindo/
+       -estavel/-caindo (aplicada como classe extra) sobrescreve — uma declaração direta
+       sempre vence a herdada, então não importa a ordem das regras no arquivo. */
   }
   .editor-serie-label {
     font-weight: 400;
