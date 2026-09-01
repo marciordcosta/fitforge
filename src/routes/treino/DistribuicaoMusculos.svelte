@@ -812,18 +812,56 @@
 
   const opcoesSeries = Array.from({ length: 10 }, (_, i) => ({ valor: i + 1, label: String(i + 1) }));
 
+  interface ImpactoMusculo {
+    nome: string;
+    pct: number;
+  }
+
+  /** % de variação que um ajuste de série representa pra cada músculo tocado pelo exercício
+   * (ponderado por peso_contribuicao) — um supino, por exemplo, mexe em peito/tríceps/ombro ao
+   * mesmo tempo, cada um com um impacto % diferente sobre o volume que já tinha na rotina. */
+  function calcularImpactoAjuste(treino: TreinoComExercicios, treinoExercicioId: string, novoNumero: number): ImpactoMusculo[] {
+    const te = treino.exercicios.find((e) => e.id === treinoExercicioId);
+    if (!te?.exercicio) return [];
+    const delta = novoNumero - te.series.length;
+    if (delta === 0) return [];
+    const mapaBase = contarSeriesPorMusculoPonderado(treino);
+    return te.exercicio.musculos.map((m) => {
+      const deltaContrib = delta * m.peso_contribuicao;
+      const base = mapaBase.get(m.musculo_id) ?? 0;
+      const pct = base > 0 ? (deltaContrib / base) * 100 : deltaContrib > 0 ? 999 : -999;
+      return { nome: m.musculo?.nome ?? "", pct };
+    });
+  }
+
+  let confirmandoImpacto = $state<{ itens: ImpactoMusculo[]; onConfirmar: () => void } | null>(null);
+
+  /** O aumento/redução de séries recomendado por vez é de 10-20% — acima disso (pra mais ou pra
+   * menos) em qualquer músculo tocado, avisa e pede confirmação antes de aplicar. */
+  function confirmarSeSeguro(treino: TreinoComExercicios, treinoExercicioId: string, novoNumero: number, aplicar: () => void): void {
+    const impacto = calcularImpactoAjuste(treino, treinoExercicioId, novoNumero);
+    if (impacto.some((i) => Math.abs(i.pct) > 20)) {
+      confirmandoImpacto = { itens: impacto, onConfirmar: aplicar };
+    } else {
+      aplicar();
+    }
+  }
+
   async function ajustarSeries(novoNumero: number): Promise<void> {
     if (!editandoSerieItem || !modalMusculoRotina) return;
     const item = editandoSerieItem;
-    const treinoId = modalMusculoRotina.treino.id;
-    salvandoSeries = true;
-    try {
-      await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
-      await refrescarTreinoMusculo(treinoId);
-    } finally {
-      salvandoSeries = false;
-      editandoSerieItem = null;
-    }
+    const treino = modalMusculoRotina.treino;
+    confirmarSeSeguro(treino, item.treinoExercicioId, novoNumero, () => {
+      void (async () => {
+        salvandoSeries = true;
+        try {
+          await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
+          await refrescarTreinoMusculo(treino.id);
+        } finally {
+          salvandoSeries = false;
+        }
+      })();
+    });
   }
 
   /** Confirmação antes de remover um exercício da rotina (editor completo ou modal por músculo) — evita tirar por engano. */
@@ -996,15 +1034,18 @@
   async function ajustarSeriesEditor(novoNumero: number): Promise<void> {
     if (!editandoSerieEditor || !modalEditorRotina) return;
     const item = editandoSerieEditor;
-    const treinoId = modalEditorRotina.id;
-    salvandoEditor = true;
-    try {
-      await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
-      await refrescarTreinoEditor(treinoId);
-    } finally {
-      salvandoEditor = false;
-      editandoSerieEditor = null;
-    }
+    const treino = modalEditorRotina;
+    confirmarSeSeguro(treino, item.treinoExercicioId, novoNumero, () => {
+      void (async () => {
+        salvandoEditor = true;
+        try {
+          await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
+          await refrescarTreinoEditor(treino.id);
+        } finally {
+          salvandoEditor = false;
+        }
+      })();
+    });
   }
 
   /** Abre o gráfico direto (sem passar por menu) quando se entra em
@@ -1670,6 +1711,31 @@
   />
 {/if}
 
+{#if confirmandoImpacto}
+  <div class="impacto-overlay" role="presentation" onclick={() => (confirmandoImpacto = null)}>
+    <div class="impacto-card" role="presentation" onclick={(e) => e.stopPropagation()}>
+      <p class="impacto-titulo">Esse ajuste passa de 20% de variação num músculo:</p>
+      <ul class="impacto-lista">
+        {#each confirmandoImpacto.itens as item (item.nome)}
+          <li class="impacto-item" class:impacto-alerta={Math.abs(item.pct) > 20}>
+            <span>{item.nome}</span>
+            <span>{item.pct > 0 ? "+" : ""}{item.pct.toFixed(0)}%</span>
+          </li>
+        {/each}
+      </ul>
+      <button
+        class="impacto-btn destructive"
+        onclick={() => {
+          const fn = confirmandoImpacto!.onConfirmar;
+          confirmandoImpacto = null;
+          fn();
+        }}
+      >Prosseguir mesmo assim</button>
+      <button class="impacto-btn" onclick={() => (confirmandoImpacto = null)}>Cancelar</button>
+    </div>
+  </div>
+{/if}
+
 <style>
   .container {
     max-width: 480px;
@@ -2233,5 +2299,68 @@
   .muted-item {
     color: var(--surface-muted);
     font-size: var(--font-size-base);
+  }
+  .impacto-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    z-index: 200;
+  }
+  .impacto-card {
+    width: 100%;
+    max-width: 320px;
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    box-shadow: var(--shadow-float);
+  }
+  .impacto-titulo {
+    text-align: center;
+    font-size: var(--font-size-base);
+    margin: 0 0 var(--space-4);
+  }
+  .impacto-lista {
+    list-style: none;
+    margin: 0 0 var(--space-4);
+    padding: 0;
+  }
+  .impacto-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--surface-border);
+    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+  }
+  .impacto-item:last-child {
+    border-bottom: none;
+  }
+  .impacto-item.impacto-alerta {
+    color: var(--color-negative);
+    font-weight: 600;
+  }
+  .impacto-btn {
+    display: block;
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--surface-border);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: var(--space-2);
+  }
+  .impacto-btn:last-child {
+    margin-bottom: 0;
+  }
+  .impacto-btn.destructive {
+    color: var(--color-danger);
   }
 </style>
