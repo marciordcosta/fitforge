@@ -2195,9 +2195,10 @@
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    padding: var(--space-2) var(--space-1);
-    border-radius: var(--radius-md);
-    background: var(--surface-card);
+    padding: var(--space-3) var(--space-1);
+    border-radius: var(--radius-lg);
+    background: var(--surface-bg);
+    box-shadow: var(--shadow-card);
   }
   .resumo-valor {
     font-size: var(--font-size-md);
