@@ -1176,14 +1176,19 @@
     return modalEditorRotina.exercicios.filter((te) => te.exercicio?.musculos.some((m) => m.musculo_id === editorFiltroMusculoId)).length;
   });
 
+  /** Um card por músculo trabalhado na rotina (com série > 0) OU com meta configurada (mesmo em
+   * 0, pra continuar mostrando o alvo vazio) — `meta: null` quando não há meta pra esse músculo,
+   * aí o card só mostra o número de séries em vez de "atual/meta". Continua clicável (filtro) e
+   * com o % de impacto igual pros dois casos. */
   const metasEditor = $derived.by(() => {
     if (!modalEditorRotina) return [];
     const atual = contarSeriesPorMusculo(modalEditorRotina);
-    const resultado: { musculo: Musculo; meta: number; atual: number; impactoPct: number }[] = [];
+    const resultado: { musculo: Musculo; meta: number | null; atual: number; impactoPct: number }[] = [];
     for (const m of musculos) {
-      const meta = metasMusculo.get(chaveMeta(modalEditorRotina.id, m.id));
-      if (meta == null) continue;
-      resultado.push({ musculo: m, meta, atual: atual.get(m.id) ?? 0, impactoPct: impactoTotalMusculo(m.id) });
+      const valorAtual = atual.get(m.id) ?? 0;
+      const meta = metasMusculo.get(chaveMeta(modalEditorRotina.id, m.id)) ?? null;
+      if (valorAtual <= 0 && meta == null) continue;
+      resultado.push({ musculo: m, meta, atual: valorAtual, impactoPct: impactoTotalMusculo(m.id) });
     }
     return resultado;
   });
@@ -2315,12 +2320,17 @@
               onclick={() => (editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id)}
             >
               <span class="editor-meta-nome">{abreviarMusculo(item.musculo.nome)}</span>
-              <span
-                class="editor-meta-valor"
-                class:valor-caindo={item.atual > item.meta}
-                class:valor-subindo={item.atual === item.meta}
-                class:valor-estavel={item.atual < item.meta}
-              >{item.atual}/{item.meta}</span>
+              {#if item.meta != null}
+                {@const meta = item.meta}
+                <span
+                  class="editor-meta-valor"
+                  class:valor-caindo={item.atual > meta}
+                  class:valor-subindo={item.atual === meta}
+                  class:valor-estavel={item.atual < meta}
+                >{item.atual}/{meta}</span>
+              {:else}
+                <span class="editor-meta-valor">{item.atual}</span>
+              {/if}
               {#if item.impactoPct !== 0}
                 <span
                   class="editor-meta-impacto"
