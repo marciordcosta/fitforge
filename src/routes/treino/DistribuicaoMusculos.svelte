@@ -676,13 +676,13 @@
   function exerciciosDoMusculo(
     lista: TreinoComExercicios[],
     musculoId: string,
-  ): { exercicioNome: string; treinoId: string; treinoNome: string; series: number }[] {
-    const resultado: { exercicioNome: string; treinoId: string; treinoNome: string; series: number }[] = [];
+  ): { exercicioNome: string; treino: TreinoComExercicios; series: number }[] {
+    const resultado: { exercicioNome: string; treino: TreinoComExercicios; series: number }[] = [];
     for (const t of lista) {
       for (const ex of t.exercicios) {
         if (!ex.exercicio) continue;
         if (ex.exercicio.musculos.some((m) => m.musculo_id === musculoId)) {
-          resultado.push({ exercicioNome: ex.exercicio.nome, treinoId: t.id, treinoNome: t.nome_treino, series: ex.series.length });
+          resultado.push({ exercicioNome: ex.exercicio.nome, treino: t, series: ex.series.length });
         }
       }
     }
@@ -692,11 +692,13 @@
   function abrirExercicios(lista: TreinoComExercicios[], musculo: Musculo): void {
     modalAberto = {
       titulo: musculo.nome,
+      // Abre o editor completo da rotina (arrastar pra reordenar, trocar exercício, % de
+      // impacto etc.) em vez da tela básica de edição — bem mais completo pra ajustar daqui.
       opcoes: exerciciosDoMusculo(lista, musculo.id).map((e) => ({
         label: e.exercicioNome,
-        subtitulo: e.treinoNome,
+        subtitulo: e.treino.nome_treino,
         valor: `${e.series} ${e.series === 1 ? "série" : "séries"}`,
-        onSelect: () => navigate(`/treino/rotina/${e.treinoId}`),
+        onSelect: () => abrirEditorRotina(e.treino),
       })),
       musculoParaGrade: musculo,
     };
