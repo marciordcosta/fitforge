@@ -704,7 +704,6 @@
 
   interface TendenciaMusculo {
     status: "subindo" | "estavel" | "caindo";
-    delta: number;
   }
 
   let tendenciaMusculo = $state<TendenciaMusculo | null>(null);
@@ -764,9 +763,9 @@
       }
       if (!variacoes.length) return;
       const media = variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
-      if (media > 0.02) tendenciaMusculo = { status: "subindo", delta: 0 };
-      else if (media < -0.02) tendenciaMusculo = { status: "caindo", delta: -1 };
-      else tendenciaMusculo = { status: "estavel", delta: 1 };
+      if (media > 0.02) tendenciaMusculo = { status: "subindo" };
+      else if (media < -0.02) tendenciaMusculo = { status: "caindo" };
+      else tendenciaMusculo = { status: "estavel" };
     } finally {
       carregandoTendencia = false;
     }
@@ -790,13 +789,6 @@
     estavel: "Tendência estável — aumentar as séries pode ajudar a sair do platô.",
     caindo: "Tendência de queda — considere reduzir o volume desse músculo.",
   };
-
-  /** Abre a roleta de séries já pré-posicionada na sugestão da tendência (o usuário ainda precisa confirmar). */
-  function abrirSerieComSugestao(item: ItemMusculoRotina): void {
-    const delta = tendenciaMusculo?.delta ?? 0;
-    const sugerido = Math.max(1, Math.min(10, item.series + delta));
-    editandoSerieItem = { ...item, series: sugerido };
-  }
 
   /** Exercícios dessa rotina específica que trabalham o músculo, com o número de séries editável
    * (abre a roleta) — ajustar aqui atualiza a rotina de verdade, as duas telas ficam ligadas.
@@ -845,19 +837,8 @@
     });
   }
 
-  let confirmandoImpacto = $state<{ itens: ImpactoMusculo[]; onConfirmar: () => void } | null>(null);
-
-  /** O aumento/redução de séries recomendado por vez é de 10-20% — acima disso (pra mais ou pra
-   * menos) em qualquer músculo tocado, avisa e pede confirmação antes de aplicar. */
-  function confirmarSeSeguro(treino: TreinoComExercicios, treinoExercicioId: string, novoNumero: number, aplicar: () => void): void {
-    const impacto = calcularImpactoAjuste(treino, treinoExercicioId, novoNumero);
-    if (impacto.some((i) => Math.abs(i.pct) > 20)) {
-      confirmandoImpacto = { itens: impacto, onConfirmar: aplicar };
-    } else {
-      aplicar();
-    }
-  }
-
+  /** Aplica direto (sem modal bloqueando) — se algum músculo passar de ±20%, o aviso vem junto
+   * na mesma linha de status, sem impedir o ajuste. */
   async function ajustarSeries(novoNumero: number): Promise<void> {
     if (!editandoSerieItem || !modalMusculoRotina) return;
     const item = editandoSerieItem;
@@ -867,23 +848,23 @@
       statusAjusteMusculo = { tipo: "info", texto: `"${item.exercicioNome}" já estava em ${novoNumero} ${novoNumero === 1 ? "série" : "séries"} — nada foi alterado.` };
       return;
     }
+    salvandoSeries = true;
     try {
-      confirmarSeSeguro(treino, item.treinoExercicioId, novoNumero, () => {
-        void (async () => {
-          salvandoSeries = true;
-          try {
-            await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
-            await refrescarTreinoMusculo(treino.id);
-            statusAjusteMusculo = { tipo: "ok", texto: `"${item.exercicioNome}" atualizado de ${valorAtualReal} para ${novoNumero}.` };
-          } catch (e) {
-            statusAjusteMusculo = { tipo: "erro", texto: "Erro ao gravar: " + (e as Error).message };
-          } finally {
-            salvandoSeries = false;
-          }
-        })();
-      });
+      const impacto = calcularImpactoAjuste(treino, item.treinoExercicioId, novoNumero);
+      await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
+      await refrescarTreinoMusculo(treino.id);
+      const grandes = impacto.filter((i) => Math.abs(i.pct) > 20);
+      const aviso = grandes.length
+        ? ` Atenção: ${grandes.map((i) => `${i.nome} ${i.pct > 0 ? "+" : ""}${i.pct.toFixed(0)}%`).join(", ")} — acima do recomendado (10-20%).`
+        : "";
+      statusAjusteMusculo = {
+        tipo: grandes.length ? "erro" : "ok",
+        texto: `"${item.exercicioNome}" atualizado de ${valorAtualReal} para ${novoNumero}.${aviso}`,
+      };
     } catch (e) {
-      statusAjusteMusculo = { tipo: "erro", texto: "Erro ao calcular impacto: " + (e as Error).message };
+      statusAjusteMusculo = { tipo: "erro", texto: "Erro ao gravar: " + (e as Error).message };
+    } finally {
+      salvandoSeries = false;
     }
   }
 
@@ -1058,22 +1039,14 @@
     if (!editandoSerieEditor || !modalEditorRotina) return;
     const item = editandoSerieEditor;
     const treino = modalEditorRotina;
+    salvandoEditor = true;
     try {
-      confirmarSeSeguro(treino, item.treinoExercicioId, novoNumero, () => {
-        void (async () => {
-          salvandoEditor = true;
-          try {
-            await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
-            await refrescarTreinoEditor(treino.id);
-          } catch (e) {
-            alert("Erro ao ajustar séries: " + (e as Error).message);
-          } finally {
-            salvandoEditor = false;
-          }
-        })();
-      });
+      await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
+      await refrescarTreinoEditor(treino.id);
     } catch (e) {
-      alert("Erro ao calcular impacto do ajuste: " + (e as Error).message);
+      alert("Erro ao ajustar séries: " + (e as Error).message);
+    } finally {
+      salvandoEditor = false;
     }
   }
 
@@ -1617,7 +1590,7 @@
               aria-label="Remover"
             >−</button>
             <button class="exercicio-musculo-nome" onclick={() => navigate(`/treino/exercicios/${item.exercicioId}`)}>{item.exercicioNome}</button>
-            <button class="exercicio-musculo-series" onclick={() => abrirSerieComSugestao(item)}>
+            <button class="exercicio-musculo-series" onclick={() => (editandoSerieItem = item)}>
               {item.series} {item.series === 1 ? "série" : "séries"}
             </button>
           </div>
@@ -1768,31 +1741,6 @@
     onConfirmar={confirmarRemocao}
     onCancelar={() => (confirmandoRemover = null)}
   />
-{/if}
-
-{#if confirmandoImpacto}
-  <div class="impacto-overlay" role="presentation" onclick={() => (confirmandoImpacto = null)}>
-    <div class="impacto-card" role="presentation" onclick={(e) => e.stopPropagation()}>
-      <p class="impacto-titulo">Esse ajuste passa de 20% de variação num músculo:</p>
-      <ul class="impacto-lista">
-        {#each confirmandoImpacto.itens as item (item.nome)}
-          <li class="impacto-item" class:impacto-alerta={Math.abs(item.pct) > 20}>
-            <span>{item.nome}</span>
-            <span>{item.pct > 0 ? "+" : ""}{item.pct.toFixed(0)}%</span>
-          </li>
-        {/each}
-      </ul>
-      <button
-        class="impacto-btn destructive"
-        onclick={() => {
-          const fn = confirmandoImpacto!.onConfirmar;
-          confirmandoImpacto = null;
-          fn();
-        }}
-      >Prosseguir mesmo assim</button>
-      <button class="impacto-btn" onclick={() => (confirmandoImpacto = null)}>Cancelar</button>
-    </div>
-  </div>
 {/if}
 
 <style>
@@ -2374,68 +2322,5 @@
   .muted-item {
     color: var(--surface-muted);
     font-size: var(--font-size-base);
-  }
-  .impacto-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-4);
-    z-index: 200;
-  }
-  .impacto-card {
-    width: 100%;
-    max-width: 320px;
-    background: var(--surface-card);
-    border-radius: var(--radius-lg);
-    padding: var(--space-5) var(--space-4) var(--space-4);
-    box-shadow: var(--shadow-float);
-  }
-  .impacto-titulo {
-    text-align: center;
-    font-size: var(--font-size-base);
-    margin: 0 0 var(--space-4);
-  }
-  .impacto-lista {
-    list-style: none;
-    margin: 0 0 var(--space-4);
-    padding: 0;
-  }
-  .impacto-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--surface-border);
-    font-size: var(--font-size-sm);
-    color: var(--surface-fg);
-  }
-  .impacto-item:last-child {
-    border-bottom: none;
-  }
-  .impacto-item.impacto-alerta {
-    color: var(--color-negative);
-    font-weight: 600;
-  }
-  .impacto-btn {
-    display: block;
-    width: 100%;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: none;
-    background: var(--surface-border);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    cursor: pointer;
-    margin-bottom: var(--space-2);
-  }
-  .impacto-btn:last-child {
-    margin-bottom: 0;
-  }
-  .impacto-btn.destructive {
-    color: var(--color-danger);
   }
 </style>
