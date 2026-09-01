@@ -2487,15 +2487,13 @@
     gap: var(--space-4);
   }
   .rotina-card {
-    background: var(--surface-card);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
-    box-shadow: var(--shadow-card);
   }
-  /* Experimento: sem fundo, pra diferenciar do resto dos cards de rotina. */
+  /* Só o card da Distribuição Semanal mantém fundo/sombra, pra se diferenciar dos demais. */
   .rotina-card.rotina-card-semanal {
-    background: none;
-    box-shadow: none;
+    background: var(--surface-card);
+    box-shadow: var(--shadow-card);
   }
   .rotina-cabecalho {
     display: flex;
