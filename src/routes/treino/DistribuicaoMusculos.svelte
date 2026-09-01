@@ -2000,8 +2000,6 @@
   .editor-totais {
     flex-shrink: 0;
     margin: var(--space-3) 0 0;
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--surface-border);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
