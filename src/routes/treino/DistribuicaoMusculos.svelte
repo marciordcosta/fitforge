@@ -2008,6 +2008,9 @@
     padding-left: var(--space-3);
     opacity: 0.85;
   }
+  .item-sub .nome-btn {
+    color: var(--surface-muted);
+  }
   .valor-subindo {
     color: var(--color-success);
   }
