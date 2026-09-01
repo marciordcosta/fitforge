@@ -1914,7 +1914,6 @@
           <p class="muted">Nenhum exercício ainda.</p>
         {/if}
       </div>
-      <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
       <div class="editor-totais">
         <span>
           {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
@@ -1926,6 +1925,7 @@
           {@render iconGrafico()}
         </button>
       </div>
+      <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
       <button class="salvar-editor-btn" onclick={salvarEditor} disabled={salvandoEditor}>{salvandoEditor ? "Salvando…" : "Salvar"}</button>
     </div>
   </div>
