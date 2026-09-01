@@ -51,17 +51,23 @@
    * pra alimentar a setinha de tendência de cada músculo sem precisar reconsultar por linha. */
   let historicoPorExercicio = $state<Map<string, { melhor1rm: number }[]>>(new Map());
 
+  /** Busca em lotes pequenos (não tudo de uma vez via Promise.all) — muitas rotinas/exercícios
+   * juntos saturavam o limite de conexões simultâneas do navegador, deixando outras requisições
+   * (tipo salvar um ajuste de série) na fila atrás dessa busca em massa. */
   async function carregarHistoricoTodos(treinosCarregados: TreinoComExercicios[]): Promise<void> {
     const ids = new Set<string>();
     for (const t of treinosCarregados) {
       for (const ex of t.exercicios) ids.add(ex.exercicio_id);
     }
-    const resultados = await Promise.all(
-      Array.from(ids).map(async (id) => [id, await getHistoricoExercicio(id)] as const),
-    );
-    const mapa = new Map(historicoPorExercicio);
-    for (const [id, pontos] of resultados) mapa.set(id, pontos);
-    historicoPorExercicio = mapa;
+    const lista = Array.from(ids);
+    const TAMANHO_LOTE = 4;
+    for (let i = 0; i < lista.length; i += TAMANHO_LOTE) {
+      const lote = lista.slice(i, i + TAMANHO_LOTE);
+      const resultados = await Promise.all(lote.map(async (id) => [id, await getHistoricoExercicio(id)] as const));
+      const mapa = new Map(historicoPorExercicio);
+      for (const [id, pontos] of resultados) mapa.set(id, pontos);
+      historicoPorExercicio = mapa;
+    }
   }
 
   async function carregarBase() {
@@ -750,7 +756,9 @@
     try {
       const variacoes: number[] = [];
       for (const item of itens) {
-        const pontos = await getHistoricoExercicio(item.exercicioId);
+        // Reaproveita o histórico já pré-carregado (carregarHistoricoTodos) — só busca de novo
+        // se esse exercício não estava no cache (ex: acabou de ser adicionado à rotina).
+        const pontos = historicoPorExercicio.get(item.exercicioId) ?? (await getHistoricoExercicio(item.exercicioId));
         const v = variacaoExercicio(pontos);
         if (v != null) variacoes.push(v);
       }
@@ -1079,8 +1087,21 @@
     return treinos.find((t) => t.id === m[1]) ?? null;
   });
 
+  /** Só abre uma vez por entrada na URL — sem isso, cada atualização de `treinos` (ex: depois de
+   * ajustar uma série) recriava `graficoUrlTreino`/`musculoUrlContexto`/`editorUrlTreino` e o
+   * efeito reabria o modal do zero de novo, brigando com a atualização direta que já tinha
+   * acabado de acontecer. */
+  let urlAbertaChave = $state<string | null>(null);
+
   $effect(() => {
-    if (graficoUrlTreino) abrirGraficoTreino(graficoUrlTreino);
+    if (!graficoUrlTreino) {
+      if (urlAbertaChave?.startsWith("grafico:")) urlAbertaChave = null;
+      return;
+    }
+    const chave = `grafico:${graficoUrlTreino.id}`;
+    if (urlAbertaChave === chave) return;
+    urlAbertaChave = chave;
+    abrirGraficoTreino(graficoUrlTreino);
   });
 
   /** Mesmo padrão do gráfico: reabre o modal de exercícios por músculo ao voltar do detalhe do
@@ -1095,7 +1116,14 @@
   });
 
   $effect(() => {
-    if (musculoUrlContexto) definirModalMusculo(musculoUrlContexto.treino, musculoUrlContexto.musculo);
+    if (!musculoUrlContexto) {
+      if (urlAbertaChave?.startsWith("musculo:")) urlAbertaChave = null;
+      return;
+    }
+    const chave = `musculo:${musculoUrlContexto.treino.id}:${musculoUrlContexto.musculo.id}`;
+    if (urlAbertaChave === chave) return;
+    urlAbertaChave = chave;
+    definirModalMusculo(musculoUrlContexto.treino, musculoUrlContexto.musculo);
   });
 
   /** Mesmo padrão: reabre o editor completo da rotina ao voltar do detalhe de um exercício. */
@@ -1106,7 +1134,14 @@
   });
 
   $effect(() => {
-    if (editorUrlTreino) definirModalEditor(editorUrlTreino);
+    if (!editorUrlTreino) {
+      if (urlAbertaChave?.startsWith("editor:")) urlAbertaChave = null;
+      return;
+    }
+    const chave = `editor:${editorUrlTreino.id}`;
+    if (urlAbertaChave === chave) return;
+    urlAbertaChave = chave;
+    definirModalEditor(editorUrlTreino);
   });
 
   /** Abre o anel da Distribuição Semanal direto — mesmo padrão do anel por rotina (bar clicável, sem menu). */
