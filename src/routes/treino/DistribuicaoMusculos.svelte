@@ -1739,6 +1739,7 @@
   .editor-lista {
     display: flex;
     flex-direction: column;
+    flex: 1;
     transition: opacity 0.15s;
   }
   .editor-lista.carregando {
@@ -1788,6 +1789,8 @@
   }
   .adicionar-exercicio-editor-btn {
     flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
     margin-top: var(--space-4);
     width: 100%;
     padding: var(--space-3);
