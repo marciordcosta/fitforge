@@ -247,7 +247,10 @@
   .container.modo-selecao {
     position: fixed;
     inset: 0;
-    z-index: 110;
+    /* Precisa ficar acima de qualquer Sheet (z-index 100) e de telas cheias tipo o editor
+       completo da rotina (.tela-editor-rotina, z-index 110) — pode abrir a partir de qualquer
+       um dos dois, em qualquer ordem no DOM. */
+    z-index: 120;
     background: var(--surface-bg);
     overflow-y: auto;
     padding-bottom: var(--space-4);

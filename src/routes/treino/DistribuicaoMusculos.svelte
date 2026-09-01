@@ -705,6 +705,7 @@
   // ---------------- Modal: exercícios de um músculo dentro de uma rotina específica, com séries editáveis ----------------
 
   interface ItemMusculoRotina {
+    treinoId: string;
     treinoExercicioId: string;
     exercicioId: string;
     exercicioNome: string;
@@ -714,16 +715,25 @@
   let modalMusculoRotina = $state<{ treino: TreinoComExercicios; musculo: Musculo; itens: ItemMusculoRotina[] } | null>(null);
   /** Feedback visível no modal sobre o resultado da última troca de exercício. */
   let statusAjusteMusculo = $state<{ tipo: "ok" | "info" | "erro"; texto: string } | null>(null);
-  /** Item cujo menu "Ver Exercício / Trocar Exercício" está aberto. */
+  /** Item cujo menu "Ver Exercício / Trocar Exercício" está aberto — usado tanto pelo modal
+   * por músculo (read-only) quanto pelo editor completo da rotina. */
   let menuExercicioMusculo = $state<ItemMusculoRotina | null>(null);
   /** Item sendo trocado (o picker abre pra escolher o exercício que vai entrar no lugar dele). */
   let trocandoItemMusculo = $state<ItemMusculoRotina | null>(null);
   let mostrarPickerMusculo = $state(false);
+  /** Só preenchido quando a troca parte do modal por músculo (filtra o picker pelo nome dele). */
+  let buscaInicialTroca = $state("");
 
   function itensMusculoRotina(treino: TreinoComExercicios, musculoId: string): ItemMusculoRotina[] {
     return treino.exercicios
       .filter((te) => te.exercicio?.musculos.some((m) => m.musculo_id === musculoId))
-      .map((te) => ({ treinoExercicioId: te.id, exercicioId: te.exercicio_id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length }));
+      .map((te) => ({
+        treinoId: treino.id,
+        treinoExercicioId: te.id,
+        exercicioId: te.exercicio_id,
+        exercicioNome: te.exercicio?.nome ?? "",
+        series: te.series.length,
+      }));
   }
 
   function definirModalMusculo(treino: TreinoComExercicios, musculo: Musculo): void {
@@ -887,27 +897,35 @@
     fn();
   }
 
-  /** Abre o picker de exercícios já com o nome do músculo no campo de busca, pra filtrar —
-   * selecionar um exercício TROCA o item.treinoExercicioId no lugar (mantém ordem/séries). */
-  function abrirTrocarExercicioMusculo(item: ItemMusculoRotina): void {
-    if (!modalMusculoRotina) return;
+  /** Abre o picker de exercícios (opcionalmente já com um nome no campo de busca, pra filtrar —
+   * usado quando parte do modal por músculo) — selecionar um exercício TROCA o
+   * item.treinoExercicioId no lugar (mantém ordem/séries). Funciona tanto a partir do modal por
+   * músculo quanto do editor completo da rotina, sem depender de qual dos dois está aberto. */
+  function abrirTrocarExercicioMusculo(item: ItemMusculoRotina, buscaInicial = ""): void {
     trocandoItemMusculo = item;
+    buscaInicialTroca = buscaInicial;
     mostrarPickerMusculo = true;
     menuExercicioMusculo = null;
   }
 
   async function trocarExercicioMusculo(ex: Exercicio): Promise<void> {
-    if (!modalMusculoRotina || !trocandoItemMusculo) return;
-    const treinoId = modalMusculoRotina.treino.id;
+    if (!trocandoItemMusculo) return;
     const anterior = trocandoItemMusculo;
     try {
       await trocarExercicioTreinoExercicio(anterior.treinoExercicioId, ex.id);
-      await refrescarTreinoMusculo(treinoId);
+      await refrescarTreinoMusculo(anterior.treinoId);
       mostrarPickerMusculo = false;
       trocandoItemMusculo = null;
-      statusAjusteMusculo = { tipo: "ok", texto: `"${anterior.exercicioNome}" foi trocado por "${ex.nome}".` };
+      // O banner de status só existe na UI do modal por músculo — no editor, erro vira alert (mesmo padrão das outras ações dele).
+      if (modalMusculoRotina) {
+        statusAjusteMusculo = { tipo: "ok", texto: `"${anterior.exercicioNome}" foi trocado por "${ex.nome}".` };
+      }
     } catch (e) {
-      statusAjusteMusculo = { tipo: "erro", texto: "Erro ao trocar exercício: " + (e as Error).message };
+      if (modalMusculoRotina) {
+        statusAjusteMusculo = { tipo: "erro", texto: "Erro ao trocar exercício: " + (e as Error).message };
+      } else {
+        alert("Erro ao trocar exercício: " + (e as Error).message);
+      }
     }
   }
 
@@ -1123,10 +1141,10 @@
     itensGrupo?: { nome: string; valor: number }[];
   } | null>(null);
 
-  /** Alterna entre o anel por músculo individual (dominância, cores A/B/C) e o anel por
-   * grupo muscular (Ombro, Costas etc. — soma bruta, uma cor por grupo). Reseta pro modo
-   * padrão sempre que um anel novo é aberto. */
-  let modoGrupoDetalhe = $state(false);
+  /** Alterna entre o anel por grupo muscular (Ombro, Costas etc. — soma bruta, uma cor por
+   * grupo, padrão) e o anel por músculo individual (dominância, cores A/B/C). Reseta pro
+   * modo padrão sempre que um anel novo é aberto. */
+  let modoGrupoDetalhe = $state(true);
 
   function abrirDetalheRotina(
     titulo: string,
@@ -1137,7 +1155,7 @@
     itensGrupo?: { nome: string; valor: number }[],
   ): void {
     modalDetalheRotina = { titulo, itens, centroValor, centroLabel, cores, itensGrupo };
-    modoGrupoDetalhe = false;
+    modoGrupoDetalhe = true;
   }
 
   /** Cor de cada fatia pela faixa ABC do percentual acumulado (itens já precisam vir
@@ -1470,22 +1488,12 @@
   <button class="grade-voltar" onclick={() => (mostrarGradeSemanal = false)} aria-label="Voltar">{@render iconVoltar()}</button>
 {/snippet}
 
-{#snippet iconAlternarGrupo()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M17 3l4 4-4 4" />
-    <path d="M21 7H7a4 4 0 0 0-4 4v1" />
-    <path d="M7 21l-4-4 4-4" />
-    <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
-  </svg>
-{/snippet}
-
 {#snippet alternarModoDetalhe()}
   <button
-    class="link-distribuicao"
-    class:ativo={modoGrupoDetalhe}
+    class="abc-toggle-btn"
     onclick={() => (modoGrupoDetalhe = !modoGrupoDetalhe)}
-    aria-label={modoGrupoDetalhe ? "Ver por músculo" : "Ver por grupo muscular"}
-  >{@render iconAlternarGrupo()}</button>
+    aria-label={modoGrupoDetalhe ? "Ver por faixa de dominância (ABC)" : "Ver por grupo muscular"}
+  >{modoGrupoDetalhe ? "ABC" : "Grupo"}</button>
 {/snippet}
 
 {#if modalAberto}
@@ -1685,30 +1693,35 @@
 
 {#if menuExercicioMusculo}
   {@const item = menuExercicioMusculo}
-  <ActionSheet
-    titulo={item.exercicioNome}
-    onFechar={() => (menuExercicioMusculo = null)}
-    opcoes={[
-      {
-        label: "Ver Exercício",
-        icon: iconVerExercicio,
-        onSelect: () => navigate(`/treino/exercicios/${item.exercicioId}`),
-      },
-      {
-        label: "Trocar Exercício",
-        icon: iconTrocarExercicio,
-        onSelect: () => abrirTrocarExercicioMusculo(item),
-      },
-    ]}
-  />
+  <!-- Precisa ficar acima do editor completo (.tela-editor-rotina, z-index 110) além do
+       modal por músculo (Sheet, z-index 100) — pode abrir a partir de qualquer um dos dois. -->
+  <div class="menu-exercicio-acima">
+    <ActionSheet
+      titulo={item.exercicioNome}
+      onFechar={() => (menuExercicioMusculo = null)}
+      opcoes={[
+        {
+          label: "Ver Exercício",
+          icon: iconVerExercicio,
+          onSelect: () => navigate(`/treino/exercicios/${item.exercicioId}`),
+        },
+        {
+          label: "Trocar Exercício",
+          icon: iconTrocarExercicio,
+          onSelect: () => abrirTrocarExercicioMusculo(item, modalMusculoRotina?.musculo.nome ?? ""),
+        },
+      ]}
+    />
+  </div>
 {/if}
 
-{#if mostrarPickerMusculo && modalMusculoRotina}
+{#if mostrarPickerMusculo && trocandoItemMusculo}
+  {@const treinoTroca = treinos.find((t) => t.id === trocandoItemMusculo!.treinoId)}
   <Exercicios
     modoSelecao
     tituloSelecao="Trocar Exercício"
-    buscaInicial={modalMusculoRotina.musculo.nome}
-    excluirIds={modalMusculoRotina.treino.exercicios.map((te) => te.exercicio_id)}
+    buscaInicial={buscaInicialTroca}
+    excluirIds={treinoTroca?.exercicios.map((te) => te.exercicio_id) ?? []}
     onSelecionar={(ex) => trocarExercicioMusculo(ex)}
     onFechar={() => {
       mostrarPickerMusculo = false;
@@ -1741,7 +1754,17 @@
               onclick={() => pedirConfirmacaoRemover(te.exercicio?.nome ?? "", () => removerExercicioEditor(te.id))}
               aria-label="Remover"
             >−</button>
-            <button class="editor-nome" onclick={() => navigate(`/treino/exercicios/${te.exercicio_id}`)}>{te.exercicio?.nome ?? ""}</button>
+            <button
+              class="editor-nome"
+              onclick={() =>
+                (menuExercicioMusculo = {
+                  treinoId: modalEditorRotina!.id,
+                  treinoExercicioId: te.id,
+                  exercicioId: te.exercicio_id,
+                  exercicioNome: te.exercicio?.nome ?? "",
+                  series: te.series.length,
+                })}
+            >{te.exercicio?.nome ?? ""}</button>
             <button
               class="exercicio-musculo-series"
               class:serie-pill-subindo={tendEx === "subindo"}
@@ -2090,6 +2113,22 @@
     font-size: var(--font-size-base);
     cursor: pointer;
     padding: var(--space-1);
+  }
+  .abc-toggle-btn {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+  }
+  .menu-exercicio-acima {
+    position: relative;
+    z-index: 115;
   }
 
   .grade-scroll {
