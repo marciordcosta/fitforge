@@ -248,7 +248,6 @@
 
   /** Rotinas cujo card está ordenado por fadiga (clicou no nome) em vez de quantidade de séries. */
   let treinosOrdenadosPorFadiga = $state<Set<string>>(new Set());
-  let semanalOrdenadaPorFadiga = $state(false);
 
   function alternarOrdemFadiga(treinoId: string): void {
     const copia = new Set(treinosOrdenadosPorFadiga);
@@ -321,33 +320,38 @@
   });
 
   /** Distribuição semanal (todas as rotinas somadas), ponderada pelo peso de contribuição parametrizado de cada músculo. */
-  /** Faixas A/B/C de fadiga por posição, tratando a semana inteira como uma sequência única
-   * (rotinas na ordem exibida, exercícios pela própria ordem) — mesma regra usada por rotina
-   * (contarSeriesPorFaixaDePosicao), estendida pra semana toda. */
-  function contarSeriesPorFaixaDePosicaoSemanal(): Map<string, Partes> {
-    const totalSeries = treinos.reduce((acc, t) => acc + t.exercicios.reduce((a, ex) => a + ex.series.length, 0), 0);
-    const mapa = new Map<string, Partes>();
-    if (!totalSeries) return mapa;
-
-    let posicao = 0;
+  /** Faixas A/B/C por DOMINÂNCIA acumulada (20/30/50 do total de séries da semana, ordenado do
+   * músculo mais forte pro mais fraco) — mesma regra do anel semanal (coresAbcAcumulado), não por
+   * posição no treino: a semana não tem uma sequência única de fadiga como uma rotina tem. Cada
+   * músculo recebe uma cor só (não se divide entre faixas), igual ao anel. */
+  function contarSeriesPorFaixaDominanciaSemanal(): Map<string, Partes> {
+    const mapa = new Map<string, number>();
     for (const t of treinos) {
-      const exerciciosOrdenados = t.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
-      for (const ex of exerciciosOrdenados) {
-        const musculosEx = ex.exercicio?.musculos ?? [];
-        for (let s = 0; s < ex.series.length; s++) {
-          posicao += 1;
-          const cor = corPorFaixa((posicao / totalSeries) * 100);
-          for (const m of musculosEx) {
-            const atual = mapa.get(m.musculo_id) ?? partesVazias();
-            if (cor === CORES_FAIXA.a) atual.a += m.peso_contribuicao;
-            else if (cor === CORES_FAIXA.b) atual.b += m.peso_contribuicao;
-            else atual.c += m.peso_contribuicao;
-            mapa.set(m.musculo_id, atual);
-          }
+      for (const ex of t.exercicios) {
+        const numSeries = ex.series.length;
+        if (!numSeries) continue;
+        for (const m of ex.exercicio?.musculos ?? []) {
+          mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + numSeries * m.peso_contribuicao);
         }
       }
     }
-    return mapa;
+    const itens = Array.from(mapa.entries())
+      .map(([musculo_id, valor]) => ({ musculo_id, valor }))
+      .sort((a, b) => b.valor - a.valor);
+    const total = itens.reduce((acc, i) => acc + i.valor, 0);
+    let acumulado = 0;
+    const resultado = new Map<string, Partes>();
+    for (const item of itens) {
+      const pct = total > 0 ? (item.valor / total) * 100 : 0;
+      acumulado += pct;
+      const cor = corPorFaixa(acumulado);
+      const p = partesVazias();
+      if (cor === CORES_FAIXA.a) p.a = item.valor;
+      else if (cor === CORES_FAIXA.b) p.b = item.valor;
+      else p.c = item.valor;
+      resultado.set(item.musculo_id, p);
+    }
+    return resultado;
   }
 
   const distribuicaoSemanal = $derived.by(() => {
@@ -361,7 +365,7 @@
         }
       }
     }
-    const partesPorMusculo = contarSeriesPorFaixaDePosicaoSemanal();
+    const partesPorMusculo = contarSeriesPorFaixaDominanciaSemanal();
     return musculos
       .map((m) => ({ musculo: m, valor: Math.round(mapa.get(m.id) ?? 0), partes: partesPorMusculo.get(m.id) ?? partesVazias() }))
       .filter((item) => item.valor > 0)
@@ -650,10 +654,15 @@
       .map((te) => ({ treinoExercicioId: te.id, exercicioId: te.exercicio_id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length }));
   }
 
-  /** Exercícios dessa rotina específica que trabalham o músculo, com o número de séries editável
-   * (abre a roleta) — ajustar aqui atualiza a rotina de verdade, as duas telas ficam ligadas. */
-  function abrirExerciciosDaRotina(treino: TreinoComExercicios, musculo: Musculo): void {
+  function definirModalMusculo(treino: TreinoComExercicios, musculo: Musculo): void {
     modalMusculoRotina = { treino, musculo, itens: itensMusculoRotina(treino, musculo.id) };
+  }
+
+  /** Exercícios dessa rotina específica que trabalham o músculo, com o número de séries editável
+   * (abre a roleta) — ajustar aqui atualiza a rotina de verdade, as duas telas ficam ligadas.
+   * Navega (em vez de só setar estado) pra sair e voltar do detalhe do exercício reabrir o modal. */
+  function abrirExerciciosDaRotina(treino: TreinoComExercicios, musculo: Musculo): void {
+    navigate(`/treino/distribuicao/rotina/${treino.id}/musculo/${musculo.id}`);
   }
 
   /** Recarrega a rotina do banco e propaga pro card/lista, pro modal por músculo e pro editor
@@ -741,8 +750,13 @@
   let arrastandoIdxEditor = $state<number | null>(null);
   let itemEditorRefs: (HTMLElement | null)[] = [];
 
-  function abrirEditorRotina(treino: TreinoComExercicios): void {
+  function definirModalEditor(treino: TreinoComExercicios): void {
     modalEditorRotina = treino;
+  }
+
+  /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o editor. */
+  function abrirEditorRotina(treino: TreinoComExercicios): void {
+    navigate(`/treino/distribuicao/rotina/${treino.id}/editor`);
   }
 
   /** Recarrega a rotina do banco após qualquer alteração e propaga pro card/lista e pro
@@ -864,6 +878,32 @@
     if (graficoUrlTreino) abrirGraficoTreino(graficoUrlTreino);
   });
 
+  /** Mesmo padrão do gráfico: reabre o modal de exercícios por músculo ao voltar do detalhe do
+   * exercício (ou de qualquer navegação), já que abrirExerciciosDaRotina navega pra essa rota. */
+  const musculoUrlContexto = $derived.by(() => {
+    const m = router.path.match(/^\/treino\/distribuicao\/rotina\/([^/]+)\/musculo\/([^/]+)$/);
+    if (!m) return null;
+    const treino = treinos.find((t) => t.id === m[1]);
+    const musculo = musculos.find((mu) => mu.id === m[2]);
+    if (!treino || !musculo) return null;
+    return { treino, musculo };
+  });
+
+  $effect(() => {
+    if (musculoUrlContexto) definirModalMusculo(musculoUrlContexto.treino, musculoUrlContexto.musculo);
+  });
+
+  /** Mesmo padrão: reabre o editor completo da rotina ao voltar do detalhe de um exercício. */
+  const editorUrlTreino = $derived.by(() => {
+    const m = router.path.match(/^\/treino\/distribuicao\/rotina\/([^/]+)\/editor$/);
+    if (!m) return null;
+    return treinos.find((t) => t.id === m[1]) ?? null;
+  });
+
+  $effect(() => {
+    if (editorUrlTreino) definirModalEditor(editorUrlTreino);
+  });
+
   /** Abre o anel da Distribuição Semanal direto — mesmo padrão do anel por rotina (bar clicável, sem menu). */
   function abrirGraficoSemanal(): void {
     abrirDetalheRotina(
@@ -976,19 +1016,13 @@
       <div class="lista-rotinas">
         <div class="rotina-card">
           <div class="rotina-cabecalho">
-            <h2 class="rotina-nome">
-              <button
-                class="rotina-nome-btn"
-                class:ativo={semanalOrdenadaPorFadiga}
-                onclick={() => (semanalOrdenadaPorFadiga = !semanalOrdenadaPorFadiga)}
-              >Distribuição Semanal</button>
-            </h2>
+            <h2 class="rotina-nome">Distribuição Semanal</h2>
           </div>
           {#if !distribuicaoSemanal.length}
             <p class="muted">Nenhum volume planejado ainda.</p>
           {:else}
             <div class="lista">
-              {#each (semanalOrdenadaPorFadiga ? ordenarPorMelhorEstimulo(linhasSemanal) : linhasSemanal) as linha (linha.chave)}
+              {#each linhasSemanal as linha (linha.chave)}
                 {@const aberto = linha.subItens != null && gruposExpandidos.has(linha.chave)}
                 <div class="item">
                   {#if linha.subItens}
@@ -1303,7 +1337,13 @@
 {/if}
 
 {#if modalMusculoRotina}
-  <Sheet titulo={modalMusculoRotina.musculo.nome} onFechar={() => (modalMusculoRotina = null)}>
+  <Sheet
+    titulo={modalMusculoRotina.musculo.nome}
+    onFechar={() => {
+      modalMusculoRotina = null;
+      if (musculoUrlContexto) window.history.back();
+    }}
+  >
     {#if !modalMusculoRotina.itens.length}
       <p class="muted">Nenhum exercício encontrado.</p>
     {:else}
@@ -1370,7 +1410,14 @@
   <div class="tela-editor-rotina">
     <div class="editor-conteudo">
       <div class="header">
-        <button class="back" onclick={() => (modalEditorRotina = null)} aria-label="Voltar">{@render iconVoltar()}</button>
+        <button
+          class="back"
+          onclick={() => {
+            modalEditorRotina = null;
+            if (editorUrlTreino) window.history.back();
+          }}
+          aria-label="Voltar"
+        >{@render iconVoltar()}</button>
         <h1>{modalEditorRotina.nome_treino}</h1>
         <span class="spacer"></span>
       </div>
