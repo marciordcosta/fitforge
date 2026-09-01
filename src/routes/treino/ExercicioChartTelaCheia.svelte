@@ -154,6 +154,8 @@
             tension: 0.3,
             pointRadius: 3,
             spanGaps: true,
+            // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
+            hidden: m.chave === "peso",
           })),
         },
         options: {
@@ -168,7 +170,13 @@
               grid: { display: false },
               ticks: { color: "#9aa0ab", maxTicksLimit: 6, autoSkip: true, font: { size: 10 } },
             },
-            y: { display: false, min: 0, max: 1 },
+            y: {
+              min: 0,
+              max: 1,
+              ticks: { display: false },
+              grid: { color: "rgba(255, 255, 255, 0.08)" },
+              border: { display: false },
+            },
           },
         },
       });
