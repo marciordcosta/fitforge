@@ -631,6 +631,7 @@
 
   interface ItemMusculoRotina {
     treinoExercicioId: string;
+    exercicioId: string;
     exercicioNome: string;
     series: number;
   }
@@ -638,17 +639,36 @@
   let modalMusculoRotina = $state<{ treino: TreinoComExercicios; musculo: Musculo; itens: ItemMusculoRotina[] } | null>(null);
   let editandoSerieItem = $state<ItemMusculoRotina | null>(null);
   let salvandoSeries = $state(false);
+  let mostrarPickerMusculo = $state(false);
+  let buscaPickerMusculo = $state("");
+  let adicionandoIdMusculo = $state<string | null>(null);
 
   function itensMusculoRotina(treino: TreinoComExercicios, musculoId: string): ItemMusculoRotina[] {
     return treino.exercicios
       .filter((te) => te.exercicio?.musculos.some((m) => m.musculo_id === musculoId))
-      .map((te) => ({ treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length }));
+      .map((te) => ({ treinoExercicioId: te.id, exercicioId: te.exercicio_id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length }));
   }
 
   /** Exercícios dessa rotina específica que trabalham o músculo, com o número de séries editável
    * (abre a roleta) — ajustar aqui atualiza a rotina de verdade, as duas telas ficam ligadas. */
   function abrirExerciciosDaRotina(treino: TreinoComExercicios, musculo: Musculo): void {
     modalMusculoRotina = { treino, musculo, itens: itensMusculoRotina(treino, musculo.id) };
+  }
+
+  /** Recarrega a rotina do banco e propaga pro card/lista, pro modal por músculo e pro editor
+   * completo (se algum deles estiver aberto pra essa mesma rotina) — mantém tudo ligado. */
+  async function refrescarTreinoMusculo(treinoId: string): Promise<void> {
+    const atualizado = await getTreino(treinoId);
+    if (!atualizado) return;
+    treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
+    if (modalMusculoRotina?.treino.id === treinoId) {
+      modalMusculoRotina = {
+        treino: atualizado,
+        musculo: modalMusculoRotina.musculo,
+        itens: itensMusculoRotina(atualizado, modalMusculoRotina.musculo.id),
+      };
+    }
+    if (modalEditorRotina?.id === treinoId) modalEditorRotina = atualizado;
   }
 
   const opcoesSeries = Array.from({ length: 10 }, (_, i) => ({ valor: i + 1, label: String(i + 1) }));
@@ -660,18 +680,52 @@
     salvandoSeries = true;
     try {
       await updateSeriesCountTreinoExercicio(item.treinoExercicioId, novoNumero);
-      const atualizado = await getTreino(treinoId);
-      if (atualizado) {
-        treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
-        modalMusculoRotina = {
-          treino: atualizado,
-          musculo: modalMusculoRotina.musculo,
-          itens: itensMusculoRotina(atualizado, modalMusculoRotina.musculo.id),
-        };
-      }
+      await refrescarTreinoMusculo(treinoId);
     } finally {
       salvandoSeries = false;
       editandoSerieItem = null;
+    }
+  }
+
+  async function removerExercicioMusculo(item: ItemMusculoRotina): Promise<void> {
+    if (!modalMusculoRotina) return;
+    const treinoId = modalMusculoRotina.treino.id;
+    salvandoSeries = true;
+    try {
+      await removerTreinoExercicio(item.treinoExercicioId);
+      await refrescarTreinoMusculo(treinoId);
+    } finally {
+      salvandoSeries = false;
+    }
+  }
+
+  /** Abre o picker de exercícios já com o nome do músculo no campo de busca, pra filtrar. */
+  function abrirPickerMusculo(): void {
+    if (!modalMusculoRotina) return;
+    buscaPickerMusculo = modalMusculoRotina.musculo.nome;
+    mostrarPickerMusculo = true;
+  }
+
+  const opcoesPickerMusculo = $derived(
+    todosExercicios.filter(
+      (e) =>
+        !modalMusculoRotina?.treino.exercicios.some((te) => te.exercicio_id === e.id) &&
+        correspondeBusca(textoBuscavelExercicio(e), buscaPickerMusculo),
+    ),
+  );
+
+  async function adicionarExercicioMusculo(ex: Exercicio): Promise<void> {
+    if (!modalMusculoRotina) return;
+    const treinoId = modalMusculoRotina.treino.id;
+    adicionandoIdMusculo = ex.id;
+    try {
+      const anterior = await getUltimoRegistro(ex.id);
+      await adicionarTreinoExercicio(treinoId, ex.id, 3, anterior);
+      await refrescarTreinoMusculo(treinoId);
+      mostrarPickerMusculo = false;
+      buscaPickerMusculo = "";
+    } finally {
+      adicionandoIdMusculo = null;
     }
   }
 
@@ -1262,7 +1316,8 @@
       <div class="lista-exercicios-musculo" class:carregando={salvandoSeries}>
         {#each modalMusculoRotina.itens as item (item.treinoExercicioId)}
           <div class="exercicio-musculo-item">
-            <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
+            <button class="remover-circulo" onclick={() => removerExercicioMusculo(item)} aria-label="Remover">−</button>
+            <button class="exercicio-musculo-nome" onclick={() => navigate(`/treino/exercicios/${item.exercicioId}`)}>{item.exercicioNome}</button>
             <button class="exercicio-musculo-series" onclick={() => (editandoSerieItem = item)}>
               {item.series} {item.series === 1 ? "série" : "séries"}
             </button>
@@ -1270,7 +1325,40 @@
         {/each}
       </div>
     {/if}
+    <button class="adicionar-exercicio-musculo-btn" onclick={abrirPickerMusculo}>+ Adicionar Exercício</button>
   </Sheet>
+{/if}
+
+{#if mostrarPickerMusculo}
+  <div class="tela-editor-rotina">
+    <div class="editor-conteudo">
+      <div class="header">
+        <button
+          class="back"
+          onclick={() => {
+            mostrarPickerMusculo = false;
+            buscaPickerMusculo = "";
+          }}
+          aria-label="Voltar"
+        >{@render iconVoltar()}</button>
+        <h1>Adicionar Exercício</h1>
+        <span class="spacer"></span>
+      </div>
+      <input class="busca-editor" type="text" placeholder="Procurar exercício" bind:value={buscaPickerMusculo} />
+      <ul class="picker-lista-editor">
+        {#each opcoesPickerMusculo as ex (ex.id)}
+          <li>
+            <button class="picker-item-editor" onclick={() => adicionarExercicioMusculo(ex)} disabled={adicionandoIdMusculo === ex.id}>
+              {ex.nome}
+            </button>
+          </li>
+        {/each}
+        {#if !opcoesPickerMusculo.length}
+          <li class="muted-item">Nenhum exercício encontrado.</li>
+        {/if}
+      </ul>
+    </div>
+  </div>
 {/if}
 
 {#if editandoSerieItem}
@@ -1720,6 +1808,13 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--font-size-base);
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    color: var(--surface-fg);
+    cursor: pointer;
   }
   .exercicio-musculo-series {
     flex-shrink: 0;
@@ -1732,6 +1827,18 @@
     font-size: var(--font-size-sm);
     font-family: inherit;
     white-space: nowrap;
+    cursor: pointer;
+  }
+  .adicionar-exercicio-musculo-btn {
+    width: 100%;
+    margin-top: var(--space-4);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
     cursor: pointer;
   }
   .tela-editor-rotina {
