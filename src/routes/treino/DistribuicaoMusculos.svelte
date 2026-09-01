@@ -1602,6 +1602,8 @@
     align-items: center;
     gap: var(--space-2);
     margin-bottom: var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--surface-border);
   }
   .rotina-cabecalho .rotina-nome {
     flex: 1;
