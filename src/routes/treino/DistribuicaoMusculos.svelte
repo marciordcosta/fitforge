@@ -1095,6 +1095,11 @@
    * Semana" — o exercício que trabalha esse músculo fica destacado na cor primária, pra saber
    * quais exercícios compõem as séries daquela célula clicada. */
   let editorDestaqueMusculoId = $state<string | null>(null);
+  /** Filtro por toque num card de meta (topo do editor): esconde os exercícios que não trabalham
+   * esse músculo e acende o card clicado, pra achar rápido quais compõem aquele total. Clicar de
+   * novo no mesmo card limpa o filtro. Reordenar (arrastar) fica desligado enquanto ativo, pra não
+   * bagunçar a ordem com itens escondidos no meio da lista. */
+  let editorFiltroMusculoId = $state<string | null>(null);
 
   /** Snapshot de séries por exercício e total bruto por músculo, capturado quando o editor é
    * aberto — base FIXA (não ao vivo) pros % de impacto mostrados após cada ajuste. Sem isso,
@@ -1155,6 +1160,7 @@
     modalEditorRotina = treino;
     capturarBaselineEditor(treino);
     editorSujo = false;
+    editorFiltroMusculoId = null;
   }
 
   /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o
@@ -2245,7 +2251,11 @@
       {#if metasEditor.length}
         <div class="editor-metas-scroll">
           {#each metasEditor as item (item.musculo.id)}
-            <div class="editor-meta-chip">
+            <button
+              class="editor-meta-chip"
+              class:editor-meta-chip-ativo={editorFiltroMusculoId === item.musculo.id}
+              onclick={() => (editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id)}
+            >
               <span class="editor-meta-nome">{abreviarMusculo(item.musculo.nome)}</span>
               <span
                 class="editor-meta-valor"
@@ -2253,7 +2263,7 @@
                 class:valor-subindo={item.atual === item.meta}
                 class:valor-estavel={item.atual < item.meta}
               >{item.atual}/{item.meta}</span>
-            </div>
+            </button>
           {/each}
         </div>
       {/if}
@@ -2265,7 +2275,13 @@
           {@const valorAnteriorSeries = baselineEditor?.seriesPorExercicio.get(te.id) ?? 0}
           {@const numeroExibidoSeries = baselineEditor?.seriesPorExercicio.has(te.id) ? valorAnteriorSeries : te.series.length}
           {@const destacado = editorDestaqueMusculoId != null && te.exercicio?.musculos.some((m) => m.musculo_id === editorDestaqueMusculoId)}
-          <div class="editor-item" class:arrastando={arrastandoIdxEditor === idx} bind:this={itemEditorRefs[idx]}>
+          {@const foraDoFiltro = editorFiltroMusculoId != null && !te.exercicio?.musculos.some((m) => m.musculo_id === editorFiltroMusculoId)}
+          <div
+            class="editor-item"
+            class:arrastando={arrastandoIdxEditor === idx}
+            class:editor-item-oculto={foraDoFiltro}
+            bind:this={itemEditorRefs[idx]}
+          >
             <button
               class="remover-circulo"
               onclick={() => pedirConfirmacaoRemover(te.exercicio?.nome ?? "", () => removerExercicioEditor(te.id))}
@@ -2314,7 +2330,13 @@
                 <span class="editor-serie-label">{numeroExibidoSeries === 1 ? "série" : "séries"}</span>
               </button>
             </div>
-            <button class="handle-arraste" onpointerdown={(e) => iniciarArrasteEditor(e, idx)} aria-label="Arrastar para reordenar">☰</button>
+            <button
+              class="handle-arraste"
+              onpointerdown={(e) => {
+                if (!editorFiltroMusculoId) iniciarArrasteEditor(e, idx);
+              }}
+              aria-label="Arrastar para reordenar"
+            >☰</button>
           </div>
         {/each}
         {#if !modalEditorRotina.exercicios.length}
@@ -3127,15 +3149,30 @@
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--surface-card);
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .editor-meta-chip-ativo {
+    background: var(--color-primary);
   }
   .editor-meta-nome {
     font-size: 10px;
     color: var(--surface-muted);
     white-space: nowrap;
   }
+  .editor-meta-chip-ativo .editor-meta-nome {
+    color: var(--color-primary-fg);
+  }
   .editor-meta-valor {
     font-size: var(--font-size-sm);
     font-weight: 700;
+  }
+  .editor-meta-chip-ativo .editor-meta-valor {
+    color: var(--color-primary-fg);
+  }
+  .editor-item-oculto {
+    display: none;
   }
   .editor-lista {
     display: flex;
