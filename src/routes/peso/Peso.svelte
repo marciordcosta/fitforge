@@ -262,10 +262,17 @@
   /** A meta é sempre semanal e parte da média móvel do primeiro dia visível, nunca do peso bruto de um dia só. */
   const pesoInicialMedia = $derived.by(() => mediaMovelGrafico[0]?.peso ?? null);
 
-  /** Peso esperado pela meta em cada dia plotado, sempre projetado a partir da média móvel do primeiro dia visível, usando os dias corridos reais entre cada ponto e esse primeiro dia (não o tamanho nominal do filtro).
-   * Calculado sempre (não só quando a linha está visível no gráfico) pra "Meta semanal" bater exatamente com o último ponto dessa mesma linha. */
+  /** Peso esperado pela meta em cada dia plotado — sempre ancorado em HOJE (a média mais recente),
+   * nunca no início do período visível: senão o alvo mudaria de acordo com o filtro escolhido, e a
+   * meta semanal tem que continuar seguindo o mesmo ritmo % em cima da média real de hoje, ganhe,
+   * mantenha ou perca peso mais rápido que o previsto — não pode "perseguir" a média de um filtro
+   * maior/menor. Projeta pra trás a partir de hoje, então o último ponto da linha é sempre
+   * `mediaAtual * (1+percentual/100)`, igual ao valor mostrado no card "Meta semanal". Calculado
+   * sempre (não só quando a linha está visível no gráfico) pra bater com o card independente do
+   * toggle. */
   const metaAlvoPorPonto = $derived.by(() => {
-    if (!meta || !mediaMovelGrafico.length || pesoInicialMedia == null) return null;
+    if (!meta || !mediaMovelGrafico.length) return null;
+    const ultimo = mediaMovelGrafico[mediaMovelGrafico.length - 1];
     if (meta.tipo === "manutencao") {
       if (meta.pesoAlvo == null) return null;
       const alvo = meta.pesoAlvo;
@@ -273,10 +280,11 @@
     }
     if (meta.percentual == null) return null;
     const percentual = meta.percentual;
-    const dataInicial = parseISODate(mediaMovelGrafico[0].data);
+    const pesoAlvoAtual = ultimo.peso * (1 + percentual / 100);
+    const dataHoje = parseISODate(ultimo.data);
     return mediaMovelGrafico.map((p) => {
-      const diasDecorridos = Math.round((parseISODate(p.data).getTime() - dataInicial.getTime()) / 86400000);
-      return pesoInicialMedia * Math.pow(1 + percentual / 100, diasDecorridos / 7);
+      const diasAtras = Math.round((dataHoje.getTime() - parseISODate(p.data).getTime()) / 86400000);
+      return pesoAlvoAtual * Math.pow(1 + percentual / 100, -diasAtras / 7);
     });
   });
 
