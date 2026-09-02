@@ -1078,12 +1078,23 @@
   {@const calProteina = 4 * proteinaG}
   {@const calTotal = calCarbo + calGordura + calProteina}
   <span class="nome-macros" class:invisivel>
-    <span class="linha-barra-stack" title={`carb ${carboidratoG.toFixed(0)}g · gord ${gorduraG.toFixed(0)}g · prot ${proteinaG.toFixed(0)}g`}>
-      {#if calTotal > 0}
-        <span style={`width:${(calCarbo / calTotal) * 100}%; background:${COR_CARBO};`}></span>
-        <span style={`width:${(calGordura / calTotal) * 100}%; background:${COR_GORDURA};`}></span>
-        <span style={`width:${(calProteina / calTotal) * 100}%; background:${COR_PROTEINA};`}></span>
-      {/if}
+    <span class="mini-macro-col">
+      <span class="mini-macro-nome">Carb</span>
+      <span class="mini-macro-barra-wrap">
+        <span class="mini-macro-barra" style={`width:${calTotal > 0 ? (calCarbo / calTotal) * 100 : 0}%; background:${COR_CARBO};`}></span>
+      </span>
+    </span>
+    <span class="mini-macro-col">
+      <span class="mini-macro-nome">Gorduras</span>
+      <span class="mini-macro-barra-wrap">
+        <span class="mini-macro-barra" style={`width:${calTotal > 0 ? (calGordura / calTotal) * 100 : 0}%; background:${COR_GORDURA};`}></span>
+      </span>
+    </span>
+    <span class="mini-macro-col">
+      <span class="mini-macro-nome">Proteínas</span>
+      <span class="mini-macro-barra-wrap">
+        <span class="mini-macro-barra" style={`width:${calTotal > 0 ? (calProteina / calTotal) * 100 : 0}%; background:${COR_PROTEINA};`}></span>
+      </span>
     </span>
     <span class="nome-pct">{pct}%</span>
   </span>
@@ -1998,16 +2009,28 @@
   .nome-pct {
     flex-shrink: 0;
   }
-  .linha-barra-stack {
-    display: flex;
+  .mini-macro-col {
     flex: 1;
     min-width: 0;
-    height: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .mini-macro-nome {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mini-macro-barra-wrap {
+    display: block;
+    height: 4px;
     border-radius: 3px;
     overflow: hidden;
     background: var(--surface-border);
   }
-  .linha-barra-stack span {
+  .mini-macro-barra {
+    display: block;
     height: 100%;
   }
   .remover-btn {
