@@ -1072,34 +1072,42 @@
   </svg>
 {/snippet}
 
-{#snippet barrasMacrosLinha(carboidratoG: number, gorduraG: number, proteinaG: number, pct: number, invisivel: boolean)}
-  {@const calCarbo = 4 * carboidratoG}
-  {@const calGordura = 9 * gorduraG}
-  {@const calProteina = 4 * proteinaG}
-  {@const calTotal = calCarbo + calGordura + calProteina}
+{#snippet barrasMacrosLinha(
+  carboidratoG: number,
+  gorduraG: number,
+  proteinaG: number,
+  carboidratoDiaG: number,
+  gorduraDiaG: number,
+  proteinaDiaG: number,
+  pct: number,
+  invisivel: boolean,
+)}
+  {@const pctCarboDia = carboidratoDiaG > 0 ? Math.round((carboidratoG / carboidratoDiaG) * 100) : 0}
+  {@const pctGorduraDia = gorduraDiaG > 0 ? Math.round((gorduraG / gorduraDiaG) * 100) : 0}
+  {@const pctProteinaDia = proteinaDiaG > 0 ? Math.round((proteinaG / proteinaDiaG) * 100) : 0}
   <span class="nome-macros" class:invisivel>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Carb</span>
       <span class="mini-macro-barra-wrap">
-        <span class="mini-macro-barra" style={`width:${calTotal > 0 ? (calCarbo / calTotal) * 100 : 0}%; background:${COR_CARBO};`}></span>
+        <span class="mini-macro-barra" style={`width:${Math.min(100, pctCarboDia)}%; background:${COR_CARBO};`}></span>
       </span>
-      <span class="mini-macro-valor">{carboidratoG.toFixed(0)} g</span>
+      <span class="mini-macro-valor">{carboidratoG.toFixed(0)} g · {pctCarboDia}%</span>
     </span>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Gorduras</span>
       <span class="mini-macro-barra-wrap">
-        <span class="mini-macro-barra" style={`width:${calTotal > 0 ? (calGordura / calTotal) * 100 : 0}%; background:${COR_GORDURA};`}></span>
+        <span class="mini-macro-barra" style={`width:${Math.min(100, pctGorduraDia)}%; background:${COR_GORDURA};`}></span>
       </span>
-      <span class="mini-macro-valor">{gorduraG.toFixed(0)} g</span>
+      <span class="mini-macro-valor">{gorduraG.toFixed(0)} g · {pctGorduraDia}%</span>
     </span>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Proteínas</span>
       <span class="mini-macro-barra-wrap">
-        <span class="mini-macro-barra" style={`width:${calTotal > 0 ? (calProteina / calTotal) * 100 : 0}%; background:${COR_PROTEINA};`}></span>
+        <span class="mini-macro-barra" style={`width:${Math.min(100, pctProteinaDia)}%; background:${COR_PROTEINA};`}></span>
       </span>
-      <span class="mini-macro-valor">{proteinaG.toFixed(0)} g</span>
+      <span class="mini-macro-valor">{proteinaG.toFixed(0)} g · {pctProteinaDia}%</span>
     </span>
-    <span class="nome-pct">{pct}% <span class="nome-pct-rotulo">do dia</span></span>
+    <span class="nome-pct">{pct}%</span>
   </span>
 {/snippet}
 
@@ -1423,6 +1431,9 @@
                   meta.carboidratoG ?? 0,
                   meta.gorduraG ?? 0,
                   meta.proteinaG ?? 0,
+                  metaGrupo.carboidratoG,
+                  metaGrupo.gorduraG,
+                  metaGrupo.proteinaG,
                   pctDeDia(arredondarDezena(meta.calorias ?? 0), grupo.calorias),
                   meta.calorias == null,
                 )}
@@ -1553,6 +1564,9 @@
                 m.metaCarboidratoG ?? 0,
                 m.metaGorduraG ?? 0,
                 m.metaProteinaG ?? 0,
+                metaGlobal.carboidratoG,
+                metaGlobal.gorduraG,
+                metaGlobal.proteinaG,
                 pctDoDia(arredondarDezena(m.metaCalorias ?? 0)),
                 m.metaCalorias == null,
               )}
@@ -2013,10 +2027,6 @@
     flex-shrink: 0;
     align-self: flex-end;
   }
-  .nome-pct-rotulo {
-    color: var(--surface-muted);
-    font-weight: 400;
-  }
   .mini-macro-col {
     flex: 1;
     min-width: 0;
@@ -2044,6 +2054,9 @@
   .mini-macro-valor {
     font-size: 10px;
     color: var(--surface-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .remover-btn {
     flex-shrink: 0;
