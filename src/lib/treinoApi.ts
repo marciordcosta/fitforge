@@ -929,12 +929,15 @@ export async function getDiasComTreino(dataInicio: string, dataFim: string): Pro
   const porDia = new Map<string, DiaComTreino>();
   for (const r of data ?? []) {
     if (porDia.has(r.data)) continue;
+    // O embed às vezes volta objeto, às vezes array (depende de como o PostgREST infere a
+    // relação) — cobre os dois formatos. Se o nome vier vazio mesmo com treino_id preenchido
+    // (linha órfã, nome em branco etc.), mostra "Treino" genérico em vez de sumir com o link.
+    const relacionado = r.treinos as unknown as { nome_treino: string } | { nome_treino: string }[] | null;
+    const nomeRelacionado = Array.isArray(relacionado) ? relacionado[0]?.nome_treino : relacionado?.nome_treino;
     porDia.set(r.data, {
       data: r.data,
       treinoId: r.treino_id,
-      treinoNome: r.treino_id
-        ? ((r.treinos as unknown as { nome_treino: string } | null)?.nome_treino ?? "")
-        : "Treino avulso",
+      treinoNome: r.treino_id ? nomeRelacionado || "Treino" : "Treino avulso",
     });
   }
   return Array.from(porDia.values());

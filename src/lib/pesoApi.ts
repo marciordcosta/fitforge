@@ -115,41 +115,34 @@ export async function getUltimoPeso(): Promise<number | null> {
   return data?.peso ?? null;
 }
 
-/** Meta única por usuário. Para "percentual", o sinal indica a direção: positivo = ganho, negativo = perda — sempre semanal. */
+/** Meta única por usuário. Para "percentual", o sinal indica a direção: positivo = ganho,
+ * negativo = perda — sempre semanal (cutting = negativo, bulking = positivo, derivado do Tipo de
+ * Dieta em Dieta > Parâmetros, não escolhido aqui). `pesoAlvo` é o peso buscado — pro tipo
+ * manutenção é o próprio peso de manutenção; pro tipo percentual é o alvo final da perda/ganho,
+ * usado pra projetar quantos dias faltam (ver getDiasParaObjetivo). */
 export interface PesoMeta {
   tipo: "percentual" | "manutencao";
   percentual: number | null;
-  pesoManutencao: number | null;
+  pesoAlvo: number | null;
 }
 
 export async function getMeta(): Promise<PesoMeta | null> {
   const { data, error } = await supabase
     .from("peso_metas")
-    .select("tipo, percentual, peso_manutencao")
+    .select("tipo, percentual, peso_alvo")
     .eq("user_id", uid())
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { tipo: data.tipo, percentual: data.percentual, pesoManutencao: data.peso_manutencao };
+  return { tipo: data.tipo, percentual: data.percentual, pesoAlvo: data.peso_alvo };
 }
 
-export async function salvarMetaPercentual(percentual: number): Promise<void> {
+export async function salvarMeta(tipo: "percentual" | "manutencao", percentual: number | null, pesoAlvo: number | null): Promise<void> {
   const { error } = await supabase.from("peso_metas").upsert({
     user_id: uid(),
-    tipo: "percentual",
-    percentual,
-    peso_manutencao: null,
-    updated_at: new Date().toISOString(),
-  });
-  if (error) throw error;
-}
-
-export async function salvarMetaManutencao(peso: number): Promise<void> {
-  const { error } = await supabase.from("peso_metas").upsert({
-    user_id: uid(),
-    tipo: "manutencao",
-    percentual: null,
-    peso_manutencao: peso,
+    tipo,
+    percentual: tipo === "percentual" ? percentual : null,
+    peso_alvo: pesoAlvo,
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
@@ -158,6 +151,49 @@ export async function salvarMetaManutencao(peso: number): Promise<void> {
 export async function excluirMeta(): Promise<void> {
   const { error } = await supabase.from("peso_metas").delete().eq("user_id", uid());
   if (error) throw error;
+}
+
+/** Quantos dias faltam pra bater o peso alvo, no ritmo semanal atual (só faz sentido pra meta
+ * "percentual" — manutenção não tem prazo, é um alvo contínuo). Projeta a partir da MÉDIA MÓVEL
+ * mais recente (não de quando a meta foi criada) — por isso o resultado sobe ou desce sozinho
+ * conforme o progresso real diverge do ritmo planejado. null quando não há meta/peso registrado,
+ * quando o peso já passou do alvo na direção contrária (trajetória impossível de fechar), ou
+ * quando o ritmo semanal é zero (nunca chegaria). */
+export async function getDiasParaObjetivo(): Promise<number | null> {
+  const meta = await getMeta();
+  if (!meta || meta.pesoAlvo == null) return null;
+  if (meta.tipo === "manutencao") return null;
+  if (meta.percentual == null || meta.percentual === 0) return null;
+
+  const mediaAtual = await getPesoMedioAtual();
+  if (mediaAtual == null) return null;
+
+  const EPSILON_KG = 0.05;
+  if (Math.abs(meta.pesoAlvo - mediaAtual) <= EPSILON_KG) return 0;
+
+  const razao = meta.pesoAlvo / mediaAtual;
+  const base = 1 + meta.percentual / 100;
+  if (base <= 0) return null;
+  const lnRazao = Math.log(razao);
+  const lnBase = Math.log(base);
+  // Sinais diferentes = a trajetória se afasta do alvo em vez de se aproximar (ex: meta de perda
+  // com alvo acima do peso atual) — não dá pra estimar um prazo que nunca chega.
+  if (Math.sign(lnRazao) !== Math.sign(lnBase)) return null;
+
+  const dias = Math.round((7 * lnRazao) / lnBase);
+  return dias > 0 ? dias : 0;
+}
+
+/** "25 dias" | "1 mês" | "1 mês e 10 dias" — mês aproximado em 30 dias, mesmo critério já usado
+ * nos filtros do gráfico de Peso ("1 mês" = 30 dias). */
+export function formatDiasObjetivo(dias: number): string {
+  if (dias <= 0) return "Objetivo alcançado";
+  if (dias < 30) return `${dias} ${dias === 1 ? "dia" : "dias"}`;
+  const meses = Math.floor(dias / 30);
+  const diasRestantes = dias % 30;
+  const partes = [`${meses} ${meses === 1 ? "mês" : "meses"}`];
+  if (diasRestantes > 0) partes.push(`${diasRestantes} ${diasRestantes === 1 ? "dia" : "dias"}`);
+  return partes.join(" e ");
 }
 
 /** Peso atual (média móvel dos últimos 7 dias, ancorada no registro mais recente). null se não há nenhum peso registrado ainda. */
@@ -172,55 +208,3 @@ export async function getPesoMedioAtual(): Promise<number | null> {
   return janela.reduce((acc, p) => acc + p.peso, 0) / janela.length;
 }
 
-export interface ProgressoMetaPeso {
-  pesoAtual: number;
-  pesoAlvo: number;
-  /** Alvo menos o peso atual — quanto falta pra bater a meta: positivo = falta ganhar, negativo = falta perder (peso já está acima do alvo). */
-  faltamG: number;
-}
-
-/**
- * Peso atual (média móvel dos últimos 7 dias, no registro mais recente) contra o alvo da meta ativa.
- * Pra meta percentual, o alvo é projetado a partir da média móvel do primeiro peso registrado nos
- * últimos 7 dias corridos — mesma janela "1 semana" que é o filtro padrão do gráfico de Peso — pra
- * bater com os mesmos valores mostrados lá. Retorna null se não há meta ativa, nenhum peso registrado
- * ainda, ou (só pra meta percentual) nenhum peso registrado na última semana.
- */
-export async function getProgressoMetaHoje(): Promise<ProgressoMetaPeso | null> {
-  const meta = await getMeta();
-  if (!meta) return null;
-
-  const registros = await getPesosDoPeriodo("1900-01-01", hojeISO());
-  if (!registros.length) return null;
-  const ordenados = [...registros].sort((a, b) => a.data.localeCompare(b.data));
-
-  function mediaMovelEm(data: string): number {
-    const d = parseISODate(data);
-    const limite = toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 6));
-    const janela = ordenados.filter((p) => p.data >= limite && p.data <= data);
-    return janela.reduce((acc, p) => acc + p.peso, 0) / janela.length;
-  }
-
-  const dataMaisRecente = ordenados[ordenados.length - 1].data;
-  const pesoAtual = mediaMovelEm(dataMaisRecente);
-
-  let pesoAlvo: number;
-  if (meta.tipo === "manutencao") {
-    if (meta.pesoManutencao == null) return null;
-    pesoAlvo = meta.pesoManutencao;
-  } else {
-    if (meta.percentual == null) return null;
-    const hoje = parseISODate(hojeISO());
-    const inicioSemana = toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 7));
-    const registrosNaSemana = ordenados.filter((p) => p.data >= inicioSemana);
-    if (!registrosNaSemana.length) return null;
-    const dataInicial = registrosNaSemana[0].data;
-    const pesoInicial = mediaMovelEm(dataInicial);
-    const diasDecorridos = Math.round(
-      (parseISODate(dataMaisRecente).getTime() - parseISODate(dataInicial).getTime()) / 86400000,
-    );
-    pesoAlvo = pesoInicial * Math.pow(1 + meta.percentual / 100, diasDecorridos / 7);
-  }
-
-  return { pesoAtual, pesoAlvo, faltamG: Math.round((pesoAlvo - pesoAtual) * 1000) };
-}

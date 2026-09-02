@@ -2,12 +2,18 @@
   import { Chart } from "chart.js/auto";
   import { navigate, router } from "../../lib/router.svelte";
   import { toISODate, parseISODate, hojeISO } from "../../lib/dates";
-  import { getPesosDoPeriodo, getMeta, excluirMeta, type PesoRegistro, type PesoMeta } from "../../lib/pesoApi";
+  import {
+    getPesosDoPeriodo,
+    getMeta,
+    getDiasParaObjetivo,
+    formatDiasObjetivo,
+    type PesoRegistro,
+    type PesoMeta,
+  } from "../../lib/pesoApi";
   import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
   import PesoGraficoTelaCheia from "./PesoGraficoTelaCheia.svelte";
-  import ActionSheet from "../../components/ActionSheet.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
 
   const COR_PESO = "#5eead4";
@@ -100,11 +106,12 @@
   void carregarRotinasAgendadas();
 
   let meta = $state<PesoMeta | null>(null);
-  let mostrarEscolhaMeta = $state(false);
-  let metaEtapa = $state<"ganho" | "perda" | "manutencao" | null>(null);
+  let mostrarFormMeta = $state(false);
+  /** "X dias/meses para o objetivo" — só existe pra meta percentual (ver getDiasParaObjetivo). */
+  let textoObjetivo = $state<string | null>(null);
 
   const CHAVE_META_VISIVEL = "fitforge_peso_meta_visivel";
-  let metaVisivel = $state(typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_META_VISIVEL) !== "0" : true);
+  let metaVisivel = $state(typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_META_VISIVEL) === "1" : false);
 
   function alternarMetaVisivel() {
     metaVisivel = !metaVisivel;
@@ -114,28 +121,12 @@
   }
 
   async function carregarMeta() {
-    meta = await getMeta();
+    const [metaCarregada, dias] = await Promise.all([getMeta(), getDiasParaObjetivo()]);
+    meta = metaCarregada;
+    textoObjetivo = dias != null ? `${formatDiasObjetivo(dias)} para o objetivo` : null;
   }
 
   void carregarMeta();
-
-  const metaAtiva = $derived.by((): "ganho" | "perda" | "manutencao" | null => {
-    if (!meta) return null;
-    if (meta.tipo === "manutencao") return "manutencao";
-    if (meta.percentual == null) return null;
-    return meta.percentual > 0 ? "ganho" : "perda";
-  });
-
-  function valorMeta(tipo: "ganho" | "perda" | "manutencao"): string | undefined {
-    if (metaAtiva !== tipo || !meta) return undefined;
-    if (tipo === "manutencao") return meta.pesoManutencao != null ? `${meta.pesoManutencao}kg` : undefined;
-    return meta.percentual != null ? `${Math.abs(meta.percentual)}%` : undefined;
-  }
-
-  async function limparMeta() {
-    await excluirMeta();
-    await carregarMeta();
-  }
 
   const mesLabel = $derived(`${MESES[mesBase.getMonth()]} ${mesBase.getFullYear()}`);
   const mesInicio = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth(), 1));
@@ -273,7 +264,7 @@
    * fixo, não precisa projetar. */
   const metaSemanalTexto = $derived.by(() => {
     if (!meta) return "Sem meta";
-    if (meta.tipo === "manutencao") return meta.pesoManutencao != null ? `${formatPeso(meta.pesoManutencao)} kg` : "Sem meta";
+    if (meta.tipo === "manutencao") return meta.pesoAlvo != null ? `${formatPeso(meta.pesoAlvo)} kg` : "Sem meta";
     if (meta.percentual == null) return "Sem meta";
     const base = mediaMovelGrafico[mediaMovelGrafico.length - 1]?.peso;
     if (base == null) return "Sem meta";
@@ -287,8 +278,8 @@
   const metaAlvoPorPonto = $derived.by(() => {
     if (!meta || !metaVisivel || !mediaMovelGrafico.length || pesoInicialMedia == null) return null;
     if (meta.tipo === "manutencao") {
-      if (meta.pesoManutencao == null) return null;
-      const alvo = meta.pesoManutencao;
+      if (meta.pesoAlvo == null) return null;
+      const alvo = meta.pesoAlvo;
       return mediaMovelGrafico.map(() => alvo);
     }
     if (meta.percentual == null) return null;
@@ -532,6 +523,8 @@
   function aoSalvar() {
     void carregar();
     void carregarGrafico();
+    // O prazo do objetivo é projetado da última média — precisa recalcular a cada peso novo.
+    void carregarMeta();
   }
 
   function aoSalvarMeta() {
@@ -561,48 +554,10 @@
     />
   </svg>
 {/snippet}
-{#snippet iconGanho()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="3 17 9 11 13 15 21 7" />
-    <polyline points="14 7 21 7 21 14" />
-  </svg>
-{/snippet}
-{#snippet iconPerda()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="3 7 9 13 13 9 21 17" />
-    <polyline points="21 10 21 17 14 17" />
-  </svg>
-{/snippet}
-{#snippet iconManutencao()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="5" y1="9" x2="19" y2="9" />
-    <line x1="5" y1="15" x2="19" y2="15" />
-  </svg>
-{/snippet}
-{#snippet iconLimparMeta()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M3 6h18" />
-    <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
-    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-  </svg>
-{/snippet}
-{#snippet iconToggleMetaGrafico()}
-  <button
-    class="toggle-meta-grafico"
-    style={`color: ${metaVisivel ? COR_TREINO : "#fff"};`}
-    onclick={alternarMetaVisivel}
-    aria-label={metaVisivel ? "Ocultar meta no gráfico" : "Mostrar meta no gráfico"}
-  >
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 3v18h18" />
-      <path d="M18.7 8L14 12.7l-3-3L7 14" />
-    </svg>
-  </button>
-{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <h1>Peso <span class="modo-label">{modoGrafico === "media" ? "Média" : "Diário"}</span></h1>
+    <h1>Peso <span class="modo-label">{textoObjetivo ?? (modoGrafico === "media" ? "Média" : "Diário")}</span></h1>
     <div class="header-acoes">
       <button class="icon-btn" onclick={() => (mostrarFiltro = true)} aria-label="Filtro de período">
         {@render iconFiltro()}
@@ -649,7 +604,7 @@
       <span class="quick-card-label">Meta semanal</span>
       <span class="quick-card-valor">{metaSemanalTexto}</span>
     </button>
-    <button class="quick-card quick-card-btn" onclick={() => (mostrarEscolhaMeta = true)}>
+    <button class="quick-card quick-card-btn" onclick={() => (mostrarFormMeta = true)}>
       <span class="quick-card-label">Configurações</span>
       {@render iconEngrenagem()}
     </button>
@@ -714,40 +669,8 @@
   />
 {/if}
 
-{#if mostrarEscolhaMeta}
-  <ActionSheet
-    titulo="Meta"
-    onFechar={() => (mostrarEscolhaMeta = false)}
-    acaoTitulo={iconToggleMetaGrafico}
-    opcoes={[
-      {
-        label: "Ganho",
-        icon: iconGanho,
-        valor: valorMeta("ganho"),
-        disabled: metaAtiva != null && metaAtiva !== "ganho",
-        onSelect: () => (metaEtapa = "ganho"),
-      },
-      {
-        label: "Perda",
-        icon: iconPerda,
-        valor: valorMeta("perda"),
-        disabled: metaAtiva != null && metaAtiva !== "perda",
-        onSelect: () => (metaEtapa = "perda"),
-      },
-      {
-        label: "Manutenção",
-        icon: iconManutencao,
-        valor: valorMeta("manutencao"),
-        disabled: metaAtiva != null && metaAtiva !== "manutencao",
-        onSelect: () => (metaEtapa = "manutencao"),
-      },
-      { label: "Limpar Metas", icon: iconLimparMeta, destructive: true, manterAberto: true, onSelect: () => limparMeta() },
-    ]}
-  />
-{/if}
-
-{#if metaEtapa !== null}
-  <PesoMetaFormSheet tipo={metaEtapa} onFechar={() => (metaEtapa = null)} onSalvo={aoSalvarMeta} />
+{#if mostrarFormMeta}
+  <PesoMetaFormSheet onFechar={() => (mostrarFormMeta = false)} onSalvo={aoSalvarMeta} />
 {/if}
 
 {#if mostrarGraficoCheio}
@@ -801,20 +724,6 @@
   .icon-btn svg {
     width: 22px;
     height: 22px;
-  }
-  .toggle-meta-grafico {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: none;
-    cursor: pointer;
-  }
-  .toggle-meta-grafico svg {
-    width: 20px;
-    height: 20px;
   }
   .chart-wrap {
     position: relative;

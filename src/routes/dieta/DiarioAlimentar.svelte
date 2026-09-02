@@ -21,7 +21,7 @@
     type RefeicaoModelo,
   } from "../../lib/dietaApi";
   import { listTreinos, type Treino } from "../../lib/treinoApi";
-  import { getProgressoMetaHoje, getPesoMedioAtual, type ProgressoMetaPeso } from "../../lib/pesoApi";
+  import { getDiasParaObjetivo, formatDiasObjetivo, getPesoMedioAtual } from "../../lib/pesoApi";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -44,7 +44,8 @@
   let mostrarData = $state(false);
   let modoRestante = $state(false);
   let rotinaHoje = $state<Treino | null>(null);
-  let progressoPeso = $state<ProgressoMetaPeso | null>(null);
+  /** "X dias/meses para o objetivo" — mesma informação e cálculo do topo da tela de Peso. */
+  let textoObjetivo = $state<string | null>(null);
   let metasRefeicaoPorNome = $state<Map<string, RefeicaoModelo>>(new Map());
   let modoDiarioPorId = $state<Set<string>>(new Set());
   let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
@@ -80,10 +81,10 @@
 
   async function carregarInfoTopo() {
     try {
-      const [treinos, progresso] = await Promise.all([listTreinos(), getProgressoMetaHoje()]);
+      const [treinos, dias] = await Promise.all([listTreinos(), getDiasParaObjetivo()]);
       const diaSemanaHoje = new Date().getDay();
-      rotinaHoje = treinos.find((t) => t.dia_semana === diaSemanaHoje) ?? null;
-      progressoPeso = progresso;
+      rotinaHoje = treinos.find((t: Treino) => t.dia_semana === diaSemanaHoje) ?? null;
+      textoObjetivo = dias != null ? `${formatDiasObjetivo(dias)} para o objetivo` : null;
     } catch {
       // informativo, não impede o uso do diário se falhar
     }
@@ -271,10 +272,10 @@
             <span class="chip-texto">{rotinaHoje.nome_treino}</span>
           </button>
         {/if}
-        {#if progressoPeso}
+        {#if textoObjetivo}
           <button class="chip-info" onclick={() => navigate("/peso")}>
             {@render iconPesoMeta()}
-            <span class="chip-texto">{progressoPeso.pesoAlvo.toFixed(1)} / {progressoPeso.pesoAtual.toFixed(1)} kg</span>
+            <span class="chip-texto">{textoObjetivo}</span>
           </button>
         {/if}
       </div>
