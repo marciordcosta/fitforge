@@ -67,7 +67,7 @@
   let hojeTemRotinaAgendada = $state(false);
 
   /** "diário" = peso bruto de cada dia; "média" = média móvel dos últimos 7 dias em cada dia (padrão de mercado — MacroFactor, Trendweight etc.), padrão do app. */
-  let modoGrafico = $state<"diario" | "media">("media");
+  let modoGrafico = $state<"diario" | "media">("diario");
 
   /** Um ponto por dia com peso registrado; a média móvel usa os até 7 dias anteriores (calendário, não semana fechada). */
   function calcularMediaMovel(lista: PesoRegistro[]): PesoRegistro[] {
@@ -321,6 +321,10 @@
           const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
           ctx.fillText(texto, ponto.x, yDiff);
         }
+        // Só o último ponto da linha reta da meta ganha o rótulo com o valor (76.3kg) — um
+        // número em cada ponto poluía o gráfico, já que a linha é reta e o valor de cada ponto
+        // intermediário já dá pra inferir visualmente.
+        if (i !== pontos.length - 1) return;
         const alvo = alvos?.[i];
         if (alvo != null && escalaY) {
           const yLinha = escalaY.getPixelForValue(alvo) - 9;
@@ -403,7 +407,18 @@
         plugins: { legend: { display: false } },
         scales: {
           x: { display: false },
-          y: { ticks: { color: "#9aa0ab", font: { size: 10 } }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
+          y: {
+            ticks: {
+              color: "#9aa0ab",
+              font: { size: 10 },
+              // Uma linha sim, outra não — todo gridline continua desenhado, só o número (usa
+              // a formatação padrão do Chart.js pra não divergir do que já tinha) fica de fora.
+              callback(valor, indice) {
+                return indice % 2 === 0 ? this.getLabelForValue(valor as number) : "";
+              },
+            },
+            grid: { color: "rgba(255, 255, 255, 0.08)" },
+          },
         },
       },
       plugins: [pluginRotulosMeta, pluginDatasEixo],
