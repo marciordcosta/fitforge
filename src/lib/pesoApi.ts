@@ -185,13 +185,14 @@ export async function getDiasParaObjetivo(): Promise<number | null> {
 }
 
 /** "25 dias" | "1 mês" | "1 mês e 10 dias" — mês aproximado em 30 dias, mesmo critério já usado
- * nos filtros do gráfico de Peso ("1 mês" = 30 dias). */
-export function formatDiasObjetivo(dias: number): string {
+ * nos filtros do gráfico de Peso ("1 mês" = 30 dias). Com `curto`, abrevia o mês ("2m e 21 dias")
+ * pra caber em espaços apertados, como o chip do topo do Diário. */
+export function formatDiasObjetivo(dias: number, curto = false): string {
   if (dias <= 0) return "Objetivo alcançado";
   if (dias < 30) return `${dias} ${dias === 1 ? "dia" : "dias"}`;
   const meses = Math.floor(dias / 30);
   const diasRestantes = dias % 30;
-  const partes = [`${meses} ${meses === 1 ? "mês" : "meses"}`];
+  const partes = [curto ? `${meses}m` : `${meses} ${meses === 1 ? "mês" : "meses"}`];
   if (diasRestantes > 0) partes.push(`${diasRestantes} ${diasRestantes === 1 ? "dia" : "dias"}`);
   return partes.join(" e ");
 }

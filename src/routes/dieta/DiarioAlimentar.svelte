@@ -84,7 +84,7 @@
       const [treinos, dias] = await Promise.all([listTreinos(), getDiasParaObjetivo()]);
       const diaSemanaHoje = new Date().getDay();
       rotinaHoje = treinos.find((t: Treino) => t.dia_semana === diaSemanaHoje) ?? null;
-      textoObjetivo = dias != null ? `${formatDiasObjetivo(dias)} para o objetivo` : null;
+      textoObjetivo = dias != null ? formatDiasObjetivo(dias, true) : null;
     } catch {
       // informativo, não impede o uso do diário se falhar
     }

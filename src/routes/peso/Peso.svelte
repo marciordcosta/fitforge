@@ -259,24 +259,13 @@
     return `${formatPeso(mediaMovelGrafico[mediaMovelGrafico.length - 1].peso)} kg`;
   });
 
-  /** Peso médio alvo pra semana que vem: projeta a média móvel mais recente pelo % semanal da
-   * meta (a meta em si já é sempre semanal — ver PesoMeta.percentual). Manutenção já é um peso
-   * fixo, não precisa projetar. */
-  const metaSemanalTexto = $derived.by(() => {
-    if (!meta) return "Sem meta";
-    if (meta.tipo === "manutencao") return meta.pesoAlvo != null ? `${formatPeso(meta.pesoAlvo)} kg` : "Sem meta";
-    if (meta.percentual == null) return "Sem meta";
-    const base = mediaMovelGrafico[mediaMovelGrafico.length - 1]?.peso;
-    if (base == null) return "Sem meta";
-    return `${formatPeso(base * (1 + meta.percentual / 100))} kg`;
-  });
-
   /** A meta é sempre semanal e parte da média móvel do primeiro dia visível, nunca do peso bruto de um dia só. */
   const pesoInicialMedia = $derived.by(() => mediaMovelGrafico[0]?.peso ?? null);
 
-  /** Peso esperado pela meta em cada dia plotado, sempre projetado a partir da média móvel do primeiro dia visível, usando os dias corridos reais entre cada ponto e esse primeiro dia (não o tamanho nominal do filtro). */
+  /** Peso esperado pela meta em cada dia plotado, sempre projetado a partir da média móvel do primeiro dia visível, usando os dias corridos reais entre cada ponto e esse primeiro dia (não o tamanho nominal do filtro).
+   * Calculado sempre (não só quando a linha está visível no gráfico) pra "Meta semanal" bater exatamente com o último ponto dessa mesma linha. */
   const metaAlvoPorPonto = $derived.by(() => {
-    if (!meta || !metaVisivel || !mediaMovelGrafico.length || pesoInicialMedia == null) return null;
+    if (!meta || !mediaMovelGrafico.length || pesoInicialMedia == null) return null;
     if (meta.tipo === "manutencao") {
       if (meta.pesoAlvo == null) return null;
       const alvo = meta.pesoAlvo;
@@ -291,6 +280,15 @@
     });
   });
 
+  /** Valor exibido no card "Meta semanal": sempre o mesmo número do último ponto da linha da meta
+   * no gráfico (metaAlvoPorPonto), pra nunca "não bater" entre o card e o rótulo desenhado. */
+  const metaSemanalTexto = $derived.by(() => {
+    if (!meta) return "Sem meta";
+    const alvos = metaAlvoPorPonto;
+    if (!alvos || !alvos.length) return "Sem meta";
+    return `${formatPeso(alvos[alvos.length - 1])} kg`;
+  });
+
   /**
    * Linha reta de meta: da média móvel do primeiro dia até o peso-alvo do último ponto.
    * Reaproveita o mesmo valor de metaAlvoPorPonto (em vez de recalcular a partir do tamanho
@@ -298,7 +296,7 @@
    * quando os dados visíveis não cobrem o período inteiro do filtro selecionado.
    */
   const metaLinha = $derived.by(() => {
-    const alvos = metaAlvoPorPonto;
+    const alvos = metaVisivel ? metaAlvoPorPonto : null;
     if (!meta || !alvos || !alvos.length || pontosGrafico.length < 2 || pesoInicialMedia == null) return null;
     const pesoAlvo = alvos[alvos.length - 1];
     const linha = new Array<number | null>(pontosGrafico.length).fill(null);
@@ -344,7 +342,7 @@
    * o sinal do rótulo bater com a posição visual do ponto em relação à linha da meta.
    */
   const diffMetaPorPonto = $derived.by(() => {
-    const alvos = metaAlvoPorPonto;
+    const alvos = metaVisivel ? metaAlvoPorPonto : null;
     const rotulo = pontosComRotulo;
     const pontos = pontosGrafico;
     if (!alvos || !rotulo || !pontos.length) return null;
@@ -358,7 +356,7 @@
   const pluginRotulosMeta = {
     id: "rotulosMeta",
     afterDatasetsDraw(c: Chart) {
-      const alvos = metaAlvoPorPonto;
+      const alvos = metaVisivel ? metaAlvoPorPonto : null;
       const pontos = c.getDatasetMeta(0).data;
       const escalaY = c.scales.y;
       const { ctx } = c;
@@ -680,7 +678,7 @@
     modo={modoGrafico}
     {metaLinha}
     {diffMetaPorPonto}
-    {metaAlvoPorPonto}
+    metaAlvoPorPonto={metaVisivel ? metaAlvoPorPonto : null}
     {pontosComData}
     {detalhesPorPonto}
     onFechar={() => (mostrarGraficoCheio = false)}
@@ -744,7 +742,7 @@
   .quick-actions {
     display: flex;
     gap: var(--space-2);
-    margin-bottom: var(--space-5);
+    margin-bottom: var(--space-6);
   }
   .quick-card {
     flex: 1;
