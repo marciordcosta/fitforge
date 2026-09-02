@@ -770,6 +770,13 @@ export interface DefinicaoParametro {
   somenteMinimo: boolean;
   /** Parâmetro só de teto (ex: gordura saturada) — sem campo de mínimo na tela, mínimo fica travado em 0. */
   somenteMaximo?: boolean;
+  /** Um valor só ("Meta"), sem distinção de mínimo/máximo — usado nos parâmetros de Metas de
+   * Consumo. min e max são gravados iguais (mesmo valor), pra quem já lê só um dos dois
+   * (ex: gordura_saturada.max) continuar funcionando sem mudança. */
+  metaUnica?: boolean;
+  /** Pra metaUnica: qual campo (min ou max) guarda o valor mostrado/editado — default "min".
+   * gordura_saturada usa "max" porque é onde o valor já era gravado (somenteMaximo). */
+  campoMeta?: "min" | "max";
 }
 
 export const DEFINICOES_PARAMETROS: DefinicaoParametro[] = [
@@ -777,9 +784,20 @@ export const DEFINICOES_PARAMETROS: DefinicaoParametro[] = [
   { chave: "proteina", categoria: "Macronutrientes", label: "Proteína", unidade: "g/kg", base: "peso", somenteMinimo: false },
   { chave: "gordura", categoria: "Macronutrientes", label: "Gordura", unidade: "g/kg", base: "peso", somenteMinimo: false },
   { chave: "carboidrato", categoria: "Macronutrientes", label: "Carboidrato", unidade: "g/kg", base: "peso", somenteMinimo: false },
-  { chave: "fibras", categoria: "Metas de Consumo", label: "Fibras", unidade: "%", base: "calorias", kcalPorGrama: 4, somenteMinimo: false },
-  { chave: "gordura_saturada", categoria: "Metas de Consumo", label: "Gordura Saturada", unidade: "%", base: "calorias", kcalPorGrama: 9, somenteMinimo: false, somenteMaximo: true },
-  { chave: "agua", categoria: "Metas de Consumo", label: "Água", unidade: "L/kg", base: "peso", somenteMinimo: false },
+  { chave: "fibras", categoria: "Metas de Consumo", label: "Fibras", unidade: "%", base: "calorias", kcalPorGrama: 4, somenteMinimo: false, metaUnica: true },
+  {
+    chave: "gordura_saturada",
+    categoria: "Metas de Consumo",
+    label: "Gordura Saturada",
+    unidade: "%",
+    base: "calorias",
+    kcalPorGrama: 9,
+    somenteMinimo: false,
+    somenteMaximo: true,
+    metaUnica: true,
+    campoMeta: "max",
+  },
+  { chave: "agua", categoria: "Metas de Consumo", label: "Água", unidade: "L/kg", base: "peso", somenteMinimo: false, metaUnica: true },
 ];
 
 export interface LimiteParametro {

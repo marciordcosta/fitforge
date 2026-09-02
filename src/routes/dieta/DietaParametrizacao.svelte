@@ -73,6 +73,10 @@
       await Promise.all(
         DEFINICOES_PARAMETROS.map((def) => {
           const v = valores[def.chave];
+          if (def.metaUnica) {
+            const valor = def.campoMeta === "max" ? v.max : v.min;
+            return salvarParametro(def.chave, valor, valor);
+          }
           const min = def.somenteMaximo ? 0 : v.min;
           const max = def.somenteMinimo ? v.min : v.max;
           return salvarParametro(def.chave, min, max);
@@ -127,23 +131,53 @@
           <div class="param-card-body">
             {#each definicoesDaCategoria(categoria) as def (def.chave)}
               <div class="param-linha">
-                <p class="param-nome">{def.label} <span class="param-unidade">({def.unidade})</span></p>
-                <div class="param-campos">
-                  {#if !def.somenteMaximo}
-                    <label class="param-campo">
-                      <span>Mínimo</span>
-                      <input type="number" inputmode="decimal" step="0.01" min="0" bind:value={valores[def.chave].min} />
-                    </label>
-                  {/if}
-                  {#if !def.somenteMinimo}
-                    <label class="param-campo">
-                      <span>Máximo</span>
-                      <input type="number" inputmode="decimal" step="0.01" min="0" bind:value={valores[def.chave].max} />
-                    </label>
-                  {/if}
+                <div class="param-linha-topo">
+                  <p class="param-nome">{def.label} <span class="param-unidade">({def.unidade})</span></p>
+                  <div class="param-campos">
+                    {#if def.metaUnica}
+                      <input
+                        class="param-input"
+                        type="number"
+                        inputmode="decimal"
+                        step="0.01"
+                        min="0"
+                        placeholder="Meta"
+                        aria-label="Meta"
+                        bind:value={valores[def.chave][def.campoMeta ?? "min"]}
+                      />
+                    {:else}
+                      {#if !def.somenteMaximo}
+                        <input
+                          class="param-input"
+                          type="number"
+                          inputmode="decimal"
+                          step="0.01"
+                          min="0"
+                          placeholder="Mín"
+                          aria-label="Mínimo"
+                          bind:value={valores[def.chave].min}
+                        />
+                      {/if}
+                      {#if !def.somenteMinimo}
+                        <input
+                          class="param-input"
+                          type="number"
+                          inputmode="decimal"
+                          step="0.01"
+                          min="0"
+                          placeholder="Máx"
+                          aria-label="Máximo"
+                          bind:value={valores[def.chave].max}
+                        />
+                      {/if}
+                    {/if}
+                  </div>
                 </div>
                 <p class="param-calculado" class:destaque={def.chave === "calorias"}>
-                  {#if def.somenteMaximo}
+                  {#if def.metaUnica}
+                    ≈ {valorCalculado(def, valores[def.chave][def.campoMeta ?? "min"])} {unidadeCalculada(def.unidade)}
+                    {def.base === "peso" ? "no seu peso" : "na sua meta de calorias"}
+                  {:else if def.somenteMaximo}
                     até {valorCalculado(def, valores[def.chave].max)} {unidadeCalculada(def.unidade)} {def.base === "peso" ? "no seu peso" : "na sua meta de calorias"}
                   {:else}
                     ≈ {valorCalculado(def, valores[def.chave].min)}{#if !def.somenteMinimo && valores[def.chave].max !== valores[def.chave].min} – {valorCalculado(def, valores[def.chave].max)}{/if}
@@ -259,8 +293,19 @@
     padding: var(--space-3) 0;
     border-top: 1px solid var(--surface-border);
   }
+  /* Nome e caixas na mesma linha, mais compacto — só o texto calculado (≈X no seu peso) fica
+     numa linha própria embaixo. */
+  .param-linha-topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-1);
+  }
   .param-nome {
-    margin: 0 0 var(--space-2);
+    flex: 1;
+    min-width: 0;
+    margin: 0;
     font-size: var(--font-size-base);
     color: var(--surface-fg);
   }
@@ -270,26 +315,19 @@
   }
   .param-campos {
     display: flex;
-    gap: var(--space-3);
-    margin-bottom: var(--space-2);
+    flex-shrink: 0;
+    gap: var(--space-2);
   }
-  .param-campo {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
-  }
-  .param-campo input {
+  .param-input {
     box-sizing: border-box;
-    width: 100%;
-    padding: var(--space-2) var(--space-3);
+    width: 64px;
+    padding: var(--space-2) var(--space-1);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     background: var(--surface-bg);
     color: var(--surface-fg);
-    font-size: 18px;
+    font-size: var(--font-size-base);
+    text-align: center;
     color-scheme: dark;
   }
   .param-calculado {
