@@ -232,6 +232,32 @@
   /** Pontos efetivamente plotados no gráfico principal, conforme o modo escolhido — mesmas datas nos dois modos, só muda se o peso é bruto ou suavizado. */
   const pontosGrafico = $derived.by(() => (modoGrafico === "media" ? mediaMovelGrafico : pesosGrafico));
 
+  function formatPeso(valor: number): string {
+    return valor.toFixed(1).replace(".", ",");
+  }
+
+  /** Último peso bruto registrado (não a média) — pesosGraficoBruto sempre busca até hoje,
+   * independente do período/zoom escolhido no gráfico. */
+  const pesoAtualTexto = $derived.by(() => {
+    if (!pesosGraficoBruto.length) return "—";
+    const ultimo = [...pesosGraficoBruto].sort((a, b) => b.data.localeCompare(a.data))[0];
+    return `${formatPeso(ultimo.peso)} kg`;
+  });
+
+  /** Média móvel dos últimos 7 dias mais recente — mesmo cálculo do gráfico em modo "média". */
+  const mediaAtualTexto = $derived.by(() => {
+    if (!mediaMovelGrafico.length) return "—";
+    return `${formatPeso(mediaMovelGrafico[mediaMovelGrafico.length - 1].peso)} kg`;
+  });
+
+  /** A meta em si já é sempre semanal (ver PesoMeta.percentual) — só formata pro card. */
+  const metaSemanalTexto = $derived.by(() => {
+    if (!meta) return "Sem meta";
+    if (meta.tipo === "manutencao") return meta.pesoManutencao != null ? `${formatPeso(meta.pesoManutencao)} kg` : "Sem meta";
+    if (meta.percentual == null) return "Sem meta";
+    return `${meta.percentual > 0 ? "+" : ""}${meta.percentual}%/sem`;
+  });
+
   /** A meta é sempre semanal e parte da média móvel do primeiro dia visível, nunca do peso bruto de um dia só. */
   const pesoInicialMedia = $derived.by(() => mediaMovelGrafico[0]?.peso ?? null);
 
@@ -521,9 +547,6 @@
       <button class="icon-btn" onclick={() => (mostrarFiltro = true)} aria-label="Filtro de período">
         {@render iconFiltro()}
       </button>
-      <button class="icon-btn" onclick={() => (mostrarEscolhaMeta = true)} aria-label="Meta">
-        {@render iconMeta()}
-      </button>
       <button
         class="icon-btn"
         class:destaque={modoGrafico === "diario"}
@@ -547,6 +570,25 @@
       <canvas bind:this={canvas}></canvas>
     </button>
   {/if}
+
+  <div class="quick-actions">
+    <div class="quick-card">
+      <span class="quick-card-valor">{pesoAtualTexto}</span>
+      <span class="quick-card-label">Peso atual</span>
+    </div>
+    <div class="quick-card">
+      <span class="quick-card-valor">{mediaAtualTexto}</span>
+      <span class="quick-card-label">Média atual</span>
+    </div>
+    <div class="quick-card">
+      <span class="quick-card-valor">{metaSemanalTexto}</span>
+      <span class="quick-card-label">Meta semanal</span>
+    </div>
+    <button class="quick-card quick-card-btn" onclick={() => (mostrarEscolhaMeta = true)}>
+      {@render iconMeta()}
+      <span class="quick-card-label">Configurações</span>
+    </button>
+  </div>
 
   <div class="mes-nav">
     <button onclick={() => trocarMes(-1)} aria-label="Mês anterior">‹</button>
@@ -725,6 +767,45 @@
     font-size: 12px;
     font-weight: 400;
     color: var(--surface-muted);
+  }
+  .quick-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+  }
+  .quick-card {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+  }
+  .quick-card-valor {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .quick-card-label {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--surface-muted);
+    white-space: nowrap;
+  }
+  .quick-card-btn {
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .quick-card-btn :global(svg) {
+    width: 20px;
+    height: 20px;
+    color: var(--color-primary);
   }
   .mes-nav {
     display: flex;
