@@ -681,14 +681,13 @@
             <div class="celula vazia"></div>
           {:else}
             {@const ehHoje = cel.iso === hojeISO()}
+            {@const temTreino = cel.nomeTreino != null}
             <button class="celula" class:com-peso={cel.peso != null} onclick={() => abrirDia(cel.iso)}>
-              {#if cel.nomeTreino}
-                <span class="nome-treino-mini">{cel.nomeTreino}</span>
-              {/if}
               <span
                 class="dia-numero"
-                class:dia-numero-hoje={!cel.nomeTreino && ehHoje}
-                class:muted={!cel.nomeTreino && !ehHoje && cel.peso == null}
+                class:dia-numero-treino={temTreino}
+                class:dia-numero-hoje={!temTreino && ehHoje}
+                class:muted={!temTreino && !ehHoje && cel.peso == null}
               >{cel.dia}</span>
               {#if cel.peso != null}
                 <span class="peso-valor">{cel.peso}</span>
@@ -954,16 +953,11 @@
   .dia-numero.dia-numero-hoje {
     color: var(--color-primary);
   }
-  /* Nome da rotina (agendada nesse dia da semana ou já registrada) em cima do número — bem
-     pequeno e numa linha só, pra não empurrar o card e ficar maior que os outros. */
-  .nome-treino-mini {
-    max-width: 100%;
-    font-size: 7px;
-    font-weight: 600;
+  /* Tem treino (agendado nesse dia da semana ou já registrado): número vermelho — vale mais que
+     "hoje" (que só é primária quando não tem treino nenhum). O nome da rotina fica só no modal
+     do dia (PesoDiaSheet), não aqui — poluía demais o card. */
+  .dia-numero.dia-numero-treino {
     color: var(--color-negative);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   .peso-valor {
     font-size: 9px;
