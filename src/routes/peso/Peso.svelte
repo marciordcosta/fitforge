@@ -638,7 +638,7 @@
     </button>
     <button
       class="quick-card quick-card-btn"
-      class:quick-card-ativo={metaVisivel}
+      class:quick-card-ativo-meta={metaVisivel}
       onclick={alternarMetaVisivel}
       aria-label={metaVisivel ? "Ocultar meta no gráfico" : "Mostrar meta no gráfico"}
     >
@@ -861,11 +861,11 @@
     font-family: inherit;
     cursor: pointer;
   }
-  .quick-card-ativo {
-    border-color: var(--color-primary);
-  }
   .quick-card-ativo .quick-card-valor {
     color: var(--color-primary);
+  }
+  .quick-card-ativo-meta .quick-card-valor {
+    color: var(--color-negative);
   }
   .quick-card-btn :global(svg) {
     width: 20px;
