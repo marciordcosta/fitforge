@@ -3323,6 +3323,11 @@
     border: none;
     font-family: inherit;
     cursor: pointer;
+    /* <button> não herda a cor do body por padrão em todo navegador — sem isso o número sem
+       meta (.editor-meta-valor sem nenhuma classe .valor-*) ficava com a cor default do botão
+       em vez do texto claro do app. Com meta, a classe .valor-* aplicada direto no span sempre
+       vence essa herdada, então não quebra a cor verde/vermelha/neutra de quando há meta. */
+    color: var(--surface-fg);
   }
   .editor-meta-chip-ativo {
     outline: 1px solid var(--color-primary);
