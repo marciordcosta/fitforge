@@ -64,7 +64,10 @@
   let loadingGrafico = $state(true);
   let mostrarFiltro = $state(false);
   let mostrarGraficoCheio = $state(false);
-  let hojeTemRotinaAgendada = $state(false);
+  /** Dias da semana (0=dom..6=sáb) com pelo menos uma rotina agendada — usado pra colorir o
+   * número da data no calendário mesmo em dias sem treino_registro ainda (ex: hoje ou um dia
+   * futuro do mês). */
+  let diasSemanaComRotina = $state<Set<number>>(new Set());
 
   /** "diário" = peso bruto de cada dia; "média" = média móvel dos últimos 7 dias em cada dia (padrão de mercado — MacroFactor, Trendweight etc.), padrão do app. */
   let modoGrafico = $state<"diario" | "media">("diario");
@@ -83,19 +86,14 @@
 
   function selecionarModoGrafico(m: "diario" | "media") {
     modoGrafico = m;
-    if (m === "diario" && periodo.valor !== PERIODOS[0].valor) {
-      periodo = PERIODOS[0];
-      void carregarGrafico();
-    }
   }
 
-  async function carregarRotinaHoje() {
+  async function carregarRotinasAgendadas() {
     const treinos = await listTreinos();
-    const diaSemanaHoje = new Date().getDay();
-    hojeTemRotinaAgendada = treinos.some((t) => t.dia_semana === diaSemanaHoje);
+    diasSemanaComRotina = new Set(treinos.filter((t) => t.dia_semana != null).map((t) => t.dia_semana as number));
   }
 
-  void carregarRotinaHoje();
+  void carregarRotinasAgendadas();
 
   let meta = $state<PesoMeta | null>(null);
   let mostrarEscolhaMeta = $state(false);
@@ -179,6 +177,24 @@
     void carregar();
   }
 
+  /** Arrastar a grade do calendário pros lados troca de mês — sem pointer capture, pra não
+   * atrapalhar o toque numa célula (abrirDia): sem arrasto de verdade, o pointerup acontece bem
+   * perto do pointerdown e nenhum trocarMes é chamado. */
+  let arrasteMesInicioX = $state<number | null>(null);
+
+  function iniciarArrasteMes(e: PointerEvent): void {
+    arrasteMesInicioX = e.clientX;
+  }
+
+  function finalizarArrasteMes(e: PointerEvent): void {
+    if (arrasteMesInicioX == null) return;
+    const delta = e.clientX - arrasteMesInicioX;
+    arrasteMesInicioX = null;
+    const LIMIAR_ARRASTE = 50;
+    if (delta > LIMIAR_ARRASTE) trocarMes(-1);
+    else if (delta < -LIMIAR_ARRASTE) trocarMes(1);
+  }
+
   function selecionarPeriodo(p: Periodo) {
     periodo = p;
     void carregarGrafico();
@@ -202,8 +218,10 @@
     const lista: ({ dia: number; iso: string; peso: number | null; temTreino: boolean } | null)[] = [];
     for (let i = 0; i < primeiroDiaSemana; i++) lista.push(null);
     for (let dia = 1; dia <= totalDias; dia++) {
-      const iso = toISODate(new Date(mesBase.getFullYear(), mesBase.getMonth(), dia));
-      lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null, temTreino: diasComTreino.has(iso) });
+      const data = new Date(mesBase.getFullYear(), mesBase.getMonth(), dia);
+      const iso = toISODate(data);
+      const temTreino = diasComTreino.has(iso) || diasSemanaComRotina.has(data.getDay());
+      lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null, temTreino });
     }
     return lista;
   });
@@ -345,17 +363,41 @@
   const pluginRotulosMeta = {
     id: "rotulosMeta",
     afterDatasetsDraw(c: Chart) {
-      if (!detalhesPorPonto) return;
-      const diffs = diffMetaPorPonto;
       const alvos = metaAlvoPorPonto;
-      const rotulo = pontosComRotulo;
       const pontos = c.getDatasetMeta(0).data;
       const escalaY = c.scales.y;
       const { ctx } = c;
+      if (!pontos.length) return;
       ctx.save();
       ctx.font = "9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
+
+      if (!detalhesPorPonto) {
+        // Filtro longo: sem rótulo por ponto (poluía), mas mantém o valor inicial e final de
+        // cada linha (peso/média em branco, meta em vermelho), pra não perder a referência.
+        const extremos = pontos.length > 1 ? [0, pontos.length - 1] : [0];
+        for (const i of extremos) {
+          const ponto = pontos[i];
+          const p = pontosGrafico[i];
+          if (!ponto || !p) continue;
+          const yPeso = ponto.y - 11;
+          ctx.fillStyle = "#fff";
+          ctx.fillText(formatPeso(p.peso), ponto.x, yPeso);
+          const alvo = alvos?.[i];
+          if (alvo != null && escalaY) {
+            const yLinha = escalaY.getPixelForValue(alvo) - 9;
+            if (Math.abs(yLinha - yPeso) < 12) continue;
+            ctx.fillStyle = COR_TREINO;
+            ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
+          }
+        }
+        ctx.restore();
+        return;
+      }
+
+      const diffs = diffMetaPorPonto;
+      const rotulo = pontosComRotulo;
       pontos.forEach((ponto, i) => {
         if (rotulo && !rotulo[i]) return;
         const diff = diffs?.[i];
@@ -594,10 +636,15 @@
       <span class="quick-card-label">Média atual</span>
       <span class="quick-card-valor">{mediaAtualTexto}</span>
     </button>
-    <div class="quick-card">
+    <button
+      class="quick-card quick-card-btn"
+      class:quick-card-ativo={metaVisivel}
+      onclick={alternarMetaVisivel}
+      aria-label={metaVisivel ? "Ocultar meta no gráfico" : "Mostrar meta no gráfico"}
+    >
       <span class="quick-card-label">Meta semanal</span>
       <span class="quick-card-valor">{metaSemanalTexto}</span>
-    </div>
+    </button>
     <button class="quick-card quick-card-btn" onclick={() => (mostrarEscolhaMeta = true)}>
       <span class="quick-card-label">Configurações</span>
       {@render iconEngrenagem()}
@@ -605,47 +652,47 @@
   </div>
 
   <div class="mes-nav">
-    <button onclick={() => trocarMes(-1)} aria-label="Mês anterior">‹</button>
+    <button class="mes-nav-icone" onclick={() => trocarMes(-1)} aria-label="Mês anterior">‹</button>
     <span>{mesLabel}</span>
-    <button onclick={() => trocarMes(1)} aria-label="Próximo mês">›</button>
+    <button class="mes-nav-icone" onclick={() => trocarMes(1)} aria-label="Próximo mês">›</button>
   </div>
 
-  <div class="dias-semana">
-    {#each DIAS_ABREV as d (d)}
-      <span>{d}</span>
-    {/each}
-  </div>
-
-  {#if !loading}
-    <div class="grade">
-      {#each celulas as cel, i (i)}
-        {#if cel === null}
-          <div class="celula vazia"></div>
-        {:else}
-          <button class="celula" class:com-peso={cel.peso != null} onclick={() => abrirDia(cel.iso)}>
-            {#if cel.iso !== hojeISO() && cel.temTreino}
-              <span class="marcador-treino" aria-hidden="true"></span>
-            {/if}
-            <span class="dia-numero-wrap">
-              <span class="dia-numero" class:muted={cel.peso == null}>{cel.dia}</span>
-              {#if cel.iso === hojeISO()}
-                {#if cel.temTreino}
-                  <span class="marcador-hoje com-treino sem-pulso" aria-hidden="true"></span>
-                {:else if hojeTemRotinaAgendada}
-                  <span class="marcador-hoje com-treino" aria-hidden="true"></span>
-                {:else if cel.peso == null}
-                  <span class="marcador-hoje" aria-hidden="true"></span>
-                {/if}
-              {/if}
-            </span>
-            {#if cel.peso != null}
-              <span class="peso-valor">{cel.peso}</span>
-            {/if}
-          </button>
-        {/if}
+  <div
+    class="mes-swipe"
+    role="presentation"
+    onpointerdown={iniciarArrasteMes}
+    onpointerup={finalizarArrasteMes}
+    onpointercancel={() => (arrasteMesInicioX = null)}
+  >
+    <div class="dias-semana">
+      {#each DIAS_ABREV as d (d)}
+        <span>{d}</span>
       {/each}
     </div>
-  {/if}
+
+    {#if !loading}
+      <div class="grade">
+        {#each celulas as cel, i (i)}
+          {#if cel === null}
+            <div class="celula vazia"></div>
+          {:else}
+            {@const ehHoje = cel.iso === hojeISO()}
+            <button class="celula" class:com-peso={cel.peso != null} onclick={() => abrirDia(cel.iso)}>
+              <span
+                class="dia-numero"
+                class:dia-numero-treino={cel.temTreino}
+                class:dia-numero-hoje={!cel.temTreino && ehHoje}
+                class:muted={!cel.temTreino && !ehHoje && cel.peso == null}
+              >{cel.dia}</span>
+              {#if cel.peso != null}
+                <span class="peso-valor">{cel.peso}</span>
+              {/if}
+            </button>
+          {/if}
+        {/each}
+      </div>
+    {/if}
+  </div>
 </div>
 
 {#if diaSelecionado !== null}
@@ -823,7 +870,7 @@
   .quick-card-btn :global(svg) {
     width: 20px;
     height: 20px;
-    color: var(--color-primary);
+    color: #fff;
   }
   .mes-nav {
     display: flex;
@@ -837,15 +884,17 @@
     min-width: 140px;
     text-align: center;
   }
-  .mes-nav button {
+  .mes-nav-icone {
     width: 32px;
     height: 32px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
+    border: none;
+    background: none;
     color: var(--surface-fg);
     font-size: var(--font-size-lg);
     cursor: pointer;
+  }
+  .mes-swipe {
+    touch-action: pan-y;
   }
   .dias-semana {
     display: grid;
@@ -880,46 +929,6 @@
     overflow: hidden;
     cursor: pointer;
   }
-  .marcador-treino {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #f87171;
-  }
-  .dia-numero-wrap {
-    position: relative;
-    display: inline-flex;
-  }
-  .marcador-hoje {
-    position: absolute;
-    top: -2px;
-    right: -7px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--color-primary);
-    animation: pulso-hoje 1.6s ease-in-out infinite;
-  }
-  .marcador-hoje.com-treino {
-    background: #f87171;
-  }
-  .marcador-hoje.sem-pulso {
-    animation: none;
-  }
-  @keyframes pulso-hoje {
-    0%,
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.45;
-      transform: scale(1.6);
-    }
-  }
   .celula.vazia {
     visibility: hidden;
     cursor: default;
@@ -935,6 +944,14 @@
   .dia-numero.muted {
     color: var(--surface-muted);
     font-weight: 400;
+  }
+  /* Tem treino (agendado nesse dia da semana ou já registrado): número vermelho — vale mais que
+     "hoje" (que só é primária quando não tem treino nenhum). */
+  .dia-numero.dia-numero-treino {
+    color: var(--color-negative);
+  }
+  .dia-numero.dia-numero-hoje {
+    color: var(--color-primary);
   }
   .peso-valor {
     font-size: 9px;

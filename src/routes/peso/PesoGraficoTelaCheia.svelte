@@ -35,18 +35,43 @@
     return `${d}/${m}`;
   }
 
+  function formatPeso(valor: number): string {
+    return valor.toFixed(1).replace(".", ",");
+  }
 
   const pluginRotulosMeta = {
     id: "rotulosMetaTelaCheia",
     afterDatasetsDraw(c: Chart) {
-      if (!detalhesPorPonto) return;
       const pontos = c.getDatasetMeta(0).data;
       const escalaY = c.scales.y;
       const { ctx } = c;
+      if (!pontos.length) return;
       ctx.save();
       ctx.font = "11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
+
+      if (!detalhesPorPonto) {
+        const extremos = pontos.length > 1 ? [0, pontos.length - 1] : [0];
+        for (const i of extremos) {
+          const ponto = pontos[i];
+          const p = pontosGrafico[i];
+          if (!ponto || !p) continue;
+          const yPeso = ponto.y - 14;
+          ctx.fillStyle = "#fff";
+          ctx.fillText(formatPeso(p.peso), ponto.x, yPeso);
+          const alvo = metaAlvoPorPonto?.[i];
+          if (alvo != null && escalaY) {
+            const yLinha = escalaY.getPixelForValue(alvo) - 12;
+            if (Math.abs(yLinha - yPeso) < 14) continue;
+            ctx.fillStyle = COR_TREINO;
+            ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
+          }
+        }
+        ctx.restore();
+        return;
+      }
+
       pontos.forEach((ponto, i) => {
         const diff = diffMetaPorPonto?.[i];
         // Suprimido por período maior que 1 semana (ver pontosComRotulo em Peso.svelte) — não anota esse ponto.
