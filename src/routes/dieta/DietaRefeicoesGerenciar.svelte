@@ -342,6 +342,18 @@
     mostrarCaloriasBlocos = true;
   }
 
+  /** Card "Calorias" da aba Refeições (bloco ondulatório): abre o mesmo editor de blocos da aba
+   * Calorias já direto na edição desse bloco — mesma redistribuição entre os outros dias
+   * (tetoRedistribuicao/redistribuirEntreBlocos), mesmos limites parametrizados. Só funciona pra
+   * um bloco já nomeado (grupo.manual) com todos os 7 dias nomeados — mesma condição que já
+   * habilita "Definir calorias" na aba Calorias. */
+  function abrirEdicaoCaloriasGrupo(grupo: GrupoDias) {
+    if (!grupo.manual || !todosOsDiasNomeados) return;
+    abrirCaloriasBlocos();
+    const idx = blocosEdicao.findIndex((b) => b.dias.includes(grupo.dias[0]));
+    if (idx !== -1) blocoCaloriasEditando = idx;
+  }
+
   /**
    * Generaliza resolverDistribuicao/distribuirValorPorDia pra quando TODOS os dias já têm um valor
    * próprio (nenhum "automático" sobrando): editar um bloco desloca todos os OUTROS igualmente por
@@ -1325,7 +1337,13 @@
           </div>
         {/if}
 
-        <div class="card-calorias">
+        <button
+          type="button"
+          class="card-calorias"
+          class:card-calorias-editavel={grupo.manual && todosOsDiasNomeados}
+          disabled={!grupo.manual || !todosOsDiasNomeados}
+          onclick={() => abrirEdicaoCaloriasGrupo(grupo)}
+        >
           <p class="card-titulo">Calorias</p>
           <div class="calorias-linha">
             <span class="calorias-valor"><strong>{somaGrupo.calorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metaGrupo.calorias.toFixed(0)}</span></span>
@@ -1334,7 +1352,7 @@
           <div class="barra-wrap-grande">
             <div class="barra-grande" style={`width:${larguraBarra(pctMeta(somaGrupo.calorias, metaGrupo.calorias))}%; background:var(--color-secondary);`}></div>
           </div>
-        </div>
+        </button>
 
         <div class="card-macros">
           <button
@@ -2172,11 +2190,23 @@
   .card-calorias,
   .card-macros {
     position: relative;
+    display: block;
+    width: 100%;
     background: var(--surface-card);
+    border: none;
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+  }
+  .card-calorias-editavel {
+    cursor: pointer;
+  }
+  .card-calorias:disabled {
+    cursor: default;
   }
   .card-titulo {
     margin: 0 0 var(--space-2);
