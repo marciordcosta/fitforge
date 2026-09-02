@@ -6,6 +6,7 @@
   import TreinoMinimizado from "./components/TreinoMinimizado.svelte";
   import Login from "./routes/login/Login.svelte";
   import Home from "./routes/Home.svelte";
+  import HomeParametrizacao from "./routes/home/HomeParametrizacao.svelte";
   import Placeholder from "./routes/Placeholder.svelte";
   import Treino from "./routes/treino/Treino.svelte";
   import Peso from "./routes/peso/Peso.svelte";
@@ -46,6 +47,8 @@
 {:else if auth.user && auth.isAllowed}
   {#if router.path === "/"}
     <Home />
+  {:else if router.path === "/inicio/configurar"}
+    <HomeParametrizacao />
   {:else if router.path.startsWith("/treino")}
     <Treino />
   {:else if router.path.startsWith("/peso")}
