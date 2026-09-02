@@ -259,9 +259,6 @@
     return `${formatPeso(mediaMovelGrafico[mediaMovelGrafico.length - 1].peso)} kg`;
   });
 
-  /** A meta é sempre semanal e parte da média móvel do primeiro dia visível, nunca do peso bruto de um dia só. */
-  const pesoInicialMedia = $derived.by(() => mediaMovelGrafico[0]?.peso ?? null);
-
   /** Peso esperado pela meta em cada dia plotado — sempre ancorado em HOJE (a média mais recente),
    * nunca no início do período visível: senão o alvo mudaria de acordo com o filtro escolhido, e a
    * meta semanal tem que continuar seguindo o mesmo ritmo % em cima da média real de hoje, ganhe,
@@ -298,18 +295,17 @@
   });
 
   /**
-   * Linha reta de meta: da média móvel do primeiro dia até o peso-alvo do último ponto.
-   * Reaproveita o mesmo valor de metaAlvoPorPonto (em vez de recalcular a partir do tamanho
-   * nominal do filtro) pra garantir que a linha sempre bata com os rótulos por ponto — mesmo
-   * quando os dados visíveis não cobrem o período inteiro do filtro selecionado.
+   * Linha reta de meta: do alvo calculado pro primeiro dia visível até o alvo de hoje (ambos
+   * vindos de metaAlvoPorPonto, a mesma curva ancorada em hoje) — nunca a média REAL do primeiro
+   * dia, que é dado bruto sujeito à oscilação do peso e não representa o ritmo planejado (fazia a
+   * linha parecer quase reta/plana em filtros longos, sem relação com o %/semana da meta).
    */
   const metaLinha = $derived.by(() => {
     const alvos = metaVisivel ? metaAlvoPorPonto : null;
-    if (!meta || !alvos || !alvos.length || pontosGrafico.length < 2 || pesoInicialMedia == null) return null;
-    const pesoAlvo = alvos[alvos.length - 1];
+    if (!meta || !alvos || !alvos.length || pontosGrafico.length < 2) return null;
     const linha = new Array<number | null>(pontosGrafico.length).fill(null);
-    linha[0] = meta.tipo === "manutencao" ? pesoAlvo : pesoInicialMedia;
-    linha[linha.length - 1] = pesoAlvo;
+    linha[0] = alvos[0];
+    linha[linha.length - 1] = alvos[alvos.length - 1];
     return linha;
   });
 
