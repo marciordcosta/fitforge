@@ -96,8 +96,8 @@
   </svg>
 {/snippet}
 
-<div class="container has-bottom-nav">
-  <div class="header">
+<div class="header-fixo">
+  <div class="header-fixo-inner">
     <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>
       {treino?.nome_treino ?? ""}
@@ -113,7 +113,9 @@
       <span class="header-spacer"></span>
     {/if}
   </div>
+</div>
 
+<div class="container has-bottom-nav">
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else if erroCarregar}
@@ -195,13 +197,22 @@
     padding-left: var(--space-4);
     padding-right: var(--space-4);
   }
-  .header {
+  .header-fixo {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .header-fixo-inner {
+    max-width: 480px;
+    margin: 0 auto;
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin-bottom: var(--space-3);
+    padding: var(--space-4);
   }
-  .header h1 {
+  .header-fixo-inner h1 {
     flex: 1;
     min-width: 0;
     font-size: var(--font-size-lg);
@@ -256,10 +267,10 @@
     cursor: not-allowed;
   }
   .dia-inline {
+    display: block;
     font-size: var(--font-size-sm);
     font-weight: 400;
     color: var(--surface-muted);
-    margin-left: var(--space-1);
   }
   .exercicio-card {
     padding: var(--space-3) 0;
