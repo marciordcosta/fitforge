@@ -762,8 +762,11 @@ export interface DefinicaoParametro {
   categoria: string;
   label: string;
   unidade: string;
-  /** peso: valor é por kg de peso corporal. calorias: valor é % das calorias do dia (convertido pra gramas via kcal/g do nutriente). */
-  base: "peso" | "calorias";
+  /** peso: valor é por kg de peso corporal. calorias: valor é % das calorias do dia (convertido
+   * pra gramas via kcal/g do nutriente) — ex: gordura saturada, cuja diretriz é uma fração do
+   * total calórico. calorias_por_mil: valor é gramas a cada 1000 kcal, direto — ex: fibras, cuja
+   * diretriz nutricional já vem nessa proporção (não faz sentido converter por kcal/g). */
+  base: "peso" | "calorias" | "calorias_por_mil";
   /** kcal por grama do nutriente — só usado quando base é "calorias", pra converter % em gramas. */
   kcalPorGrama?: number;
   /** Parâmetro só de piso (ex: calorias mínimas) — sem campo de máximo na tela. */
@@ -784,7 +787,15 @@ export const DEFINICOES_PARAMETROS: DefinicaoParametro[] = [
   { chave: "proteina", categoria: "Macronutrientes", label: "Proteína", unidade: "g/kg", base: "peso", somenteMinimo: false },
   { chave: "gordura", categoria: "Macronutrientes", label: "Gordura", unidade: "g/kg", base: "peso", somenteMinimo: false },
   { chave: "carboidrato", categoria: "Macronutrientes", label: "Carboidrato", unidade: "g/kg", base: "peso", somenteMinimo: false },
-  { chave: "fibras", categoria: "Metas de Consumo", label: "Fibras", unidade: "%", base: "calorias", kcalPorGrama: 4, somenteMinimo: false, metaUnica: true },
+  {
+    chave: "fibras",
+    categoria: "Metas de Consumo",
+    label: "Fibras",
+    unidade: "g/1000kcal",
+    base: "calorias_por_mil",
+    somenteMinimo: false,
+    metaUnica: true,
+  },
   {
     chave: "gordura_saturada",
     categoria: "Metas de Consumo",
@@ -806,16 +817,16 @@ export interface LimiteParametro {
 }
 
 /**
- * Valores de hoje, usados como padrão pra qualquer chave sem linha salva ainda. Fibras
- * (5,6% ≈ 14g a cada 1000 kcal, usando 4 kcal/g) e Gordura Saturada (teto de 10% das
- * calorias do dia, diretriz comum de OMS/AHA) são % das calorias; os demais são por kg de peso.
+ * Valores de hoje, usados como padrão pra qualquer chave sem linha salva ainda. Fibras (14g a
+ * cada 1000 kcal, diretriz nutricional direta) e Gordura Saturada (teto de 10% das calorias do
+ * dia, diretriz comum de OMS/AHA) são baseadas nas calorias do dia; os demais são por kg de peso.
  */
 export const PARAMETROS_PADRAO: Record<string, LimiteParametro> = {
   calorias: { min: 20, max: 20 },
   proteina: { min: 1, max: 3 },
   gordura: { min: 0.5, max: 1.5 },
   carboidrato: { min: 1, max: 10 },
-  fibras: { min: 5.6, max: 5.6 },
+  fibras: { min: 14, max: 14 },
   gordura_saturada: { min: 0, max: 10 },
   agua: { min: 0.05, max: 0.05 },
 };
@@ -823,6 +834,7 @@ export const PARAMETROS_PADRAO: Record<string, LimiteParametro> = {
 /** Converte um valor de parâmetro (g/kg, L/kg ou % das calorias, conforme `def.base`) em gramas (ou litros, pra água). */
 export function gramasDoParametro(def: DefinicaoParametro, valor: number, pesoAtual: number, caloriasCalc: number): number {
   if (def.base === "peso") return valor * pesoAtual;
+  if (def.base === "calorias_por_mil") return (valor * caloriasCalc) / 1000;
   return ((valor / 100) * caloriasCalc) / (def.kcalPorGrama ?? 4);
 }
 
