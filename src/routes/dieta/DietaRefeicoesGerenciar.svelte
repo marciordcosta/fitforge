@@ -1083,20 +1083,23 @@
       <span class="mini-macro-barra-wrap">
         <span class="mini-macro-barra" style={`width:${calTotal > 0 ? (calCarbo / calTotal) * 100 : 0}%; background:${COR_CARBO};`}></span>
       </span>
+      <span class="mini-macro-valor">{carboidratoG.toFixed(0)} g</span>
     </span>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Gorduras</span>
       <span class="mini-macro-barra-wrap">
         <span class="mini-macro-barra" style={`width:${calTotal > 0 ? (calGordura / calTotal) * 100 : 0}%; background:${COR_GORDURA};`}></span>
       </span>
+      <span class="mini-macro-valor">{gorduraG.toFixed(0)} g</span>
     </span>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Proteínas</span>
       <span class="mini-macro-barra-wrap">
         <span class="mini-macro-barra" style={`width:${calTotal > 0 ? (calProteina / calTotal) * 100 : 0}%; background:${COR_PROTEINA};`}></span>
       </span>
+      <span class="mini-macro-valor">{proteinaG.toFixed(0)} g</span>
     </span>
-    <span class="nome-pct">{pct}%</span>
+    <span class="nome-pct">{pct}% <span class="nome-pct-rotulo">do dia</span></span>
   </span>
 {/snippet}
 
@@ -2008,6 +2011,11 @@
   }
   .nome-pct {
     flex-shrink: 0;
+    align-self: flex-end;
+  }
+  .nome-pct-rotulo {
+    color: var(--surface-muted);
+    font-weight: 400;
   }
   .mini-macro-col {
     flex: 1;
@@ -2032,6 +2040,10 @@
   .mini-macro-barra {
     display: block;
     height: 100%;
+  }
+  .mini-macro-valor {
+    font-size: 10px;
+    color: var(--surface-muted);
   }
   .remover-btn {
     flex-shrink: 0;
