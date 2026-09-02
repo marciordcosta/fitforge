@@ -1711,15 +1711,6 @@
               {#if treino.dia_semana != null}
                 <span class="dia-tag">{DIAS_SEMANA_ABREV[treino.dia_semana]}</span>
               {/if}
-              <button
-                class="ordenar-fadiga-btn"
-                class:ativo={porFadiga}
-                onclick={(e) => {
-                  e.stopPropagation();
-                  alternarOrdemFadiga(treino.id);
-                }}
-                aria-label="Ordenar por fadiga"
-              >{@render iconOrdenarFadiga()}</button>
               <span class="chevron-rotina" class:aberto={expandido}>›</span>
             </div>
             {#if expandido}
@@ -1774,6 +1765,12 @@
                     0,
                   )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
                 </button>
+                <button
+                  class="ordenar-fadiga-btn"
+                  class:ativo={porFadiga}
+                  onclick={() => alternarOrdemFadiga(treino.id)}
+                  aria-label="Ordenar por fadiga"
+                >{@render iconOrdenarFadiga()}</button>
                 <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino)} aria-label="Ver anel por dominância">
                   {@render iconGrafico()}
                 </button>
@@ -2637,8 +2634,8 @@
   }
   .ordenar-fadiga-btn {
     flex-shrink: 0;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2649,8 +2646,8 @@
     cursor: pointer;
   }
   .ordenar-fadiga-btn svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
   }
   .ordenar-fadiga-btn.ativo {
     color: var(--color-primary);
