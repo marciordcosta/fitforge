@@ -1171,14 +1171,16 @@
    * bagunçar a ordem com itens escondidos no meio da lista. */
   let editorFiltroMusculoId = $state<string | null>(null);
 
-  /** Snapshot de séries por exercício, capturado quando o editor é aberto — base FIXA (não ao
-   * vivo) pro badge "4-1" e pro número congelado até o ajuste. */
-  let baselineEditor = $state<{ seriesPorExercicio: Map<string, number> } | null>(null);
+  /** Snapshot de séries por exercício e total bruto por músculo, capturado quando o editor é
+   * aberto — base FIXA (não ao vivo) pro badge "4-1", pro número congelado até o ajuste, e pro %
+   * de impacto do balãozinho nos cards de meta. Sem isso, baixar as séries e depois voltar ao
+   * número original mostraria um "aumento" (relativo ao valor intermediário) em vez de sumir. */
+  let baselineEditor = $state<{ seriesPorExercicio: Map<string, number>; totalPorMusculo: Map<string, number> } | null>(null);
 
   function capturarBaselineEditor(treino: TreinoComExercicios): void {
     const seriesPorExercicio = new Map<string, number>();
     for (const te of treino.exercicios) seriesPorExercicio.set(te.id, te.series.length);
-    baselineEditor = { seriesPorExercicio };
+    baselineEditor = { seriesPorExercicio, totalPorMusculo: contarSeriesPorMusculo(treino) };
   }
 
   /** Delta de séries de um exercício comparado à baseline (0 se ele não existia nela, ou seja,
@@ -1187,6 +1189,26 @@
     if (!baselineEditor) return 0;
     const baseSeries = baselineEditor.seriesPorExercicio.get(te.id) ?? 0;
     return te.series.length - baseSeries;
+  }
+
+  /** % de impacto de TODO o rascunho num músculo, comparando as séries ATUAIS com a baseline
+   * fixa: soma o delta de séries (ponderado por peso_contribuicao) de TODOS os exercícios que
+   * trabalham esse músculo, sobre o total bruto ORIGINAL dele na rotina. Mostrado como o
+   * balãozinho no canto do card de meta (mesmo estilo do "x" nos cards de dia da Dieta). 0 se não
+   * há baseline ou se as mudanças voltaram a se cancelar. */
+  function impactoTotalMusculo(musculoId: string): number {
+    if (!baselineEditor || !modalEditorRotina) return 0;
+    const totalBase = baselineEditor.totalPorMusculo.get(musculoId) ?? 0;
+    if (totalBase <= 0) return 0;
+    let deltaPonderado = 0;
+    for (const te of modalEditorRotina.exercicios) {
+      const deltaSeries = deltaSeriesEditor(te);
+      if (deltaSeries === 0) continue;
+      const m = te.exercicio?.musculos.find((mm) => mm.musculo_id === musculoId);
+      if (!m) continue;
+      deltaPonderado += deltaSeries * m.peso_contribuicao;
+    }
+    return (deltaPonderado / totalBase) * 100;
   }
 
   /** Metas manuais definidas pra essa rotina (só os músculos que têm uma), com o saldo AO VIVO —
@@ -1211,12 +1233,12 @@
     if (!modalEditorRotina) return [];
     const atual = contarSeriesPorMusculo(modalEditorRotina);
     const ponderado = contarSeriesPorMusculoPonderado(modalEditorRotina);
-    const resultado: { musculo: Musculo; meta: number | null; atual: number; ponderado: number }[] = [];
+    const resultado: { musculo: Musculo; meta: number | null; atual: number; ponderado: number; impactoPct: number }[] = [];
     for (const m of musculos) {
       const valorAtual = atual.get(m.id) ?? 0;
       const meta = metasMusculo.get(chaveMeta(modalEditorRotina.id, m.id)) ?? null;
       if (valorAtual <= 0 && meta == null) continue;
-      resultado.push({ musculo: m, meta, atual: valorAtual, ponderado: ponderado.get(m.id) ?? 0 });
+      resultado.push({ musculo: m, meta, atual: valorAtual, ponderado: ponderado.get(m.id) ?? 0, impactoPct: impactoTotalMusculo(m.id) });
     }
     return resultado.sort((a, b) => b.atual - a.atual);
   });
@@ -2355,6 +2377,10 @@
               class:editor-meta-chip-ativo={editorFiltroMusculoId === item.musculo.id}
               onclick={() => (editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id)}
             >
+              {#if item.impactoPct !== 0}
+                <span class="editor-meta-badge" class:badge-mais={item.impactoPct > 0} class:badge-menos={item.impactoPct < 0}
+                >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
+              {/if}
               <span class="editor-meta-nome">{abreviarMusculo(item.musculo.nome)}</span>
               {#if item.meta != null}
                 {@const meta = item.meta}
@@ -3287,13 +3313,14 @@
     display: flex;
     gap: var(--space-2);
     overflow-x: auto;
-    /* Espaço extra além do padding-bottom normal: sem isso o contorno do card ativo
-       (outline-offset positivo) ficava cortado pelo próprio scroll (overflow-x:auto vira
-       overflow-y:auto também, por padrão do CSS). */
-    padding: 4px 4px var(--space-2);
+    /* Espaço extra em cima: sem isso o contorno do card ativo (outline-offset positivo) e o
+       balãozinho de %impacto (que estoura pra fora do card) ficavam cortados pelo próprio
+       scroll (overflow-x:auto vira overflow-y:auto também, por padrão do CSS). */
+    padding: 10px 4px var(--space-2);
     margin-bottom: var(--space-2);
   }
   .editor-meta-chip {
+    position: relative;
     flex-shrink: 0;
     width: 72px;
     display: flex;
@@ -3315,6 +3342,31 @@
   .editor-meta-chip-ativo {
     outline: 1px solid var(--color-primary);
     outline-offset: 2px;
+  }
+  /* Balãozinho no canto do card, mesmo estilo do "x" nos cards de dia da tela de Dieta
+     (DietaRefeicoesGerenciar.svelte .dia-card-x) — só que em pílula (o texto "+17%" não cabe
+     num círculo de 20px) em vez de círculo. */
+  .editor-meta-badge {
+    position: absolute;
+    top: -8px;
+    right: -4px;
+    min-width: 20px;
+    height: 16px;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .editor-meta-badge.badge-mais {
+    background: var(--color-success);
+  }
+  .editor-meta-badge.badge-menos {
+    background: var(--color-negative);
   }
   .editor-meta-nome {
     font-size: 10px;
