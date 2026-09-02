@@ -134,17 +134,18 @@
     return mapa;
   }
 
-  /** Modo alternativo dos anéis de dominância: soma total de séries por GRUPO muscular
-   * (agrupamento_id — Ombro junta Deltoide Anterior/Lateral/Posterior, Costas junta
-   * Superiores/Latíssimo etc.), cru (mesma contagem de contarSeriesPorMusculo, sem
-   * ponderar por peso_contribuicao) e sem separar por posição/fadiga — só quantidade. Um
-   * músculo sem agrupamento cadastrado fica sozinho no próprio grupo. */
-  function itensGrupoRaw(treinosLista: TreinoComExercicios[]): { nome: string; valor: number }[] {
+  /** Modo alternativo dos anéis de dominância: soma total de séries PONDERADA (peso_contribuicao)
+   * por GRUPO muscular (agrupamento_id — Ombro junta Deltoide Anterior/Lateral/Posterior, Costas
+   * junta Superiores/Latíssimo etc.), sem separar por posição/fadiga — só quantidade. Um músculo
+   * sem agrupamento cadastrado fica sozinho no próprio grupo. A contagem crua (sem peso) fica só
+   * na grade "Distribuição na Semana" e nos cards de meta do editor de rotina, que precisam bater
+   * com o mesmo número um do outro. */
+  function itensGrupoPonderado(treinosLista: TreinoComExercicios[]): { nome: string; valor: number }[] {
     const porGrupo = new Map<string, { nome: string; valor: number }>();
     for (const t of treinosLista) {
-      const mapaRaw = contarSeriesPorMusculo(t);
+      const mapaPonderado = contarSeriesPorMusculoPonderado(t);
       for (const m of musculos) {
-        const valor = mapaRaw.get(m.id) ?? 0;
+        const valor = mapaPonderado.get(m.id) ?? 0;
         if (valor <= 0) continue;
         const chave = m.agrupamento_id ?? `solo:${m.id}`;
         const atual = porGrupo.get(chave) ?? { nome: m.agrupamento?.nome ?? m.nome, valor: 0 };
@@ -1483,7 +1484,7 @@
       totaisSemanais.series,
       "séries",
       coresAbcAcumulado(distribuicaoSemanal),
-      itensGrupoRaw(treinos),
+      itensGrupoPonderado(treinos),
       // Acompanha a visualização do card: ordenado por fadiga/efetivo abre no modo ABC
       // (músculo individual), padrão abre no modo Grupo.
       !semanalOrdenadaPorEfetivo,
@@ -1571,7 +1572,7 @@
       totalSeries,
       "séries",
       coresAbcAcumulado(itens),
-      itensGrupoRaw([treino]),
+      itensGrupoPonderado([treino]),
       // Acompanha a visualização do card: ordenado por fadiga abre no modo ABC (músculo
       // individual), padrão abre no modo Grupo.
       !treinosOrdenadosPorFadiga.has(treino.id),
@@ -1920,7 +1921,7 @@
     class="abc-toggle-btn"
     onclick={() => (modoGrupoDetalhe = !modoGrupoDetalhe)}
     aria-label={modoGrupoDetalhe ? "Ver por faixa de dominância (ABC)" : "Ver por grupo muscular"}
-  >{modoGrupoDetalhe ? "ABC" : "Grupo"}</button>
+  >{modoGrupoDetalhe ? "Grupo" : "ABC"}</button>
 {/snippet}
 
 {#if modalAberto}
