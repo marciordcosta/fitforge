@@ -186,7 +186,9 @@
                   {iniciais(ex.nome)}
                 {/if}
               </span>
-              <span class="conteudo-btn">{@render infoExercicio(ex)}</span>
+              <button class="conteudo-btn" onclick={() => navigate(`/treino/exercicios/${ex.id}`)}>
+                {@render infoExercicio(ex)}
+              </button>
               <button
                 class="selecionar-btn"
                 onclick={() => selecionar(ex)}
