@@ -131,6 +131,14 @@
           <div class="param-card-body">
             {#each definicoesDaCategoria(categoria) as def (def.chave)}
               <div class="param-linha">
+                <div class="param-titulos">
+                  {#if def.metaUnica}
+                    <span class="param-titulo-campo">Meta</span>
+                  {:else}
+                    {#if !def.somenteMaximo}<span class="param-titulo-campo">Mín</span>{/if}
+                    {#if !def.somenteMinimo}<span class="param-titulo-campo">Máx</span>{/if}
+                  {/if}
+                </div>
                 <div class="param-linha-topo">
                   <p class="param-nome">{def.label} <span class="param-unidade">({def.unidade})</span></p>
                   <div class="param-campos">
@@ -295,6 +303,18 @@
   }
   /* Nome e caixas na mesma linha, mais compacto — só o texto calculado (≈X no seu peso) fica
      numa linha própria embaixo. */
+  .param-titulos {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+  }
+  .param-titulo-campo {
+    width: 64px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--surface-muted);
+  }
   .param-linha-topo {
     display: flex;
     align-items: center;
