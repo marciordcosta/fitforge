@@ -819,14 +819,6 @@
     mostrarForm = true;
   }
 
-  function pctDoDia(calorias: number): number {
-    return caloriasCalc > 0 ? Math.round((calorias / caloriasCalc) * 100) : 0;
-  }
-
-  function pctDeDia(calorias: number, diaCalorias: number): number {
-    return diaCalorias > 0 ? Math.round((calorias / diaCalorias) * 100) : 0;
-  }
-
   /** diasGrupo: todos os dias que compartilham essa meta de calorias — vincular um prato aqui vale pro grupo inteiro de uma vez. */
   function abrirMeta(m: RefeicaoModelo, diasGrupo?: number[]) {
     const receitaId = diasGrupo?.length ? metaEfetivaDoDia(m, diasGrupo[0]).receitaId : m.metaReceitaId;
@@ -1100,7 +1092,6 @@
   carboidratoDiaG: number,
   gorduraDiaG: number,
   proteinaDiaG: number,
-  pct: number,
   invisivel: boolean,
 )}
   {@const pctCarboDia = carboidratoDiaG > 0 ? Math.round((carboidratoG / carboidratoDiaG) * 100) : 0}
@@ -1128,7 +1119,6 @@
       </span>
       <span class="mini-macro-valor">{proteinaG.toFixed(0)} g · {pctProteinaDia}%</span>
     </span>
-    <span class="nome-pct">{pct}%</span>
   </span>
 {/snippet}
 
@@ -1456,7 +1446,6 @@
                   metaGrupo.carboidratoG,
                   metaGrupo.gorduraG,
                   metaGrupo.proteinaG,
-                  pctDeDia(arredondarDezena(meta.calorias ?? 0), grupo.calorias),
                   meta.calorias == null,
                 )}
               </button>
@@ -1589,7 +1578,6 @@
                 metaGlobal.carboidratoG,
                 metaGlobal.gorduraG,
                 metaGlobal.proteinaG,
-                pctDoDia(arredondarDezena(m.metaCalorias ?? 0)),
                 m.metaCalorias == null,
               )}
             </button>
@@ -2043,10 +2031,6 @@
   }
   .nome-macros.invisivel {
     visibility: hidden;
-  }
-  .nome-pct {
-    flex-shrink: 0;
-    align-self: flex-end;
   }
   .mini-macro-col {
     flex: 1;
