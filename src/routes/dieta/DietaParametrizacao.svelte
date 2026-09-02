@@ -5,11 +5,14 @@
     getPerfilDietaEditavel,
     getParametros,
     salvarParametro,
+    getTipoDieta,
+    salvarTipoDieta,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
     gramasDoParametro,
     type LimiteParametro,
     type DefinicaoParametro,
+    type TipoDieta,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
 
@@ -20,6 +23,13 @@
   let salvando = $state(false);
   let valores = $state<Record<string, LimiteParametro>>({ ...PARAMETROS_PADRAO });
   let categoriasAbertas = $state<Set<string>>(new Set());
+  let tipoDieta = $state<TipoDieta>("manutencao");
+
+  const OPCOES_TIPO_DIETA: { valor: TipoDieta; label: string }[] = [
+    { valor: "cutting", label: "Cutting" },
+    { valor: "manutencao", label: "Manutenção" },
+    { valor: "bulking", label: "Bulking" },
+  ];
 
   const categorias = [...new Set(DEFINICOES_PARAMETROS.map((d) => d.categoria))];
 
@@ -48,16 +58,18 @@
     carregando = true;
     erro = null;
     try {
-      const [perfil, pesoMedio, parametros] = await Promise.all([
+      const [perfil, pesoMedio, parametros, tipo] = await Promise.all([
         getPerfilDietaEditavel(),
         getPesoMedioAtual(),
         getParametros(),
+        getTipoDieta(),
       ]);
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
       caloriasCalc = Math.round(4 * perfil.proteinaGKg * pesoAtual + 9 * perfil.gorduraGKg * pesoAtual + 4 * perfil.carboidratoGKg * pesoAtual);
       const novo: Record<string, LimiteParametro> = { ...PARAMETROS_PADRAO };
       for (const [chave, limite] of parametros) novo[chave] = limite;
       valores = novo;
+      tipoDieta = tipo;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -82,6 +94,7 @@
           return salvarParametro(def.chave, min, max);
         }),
       );
+      await salvarTipoDieta(tipoDieta);
       navigate("/dieta");
     } catch (err) {
       alert("Erro ao salvar parâmetros: " + (err as Error).message);
@@ -116,9 +129,6 @@
     <p class="erro">Erro ao carregar parâmetros: {erro}</p>
   {:else}
     <p class="peso-ref">Com base no peso médio atual: <strong>{pesoAtual.toFixed(1)} kg</strong></p>
-    <p class="dica">
-      Cada parâmetro é um mínimo e máximo, por kg de peso ou por % das calorias do dia (Fibras e Gordura Saturada) — usados pelo app pra travar faixas (roletas, piso de calorias) e calcular metas automáticas.
-    </p>
 
     {#each categorias as categoria (categoria)}
       {@const aberta = categoriasAbertas.has(categoria)}
@@ -129,6 +139,20 @@
         </button>
         {#if aberta}
           <div class="param-card-body">
+            {#if categoria === "Calorias"}
+              <div class="param-linha param-tipo-dieta">
+                <p class="param-nome">Tipo de Dieta</p>
+                <div class="tipo-dieta-opcoes">
+                  {#each OPCOES_TIPO_DIETA as opcao (opcao.valor)}
+                    <button
+                      type="button"
+                      class:ativo={tipoDieta === opcao.valor}
+                      onclick={() => (tipoDieta = opcao.valor)}
+                    >{opcao.label}</button>
+                  {/each}
+                </div>
+              </div>
+            {/if}
             {#each definicoesDaCategoria(categoria) as def (def.chave)}
               <div class="param-linha">
                 <div class="param-titulos">
@@ -250,11 +274,6 @@
     color: var(--surface-muted);
     font-size: var(--font-size-sm);
   }
-  .dica {
-    margin: 0 0 var(--space-4);
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
-  }
   .muted {
     color: var(--surface-muted);
   }
@@ -314,6 +333,30 @@
     text-align: center;
     font-size: 11px;
     color: var(--surface-muted);
+  }
+  .param-tipo-dieta .param-nome {
+    margin: 0 0 var(--space-2);
+  }
+  .tipo-dieta-opcoes {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .tipo-dieta-opcoes button {
+    flex: 1;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tipo-dieta-opcoes button.ativo {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    border-color: var(--color-primary);
   }
   .param-linha-topo {
     display: flex;

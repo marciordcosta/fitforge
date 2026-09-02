@@ -901,6 +901,24 @@ export async function salvarPerfilDieta(input: {
   if (error) throw error;
 }
 
+export type TipoDieta = "cutting" | "manutencao" | "bulking";
+
+/** Classificação da dieta (aba Calorias, tela de Parâmetros) — guardada junto do resto do
+ * perfil (dieta_perfil), mas lida/salva à parte pra quem só precisa desse campo não ter que
+ * carregar o PerfilDietaEditavel inteiro. */
+export async function getTipoDieta(): Promise<TipoDieta> {
+  const { data, error } = await supabase.from("dieta_perfil").select("tipo_dieta").maybeSingle();
+  if (error) throw error;
+  return (data?.tipo_dieta as TipoDieta | null) ?? "manutencao";
+}
+
+export async function salvarTipoDieta(tipo: TipoDieta): Promise<void> {
+  const { error } = await supabase
+    .from("dieta_perfil")
+    .upsert({ user_id: uid(), tipo_dieta: tipo, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) throw error;
+}
+
 // ---------------- Distribuição semanal de calorias (Fixa / Ondulatória) ----------------
 
 export interface CaloriasPorDia {
