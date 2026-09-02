@@ -423,14 +423,21 @@
    * gravação se o saldo ficar negativo (o usuário só vê em vermelho). */
   let metasMusculo = $state<Map<string, number>>(new Map());
   let modoEdicaoMetas = $state(false);
-  let editandoMeta = $state<{ treinoId: string; musculo: Musculo; valorAtual: number | null } | null>(null);
+  let editandoMeta = $state<{ treinoId: string; musculo: Musculo; valorAtual: number | null; valorAtualSeries: number } | null>(null);
 
   function chaveMeta(treinoId: string, musculoId: string): string {
     return `${treinoId}:${musculoId}`;
   }
 
-  function abrirEditarMeta(treinoId: string, musculo: Musculo, valorSugerido: number): void {
-    editandoMeta = { treinoId, musculo, valorAtual: metasMusculo.get(chaveMeta(treinoId, musculo.id)) ?? valorSugerido };
+  /** `valorAtualSeries` é o número de séries JÁ FEITAS naquela célula (não a meta) — guardado à
+   * parte pra, ao salvar, detectar quando a meta escolhida bate com o que já foi feito. */
+  function abrirEditarMeta(treinoId: string, musculo: Musculo, valorAtualSeries: number): void {
+    editandoMeta = {
+      treinoId,
+      musculo,
+      valorAtual: metasMusculo.get(chaveMeta(treinoId, musculo.id)) ?? valorAtualSeries,
+      valorAtualSeries,
+    };
   }
 
   const OPCOES_META: { valor: number | null; label: string }[] = [
@@ -438,9 +445,11 @@
     ...Array.from({ length: 31 }, (_, i) => ({ valor: i, label: String(i) })),
   ];
 
-  async function salvarMetaSelecionada(valor: number | null): Promise<void> {
+  async function salvarMetaSelecionada(valorSelecionado: number | null): Promise<void> {
     if (!editandoMeta) return;
-    const { treinoId, musculo } = editandoMeta;
+    const { treinoId, musculo, valorAtualSeries } = editandoMeta;
+    // Meta igual ao que já foi feito já está "batida" — limpa em vez de mostrar "6/6".
+    const valor = valorSelecionado === valorAtualSeries ? null : valorSelecionado;
     try {
       await salvarMetaMusculo(treinoId, musculo.id, valor);
       const mapa = new Map(metasMusculo);
@@ -1985,7 +1994,7 @@
                     <button
                       class="grade-valor-caixa grade-valor-meta-edit"
                       style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
-                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, meta ?? valor)}
+                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, valor)}
                     >{valor}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</button>
                   {:else if valor > 0 && treinoId}
                     <button
