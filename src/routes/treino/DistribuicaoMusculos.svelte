@@ -2737,7 +2737,7 @@
   }
   .item {
     display: grid;
-    grid-template-columns: 100px 1fr 52px;
+    grid-template-columns: 130px 1fr 52px;
     align-items: center;
     gap: var(--space-3);
   }
