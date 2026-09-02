@@ -89,10 +89,6 @@
     }
   }
 
-  function alternarModoGrafico() {
-    selecionarModoGrafico(modoGrafico === "diario" ? "media" : "diario");
-  }
-
   async function carregarRotinaHoje() {
     const treinos = await listTreinos();
     const diaSemanaHoje = new Date().getDay();
@@ -250,12 +246,16 @@
     return `${formatPeso(mediaMovelGrafico[mediaMovelGrafico.length - 1].peso)} kg`;
   });
 
-  /** A meta em si já é sempre semanal (ver PesoMeta.percentual) — só formata pro card. */
+  /** Peso médio alvo pra semana que vem: projeta a média móvel mais recente pelo % semanal da
+   * meta (a meta em si já é sempre semanal — ver PesoMeta.percentual). Manutenção já é um peso
+   * fixo, não precisa projetar. */
   const metaSemanalTexto = $derived.by(() => {
     if (!meta) return "Sem meta";
     if (meta.tipo === "manutencao") return meta.pesoManutencao != null ? `${formatPeso(meta.pesoManutencao)} kg` : "Sem meta";
     if (meta.percentual == null) return "Sem meta";
-    return `${meta.percentual > 0 ? "+" : ""}${meta.percentual}%/sem`;
+    const base = mediaMovelGrafico[mediaMovelGrafico.length - 1]?.peso;
+    if (base == null) return "Sem meta";
+    return `${formatPeso(base * (1 + meta.percentual / 100))} kg`;
   });
 
   /** A meta é sempre semanal e parte da média móvel do primeiro dia visível, nunca do peso bruto de um dia só. */
@@ -308,6 +308,23 @@
     return pontosGrafico.map((_, i) => (total - 1 - i) % 7 === 0);
   });
 
+  /** Só mostra os detalhes por ponto (%, valor da meta, pontos marcados na linha) com até 1 mês
+   * de período — em filtros maiores vira poluição visual (dezenas de rótulos/pontos
+   * sobrepostos). Acima disso a linha fica só a linha, mais fina e sem pontos. */
+  const detalhesPorPonto = $derived(periodo.dias != null && periodo.dias <= 30);
+
+  /** Datas do eixo: no máximo 8, sempre em intervalos iguais — diferente de pontosComRotulo (que
+   * rotula a cada 7 dias e cresce sem limite em períodos muito longos, tipo "Tudo" com anos de
+   * dados). */
+  const pontosComData = $derived.by((): boolean[] | null => {
+    const total = pontosGrafico.length;
+    if (!total) return null;
+    if (total <= 8) return pontosGrafico.map(() => true);
+    const passo = (total - 1) / 7;
+    const indices = new Set(Array.from({ length: 8 }, (_, i) => Math.round(i * passo)));
+    return pontosGrafico.map((_, i) => indices.has(i));
+  });
+
   /**
    * Diferença % de cada dia rotulado em relação ao peso esperado pela meta naquela mesma data.
    * Compara sempre o valor efetivamente plotado (bruto no modo diário, média no modo média), pra
@@ -328,6 +345,7 @@
   const pluginRotulosMeta = {
     id: "rotulosMeta",
     afterDatasetsDraw(c: Chart) {
+      if (!detalhesPorPonto) return;
       const diffs = diffMetaPorPonto;
       const alvos = metaAlvoPorPonto;
       const rotulo = pontosComRotulo;
@@ -368,7 +386,7 @@
     id: "datasEixo",
     afterDatasetsDraw(c: Chart) {
       const pontosDados = pontosGrafico;
-      const rotulo = pontosComRotulo;
+      const rotulo = pontosComData;
       const pontos = c.getDatasetMeta(0).data;
       const y = c.chartArea.bottom + 11;
       const { ctx } = c;
@@ -409,7 +427,8 @@
             pointBackgroundColor: pontos.map((p) => corPonto(p.data)),
             pointBorderColor: pontos.map((p) => corPonto(p.data)),
             tension: 0.3,
-            pointRadius: 3,
+            pointRadius: detalhesPorPonto ? 3 : 0,
+            borderWidth: detalhesPorPonto ? 3 : 1.5,
           },
           ...(metaLinha
             ? [
@@ -418,6 +437,7 @@
                   borderColor: COR_META,
                   backgroundColor: COR_META,
                   borderDash: [6, 4],
+                  borderWidth: detalhesPorPonto ? 2 : 1,
                   pointRadius: 0,
                   spanGaps: true,
                   tension: 0,
@@ -487,10 +507,12 @@
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 {/snippet}
-{#snippet iconMeta()}
+{#snippet iconEngrenagem()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-    <line x1="4" y1="22" x2="4" y2="2" />
+    <circle cx="12" cy="12" r="3" />
+    <path
+      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+    />
   </svg>
 {/snippet}
 {#snippet iconGanho()}
@@ -518,14 +540,6 @@
     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
   </svg>
 {/snippet}
-{#snippet iconAlternarModo()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M17 2l4 4-4 4" />
-    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-    <path d="M7 22l-4-4 4-4" />
-    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-  </svg>
-{/snippet}
 {#snippet iconToggleMetaGrafico()}
   <button
     class="toggle-meta-grafico"
@@ -547,14 +561,6 @@
       <button class="icon-btn" onclick={() => (mostrarFiltro = true)} aria-label="Filtro de período">
         {@render iconFiltro()}
       </button>
-      <button
-        class="icon-btn"
-        class:destaque={modoGrafico === "diario"}
-        onclick={alternarModoGrafico}
-        aria-label="Alternar modo do gráfico"
-      >
-        {@render iconAlternarModo()}
-      </button>
       <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar peso">
         {@render iconAdicionar()}
       </button>
@@ -572,21 +578,29 @@
   {/if}
 
   <div class="quick-actions">
-    <div class="quick-card">
-      <span class="quick-card-valor">{pesoAtualTexto}</span>
+    <button
+      class="quick-card quick-card-btn"
+      class:quick-card-ativo={modoGrafico === "diario"}
+      onclick={() => selecionarModoGrafico("diario")}
+    >
       <span class="quick-card-label">Peso atual</span>
-    </div>
-    <div class="quick-card">
-      <span class="quick-card-valor">{mediaAtualTexto}</span>
+      <span class="quick-card-valor">{pesoAtualTexto}</span>
+    </button>
+    <button
+      class="quick-card quick-card-btn"
+      class:quick-card-ativo={modoGrafico === "media"}
+      onclick={() => selecionarModoGrafico("media")}
+    >
       <span class="quick-card-label">Média atual</span>
-    </div>
+      <span class="quick-card-valor">{mediaAtualTexto}</span>
+    </button>
     <div class="quick-card">
-      <span class="quick-card-valor">{metaSemanalTexto}</span>
       <span class="quick-card-label">Meta semanal</span>
+      <span class="quick-card-valor">{metaSemanalTexto}</span>
     </div>
     <button class="quick-card quick-card-btn" onclick={() => (mostrarEscolhaMeta = true)}>
-      {@render iconMeta()}
       <span class="quick-card-label">Configurações</span>
+      {@render iconEngrenagem()}
     </button>
   </div>
 
@@ -692,7 +706,8 @@
     {metaLinha}
     {diffMetaPorPonto}
     {metaAlvoPorPonto}
-    {pontosComRotulo}
+    {pontosComData}
+    {detalhesPorPonto}
     onFechar={() => (mostrarGraficoCheio = false)}
   />
 {/if}
@@ -734,9 +749,6 @@
   .icon-btn svg {
     width: 22px;
     height: 22px;
-  }
-  .icon-btn.destaque {
-    color: var(--color-primary);
   }
   .toggle-meta-grafico {
     display: flex;
@@ -801,6 +813,12 @@
   .quick-card-btn {
     font-family: inherit;
     cursor: pointer;
+  }
+  .quick-card-ativo {
+    border-color: var(--color-primary);
+  }
+  .quick-card-ativo .quick-card-valor {
+    color: var(--color-primary);
   }
   .quick-card-btn :global(svg) {
     width: 20px;

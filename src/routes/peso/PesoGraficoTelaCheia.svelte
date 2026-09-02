@@ -9,7 +9,8 @@
     metaLinha,
     diffMetaPorPonto,
     metaAlvoPorPonto,
-    pontosComRotulo,
+    pontosComData,
+    detalhesPorPonto,
     onFechar,
   }: {
     pontosGrafico: PesoRegistro[];
@@ -18,7 +19,10 @@
     metaLinha: (number | null)[] | null;
     diffMetaPorPonto: (number | null)[] | null;
     metaAlvoPorPonto: (number | null)[] | null;
-    pontosComRotulo: boolean[] | null;
+    /** No máximo 8 datas no eixo, em intervalos iguais — mesma lista calculada em Peso.svelte. */
+    pontosComData: boolean[] | null;
+    /** Só com até 1 mês de período: pontos marcados na linha e rótulos de %/meta por ponto. */
+    detalhesPorPonto: boolean;
     onFechar: () => void;
   } = $props();
 
@@ -35,6 +39,7 @@
   const pluginRotulosMeta = {
     id: "rotulosMetaTelaCheia",
     afterDatasetsDraw(c: Chart) {
+      if (!detalhesPorPonto) return;
       const pontos = c.getDatasetMeta(0).data;
       const escalaY = c.scales.y;
       const { ctx } = c;
@@ -52,6 +57,8 @@
           const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
           ctx.fillText(texto, ponto.x, yDiff);
         }
+        // Só o último ponto da linha reta da meta ganha o rótulo com o valor — igual Peso.svelte.
+        if (i !== pontos.length - 1) return;
         const alvo = metaAlvoPorPonto?.[i];
         if (alvo != null && escalaY) {
           const yLinha = escalaY.getPixelForValue(alvo) - 12;
@@ -74,7 +81,7 @@
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pontosGrafico.map((p, i) => (pontosComRotulo && !pontosComRotulo[i] ? "" : formatDataCurta(p.data))),
+        labels: pontosGrafico.map((p, i) => (pontosComData && !pontosComData[i] ? "" : formatDataCurta(p.data))),
         datasets: [
           {
             data: pontosGrafico.map((p) => p.peso),
@@ -83,7 +90,8 @@
             pointBackgroundColor: pontosGrafico.map((p) => corPonto(p.data)),
             pointBorderColor: pontosGrafico.map((p) => corPonto(p.data)),
             tension: 0.3,
-            pointRadius: 4,
+            pointRadius: detalhesPorPonto ? 4 : 0,
+            borderWidth: detalhesPorPonto ? 3 : 1.5,
           },
           ...(metaLinha
             ? [
@@ -92,6 +100,7 @@
                   borderColor: COR_META,
                   backgroundColor: COR_META,
                   borderDash: [6, 4],
+                  borderWidth: detalhesPorPonto ? 2 : 1,
                   pointRadius: 0,
                   spanGaps: true,
                   tension: 0,
