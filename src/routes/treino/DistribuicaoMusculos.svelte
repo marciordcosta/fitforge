@@ -1229,7 +1229,7 @@
       if (valorAtual <= 0 && meta == null) continue;
       resultado.push({ musculo: m, meta, atual: valorAtual, impactoPct: impactoTotalMusculo(m.id) });
     }
-    return resultado;
+    return resultado.sort((a, b) => b.atual - a.atual);
   });
 
   function definirModalEditor(treino: TreinoComExercicios): void {
