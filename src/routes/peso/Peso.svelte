@@ -47,7 +47,8 @@
 
   let mesBase = $state(new Date());
   let pesos = $state<PesoRegistro[]>([]);
-  let diasComTreino = $state<Set<string>>(new Set());
+  /** Data -> nome da rotina executada nesse dia (treino_registros), pro nome pequeno no calendário. */
+  let diasComTreino = $state<Map<string, string>>(new Map());
   let loading = $state(true);
 
   /** Deriva do path (não de estado local) pra que o botão "voltar" do navegador feche o modal, ou reabra ao voltar de uma tela navegada a partir dele (ex: link "Dia de X"). */
@@ -64,10 +65,9 @@
   let loadingGrafico = $state(true);
   let mostrarFiltro = $state(false);
   let mostrarGraficoCheio = $state(false);
-  /** Dias da semana (0=dom..6=sáb) com pelo menos uma rotina agendada — usado pra colorir o
-   * número da data no calendário mesmo em dias sem treino_registro ainda (ex: hoje ou um dia
-   * futuro do mês). */
-  let diasSemanaComRotina = $state<Set<number>>(new Set());
+  /** Dia da semana (0=dom..6=sáb) -> nome da rotina agendada — usado pro nome pequeno no
+   * calendário mesmo em dias sem treino_registro ainda (ex: hoje ou um dia futuro do mês). */
+  let diasSemanaComRotina = $state<Map<number, string>>(new Map());
 
   /** "diário" = peso bruto de cada dia; "média" = média móvel dos últimos 7 dias em cada dia (padrão de mercado — MacroFactor, Trendweight etc.), padrão do app. */
   let modoGrafico = $state<"diario" | "media">("diario");
@@ -90,7 +90,11 @@
 
   async function carregarRotinasAgendadas() {
     const treinos = await listTreinos();
-    diasSemanaComRotina = new Set(treinos.filter((t) => t.dia_semana != null).map((t) => t.dia_semana as number));
+    const mapa = new Map<number, string>();
+    for (const t of treinos) {
+      if (t.dia_semana != null && !mapa.has(t.dia_semana)) mapa.set(t.dia_semana, t.nome_treino);
+    }
+    diasSemanaComRotina = mapa;
   }
 
   void carregarRotinasAgendadas();
@@ -146,7 +150,7 @@
       getDiasComTreino(dataInicio, dataFim),
     ]);
     pesos = listaPesos;
-    diasComTreino = new Set(listaTreinos.map((t) => t.data));
+    diasComTreino = new Map(listaTreinos.map((t) => [t.data, t.treinoNome]));
     loading = false;
   }
 
@@ -215,13 +219,13 @@
   const celulas = $derived.by(() => {
     const totalDias = mesFim.getDate();
     const primeiroDiaSemana = (mesInicio.getDay() + 6) % 7; // 0=Seg..6=Dom
-    const lista: ({ dia: number; iso: string; peso: number | null; temTreino: boolean } | null)[] = [];
+    const lista: ({ dia: number; iso: string; peso: number | null; nomeTreino: string | null } | null)[] = [];
     for (let i = 0; i < primeiroDiaSemana; i++) lista.push(null);
     for (let dia = 1; dia <= totalDias; dia++) {
       const data = new Date(mesBase.getFullYear(), mesBase.getMonth(), dia);
       const iso = toISODate(data);
-      const temTreino = diasComTreino.has(iso) || diasSemanaComRotina.has(data.getDay());
-      lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null, temTreino });
+      const nomeTreino = diasComTreino.get(iso) ?? diasSemanaComRotina.get(data.getDay()) ?? null;
+      lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null, nomeTreino });
     }
     return lista;
   });
@@ -678,11 +682,13 @@
           {:else}
             {@const ehHoje = cel.iso === hojeISO()}
             <button class="celula" class:com-peso={cel.peso != null} onclick={() => abrirDia(cel.iso)}>
+              {#if cel.nomeTreino}
+                <span class="nome-treino-mini">{cel.nomeTreino}</span>
+              {/if}
               <span
                 class="dia-numero"
-                class:dia-numero-treino={cel.temTreino}
-                class:dia-numero-hoje={!cel.temTreino && ehHoje}
-                class:muted={!cel.temTreino && !ehHoje && cel.peso == null}
+                class:dia-numero-hoje={!cel.nomeTreino && ehHoje}
+                class:muted={!cel.nomeTreino && !ehHoje && cel.peso == null}
               >{cel.dia}</span>
               {#if cel.peso != null}
                 <span class="peso-valor">{cel.peso}</span>
@@ -945,13 +951,19 @@
     color: var(--surface-muted);
     font-weight: 400;
   }
-  /* Tem treino (agendado nesse dia da semana ou já registrado): número vermelho — vale mais que
-     "hoje" (que só é primária quando não tem treino nenhum). */
-  .dia-numero.dia-numero-treino {
-    color: var(--color-negative);
-  }
   .dia-numero.dia-numero-hoje {
     color: var(--color-primary);
+  }
+  /* Nome da rotina (agendada nesse dia da semana ou já registrada) em cima do número — bem
+     pequeno e numa linha só, pra não empurrar o card e ficar maior que os outros. */
+  .nome-treino-mini {
+    max-width: 100%;
+    font-size: 7px;
+    font-weight: 600;
+    color: var(--color-negative);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .peso-valor {
     font-size: 9px;
