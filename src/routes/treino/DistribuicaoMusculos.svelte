@@ -2216,7 +2216,7 @@
         </div>
         <div class="resumo-item">
           <span class="resumo-valor">{formatValor(resumoMusculoModal.totalValido)}</span>
-          <span class="resumo-label">Séries Válidas</span>
+          <span class="resumo-label">Séries Ponderadas</span>
         </div>
         <div class="resumo-item">
           <span class="resumo-valor">{formatValor(resumoMusculoModal.totalAcumulado)}</span>
