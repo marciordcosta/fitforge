@@ -69,6 +69,9 @@ export interface Treino {
   nome_treino: string;
   dia_semana: number | null;
   ordem: number;
+  /** Quando a composição (exercícios/séries) foi salva pela última vez — usado pra contar só os
+   * registros feitos DEPOIS da última edição ("registros" no rodapé do card). */
+  composicao_atualizada_em: string;
 }
 
 /** 0=domingo..6=sábado, mesma convenção de Date.getDay(). */
@@ -598,7 +601,7 @@ function ordenarExercicios(treino: TreinoComExercicios): void {
 export async function listTreinos(): Promise<TreinoComExercicios[]> {
   const { data, error } = await supabase
     .from("treinos")
-    .select(`id, nome_treino, dia_semana, ordem, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
+    .select(`id, nome_treino, dia_semana, ordem, composicao_atualizada_em, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
     .order("ordem", { ascending: true });
   if (error) throw error;
   const treinos = (data ?? []) as unknown as TreinoComExercicios[];
@@ -609,7 +612,7 @@ export async function listTreinos(): Promise<TreinoComExercicios[]> {
 export async function getTreino(id: string): Promise<TreinoComExercicios | null> {
   const { data, error } = await supabase
     .from("treinos")
-    .select(`id, nome_treino, dia_semana, ordem, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
+    .select(`id, nome_treino, dia_semana, ordem, composicao_atualizada_em, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
@@ -1122,6 +1125,20 @@ export async function salvarMetaMusculo(treinoId: string, musculoId: string, met
       { onConflict: "treino_id,musculo_id" },
     );
   if (error) throw error;
+}
+
+export interface RegistroPorTreino {
+  treino_id: string | null;
+  data: string;
+}
+
+/** Registros (uma linha por série, repetida por dia) desde uma data — usado pra contar quantas
+ * sessões (dias distintos) cada rotina teve DEPOIS da última vez que sua composição foi editada
+ * (treinos.composicao_atualizada_em), sem precisar buscar o histórico inteiro de cada uma. */
+export async function getRegistrosPorTreinoDesde(dataMinima: string): Promise<RegistroPorTreino[]> {
+  const { data, error } = await supabase.from("treino_registros").select("treino_id, data").gte("data", dataMinima);
+  if (error) throw error;
+  return data ?? [];
 }
 
 /** Apaga TODAS as metas manuais de séries de uma rotina de uma vez — usado ao salvar o editor

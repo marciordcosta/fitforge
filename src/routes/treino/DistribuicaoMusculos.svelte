@@ -21,6 +21,7 @@
     listMetasMusculo,
     salvarMetaMusculo,
     limparMetasMusculoRotina,
+    getRegistrosPorTreinoDesde,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
     abreviarMusculo,
@@ -72,6 +73,38 @@
     }
   }
 
+  /** Quantas sessões (dias distintos de treino_registros) cada rotina teve DEPOIS da última vez
+   * que sua composição foi editada — "registros" no rodapé do card, zera sozinho a cada Salvar
+   * (o backend atualiza treinos.composicao_atualizada_em via trigger, cobrindo qualquer forma de
+   * editar a rotina, não só o editor completo). */
+  let registrosPorTreino = $state<Map<string, number>>(new Map());
+
+  async function carregarRegistrosPorTreino(treinosCarregados: TreinoComExercicios[]): Promise<void> {
+    if (!treinosCarregados.length) {
+      registrosPorTreino = new Map();
+      return;
+    }
+    const dataMinima = toISODate(
+      new Date(Math.min(...treinosCarregados.map((t) => new Date(t.composicao_atualizada_em).getTime()))),
+    );
+    const registros = await getRegistrosPorTreinoDesde(dataMinima);
+    const diasPorTreino = new Map<string, Set<string>>();
+    for (const r of registros) {
+      if (!r.treino_id) continue;
+      const dias = diasPorTreino.get(r.treino_id) ?? new Set<string>();
+      dias.add(r.data);
+      diasPorTreino.set(r.treino_id, dias);
+    }
+    const mapa = new Map<string, number>();
+    for (const t of treinosCarregados) {
+      const desde = toISODate(new Date(t.composicao_atualizada_em));
+      const dias = diasPorTreino.get(t.id);
+      const count = dias ? Array.from(dias).filter((d) => d >= desde).length : 0;
+      mapa.set(t.id, count);
+    }
+    registrosPorTreino = mapa;
+  }
+
   async function carregarBase() {
     const [musculosCarregados, treinosCarregados, metasCarregadas] = await Promise.all([
       listMusculos(),
@@ -82,6 +115,7 @@
     treinos = ordenarPorDia(treinosCarregados);
     metasMusculo = new Map(metasCarregadas.map((m) => [chaveMeta(m.treino_id, m.musculo_id), m.meta_series]));
     void carregarHistoricoTodos(treinosCarregados);
+    void carregarRegistrosPorTreino(treinosCarregados);
     await carregarRealizado();
   }
 
@@ -942,6 +976,9 @@
     const atualizado = await getTreino(treinoId);
     if (!atualizado) return;
     treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
+    // Trocar/mover exercício muda treino_exercicios de verdade (não é rascunho) — o trigger no
+    // banco já reseta composicao_atualizada_em, só falta recontar os "registros" com o novo valor.
+    void carregarRegistrosPorTreino(treinos);
     if (modalMusculoRotina?.multiRotina) {
       // `treinos` já está atualizado acima — recalcula juntando todas as rotinas de novo.
       modalMusculoRotina = { ...modalMusculoRotina, itens: itensMusculoTodasRotinas(modalMusculoRotina.musculo.id) };
@@ -1255,6 +1292,8 @@
       metasMusculo = mapaMetas;
       const atualizado = await getTreino(treinoId);
       if (atualizado) treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
+      // O trigger no banco já resetou composicao_atualizada_em — recontar os "registros" do rodapé.
+      void carregarRegistrosPorTreino(treinos);
       editorSujo = false;
       modalEditorRotina = null;
       if (editorUrlTreino) window.history.back();
@@ -1733,7 +1772,7 @@
                   {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
                     (acc, ex) => acc + ex.series.length,
                     0,
-                  )} séries
+                  )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
                 </button>
                 <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino)} aria-label="Ver anel por dominância">
                   {@render iconGrafico()}
