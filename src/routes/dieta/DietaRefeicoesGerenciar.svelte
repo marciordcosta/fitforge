@@ -664,6 +664,8 @@
     proteinaG: number | null;
     gorduraG: number | null;
     carboidratoG: number | null;
+    fibraG: number | null;
+    gorduraSaturadaG: number | null;
   }
 
   /** Meta de uma refeição do catálogo num dia específico — usa o override daquele dia se houver, senão cai pra meta global (m). */
@@ -676,9 +678,19 @@
         proteinaG: override.metaProteinaG,
         gorduraG: override.metaGorduraG,
         carboidratoG: override.metaCarboidratoG,
+        fibraG: override.metaFibraG,
+        gorduraSaturadaG: override.metaGorduraSaturadaG,
       };
     }
-    return { receitaId: m.metaReceitaId, calorias: m.metaCalorias, proteinaG: m.metaProteinaG, gorduraG: m.metaGorduraG, carboidratoG: m.metaCarboidratoG };
+    return {
+      receitaId: m.metaReceitaId,
+      calorias: m.metaCalorias,
+      proteinaG: m.metaProteinaG,
+      gorduraG: m.metaGorduraG,
+      carboidratoG: m.metaCarboidratoG,
+      fibraG: m.metaFibraG,
+      gorduraSaturadaG: m.metaGorduraSaturadaG,
+    };
   }
 
   /** Soma dos macros já configurados nas refeições desse dia — pra comparar com a meta do dia. */
@@ -691,9 +703,11 @@
           proteinaG: acc.proteinaG + (meta.proteinaG ?? 0),
           gorduraG: acc.gorduraG + (meta.gorduraG ?? 0),
           carboidratoG: acc.carboidratoG + (meta.carboidratoG ?? 0),
+          fibraG: acc.fibraG + (meta.fibraG ?? 0),
+          gorduraSaturadaG: acc.gorduraSaturadaG + (meta.gorduraSaturadaG ?? 0),
         };
       },
-      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0, fibraG: 0, gorduraSaturadaG: 0 },
     );
   }
 
@@ -705,8 +719,10 @@
         proteinaG: acc.proteinaG + (m.metaProteinaG ?? 0),
         gorduraG: acc.gorduraG + (m.metaGorduraG ?? 0),
         carboidratoG: acc.carboidratoG + (m.metaCarboidratoG ?? 0),
+        fibraG: acc.fibraG + (m.metaFibraG ?? 0),
+        gorduraSaturadaG: acc.gorduraSaturadaG + (m.metaGorduraSaturadaG ?? 0),
       }),
-      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0, fibraG: 0, gorduraSaturadaG: 0 },
     );
   }
 
@@ -1056,6 +1072,23 @@
   </svg>
 {/snippet}
 
+{#snippet barrasMacrosLinha(carboidratoG: number, gorduraG: number, proteinaG: number, pct: number, invisivel: boolean)}
+  {@const calCarbo = 4 * carboidratoG}
+  {@const calGordura = 9 * gorduraG}
+  {@const calProteina = 4 * proteinaG}
+  {@const calTotal = calCarbo + calGordura + calProteina}
+  <span class="nome-macros" class:invisivel>
+    <span class="linha-barra-stack" title={`carb ${carboidratoG.toFixed(0)}g · gord ${gorduraG.toFixed(0)}g · prot ${proteinaG.toFixed(0)}g`}>
+      {#if calTotal > 0}
+        <span style={`width:${(calCarbo / calTotal) * 100}%; background:${COR_CARBO};`}></span>
+        <span style={`width:${(calGordura / calTotal) * 100}%; background:${COR_GORDURA};`}></span>
+        <span style={`width:${(calProteina / calTotal) * 100}%; background:${COR_PROTEINA};`}></span>
+      {/if}
+    </span>
+    <span class="nome-pct">{pct}%</span>
+  </span>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/dieta")} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -1266,6 +1299,17 @@
           </div>
         {/if}
 
+        <div class="card-calorias">
+          <p class="card-titulo">Calorias</p>
+          <div class="calorias-linha">
+            <span class="calorias-valor"><strong>{somaGrupo.calorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metaGrupo.calorias.toFixed(0)}</span></span>
+            <span class="calorias-restantes"><strong>{restante(somaGrupo.calorias, metaGrupo.calorias).toFixed(0)}</strong> restantes</span>
+          </div>
+          <div class="barra-wrap-grande">
+            <div class="barra-grande" style={`width:${larguraBarra(pctMeta(somaGrupo.calorias, metaGrupo.calorias))}%; background:var(--color-secondary);`}></div>
+          </div>
+        </div>
+
         <div class="card-macros">
           <button
             type="button"
@@ -1276,19 +1320,6 @@
             {@render iconToggle()}
           </button>
           <div class="macros-grid">
-            <div class="macro-col">
-              <p class="macro-nome">Calorias</p>
-              <p class="macro-valor">
-                {#if modoRestanteRefeicoes}
-                  <strong>{restante(somaGrupo.calorias, metaGrupo.calorias).toFixed(0)}</strong> <span class="macro-meta">restantes</span>
-                {:else}
-                  <strong>{somaGrupo.calorias.toFixed(0)}</strong> <span class="macro-meta">/ {metaGrupo.calorias.toFixed(0)}</span>
-                {/if}
-              </p>
-              <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.calorias, metaGrupo.calorias))}%; background:var(--color-secondary);`}></div>
-              </div>
-            </div>
             <div class="macro-col">
               <p class="macro-nome">Carb</p>
               <p class="macro-valor">
@@ -1332,26 +1363,26 @@
               <p class="macro-nome">G. satur</p>
               <p class="macro-valor">
                 {#if modoRestanteRefeicoes}
-                  <strong>{restante(0, gorduraSaturadaMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                  <strong>{restante(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
                 {:else}
-                  <strong>0 g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxGrupo.toFixed(0)}</span>
+                  <strong>{somaGrupo.gorduraSaturadaG.toFixed(0)} g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxGrupo.toFixed(0)}</span>
                 {/if}
               </p>
               <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(0, gorduraSaturadaMaxGrupo))}%; background:${COR_GORDURA};`}></div>
+                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo))}%; background:${COR_GORDURA};`}></div>
               </div>
             </div>
             <div class="macro-col">
               <p class="macro-nome">Fibras</p>
               <p class="macro-valor">
                 {#if modoRestanteRefeicoes}
-                  <strong>{restante(0, fibrasMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                  <strong>{restante(somaGrupo.fibraG, fibrasMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
                 {:else}
-                  <strong>0 g</strong> <span class="macro-meta">/ {fibrasMaxGrupo.toFixed(0)}</span>
+                  <strong>{somaGrupo.fibraG.toFixed(0)} g</strong> <span class="macro-meta">/ {fibrasMaxGrupo.toFixed(0)}</span>
                 {/if}
               </p>
               <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(0, fibrasMaxGrupo))}%; background:${COR_CARBO};`}></div>
+                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.fibraG, fibrasMaxGrupo))}%; background:${COR_CARBO};`}></div>
               </div>
             </div>
           </div>
@@ -1374,10 +1405,13 @@
                   <span class="nome">{m.nome}</span>
                   {#if meta.calorias != null}<span class="nome-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
                 </span>
-                <span class="nome-macros" class:invisivel={meta.calorias == null}>
-                  <span>carb {(meta.carboidratoG ?? 0).toFixed(0)}g · gord {(meta.gorduraG ?? 0).toFixed(0)}g · prot {(meta.proteinaG ?? 0).toFixed(0)}g</span>
-                  <span class="nome-pct">{pctDeDia(arredondarDezena(meta.calorias ?? 0), grupo.calorias)}%</span>
-                </span>
+                {@render barrasMacrosLinha(
+                  meta.carboidratoG ?? 0,
+                  meta.gorduraG ?? 0,
+                  meta.proteinaG ?? 0,
+                  pctDeDia(arredondarDezena(meta.calorias ?? 0), grupo.calorias),
+                  meta.calorias == null,
+                )}
               </button>
               <button class="remover-btn" onclick={() => removerDoGrupo(grupo, m)} aria-label={`Remover ${m.nome} desse dia`}>✕</button>
             </li>
@@ -1391,6 +1425,17 @@
       {@const somaGlobal = somaMacrosGlobal()}
       {@const metaGlobal = { calorias: caloriasCalc, proteinaG: proteinaGInput ?? 0, gorduraG: gorduraGInput ?? 0, carboidratoG: carboidratoGInput ?? 0 }}
 
+      <div class="card-calorias">
+        <p class="card-titulo">Calorias</p>
+        <div class="calorias-linha">
+          <span class="calorias-valor"><strong>{somaGlobal.calorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metaGlobal.calorias.toFixed(0)}</span></span>
+          <span class="calorias-restantes"><strong>{restante(somaGlobal.calorias, metaGlobal.calorias).toFixed(0)}</strong> restantes</span>
+        </div>
+        <div class="barra-wrap-grande">
+          <div class="barra-grande" style={`width:${larguraBarra(pctMeta(somaGlobal.calorias, metaGlobal.calorias))}%; background:var(--color-secondary);`}></div>
+        </div>
+      </div>
+
       <div class="card-macros">
         <button
           type="button"
@@ -1401,19 +1446,6 @@
           {@render iconToggle()}
         </button>
         <div class="macros-grid">
-          <div class="macro-col">
-            <p class="macro-nome">Calorias</p>
-            <p class="macro-valor">
-              {#if modoRestanteRefeicoes}
-                <strong>{restante(somaGlobal.calorias, metaGlobal.calorias).toFixed(0)}</strong> <span class="macro-meta">restantes</span>
-              {:else}
-                <strong>{somaGlobal.calorias.toFixed(0)}</strong> <span class="macro-meta">/ {metaGlobal.calorias.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.calorias, metaGlobal.calorias))}%; background:var(--color-secondary);`}></div>
-            </div>
-          </div>
           <div class="macro-col">
             <p class="macro-nome">Carb</p>
             <p class="macro-valor">
@@ -1457,26 +1489,26 @@
             <p class="macro-nome">G. satur</p>
             <p class="macro-valor">
               {#if modoRestanteRefeicoes}
-                <strong>{restante(0, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                <strong>{restante(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
               {:else}
-                <strong>0 g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
+                <strong>{somaGlobal.gorduraSaturadaG.toFixed(0)} g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
               {/if}
             </p>
             <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(0, gorduraSaturadaMaxG))}%; background:${COR_GORDURA};`}></div>
+              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG))}%; background:${COR_GORDURA};`}></div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Fibras</p>
             <p class="macro-valor">
               {#if modoRestanteRefeicoes}
-                <strong>{restante(0, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
+                <strong>{restante(somaGlobal.fibraG, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta">restantes</span>
               {:else}
-                <strong>0 g</strong> <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
+                <strong>{somaGlobal.fibraG.toFixed(0)} g</strong> <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
               {/if}
             </p>
             <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(0, fibrasMaxG))}%; background:${COR_CARBO};`}></div>
+              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.fibraG, fibrasMaxG))}%; background:${COR_CARBO};`}></div>
             </div>
           </div>
         </div>
@@ -1503,10 +1535,13 @@
                 <span class="nome">{m.nome}</span>
                 {#if m.metaCalorias != null}<span class="nome-cal">{arredondarDezena(m.metaCalorias)} cal</span>{/if}
               </span>
-              <span class="nome-macros" class:invisivel={m.metaCalorias == null}>
-                <span>carb {(m.metaCarboidratoG ?? 0).toFixed(0)}g · gord {(m.metaGorduraG ?? 0).toFixed(0)}g · prot {(m.metaProteinaG ?? 0).toFixed(0)}g</span>
-                <span class="nome-pct">{pctDoDia(arredondarDezena(m.metaCalorias ?? 0))}%</span>
-              </span>
+              {@render barrasMacrosLinha(
+                m.metaCarboidratoG ?? 0,
+                m.metaGorduraG ?? 0,
+                m.metaProteinaG ?? 0,
+                pctDoDia(arredondarDezena(m.metaCalorias ?? 0)),
+                m.metaCalorias == null,
+              )}
             </button>
           </li>
         {/each}
@@ -1951,7 +1986,7 @@
   }
   .nome-macros {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
     font-size: 12px;
@@ -1962,6 +1997,18 @@
   }
   .nome-pct {
     flex-shrink: 0;
+  }
+  .linha-barra-stack {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    height: 5px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--surface-border);
+  }
+  .linha-barra-stack span {
+    height: 100%;
   }
   .remover-btn {
     flex-shrink: 0;
@@ -2071,6 +2118,7 @@
     width: 20px;
     height: 20px;
   }
+  .card-calorias,
   .card-macros {
     position: relative;
     background: var(--surface-card);
@@ -2078,6 +2126,41 @@
     padding: var(--space-4);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
+  }
+  .card-titulo {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-base);
+    color: var(--surface-muted);
+  }
+  .calorias-linha {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+  }
+  .calorias-valor {
+    font-size: var(--font-size-lg);
+  }
+  .calorias-valor strong {
+    font-size: 22px;
+  }
+  .calorias-meta {
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+  }
+  .calorias-restantes {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .barra-wrap-grande {
+    height: 10px;
+    background: var(--surface-border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .barra-grande {
+    height: 100%;
+    border-radius: 6px;
   }
   .toggle-btn {
     position: absolute;

@@ -241,10 +241,12 @@ export interface RefeicaoModelo {
   metaProteinaG: number | null;
   metaGorduraG: number | null;
   metaCarboidratoG: number | null;
+  metaFibraG: number | null;
+  metaGorduraSaturadaG: number | null;
 }
 
 const REFEICAO_MODELO_SELECT =
-  "id, nome, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g)))";
+  "id, nome, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g)))";
 
 interface ItemReceitaBruto {
   quantidade: number;
@@ -254,6 +256,8 @@ interface ItemReceitaBruto {
     proteina_g: number;
     gordura_g: number;
     carboidrato_g: number;
+    fibra_g: number | null;
+    gordura_saturada_g: number | null;
   } | null;
 }
 
@@ -267,9 +271,11 @@ function somarTotaisItensReceita(itens: ItemReceitaBruto[]) {
         proteinaG: acc.proteinaG + it.alimento.proteina_g * fator,
         gorduraG: acc.gorduraG + it.alimento.gordura_g * fator,
         carboidratoG: acc.carboidratoG + it.alimento.carboidrato_g * fator,
+        fibraG: acc.fibraG + (it.alimento.fibra_g ?? 0) * fator,
+        gorduraSaturadaG: acc.gorduraSaturadaG + (it.alimento.gordura_saturada_g ?? 0) * fator,
       };
     },
-    { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+    { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0, fibraG: 0, gorduraSaturadaG: 0 },
   );
 }
 
@@ -277,7 +283,7 @@ function mapRefeicaoModelo(l: Record<string, unknown>): RefeicaoModelo {
   const metaReceita = l.meta_receita as { itens: ItemReceitaBruto[] } | null;
   const base = { id: l.id as string, nome: l.nome as string, metaReceitaId: l.meta_receita_id as string | null };
   if (!metaReceita) {
-    return { ...base, metaCalorias: null, metaProteinaG: null, metaGorduraG: null, metaCarboidratoG: null };
+    return { ...base, metaCalorias: null, metaProteinaG: null, metaGorduraG: null, metaCarboidratoG: null, metaFibraG: null, metaGorduraSaturadaG: null };
   }
   const totais = somarTotaisItensReceita(metaReceita.itens ?? []);
   return {
@@ -286,6 +292,8 @@ function mapRefeicaoModelo(l: Record<string, unknown>): RefeicaoModelo {
     metaProteinaG: round1(totais.proteinaG),
     metaGorduraG: round1(totais.gorduraG),
     metaCarboidratoG: round1(totais.carboidratoG),
+    metaFibraG: round1(totais.fibraG),
+    metaGorduraSaturadaG: round1(totais.gorduraSaturadaG),
   };
 }
 
@@ -351,10 +359,12 @@ export interface MetaDiaModelo {
   metaProteinaG: number;
   metaGorduraG: number;
   metaCarboidratoG: number;
+  metaFibraG: number;
+  metaGorduraSaturadaG: number;
 }
 
 const META_DIA_MODELO_SELECT =
-  "modelo_id, dia_semana, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g)))";
+  "modelo_id, dia_semana, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g)))";
 
 /** Todas as metas por dia já configuradas (qualquer refeição, qualquer dia) — ausência de linha pra um (modelo, dia) usa o meta_receita_id global como fallback. */
 export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
@@ -372,6 +382,8 @@ export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
       metaProteinaG: round1(totais.proteinaG),
       metaGorduraG: round1(totais.gorduraG),
       metaCarboidratoG: round1(totais.carboidratoG),
+      metaFibraG: round1(totais.fibraG),
+      metaGorduraSaturadaG: round1(totais.gorduraSaturadaG),
     };
   });
 }
