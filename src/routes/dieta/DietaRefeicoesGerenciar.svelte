@@ -778,16 +778,25 @@
   void carregar();
 
   let treinos = $state<Treino[]>([]);
+  let carregouTreinos = $state(false);
 
   async function carregarTreinos() {
     try {
       treinos = await listTreinos();
     } catch {
       // informativo — só usado pra mostrar o nome do treino em cima dos cards de dia
+    } finally {
+      carregouTreinos = true;
     }
   }
 
   void carregarTreinos();
+
+  /** Só libera a tela quando TUDO (metas/calorias, catálogo de refeições e treinos) já carregou —
+   * senão a "Refeições" pinta primeiro em modo Fixa e pula pra Ondulatória assim que carregarMetas
+   * termina (modoCalorias começa em "fixa" e só é sobrescrito depois), e o nome do treino em cima
+   * de cada card de dia aparece com atraso. Preferível segurar tudo e pintar uma vez só, completo. */
+  const pronto = $derived(perfilCarregado && carregouAlgumaVez && carregouTreinos);
 
   function treinoDoDia(dia: number): string | null {
     return treinos.find((t) => t.dia_semana === dia)?.nome_treino ?? null;
@@ -1127,12 +1136,13 @@
     <button class:active={aba === "refeicoes"} onclick={() => irParaAba("refeicoes")}>Refeições</button>
   </div>
 
-  {#if aba === "calorias"}
-    {#if erroMetas}
-      <p class="erro">Erro ao carregar metas: {erroMetas}</p>
-    {:else if !perfilCarregado}
-      <p class="muted">Carregando…</p>
-    {:else}
+  {#if erroMetas}
+    <p class="erro">Erro ao carregar metas: {erroMetas}</p>
+  {:else if erro}
+    <p class="erro">Erro ao carregar refeições: {erro}</p>
+  {:else if !pronto}
+    <p class="muted">Carregando…</p>
+  {:else if aba === "calorias"}
       <p class="peso-ref">Com base no peso médio atual: <strong>{pesoAtual.toFixed(1)} kg</strong></p>
 
       <div class="resumo">
@@ -1289,15 +1299,9 @@
       {/if}
 
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
-    {/if}
   {:else}
-    {#if loading && !carregouAlgumaVez}
-      <p class="muted">Carregando…</p>
-    {:else}
     <div class="conteudo" class:carregando={loading}>
-    {#if erro}
-      <p class="erro">Erro ao carregar refeições: {erro}</p>
-    {:else if !modelos.length}
+    {#if !modelos.length}
       <p class="muted">Nenhuma refeição cadastrada ainda.</p>
     {:else if modoCalorias === "ondulatoria"}
       {#each gruposDias as grupo (grupo.dias[0])}
@@ -1576,7 +1580,6 @@
       </ul>
     {/if}
     </div>
-    {/if}
   {/if}
 </div>
 
