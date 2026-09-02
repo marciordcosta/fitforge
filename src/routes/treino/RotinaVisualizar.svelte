@@ -65,11 +65,6 @@
   </svg>
 {/snippet}
 
-{#snippet iconIniciar()}
-  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-    <polygon points="6 3 20 12 6 21 6 3" />
-  </svg>
-{/snippet}
 {#snippet iconEditar()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 20h9" />
@@ -161,7 +156,7 @@
         </div>
       {/each}
       <button class="iniciar-rotina-btn" onclick={() => navigate(`/treino/log/${treino!.id}`)}>
-        {@render iconIniciar()} Iniciar Rotina
+        Iniciar Rotina
       </button>
     {/if}
   {/if}
@@ -337,9 +332,5 @@
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-  }
-  .iniciar-rotina-btn :global(svg) {
-    width: 18px;
-    height: 18px;
   }
 </style>

@@ -480,6 +480,9 @@
       await renameTreino(treinoId, treinoNome, novoDia);
       const atualizado = await getTreino(treinoId);
       if (atualizado) treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
+      // O editor completo é um rascunho à parte (cópia local) — sem isso o cabeçalho dele
+      // continuava mostrando o dia antigo até fechar e abrir de novo.
+      if (modalEditorRotina?.id === treinoId) modalEditorRotina = { ...modalEditorRotina, dia_semana: novoDia };
       movendoDiaTreino = null;
     } catch (e) {
       alert("Erro ao mover rotina de dia: " + (e as Error).message);
@@ -2367,7 +2370,11 @@
       <div class="header">
         <button class="back" onclick={tentarFecharEditor} aria-label="Voltar">{@render iconVoltar()}</button>
         <h1>{modalEditorRotina.nome_treino}</h1>
-        <span class="spacer"></span>
+        <button
+          class="editor-dia-btn"
+          onclick={() =>
+            abrirMoverDiaTreino(modalEditorRotina!.id, modalEditorRotina!.nome_treino, modalEditorRotina!.dia_semana ?? 0)}
+        >{modalEditorRotina.dia_semana != null ? DIAS_SEMANA_ABREV[modalEditorRotina.dia_semana] : "Dia"}</button>
       </div>
       {#if metasEditor.length}
         <div class="editor-metas-scroll">
@@ -2572,6 +2579,20 @@
   }
   .spacer {
     width: 36px;
+  }
+  .editor-dia-btn {
+    flex-shrink: 0;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
   }
   .tabs {
     display: flex;
