@@ -1171,16 +1171,14 @@
    * bagunçar a ordem com itens escondidos no meio da lista. */
   let editorFiltroMusculoId = $state<string | null>(null);
 
-  /** Snapshot de séries por exercício e total bruto por músculo, capturado quando o editor é
-   * aberto — base FIXA (não ao vivo) pros % de impacto mostrados após cada ajuste. Sem isso,
-   * baixar as séries e depois voltar ao número original mostraria um "aumento" (relativo ao
-   * valor intermediário) em vez de simplesmente sumir. */
-  let baselineEditor = $state<{ seriesPorExercicio: Map<string, number>; totalPorMusculo: Map<string, number> } | null>(null);
+  /** Snapshot de séries por exercício, capturado quando o editor é aberto — base FIXA (não ao
+   * vivo) pro badge "4-1" e pro número congelado até o ajuste. */
+  let baselineEditor = $state<{ seriesPorExercicio: Map<string, number> } | null>(null);
 
   function capturarBaselineEditor(treino: TreinoComExercicios): void {
     const seriesPorExercicio = new Map<string, number>();
     for (const te of treino.exercicios) seriesPorExercicio.set(te.id, te.series.length);
-    baselineEditor = { seriesPorExercicio, totalPorMusculo: contarSeriesPorMusculo(treino) };
+    baselineEditor = { seriesPorExercicio };
   }
 
   /** Delta de séries de um exercício comparado à baseline (0 se ele não existia nela, ou seja,
@@ -1189,27 +1187,6 @@
     if (!baselineEditor) return 0;
     const baseSeries = baselineEditor.seriesPorExercicio.get(te.id) ?? 0;
     return te.series.length - baseSeries;
-  }
-
-  /** % de impacto de TODO o rascunho num músculo, comparando as séries ATUAIS com a baseline
-   * fixa: soma o delta de séries (ponderado por peso_contribuicao) de TODOS os exercícios que
-   * trabalham esse músculo, sobre o total bruto ORIGINAL dele na rotina — ex: supino de 3 pra 4
-   * séries junto com um ajuste de -1 numa remada, ambos afetando o peito, somam antes de dividir
-   * pelo total base. Mostrado nos cards de meta no topo (não mais por exercício). 0 se não há
-   * baseline ou se as mudanças voltaram a se cancelar. */
-  function impactoTotalMusculo(musculoId: string): number {
-    if (!baselineEditor || !modalEditorRotina) return 0;
-    const totalBase = baselineEditor.totalPorMusculo.get(musculoId) ?? 0;
-    if (totalBase <= 0) return 0;
-    let deltaPonderado = 0;
-    for (const te of modalEditorRotina.exercicios) {
-      const deltaSeries = deltaSeriesEditor(te);
-      if (deltaSeries === 0) continue;
-      const m = te.exercicio?.musculos.find((mm) => mm.musculo_id === musculoId);
-      if (!m) continue;
-      deltaPonderado += deltaSeries * m.peso_contribuicao;
-    }
-    return (deltaPonderado / totalBase) * 100;
   }
 
   /** Metas manuais definidas pra essa rotina (só os músculos que têm uma), com o saldo AO VIVO —
@@ -1226,17 +1203,20 @@
 
   /** Um card por músculo trabalhado na rotina (com série > 0) OU com meta configurada (mesmo em
    * 0, pra continuar mostrando o alvo vazio) — `meta: null` quando não há meta pra esse músculo,
-   * aí o card só mostra o número de séries em vez de "atual/meta". Continua clicável (filtro) e
-   * com o % de impacto igual pros dois casos. */
+   * aí o card só mostra o número de séries em vez de "atual/meta". Continua clicável (filtro) pros
+   * dois casos. `ponderado` é o mesmo cálculo (peso_contribuicao) usado nos outros gráficos da
+   * tela — dá pra calcular ao vivo porque o peso já é conhecido assim que o exercício entra no
+   * rascunho, não precisa esperar a rotina "estar pronta". */
   const metasEditor = $derived.by(() => {
     if (!modalEditorRotina) return [];
     const atual = contarSeriesPorMusculo(modalEditorRotina);
-    const resultado: { musculo: Musculo; meta: number | null; atual: number; impactoPct: number }[] = [];
+    const ponderado = contarSeriesPorMusculoPonderado(modalEditorRotina);
+    const resultado: { musculo: Musculo; meta: number | null; atual: number; ponderado: number }[] = [];
     for (const m of musculos) {
       const valorAtual = atual.get(m.id) ?? 0;
       const meta = metasMusculo.get(chaveMeta(modalEditorRotina.id, m.id)) ?? null;
       if (valorAtual <= 0 && meta == null) continue;
-      resultado.push({ musculo: m, meta, atual: valorAtual, impactoPct: impactoTotalMusculo(m.id) });
+      resultado.push({ musculo: m, meta, atual: valorAtual, ponderado: ponderado.get(m.id) ?? 0 });
     }
     return resultado.sort((a, b) => b.atual - a.atual);
   });
@@ -2387,12 +2367,8 @@
               {:else}
                 <span class="editor-meta-valor">{item.atual}</span>
               {/if}
-              {#if item.impactoPct !== 0}
-                <span
-                  class="editor-meta-impacto"
-                  class:valor-subindo={item.impactoPct > 0}
-                  class:valor-caindo={item.impactoPct < 0}
-                >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
+              {#if item.ponderado > 0}
+                <span class="editor-meta-ponderado">≈{formatValor(item.ponderado)}</span>
               {/if}
             </button>
           {/each}
@@ -3352,9 +3328,10 @@
     font-size: var(--font-size-sm);
     font-weight: 700;
   }
-  .editor-meta-impacto {
+  .editor-meta-ponderado {
     font-size: 9px;
     font-weight: 600;
+    color: var(--surface-muted);
   }
   .editor-lista {
     display: flex;
