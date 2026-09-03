@@ -1169,6 +1169,68 @@
    * bagunçar a ordem com itens escondidos no meio da lista. */
   let editorFiltroMusculoId = $state<string | null>(null);
 
+  /** Ligado pelo menu "Reordenar" de qualquer card — mostra a alça de arrastar em todos os
+   * exercícios e desliga o toque-pra-abrir-modal enquanto ativo. "Concluído" desliga de volta. */
+  let modoReordenarEditor = $state(false);
+
+  /** Pressionar-e-segurar (sem soltar cedo, sem arrastar) num card de exercício abre o menu —
+   * mesma ideia de qualquer outro long-press do app, só que aqui dispara um menu em vez de um
+   * arrasto. `disparouPressionarEditor` evita que o "click" nativo que sempre segue o pointerup,
+   * mesmo depois de um toque longo, também abra o modal de séries por cima do menu. */
+  const ATRASO_PRESSIONAR_EDITOR_MS = 450;
+  const TOLERANCIA_PRESSIONAR_EDITOR_PX = 8;
+  let timeoutPressionarEditor: ReturnType<typeof setTimeout> | undefined;
+  let pressionarEditorX = 0;
+  let pressionarEditorY = 0;
+  let disparouPressionarEditor = false;
+
+  function aoPointerDownCardEditor(e: PointerEvent, te: TreinoComExercicios["exercicios"][number]): void {
+    disparouPressionarEditor = false;
+    pressionarEditorX = e.clientX;
+    pressionarEditorY = e.clientY;
+    window.addEventListener("pointermove", aoPointerMoveEsperandoPressionarEditor);
+    window.addEventListener("pointerup", aoPointerUpEsperandoPressionarEditor);
+    timeoutPressionarEditor = setTimeout(() => {
+      cancelarEsperaPressionarEditor();
+      disparouPressionarEditor = true;
+      if (navigator.vibrate) navigator.vibrate(10);
+      menuExercicioMusculo = {
+        treinoId: modalEditorRotina!.id,
+        treinoNome: modalEditorRotina!.nome_treino,
+        treinoExercicioId: te.id,
+        exercicioId: te.exercicio_id,
+        exercicioNome: te.exercicio?.nome ?? "",
+        series: te.series.length,
+      };
+    }, ATRASO_PRESSIONAR_EDITOR_MS);
+  }
+
+  function cancelarEsperaPressionarEditor(): void {
+    clearTimeout(timeoutPressionarEditor);
+    timeoutPressionarEditor = undefined;
+    window.removeEventListener("pointermove", aoPointerMoveEsperandoPressionarEditor);
+    window.removeEventListener("pointerup", aoPointerUpEsperandoPressionarEditor);
+  }
+
+  function aoPointerMoveEsperandoPressionarEditor(e: PointerEvent): void {
+    if (Math.hypot(e.clientX - pressionarEditorX, e.clientY - pressionarEditorY) > TOLERANCIA_PRESSIONAR_EDITOR_PX) {
+      cancelarEsperaPressionarEditor();
+    }
+  }
+
+  function aoPointerUpEsperandoPressionarEditor(): void {
+    cancelarEsperaPressionarEditor();
+  }
+
+  /** Abre o seletor de séries no toque curto — ignora o "click" que segue um long-press que já disparou o menu. */
+  function abrirSerieOuIgnorar(te: TreinoComExercicios["exercicios"][number]): void {
+    if (disparouPressionarEditor) {
+      disparouPressionarEditor = false;
+      return;
+    }
+    editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length };
+  }
+
   /** Snapshot de séries por exercício e total bruto por músculo, capturado quando o editor é
    * aberto — base FIXA (não ao vivo) pro badge "4-1", pro número congelado até o ajuste, e pro %
    * de impacto do balãozinho nos cards de meta. Sem isso, baixar as séries e depois voltar ao
@@ -1231,14 +1293,35 @@
     if (!modalEditorRotina) return [];
     const atual = contarSeriesPorMusculo(modalEditorRotina);
     const ponderado = contarSeriesPorMusculoPonderado(modalEditorRotina);
-    const resultado: { musculo: Musculo; meta: number | null; atual: number; ponderado: number; impactoPct: number }[] = [];
+    const posicao = contarSeriesPorFaixaDePosicao(modalEditorRotina);
+    const resultado: {
+      musculo: Musculo;
+      meta: number | null;
+      atual: number;
+      ponderado: number;
+      acumulado: number;
+      partes: Partes;
+      impactoPct: number;
+    }[] = [];
     for (const m of musculos) {
       const valorAtual = atual.get(m.id) ?? 0;
       const meta = metasMusculo.get(chaveMeta(modalEditorRotina.id, m.id)) ?? null;
       if (valorAtual <= 0 && meta == null) continue;
-      resultado.push({ musculo: m, meta, atual: valorAtual, ponderado: ponderado.get(m.id) ?? 0, impactoPct: impactoTotalMusculo(m.id) });
+      const partes = posicao.get(m.id) ?? partesVazias();
+      resultado.push({
+        musculo: m,
+        meta,
+        atual: valorAtual,
+        ponderado: ponderado.get(m.id) ?? 0,
+        acumulado: valorEfetivoFadiga(partes),
+        partes,
+        impactoPct: impactoTotalMusculo(m.id),
+      });
     }
-    return resultado.sort((a, b) => b.atual - a.atual);
+    // Sempre por séries ponderadas — é o valor que melhor reflete o volume real (leva em conta o
+    // peso_contribuicao de cada músculo secundário), diferente do bruto que infla exercícios
+    // multi-músculo.
+    return resultado.sort((a, b) => b.ponderado - a.ponderado);
   });
 
   function definirModalEditor(treino: TreinoComExercicios): void {
@@ -1246,6 +1329,7 @@
     capturarBaselineEditor(treino);
     editorSujo = false;
     editorFiltroMusculoId = null;
+    modoReordenarEditor = false;
   }
 
   /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o
@@ -1900,6 +1984,21 @@
     <line x1="3" y1="10" x2="21" y2="10" />
   </svg>
 {/snippet}
+{#snippet iconReordenarMenu()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="7 10 12 5 17 10" />
+    <polyline points="7 14 12 19 17 14" />
+  </svg>
+{/snippet}
+{#snippet iconRemoverExercicio()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+{/snippet}
 {#snippet iconEditarMeta()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 20h9" />
@@ -2250,6 +2349,23 @@
           icon: iconMover,
           onSelect: () => abrirMoverExercicio(item),
         },
+        {
+          label: "Reordenar",
+          icon: iconReordenarMenu,
+          // Limpa o filtro por músculo ao entrar em modo de reordenar: com itens escondidos
+          // (display:none) no meio da lista, o cálculo de posição do arrasto (moverDuranteArrasteEditor,
+          // baseado em getBoundingClientRect de cada item) bagunça a ordem.
+          onSelect: () => {
+            editorFiltroMusculoId = null;
+            modoReordenarEditor = true;
+          },
+        },
+        {
+          label: "Remover",
+          icon: iconRemoverExercicio,
+          destructive: true,
+          onSelect: () => pedirConfirmacaoRemover(item.exercicioNome, () => removerExercicioEditor(item.treinoExercicioId)),
+        },
       ]}
     />
   </div>
@@ -2372,38 +2488,13 @@
             abrirMoverDiaTreino(modalEditorRotina!.id, modalEditorRotina!.nome_treino, modalEditorRotina!.dia_semana ?? 0)}
         >{modalEditorRotina.dia_semana != null ? DIAS_SEMANA_ABREV[modalEditorRotina.dia_semana] : "Dia"}</button>
       </div>
-      {#if metasEditor.length}
-        <div class="editor-metas-scroll">
-          {#each metasEditor as item (item.musculo.id)}
-            <button
-              class="editor-meta-chip"
-              class:editor-meta-chip-ativo={editorFiltroMusculoId === item.musculo.id}
-              onclick={() => (editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id)}
-            >
-              {#if item.impactoPct !== 0}
-                <span class="editor-meta-badge" class:badge-mais={item.impactoPct > 0} class:badge-menos={item.impactoPct < 0}
-                >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
-              {/if}
-              <span class="editor-meta-nome">{abreviarMusculo(item.musculo.nome)}</span>
-              {#if item.meta != null}
-                {@const meta = item.meta}
-                <span
-                  class="editor-meta-valor"
-                  class:valor-caindo={item.atual > meta}
-                  class:valor-subindo={item.atual === meta}
-                  class:valor-estavel={item.atual < meta}
-                >{item.atual}/{meta}</span>
-              {:else}
-                <span class="editor-meta-valor">{item.atual}</span>
-              {/if}
-              {#if item.ponderado > 0}
-                <span class="editor-meta-ponderado">≈{formatValor(item.ponderado)}</span>
-              {/if}
-            </button>
-          {/each}
+      {#if modoReordenarEditor}
+        <div class="editor-modo-reordenar">
+          <span>Arraste os cards pra reordenar</span>
+          <button type="button" onclick={() => (modoReordenarEditor = false)}>Concluído</button>
         </div>
       {/if}
-      <div class="editor-lista" class:carregando={salvandoEditor}>
+      <div class="editor-exercicios-lista" class:carregando={salvandoEditor}>
         {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
           {@const tendEx = tendenciaExercicio(te.exercicio_id)}
           {@const deltaTotal = deltaSeriesEditor(te)}
@@ -2412,40 +2503,32 @@
           {@const destacado = editorDestaqueMusculoId != null && te.exercicio?.musculos.some((m) => m.musculo_id === editorDestaqueMusculoId)}
           {@const foraDoFiltro = editorFiltroMusculoId != null && !te.exercicio?.musculos.some((m) => m.musculo_id === editorFiltroMusculoId)}
           <div
-            class="editor-item"
+            class="editor-exercicio-card"
             class:arrastando={arrastandoIdxEditor === idx}
             class:editor-item-oculto={foraDoFiltro}
             bind:this={itemEditorRefs[idx]}
           >
-            <button
-              class="remover-circulo"
-              onclick={() => pedirConfirmacaoRemover(te.exercicio?.nome ?? "", () => removerExercicioEditor(te.id))}
-              aria-label="Remover"
-            >−</button>
-            <button
-              class="editor-nome"
-              onclick={() =>
-                (menuExercicioMusculo = {
-                  treinoId: modalEditorRotina!.id,
-                  treinoNome: modalEditorRotina!.nome_treino,
-                  treinoExercicioId: te.id,
-                  exercicioId: te.exercicio_id,
-                  exercicioNome: te.exercicio?.nome ?? "",
-                  series: te.series.length,
-                })}
-            >
-              <span class="editor-nome-texto" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
-            </button>
-            <div class="editor-serie-col">
-              {#if deltaTotal !== 0}
-                <span class="editor-serie-badge"
-                >{valorAnteriorSeries}{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
-              {/if}
+            {#if modoReordenarEditor}
               <button
-                class="exercicio-musculo-series"
-                onclick={() =>
-                  (editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length })}
-              >
+                class="handle-arraste"
+                onpointerdown={(e) => iniciarArrasteEditor(e, idx)}
+                aria-label="Arrastar para reordenar"
+              >☰</button>
+            {/if}
+            <button
+              type="button"
+              class="editor-exercicio-conteudo"
+              disabled={modoReordenarEditor}
+              onpointerdown={(e) => {
+                if (!modoReordenarEditor) aoPointerDownCardEditor(e, te);
+              }}
+              onclick={() => abrirSerieOuIgnorar(te)}
+            >
+              {#if deltaTotal !== 0}
+                <span class="editor-serie-badge">{valorAnteriorSeries}{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
+              {/if}
+              <span class="editor-exercicio-nome" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
+              <span class="editor-exercicio-series-col">
                 <span
                   class="editor-serie-numero"
                   class:valor-subindo={tendEx === "subindo"}
@@ -2453,15 +2536,8 @@
                   class:valor-caindo={tendEx === "caindo"}
                 >{numeroExibidoSeries}</span>
                 <span class="editor-serie-label">{numeroExibidoSeries === 1 ? "série" : "séries"}</span>
-              </button>
-            </div>
-            <button
-              class="handle-arraste"
-              onpointerdown={(e) => {
-                if (!editorFiltroMusculoId) iniciarArrasteEditor(e, idx);
-              }}
-              aria-label="Arrastar para reordenar"
-            >☰</button>
+              </span>
+            </button>
           </div>
         {/each}
         {#if !modalEditorRotina.exercicios.length}
@@ -2470,6 +2546,39 @@
           <p class="muted">Nenhum exercício desse músculo — o filtro ainda está ativo, toca de novo no card pra limpar.</p>
         {/if}
       </div>
+      {#if metasEditor.length}
+        {@render cabecalhoCaixas("ponderado")}
+        <div class="editor-musculos-lista">
+          {#each metasEditor as item (item.musculo.id)}
+            <button
+              type="button"
+              class="item editor-musculo-linha"
+              class:editor-musculo-ativo={editorFiltroMusculoId === item.musculo.id}
+              disabled={modoReordenarEditor}
+              onclick={() => (editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id)}
+            >
+              <span class="editor-musculo-nome-col">
+                <span class="editor-musculo-nome">{abreviarMusculo(item.musculo.nome)}</span>
+                {#if item.impactoPct !== 0}
+                  <span class="editor-meta-badge" class:badge-mais={item.impactoPct > 0} class:badge-menos={item.impactoPct < 0}
+                  >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
+                {/if}
+                {#if item.meta != null}
+                  {@const meta = item.meta}
+                  <span
+                    class="editor-musculo-meta"
+                    class:valor-caindo={item.atual > meta}
+                    class:valor-subindo={item.atual === meta}
+                    class:valor-estavel={item.atual < meta}
+                  >meta {item.atual}/{meta}</span>
+                {/if}
+              </span>
+              {@render barraFadiga(item.partes, item.partes.a + item.partes.b + item.partes.c)}
+              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, "ponderado")}
+            </button>
+          {/each}
+        </div>
+      {/if}
       <div class="editor-totais">
         <span>
           {modalEditorRotina.exercicios.length} {modalEditorRotina.exercicios.length === 1 ? "exercício" : "exercícios"} · {modalEditorRotina.exercicios.reduce(
@@ -3215,19 +3324,6 @@
     font-weight: 400;
     white-space: nowrap;
   }
-  .exercicio-musculo-series {
-    flex-shrink: 0;
-    display: flex;
-    align-items: baseline;
-    gap: 3px;
-    border: none;
-    background: none;
-    padding: 0;
-    font-family: inherit;
-    color: var(--surface-fg);
-    white-space: nowrap;
-    cursor: pointer;
-  }
   .editor-serie-numero {
     font-weight: 700;
     font-size: var(--font-size-lg);
@@ -3240,15 +3336,20 @@
     font-size: 11px;
     color: var(--surface-muted);
   }
-  .editor-serie-col {
-    position: relative;
+  .editor-exercicio-series-col {
     flex-shrink: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
   }
   .editor-serie-badge {
     position: absolute;
-    top: -8px;
-    right: -2px;
+    top: -6px;
+    right: -6px;
     z-index: 1;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #232a3b;
     font-size: 10px;
     font-weight: 800;
     line-height: 1.3;
@@ -3357,41 +3458,133 @@
     display: flex;
     flex-direction: column;
   }
-  .editor-metas-scroll {
-    display: flex;
-    gap: var(--space-2);
-    overflow-x: auto;
-    /* Espaço extra em cima: sem isso o contorno do card ativo (outline-offset positivo) e o
-       balãozinho de %impacto (que estoura pra fora do card) ficavam cortados pelo próprio
-       scroll (overflow-x:auto vira overflow-y:auto também, por padrão do CSS). */
-    padding: 10px 4px var(--space-2);
-    margin-bottom: var(--space-2);
-  }
-  .editor-meta-chip {
-    position: relative;
-    flex-shrink: 0;
-    width: 72px;
+  .editor-exercicios-lista {
     display: flex;
     flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    transition: opacity 0.15s;
+  }
+  .editor-exercicios-lista.carregando {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .editor-modo-reordenar {
+    display: flex;
     align-items: center;
-    gap: 2px;
-    padding: var(--space-1) 2px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-card);
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-1) 0 var(--space-3);
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+  }
+  .editor-modo-reordenar button {
+    flex-shrink: 0;
+    padding: var(--space-1) var(--space-3);
+    border-radius: 999px;
     border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-weight: 600;
+    font-size: var(--font-size-sm);
     font-family: inherit;
     cursor: pointer;
-    /* <button> não herda a cor do body por padrão em todo navegador — sem isso o número sem
-       meta (.editor-meta-valor sem nenhuma classe .valor-*) ficava com a cor default do botão
-       em vez do texto claro do app. Com meta, a classe .valor-* aplicada direto no span sempre
-       vence essa herdada, então não quebra a cor verde/vermelha/neutra de quando há meta. */
+  }
+  .editor-exercicio-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .editor-exercicio-card.editor-item-oculto {
+    display: none;
+  }
+  .editor-exercicio-card.arrastando {
+    opacity: 0.8;
+  }
+  .editor-exercicio-conteudo {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    background: var(--surface-card);
+    box-shadow: var(--shadow-card);
+    border: none;
+    text-align: left;
+    font-family: inherit;
     color: var(--surface-fg);
+    cursor: pointer;
   }
-  .editor-meta-chip-ativo {
-    outline: 1px solid var(--color-primary);
-    outline-offset: 2px;
+  .editor-exercicio-conteudo:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
-  /* Balãozinho no canto do card, mesmo estilo do "x" nos cards de dia da tela de Dieta
+  .editor-exercicio-nome {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-base);
+  }
+  .editor-exercicio-nome.editor-nome-destacado {
+    color: var(--color-primary);
+    font-weight: 700;
+  }
+  .editor-musculos-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .editor-musculo-linha {
+    width: 100%;
+    padding: var(--space-2) 0;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--surface-border);
+    font-family: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .editor-musculo-linha:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .editor-musculo-linha:last-child {
+    border-bottom: none;
+  }
+  .editor-musculo-ativo {
+    background: var(--surface-card);
+    border-radius: var(--radius-md);
+    border-bottom-color: transparent;
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+  .editor-musculo-nome-col {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+  }
+  .editor-musculo-nome {
+    font-size: var(--font-size-sm);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .editor-musculo-meta {
+    font-size: 10px;
+    font-weight: 600;
+  }
+  /* Balãozinho no canto, mesmo estilo do "x" nos cards de dia da tela de Dieta
      (DietaRefeicoesGerenciar.svelte .dia-card-x) — só que em pílula (o texto "+17%" não cabe
      num círculo de 20px) em vez de círculo. */
   .editor-meta-badge {
@@ -3415,87 +3608,6 @@
   }
   .editor-meta-badge.badge-menos {
     background: var(--color-negative);
-  }
-  .editor-meta-nome {
-    font-size: 10px;
-    color: var(--surface-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-  .editor-meta-valor {
-    font-size: var(--font-size-sm);
-    font-weight: 700;
-  }
-  .editor-meta-ponderado {
-    font-size: 9px;
-    font-weight: 600;
-    color: var(--surface-muted);
-  }
-  .editor-lista {
-    display: flex;
-    flex-direction: column;
-    transition: opacity 0.15s;
-  }
-  .editor-lista.carregando {
-    opacity: 0.5;
-    pointer-events: none;
-  }
-  .editor-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--surface-border);
-    touch-action: none;
-  }
-  .editor-item.arrastando {
-    background: var(--surface-card);
-    opacity: 0.8;
-  }
-  /* Compound (2 classes) de propósito: precisa vencer o display:flex de .editor-item acima
-     mesmo estando definida antes dela no arquivo — mesma pegadinha de cascata de sempre. */
-  .editor-item.editor-item-oculto {
-    display: none;
-  }
-  .editor-nome {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    text-align: left;
-    background: none;
-    border: none;
-    padding: 0;
-    font-family: inherit;
-    cursor: pointer;
-  }
-  .editor-nome-texto {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--font-size-base);
-    color: var(--surface-fg);
-  }
-  .editor-nome-texto.editor-nome-destacado {
-    color: var(--color-primary);
-    font-weight: 700;
-  }
-  .remover-circulo {
-    width: 24px;
-    height: 24px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    border: none;
-    background: var(--color-danger);
-    color: #fff;
-    font-size: var(--font-size-base);
-    line-height: 1;
-    cursor: pointer;
   }
   .handle-arraste {
     flex-shrink: 0;
