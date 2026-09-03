@@ -1235,6 +1235,21 @@
     editandoSerieEditor = { treinoExercicioId: te.id, exercicioNome: te.exercicio?.nome ?? "", series: te.series.length };
   }
 
+  /** No PC não tem "pressionar e segurar" — o botão direito (contextmenu) abre o mesmo menu direto. */
+  function aoContextMenuCardEditor(e: MouseEvent, te: TreinoComExercicios["exercicios"][number]): void {
+    e.preventDefault();
+    cancelarEsperaPressionarEditor();
+    disparouPressionarEditor = false;
+    menuExercicioMusculo = {
+      treinoId: modalEditorRotina!.id,
+      treinoNome: modalEditorRotina!.nome_treino,
+      treinoExercicioId: te.id,
+      exercicioId: te.exercicio_id,
+      exercicioNome: te.exercicio?.nome ?? "",
+      series: te.series.length,
+    };
+  }
+
   /** Snapshot de séries por exercício e total bruto por músculo, capturado quando o editor é
    * aberto — base FIXA (não ao vivo) pro badge "4-1", pro número congelado até o ajuste, e pro %
    * de impacto do balãozinho nos cards de meta. Sem isso, baixar as séries e depois voltar ao
@@ -2546,6 +2561,9 @@
                   if (!modoReordenarEditor) aoPointerDownCardEditor(e, te);
                 }}
                 onclick={() => abrirSerieOuIgnorar(te)}
+                oncontextmenu={(e) => {
+                  if (!modoReordenarEditor) aoContextMenuCardEditor(e, te);
+                }}
               >
                 {#if deltaTotal !== 0}
                   <span class="editor-serie-badge">{valorAnteriorSeries}{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
