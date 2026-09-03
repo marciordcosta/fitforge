@@ -1412,15 +1412,17 @@
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
 
+  /** Cards ficam lado a lado (rolagem horizontal), então a comparação de posição durante o
+   * arrasto é pelo eixo X (clientX/rect.left), não Y como seria numa lista vertical. */
   function moverDuranteArrasteEditor(e: PointerEvent): void {
     if (arrastandoIdxEditor === null || !modalEditorRotina) return;
-    const y = e.clientY;
+    const x = e.clientX;
     for (let i = 0; i < itemEditorRefs.length; i++) {
       const el = itemEditorRefs[i];
       if (!el || i === arrastandoIdxEditor) continue;
       const rect = el.getBoundingClientRect();
-      const meio = rect.top + rect.height / 2;
-      if ((i < arrastandoIdxEditor && y < meio) || (i > arrastandoIdxEditor && y > meio)) {
+      const meio = rect.left + rect.width / 2;
+      if ((i < arrastandoIdxEditor && x < meio) || (i > arrastandoIdxEditor && x > meio)) {
         const ordenados = modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
         const [item] = ordenados.splice(arrastandoIdxEditor, 1);
         ordenados.splice(i, 0, item);
@@ -2494,58 +2496,60 @@
           <button type="button" onclick={() => (modoReordenarEditor = false)}>Concluído</button>
         </div>
       {/if}
-      <div class="editor-exercicios-lista" class:carregando={salvandoEditor}>
-        {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
-          {@const tendEx = tendenciaExercicio(te.exercicio_id)}
-          {@const deltaTotal = deltaSeriesEditor(te)}
-          {@const valorAnteriorSeries = baselineEditor?.seriesPorExercicio.get(te.id) ?? 0}
-          {@const numeroExibidoSeries = te.series.length}
-          {@const destacado = editorDestaqueMusculoId != null && te.exercicio?.musculos.some((m) => m.musculo_id === editorDestaqueMusculoId)}
-          {@const foraDoFiltro = editorFiltroMusculoId != null && !te.exercicio?.musculos.some((m) => m.musculo_id === editorFiltroMusculoId)}
-          <div
-            class="editor-exercicio-card"
-            class:arrastando={arrastandoIdxEditor === idx}
-            class:editor-item-oculto={foraDoFiltro}
-            bind:this={itemEditorRefs[idx]}
-          >
-            {#if modoReordenarEditor}
-              <button
-                class="handle-arraste"
-                onpointerdown={(e) => iniciarArrasteEditor(e, idx)}
-                aria-label="Arrastar para reordenar"
-              >☰</button>
-            {/if}
-            <button
-              type="button"
-              class="editor-exercicio-conteudo"
-              disabled={modoReordenarEditor}
-              onpointerdown={(e) => {
-                if (!modoReordenarEditor) aoPointerDownCardEditor(e, te);
-              }}
-              onclick={() => abrirSerieOuIgnorar(te)}
+      {#if !modalEditorRotina.exercicios.length}
+        <p class="muted">Nenhum exercício ainda.</p>
+      {:else}
+        <div class="editor-exercicios-lista" class:carregando={salvandoEditor}>
+          {#each modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te, idx (te.id)}
+            {@const tendEx = tendenciaExercicio(te.exercicio_id)}
+            {@const deltaTotal = deltaSeriesEditor(te)}
+            {@const valorAnteriorSeries = baselineEditor?.seriesPorExercicio.get(te.id) ?? 0}
+            {@const numeroExibidoSeries = te.series.length}
+            {@const destacado = editorDestaqueMusculoId != null && te.exercicio?.musculos.some((m) => m.musculo_id === editorDestaqueMusculoId)}
+            {@const foraDoFiltro = editorFiltroMusculoId != null && !te.exercicio?.musculos.some((m) => m.musculo_id === editorFiltroMusculoId)}
+            <div
+              class="editor-exercicio-card"
+              class:arrastando={arrastandoIdxEditor === idx}
+              class:editor-item-oculto={foraDoFiltro}
+              bind:this={itemEditorRefs[idx]}
             >
-              {#if deltaTotal !== 0}
-                <span class="editor-serie-badge">{valorAnteriorSeries}{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
+              <button
+                type="button"
+                class="editor-exercicio-conteudo"
+                disabled={modoReordenarEditor}
+                onpointerdown={(e) => {
+                  if (!modoReordenarEditor) aoPointerDownCardEditor(e, te);
+                }}
+                onclick={() => abrirSerieOuIgnorar(te)}
+              >
+                {#if deltaTotal !== 0}
+                  <span class="editor-serie-badge">{valorAnteriorSeries}{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
+                {/if}
+                <span class="editor-exercicio-nome" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
+                <span class="editor-exercicio-series-col">
+                  <span
+                    class="editor-serie-numero"
+                    class:valor-subindo={tendEx === "subindo"}
+                    class:valor-estavel={tendEx === "estavel"}
+                    class:valor-caindo={tendEx === "caindo"}
+                  >{numeroExibidoSeries}</span>
+                  <span class="editor-serie-label">{numeroExibidoSeries === 1 ? "série" : "séries"}</span>
+                </span>
+              </button>
+              {#if modoReordenarEditor}
+                <button
+                  class="handle-arraste-card"
+                  onpointerdown={(e) => iniciarArrasteEditor(e, idx)}
+                  aria-label="Arrastar para reordenar"
+                >☰</button>
               {/if}
-              <span class="editor-exercicio-nome" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
-              <span class="editor-exercicio-series-col">
-                <span
-                  class="editor-serie-numero"
-                  class:valor-subindo={tendEx === "subindo"}
-                  class:valor-estavel={tendEx === "estavel"}
-                  class:valor-caindo={tendEx === "caindo"}
-                >{numeroExibidoSeries}</span>
-                <span class="editor-serie-label">{numeroExibidoSeries === 1 ? "série" : "séries"}</span>
-              </span>
-            </button>
-          </div>
-        {/each}
-        {#if !modalEditorRotina.exercicios.length}
-          <p class="muted">Nenhum exercício ainda.</p>
-        {:else if exerciciosVisiveisEditor === 0}
+            </div>
+          {/each}
+        </div>
+        {#if exerciciosVisiveisEditor === 0}
           <p class="muted">Nenhum exercício desse músculo — o filtro ainda está ativo, toca de novo no card pra limpar.</p>
         {/if}
-      </div>
+      {/if}
       {#if metasEditor.length}
         {@render cabecalhoCaixas("ponderado")}
         <div class="editor-musculos-lista">
@@ -3458,10 +3462,15 @@
     display: flex;
     flex-direction: column;
   }
+  /* Rolagem horizontal de cards quadrados — mesmo formato que os chips de músculo tinham na
+     versão anterior do editor, só que maiores (o conteúdo principal de edição agora é aqui). */
   .editor-exercicios-lista {
     display: flex;
-    flex-direction: column;
     gap: var(--space-2);
+    overflow-x: auto;
+    /* Espaço extra em cima: sem isso a alça de arrastar (que estoura pra fora do card, top:-8px)
+       e o balãozinho de delta de séries ficavam cortados pelo próprio scroll. */
+    padding: 10px 4px var(--space-2);
     margin-bottom: var(--space-4);
     transition: opacity 0.15s;
   }
@@ -3491,9 +3500,9 @@
     cursor: pointer;
   }
   .editor-exercicio-card {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+    position: relative;
+    flex-shrink: 0;
+    width: 118px;
   }
   .editor-exercicio-card.editor-item-oculto {
     display: none;
@@ -3503,13 +3512,13 @@
   }
   .editor-exercicio-conteudo {
     position: relative;
-    flex: 1;
-    min-width: 0;
+    width: 100%;
+    min-height: 110px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     justify-content: space-between;
-    gap: var(--space-3);
-    padding: var(--space-4);
+    gap: var(--space-2);
+    padding: var(--space-3);
     border-radius: var(--radius-lg);
     background: var(--surface-card);
     box-shadow: var(--shadow-card);
@@ -3525,15 +3534,34 @@
   }
   .editor-exercicio-nome {
     flex: 1;
-    min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--font-size-base);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    font-size: 12px;
+    line-height: 1.25;
   }
   .editor-exercicio-nome.editor-nome-destacado {
     color: var(--color-primary);
     font-weight: 700;
+  }
+  .handle-arraste-card {
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    z-index: 1;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    touch-action: none;
   }
   .editor-musculos-lista {
     display: flex;
@@ -3608,16 +3636,6 @@
   }
   .editor-meta-badge.badge-menos {
     background: var(--color-negative);
-  }
-  .handle-arraste {
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    color: var(--surface-muted);
-    font-size: var(--font-size-lg);
-    cursor: grab;
-    touch-action: none;
-    padding: var(--space-2);
   }
   .editor-botoes-fixos {
     flex-shrink: 0;
