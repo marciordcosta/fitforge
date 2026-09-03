@@ -1173,6 +1173,10 @@
    * exercícios e desliga o toque-pra-abrir-modal enquanto ativo. "Concluído" desliga de volta. */
   let modoReordenarEditor = $state(false);
 
+  /** Qual coluna (Total/Pond./Acum.) está ordenando a lista de músculos do editor — ícone no
+   * rodapé cicla entre as 3, mesmo padrão da Distribuição Semanal e dos cards por rotina. */
+  let ordemMusculosEditor = $state<CampoOrdenacaoSeries>("ponderado");
+
   /** Pressionar-e-segurar (sem soltar cedo, sem arrastar) num card de exercício abre o menu —
    * mesma ideia de qualquer outro long-press do app, só que aqui dispara um menu em vez de um
    * arrasto. `disparouPressionarEditor` evita que o "click" nativo que sempre segue o pointerup,
@@ -1318,10 +1322,15 @@
         impactoPct: impactoTotalMusculo(m.id),
       });
     }
-    // Sempre por séries ponderadas — é o valor que melhor reflete o volume real (leva em conta o
-    // peso_contribuicao de cada músculo secundário), diferente do bruto que infla exercícios
-    // multi-músculo.
-    return resultado.sort((a, b) => b.ponderado - a.ponderado);
+    // Ordena pela coluna escolhida (ícone no rodapé) — padrão "ponderado", o valor que melhor
+    // reflete o volume real (leva em conta o peso_contribuicao de cada músculo secundário),
+    // diferente do bruto que infla exercícios multi-músculo.
+    const campo = ordemMusculosEditor;
+    return resultado.sort(
+      (a, b) =>
+        valorPorCampoOrdenacao({ valor: b.ponderado, bruto: b.atual, partes: b.partes }, campo) -
+        valorPorCampoOrdenacao({ valor: a.ponderado, bruto: a.atual, partes: a.partes }, campo),
+    );
   });
 
   function definirModalEditor(treino: TreinoComExercicios): void {
@@ -1330,6 +1339,7 @@
     editorSujo = false;
     editorFiltroMusculoId = null;
     modoReordenarEditor = false;
+    ordemMusculosEditor = "ponderado";
   }
 
   /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o
@@ -1730,7 +1740,7 @@
     <div class="caixa-serie">
       <span
         class="caixa-serie-valor"
-        class:caixa-serie-ativa={ordenandoPor === "total"}
+        class:caixa-serie-ativa={ordenandoPor === "total" && totalClasse == null}
         class:valor-subindo={totalClasse === "valor-subindo"}
         class:valor-estavel={totalClasse === "valor-estavel"}
         class:valor-caindo={totalClasse === "valor-caindo"}
@@ -2566,7 +2576,7 @@
         {/if}
       {/if}
       {#if metasEditor.length}
-        {@render cabecalhoCaixas("ponderado")}
+        {@render cabecalhoCaixas(ordemMusculosEditor)}
         <div class="editor-musculos-lista">
           {#each metasEditor as item (item.musculo.id)}
             {@const totalTexto = item.meta != null ? `${item.atual}/${item.meta}` : null}
@@ -2587,7 +2597,7 @@
                 {/if}
               </span>
               {@render barraFadiga(item.partes, item.partes.a + item.partes.b + item.partes.c)}
-              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, "ponderado", totalTexto, totalClasse)}
+              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemMusculosEditor, totalTexto, totalClasse)}
             </button>
           {/each}
         </div>
@@ -2602,12 +2612,9 @@
         <div class="editor-totais-acoes">
           <button
             class="ordenar-fadiga-btn"
-            class:ativo={modoReordenarEditor}
-            onclick={() => {
-              editorFiltroMusculoId = null;
-              modoReordenarEditor = !modoReordenarEditor;
-            }}
-            aria-label="Reordenar exercícios"
+            class:ativo={ordemMusculosEditor !== "ponderado"}
+            onclick={() => (ordemMusculosEditor = proximoCampoOrdenacao(ordemMusculosEditor))}
+            aria-label="Ordenar músculos por Total/Ponderada/Acumulada"
           >{@render iconOrdenarFadiga()}</button>
           <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
             {@render iconGrafico()}
@@ -3549,7 +3556,6 @@
     cursor: pointer;
   }
   .editor-exercicio-conteudo:disabled {
-    opacity: 0.6;
     cursor: default;
   }
   .editor-exercicio-nome {
