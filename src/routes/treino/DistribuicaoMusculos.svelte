@@ -274,28 +274,31 @@
     chave: string;
     nome: string;
     valor: number;
+    bruto: number;
     pct: number;
     partes: Partes;
     musculo: Musculo | null;
-    subItens: { musculo: Musculo; valor: number; partes: Partes }[] | null;
+    subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes }[] | null;
   }
 
   const distribuicaoPorTreino = $derived.by(() => {
     return treinos.map((t) => {
       const totalSeries = t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
       const mapaValor = contarSeriesPorMusculoPonderado(t);
+      const mapaBruto = contarSeriesPorMusculo(t);
       const mapaFaixaPosicao = contarSeriesPorFaixaDePosicao(t);
-      const bruto = musculos
+      const itens = musculos
         .map((m) => ({
           musculo: m,
           valor: mapaValor.get(m.id) ?? 0,
+          bruto: mapaBruto.get(m.id) ?? 0,
           partes: mapaFaixaPosicao.get(m.id) ?? partesVazias(),
         }))
         .filter((item) => item.valor > 0);
 
-      const porGrupo = new Map<string, { nome: string; itens: typeof bruto }>();
-      const avulsos: typeof bruto = [];
-      for (const item of bruto) {
+      const porGrupo = new Map<string, { nome: string; itens: typeof itens }>();
+      const avulsos: typeof itens = [];
+      for (const item of itens) {
         const agrupamento = item.musculo.agrupamento;
         if (agrupamento) {
           const grupo = porGrupo.get(agrupamento.id) ?? { nome: agrupamento.nome, itens: [] };
@@ -312,6 +315,7 @@
           chave: id,
           nome: grupo.nome,
           valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
+          bruto: grupo.itens.reduce((acc, i) => acc + i.bruto, 0),
           partes: somarPartes(...grupo.itens.map((i) => i.partes)),
           musculo: null,
           subItens: grupo.itens,
@@ -322,6 +326,7 @@
           chave: item.musculo.id,
           nome: item.musculo.nome,
           valor: item.valor,
+          bruto: item.bruto,
           partes: item.partes,
           musculo: item.musculo,
           subItens: null,
@@ -914,30 +919,6 @@
     const pontos = historicoPorExercicio.get(exercicioId);
     if (!pontos) return null;
     return variacaoExercicio(pontos);
-  }
-
-  /** Setinha discreta no card: mesma lógica de tendência (variacaoExercicio), mas usando o
-   * histórico já pré-carregado (historicoPorExercicio) pra não refazer a consulta por linha. */
-  function tendenciaParaMusculos(listaTreinos: TreinoComExercicios[], musculoIds: string[]): "subindo" | "estavel" | "caindo" | null {
-    const idsSet = new Set(musculoIds);
-    const exercicioIds = new Set<string>();
-    for (const t of listaTreinos) {
-      for (const te of t.exercicios) {
-        if (te.exercicio?.musculos.some((m) => idsSet.has(m.musculo_id))) exercicioIds.add(te.exercicio_id);
-      }
-    }
-    const variacoes: number[] = [];
-    for (const id of exercicioIds) {
-      const pontos = historicoPorExercicio.get(id);
-      if (!pontos) continue;
-      const v = variacaoExercicio(pontos);
-      if (v != null) variacoes.push(v);
-    }
-    if (!variacoes.length) return null;
-    const media = variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
-    if (media > 0.02) return "subindo";
-    if (media < -0.02) return "caindo";
-    return "estavel";
   }
 
   /** Tendência do músculo = média da variação de 1RM de cada exercício que o trabalha (nessa
@@ -1631,19 +1612,28 @@
   </div>
 {/snippet}
 
+{#snippet cabecalhoCaixas()}
+  <div class="item item-cabecalho">
+    <span></span>
+    <span></span>
+    <div class="caixas-series caixas-cabecalho">
+      <span class="caixa-cabecalho-label">Total</span>
+      <span class="caixa-cabecalho-label">Pond.</span>
+      <span class="caixa-cabecalho-label">Acum.</span>
+    </div>
+  </div>
+{/snippet}
+
 {#snippet caixasSeries(bruto: number, ponderado: number, acumulado: number)}
   <div class="caixas-series">
     <div class="caixa-serie">
       <span class="caixa-serie-valor">{formatValor(bruto)}</span>
-      <span class="caixa-serie-label">Total</span>
     </div>
     <div class="caixa-serie">
       <span class="caixa-serie-valor">{formatValor(ponderado)}</span>
-      <span class="caixa-serie-label">Pond.</span>
     </div>
     <div class="caixa-serie">
       <span class="caixa-serie-valor">{formatValor(acumulado)}</span>
-      <span class="caixa-serie-label">Acum.</span>
     </div>
   </div>
 {/snippet}
@@ -1678,6 +1668,7 @@
           {#if !distribuicaoSemanal.length}
             <p class="muted">Nenhum volume planejado ainda.</p>
           {:else}
+            {@render cabecalhoCaixas()}
             <div class="lista">
               {#each (semanalOrdenadaPorEfetivo ? ordenarPorEfetivo(linhasSemanal) : linhasSemanal) as linha (linha.chave)}
                 {@const aberto = linha.subItens != null && gruposExpandidos.has(linha.chave)}
@@ -1743,12 +1734,11 @@
               {#if !lista.length}
                 <p class="muted">Nenhuma série definida ainda.</p>
               {:else}
+                {@render cabecalhoCaixas()}
                 <div class="lista">
                   {#each listaExibida as linha (linha.chave)}
                     {@const grupoChave = `${treino.id}:${linha.chave}`}
                     {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
-                    {@const musculoIds = linha.musculo ? [linha.musculo.id] : (linha.subItens ?? []).map((s) => s.musculo.id)}
-                    {@const tend = tendenciaParaMusculos([treino], musculoIds)}
                     <div class="item">
                       {#if linha.subItens}
                         <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
@@ -1759,25 +1749,14 @@
                         <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                       {/if}
                       {@render barraFadiga(linha.partes, linha.valor)}
-                      <span
-                        class="valor"
-                        class:valor-subindo={tend === "subindo"}
-                        class:valor-estavel={tend === "estavel"}
-                        class:valor-caindo={tend === "caindo"}
-                      >{formatValor(porFadiga ? valorEfetivoFadiga(linha.partes) : linha.valor)}</span>
+                      {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes))}
                     </div>
                     {#if aberto && linha.subItens}
                       {#each linha.subItens as sub (sub.musculo.id)}
-                        {@const tendSub = tendenciaParaMusculos([treino], [sub.musculo.id])}
                         <div class="item item-sub">
                           <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                           {@render barraFadiga(sub.partes, sub.valor)}
-                          <span
-                            class="valor"
-                            class:valor-subindo={tendSub === "subindo"}
-                            class:valor-estavel={tendSub === "estavel"}
-                            class:valor-caindo={tendSub === "caindo"}
-                          >{formatValor(porFadiga ? valorEfetivoFadiga(sub.partes) : sub.valor)}</span>
+                          {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes))}
                         </div>
                       {/each}
                     {/if}
@@ -2880,23 +2859,37 @@
     font-weight: 600;
     font-size: var(--font-size-sm);
   }
-  /* Distribuição Semanal mostra as 3 contagens (total/ponderada/acumulada) em vez de um número só —
-     precisa de mais espaço na 3ª coluna, então o nome do músculo encolhe pra abrir espaço. */
-  .rotina-card-semanal .item {
-    grid-template-columns: 88px 1fr 130px;
+  /* Linhas com as 3 contagens (total/ponderada/acumulada) em vez de um número só — precisa de
+     mais espaço na 3ª coluna, então o nome do músculo encolhe e a barra fica com o resto. Pega a
+     linha de cabeçalho (item-cabecalho) também, porque ela tem o mesmo .caixas-series dentro. */
+  .item:has(.caixas-series) {
+    grid-template-columns: 78px 1fr 102px;
+  }
+  .item-cabecalho {
+    margin-bottom: 2px;
   }
   .caixas-series {
     display: flex;
     gap: 3px;
   }
+  .caixas-cabecalho {
+    gap: 2px;
+  }
+  .caixa-cabecalho-label {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    font-size: 9px;
+    color: var(--surface-muted);
+    white-space: nowrap;
+  }
   .caixa-serie {
     flex: 1;
     min-width: 0;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 1px;
-    padding: 3px 2px;
+    justify-content: center;
+    padding: 4px 2px;
     border-radius: var(--radius-sm);
     background: #232a3b;
   }
@@ -2904,11 +2897,6 @@
     font-size: 11px;
     font-weight: 700;
     color: var(--surface-fg);
-    white-space: nowrap;
-  }
-  .caixa-serie-label {
-    font-size: 8px;
-    color: var(--surface-muted);
     white-space: nowrap;
   }
   .muted {
