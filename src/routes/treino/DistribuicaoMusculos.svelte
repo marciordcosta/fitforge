@@ -383,21 +383,40 @@
       .sort((a, b) => scoreFadiga(a) - scoreFadiga(b));
   }
 
-  /** Rotinas cujo card está ordenado por distribuição de séries (20/30/50, mesmo peso 1/0.7/0.4). */
-  let semanalOrdenadaPorEfetivo = $state(false);
+  type CampoOrdenacaoSeries = "total" | "ponderado" | "acumulado";
 
-  /** Ordena pelo valor "efetivo" (mesma regra 1/0.7/0.4 por faixa) em vez do bruto — usado na
-   * Distribuição Semanal, onde a faixa é por dominância (20/30/50), não por fadiga de posição. */
-  function ordenarPorEfetivo<T extends { valor: number; partes: Partes; subItens: { valor: number; partes: Partes }[] | null }>(
-    lista: T[],
-  ): T[] {
+  /** Qual coluna (Total/Pond./Acum.) está ordenando a Distribuição Semanal — clicar no título cicla entre as 3. */
+  let ordemSemanal = $state<CampoOrdenacaoSeries>("ponderado");
+
+  function proximoCampoOrdenacao(atual: CampoOrdenacaoSeries): CampoOrdenacaoSeries {
+    if (atual === "total") return "ponderado";
+    if (atual === "ponderado") return "acumulado";
+    return "total";
+  }
+
+  function valorPorCampoOrdenacao(item: { valor: number; bruto: number; partes: Partes }, campo: CampoOrdenacaoSeries): number {
+    if (campo === "total") return item.bruto;
+    if (campo === "acumulado") return valorEfetivoFadiga(item.partes);
+    return item.valor;
+  }
+
+  /** Ordena pela coluna escolhida (total bruto, ponderado ou acumulado/fadiga) — usado tanto na
+   * Distribuição Semanal quanto nos cards de cada rotina, pra manter os 2 lugares consistentes. */
+  function ordenarPorCampo<
+    T extends { valor: number; bruto: number; partes: Partes; subItens: { valor: number; bruto: number; partes: Partes }[] | null },
+  >(lista: T[], campo: CampoOrdenacaoSeries): T[] {
     return lista
       .map((item) =>
         item.subItens
-          ? { ...item, subItens: item.subItens.slice().sort((a, b) => valorEfetivoFadiga(b.partes) - valorEfetivoFadiga(a.partes)) }
+          ? {
+              ...item,
+              subItens: item.subItens
+                .slice()
+                .sort((a, b) => valorPorCampoOrdenacao(b, campo) - valorPorCampoOrdenacao(a, campo)),
+            }
           : item,
       )
-      .sort((a, b) => valorEfetivoFadiga(b.partes) - valorEfetivoFadiga(a.partes));
+      .sort((a, b) => valorPorCampoOrdenacao(b, campo) - valorPorCampoOrdenacao(a, campo));
   }
 
   const totaisSemanais = $derived.by(() => {
@@ -1488,9 +1507,9 @@
       "séries",
       coresAbcAcumulado(distribuicaoSemanal),
       itensGrupoPonderado(treinos),
-      // Acompanha a visualização do card: ordenado por fadiga/efetivo abre no modo ABC
-      // (músculo individual), padrão abre no modo Grupo.
-      !semanalOrdenadaPorEfetivo,
+      // Acompanha a visualização do card: ordenado por ponderado (padrão) abre no modo Grupo,
+      // ordenado por total ou acumulado abre no modo ABC (músculo individual).
+      ordemSemanal === "ponderado",
     );
   }
 
@@ -1612,28 +1631,28 @@
   </div>
 {/snippet}
 
-{#snippet cabecalhoCaixas()}
+{#snippet cabecalhoCaixas(ordenandoPor: CampoOrdenacaoSeries | null = null)}
   <div class="item item-cabecalho">
     <span></span>
     <span></span>
     <div class="caixas-series caixas-cabecalho">
-      <span class="caixa-cabecalho-label">Total</span>
-      <span class="caixa-cabecalho-label">Pond.</span>
-      <span class="caixa-cabecalho-label">Acum.</span>
+      <span class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "total"}>Total</span>
+      <span class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "ponderado"}>Pond.</span>
+      <span class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "acumulado"}>Acum.</span>
     </div>
   </div>
 {/snippet}
 
-{#snippet caixasSeries(bruto: number, ponderado: number, acumulado: number)}
+{#snippet caixasSeries(bruto: number, ponderado: number, acumulado: number, ordenandoPor: CampoOrdenacaoSeries | null = null)}
   <div class="caixas-series">
     <div class="caixa-serie">
-      <span class="caixa-serie-valor">{formatValor(bruto)}</span>
+      <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === "total"}>{formatValor(bruto)}</span>
     </div>
     <div class="caixa-serie">
-      <span class="caixa-serie-valor">{formatValor(ponderado)}</span>
+      <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === "ponderado"}>{formatValor(ponderado)}</span>
     </div>
     <div class="caixa-serie">
-      <span class="caixa-serie-valor">{formatValor(acumulado)}</span>
+      <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === "acumulado"}>{formatValor(acumulado)}</span>
     </div>
   </div>
 {/snippet}
@@ -1660,17 +1679,17 @@
             <h2 class="rotina-nome">
               <button
                 class="rotina-nome-btn"
-                class:ativo={semanalOrdenadaPorEfetivo}
-                onclick={() => (semanalOrdenadaPorEfetivo = !semanalOrdenadaPorEfetivo)}
+                class:ativo={ordemSemanal !== "ponderado"}
+                onclick={() => (ordemSemanal = proximoCampoOrdenacao(ordemSemanal))}
               >Distribuição Semanal</button>
             </h2>
           </div>
           {#if !distribuicaoSemanal.length}
             <p class="muted">Nenhum volume planejado ainda.</p>
           {:else}
-            {@render cabecalhoCaixas()}
+            {@render cabecalhoCaixas(ordemSemanal)}
             <div class="lista">
-              {#each (semanalOrdenadaPorEfetivo ? ordenarPorEfetivo(linhasSemanal) : linhasSemanal) as linha (linha.chave)}
+              {#each ordenarPorCampo(linhasSemanal, ordemSemanal) as linha (linha.chave)}
                 {@const aberto = linha.subItens != null && gruposExpandidos.has(linha.chave)}
                 <div class="item">
                   {#if linha.subItens}
@@ -1682,14 +1701,14 @@
                     <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(linha.musculo)}>{linha.nome}</button>
                   {/if}
                   {@render barraFadiga(linha.partes, linha.partes.a + linha.partes.b + linha.partes.c)}
-                  {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes))}
+                  {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes), ordemSemanal)}
                 </div>
                 {#if aberto && linha.subItens}
                   {#each linha.subItens as sub (sub.musculo.id)}
                     <div class="item item-sub">
                       <button class="nome-btn" onclick={() => abrirExercicios(sub.musculo)}>{sub.musculo.nome}</button>
                       {@render barraFadiga(sub.partes, sub.partes.a + sub.partes.b + sub.partes.c)}
-                      {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes))}
+                      {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes), ordemSemanal)}
                     </div>
                   {/each}
                 {/if}
@@ -2883,6 +2902,10 @@
     color: var(--surface-muted);
     white-space: nowrap;
   }
+  .caixa-cabecalho-label.cabecalho-ativo {
+    color: var(--color-primary);
+    font-weight: 700;
+  }
   .caixa-serie {
     flex: 1;
     min-width: 0;
@@ -2898,6 +2921,9 @@
     font-weight: 700;
     color: var(--surface-fg);
     white-space: nowrap;
+  }
+  .caixa-serie-valor.caixa-serie-ativa {
+    color: var(--color-primary);
   }
   .muted {
     color: var(--surface-muted);
