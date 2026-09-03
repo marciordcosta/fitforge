@@ -538,7 +538,11 @@
 
   const distribuicaoSemanal = $derived.by(() => {
     const mapa = new Map<string, number>();
+    const mapaBruto = new Map<string, number>();
     for (const t of treinos) {
+      for (const [id, v] of contarSeriesPorMusculo(t)) {
+        mapaBruto.set(id, (mapaBruto.get(id) ?? 0) + v);
+      }
       for (const ex of t.exercicios) {
         const numSeries = ex.series.length;
         if (!numSeries) continue;
@@ -551,8 +555,9 @@
     return musculos
       .map((m) => {
         const valor = Math.round(mapa.get(m.id) ?? 0);
+        const bruto = Math.round(mapaBruto.get(m.id) ?? 0);
         const partes = partesPorMusculo.get(m.id) ?? partesVazias();
-        return { musculo: m, valor, partes };
+        return { musculo: m, valor, bruto, partes };
       })
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
@@ -562,11 +567,12 @@
     chave: string;
     nome: string;
     valor: number;
+    bruto: number;
     partes: Partes;
     /** Preenchido só quando a linha é um músculo avulso (sem agrupamento) — usado pra abrir os exercícios dele. */
     musculo: Musculo | null;
     /** null = músculo avulso; senão, os músculos que compõem o total do grupo. */
-    subItens: { musculo: Musculo; valor: number; partes: Partes }[] | null;
+    subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes }[] | null;
   }
 
   let gruposExpandidos = $state<Set<string>>(new Set());
@@ -601,9 +607,10 @@
         chave: id,
         nome: grupo.nome,
         valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
+        bruto: grupo.itens.reduce((acc, i) => acc + i.bruto, 0),
         partes: somarPartes(...grupo.itens.map((i) => i.partes)),
         musculo: null,
-        subItens: grupo.itens.map((i) => ({ musculo: i.musculo, valor: i.valor, partes: i.partes })),
+        subItens: grupo.itens.map((i) => ({ musculo: i.musculo, valor: i.valor, bruto: i.bruto, partes: i.partes })),
       });
     }
     for (const item of avulsos) {
@@ -611,6 +618,7 @@
         chave: item.musculo.id,
         nome: item.musculo.nome,
         valor: item.valor,
+        bruto: item.bruto,
         partes: item.partes,
         musculo: item.musculo,
         subItens: null,
@@ -1623,6 +1631,22 @@
   </div>
 {/snippet}
 
+{#snippet caixasSeries(bruto: number, ponderado: number, acumulado: number)}
+  <div class="caixas-series">
+    <div class="caixa-serie">
+      <span class="caixa-serie-valor">{formatValor(bruto)}</span>
+      <span class="caixa-serie-label">Total</span>
+    </div>
+    <div class="caixa-serie">
+      <span class="caixa-serie-valor">{formatValor(ponderado)}</span>
+      <span class="caixa-serie-label">Pond.</span>
+    </div>
+    <div class="caixa-serie">
+      <span class="caixa-serie-valor">{formatValor(acumulado)}</span>
+      <span class="caixa-serie-label">Acum.</span>
+    </div>
+  </div>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -1657,8 +1681,6 @@
             <div class="lista">
               {#each (semanalOrdenadaPorEfetivo ? ordenarPorEfetivo(linhasSemanal) : linhasSemanal) as linha (linha.chave)}
                 {@const aberto = linha.subItens != null && gruposExpandidos.has(linha.chave)}
-                {@const musculoIds = linha.musculo ? [linha.musculo.id] : (linha.subItens ?? []).map((s) => s.musculo.id)}
-                {@const tend = tendenciaParaMusculos(treinos, musculoIds)}
                 <div class="item">
                   {#if linha.subItens}
                     <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(linha.chave)}>
@@ -1669,25 +1691,14 @@
                     <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(linha.musculo)}>{linha.nome}</button>
                   {/if}
                   {@render barraFadiga(linha.partes, linha.partes.a + linha.partes.b + linha.partes.c)}
-                  <span
-                    class="valor"
-                    class:valor-subindo={tend === "subindo"}
-                    class:valor-estavel={tend === "estavel"}
-                    class:valor-caindo={tend === "caindo"}
-                  >{formatValor(semanalOrdenadaPorEfetivo ? valorEfetivoFadiga(linha.partes) : linha.valor)}</span>
+                  {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes))}
                 </div>
                 {#if aberto && linha.subItens}
                   {#each linha.subItens as sub (sub.musculo.id)}
-                    {@const tendSub = tendenciaParaMusculos(treinos, [sub.musculo.id])}
                     <div class="item item-sub">
                       <button class="nome-btn" onclick={() => abrirExercicios(sub.musculo)}>{sub.musculo.nome}</button>
                       {@render barraFadiga(sub.partes, sub.partes.a + sub.partes.b + sub.partes.c)}
-                      <span
-                        class="valor"
-                        class:valor-subindo={tendSub === "subindo"}
-                        class:valor-estavel={tendSub === "estavel"}
-                        class:valor-caindo={tendSub === "caindo"}
-                      >{formatValor(semanalOrdenadaPorEfetivo ? valorEfetivoFadiga(sub.partes) : sub.valor)}</span>
+                      {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes))}
                     </div>
                   {/each}
                 {/if}
@@ -2868,6 +2879,37 @@
     text-align: right;
     font-weight: 600;
     font-size: var(--font-size-sm);
+  }
+  /* Distribuição Semanal mostra as 3 contagens (total/ponderada/acumulada) em vez de um número só —
+     precisa de mais espaço na 3ª coluna, então o nome do músculo encolhe pra abrir espaço. */
+  .rotina-card-semanal .item {
+    grid-template-columns: 88px 1fr 130px;
+  }
+  .caixas-series {
+    display: flex;
+    gap: 3px;
+  }
+  .caixa-serie {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 3px 2px;
+    border-radius: var(--radius-sm);
+    background: #232a3b;
+  }
+  .caixa-serie-valor {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--surface-fg);
+    white-space: nowrap;
+  }
+  .caixa-serie-label {
+    font-size: 8px;
+    color: var(--surface-muted);
+    white-space: nowrap;
   }
   .muted {
     color: var(--surface-muted);
