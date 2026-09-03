@@ -342,14 +342,15 @@
     });
   });
 
-  /** Rotinas cujo card está ordenado por fadiga (clicou no nome) em vez de quantidade de séries. */
-  let treinosOrdenadosPorFadiga = $state<Set<string>>(new Set());
+  /** Qual coluna (Total/Pond./Acum.) está ordenando o card de cada rotina — mesmo ciclo de 3
+   * estados da Distribuição Semanal. Ausência no mapa = padrão ("ponderado"). */
+  let ordemPorTreino = $state<Map<string, CampoOrdenacaoSeries>>(new Map());
 
-  function alternarOrdemFadiga(treinoId: string): void {
-    const copia = new Set(treinosOrdenadosPorFadiga);
-    if (copia.has(treinoId)) copia.delete(treinoId);
-    else copia.add(treinoId);
-    treinosOrdenadosPorFadiga = copia;
+  function alternarOrdemTreino(treinoId: string): void {
+    const atual = ordemPorTreino.get(treinoId) ?? "ponderado";
+    const copia = new Map(ordemPorTreino);
+    copia.set(treinoId, proximoCampoOrdenacao(atual));
+    ordemPorTreino = copia;
   }
 
   /** Cards de rotina começam ocultos (só o cabeçalho) — tocar no cabeçalho expande/recolhe. */
@@ -362,25 +363,11 @@
     treinosExpandidos = copia;
   }
 
-  /** Média ponderada da faixa de fadiga (A=0, B=1, C=2) das séries do músculo — quanto menor,
-   * mais séries dele caíram no início do treino (menos fadiga acumulada, melhor estímulo). */
-  function scoreFadiga(linha: { valor: number; partes: Partes }): number {
-    return linha.valor > 0 ? (linha.partes.b + linha.partes.c * 2) / linha.valor : 0;
-  }
-
   /** Número de séries "efetivo" no modo por fadiga: desconta pela faixa em que cada série caiu
    * (A = fresco, conta cheio; B = meio, 70%; C = mais fatigado, 40%) — uma forma de aproximar
    * quanto do volume bruto realmente equivale a estímulo de qualidade. */
   function valorEfetivoFadiga(partes: Partes): number {
     return partes.a * 1 + partes.b * 0.7 + partes.c * 0.4;
-  }
-
-  function ordenarPorMelhorEstimulo<T extends { valor: number; partes: Partes; subItens: { valor: number; partes: Partes }[] | null }>(
-    lista: T[],
-  ): T[] {
-    return lista
-      .map((item) => (item.subItens ? { ...item, subItens: item.subItens.slice().sort((a, b) => scoreFadiga(a) - scoreFadiga(b)) } : item))
-      .sort((a, b) => scoreFadiga(a) - scoreFadiga(b));
   }
 
   type CampoOrdenacaoSeries = "total" | "ponderado" | "acumulado";
@@ -1595,9 +1582,9 @@
       "séries",
       coresAbcAcumulado(itens),
       itensGrupoPonderado([treino]),
-      // Acompanha a visualização do card: ordenado por fadiga abre no modo ABC (músculo
-      // individual), padrão abre no modo Grupo.
-      !treinosOrdenadosPorFadiga.has(treino.id),
+      // Acompanha a visualização do card: ordenado por ponderado (padrão) abre no modo Grupo,
+      // ordenado por total ou acumulado abre no modo ABC (músculo individual).
+      (ordemPorTreino.get(treino.id) ?? "ponderado") === "ponderado",
     );
   }
 </script>
@@ -1676,13 +1663,7 @@
       <div class="lista-rotinas">
         <div class="rotina-card rotina-card-semanal">
           <div class="rotina-cabecalho">
-            <h2 class="rotina-nome">
-              <button
-                class="rotina-nome-btn"
-                class:ativo={ordemSemanal !== "ponderado"}
-                onclick={() => (ordemSemanal = proximoCampoOrdenacao(ordemSemanal))}
-              >Distribuição Semanal</button>
-            </h2>
+            <h2 class="rotina-nome">Distribuição Semanal</h2>
           </div>
           {#if !distribuicaoSemanal.length}
             <p class="muted">Nenhum volume planejado ainda.</p>
@@ -1718,6 +1699,12 @@
               <button class="rotina-totais-texto" onclick={() => abrirGradeSemanal(null)}>
                 {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
               </button>
+              <button
+                class="ordenar-fadiga-btn"
+                class:ativo={ordemSemanal !== "ponderado"}
+                onclick={() => (ordemSemanal = proximoCampoOrdenacao(ordemSemanal))}
+                aria-label="Ordenar por Total/Ponderada/Acumulada"
+              >{@render iconOrdenarFadiga()}</button>
               <button class="rotina-grafico-btn" onclick={() => abrirGraficoSemanal()} aria-label="Ver anel por dominância">
                 {@render iconGrafico()}
               </button>
@@ -1726,8 +1713,8 @@
         </div>
 
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
-          {@const porFadiga = treinosOrdenadosPorFadiga.has(treino.id)}
-          {@const listaExibida = porFadiga ? ordenarPorMelhorEstimulo(lista) : lista}
+          {@const ordemTreino = ordemPorTreino.get(treino.id) ?? "ponderado"}
+          {@const listaExibida = ordenarPorCampo(lista, ordemTreino)}
           {@const expandido = treinosExpandidos.has(treino.id)}
           <div class="rotina-card">
             <div
@@ -1753,7 +1740,7 @@
               {#if !lista.length}
                 <p class="muted">Nenhuma série definida ainda.</p>
               {:else}
-                {@render cabecalhoCaixas()}
+                {@render cabecalhoCaixas(ordemTreino)}
                 <div class="lista">
                   {#each listaExibida as linha (linha.chave)}
                     {@const grupoChave = `${treino.id}:${linha.chave}`}
@@ -1768,14 +1755,14 @@
                         <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                       {/if}
                       {@render barraFadiga(linha.partes, linha.valor)}
-                      {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes))}
+                      {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes), ordemTreino)}
                     </div>
                     {#if aberto && linha.subItens}
                       {#each linha.subItens as sub (sub.musculo.id)}
                         <div class="item item-sub">
                           <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                           {@render barraFadiga(sub.partes, sub.valor)}
-                          {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes))}
+                          {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes), ordemTreino)}
                         </div>
                       {/each}
                     {/if}
@@ -1791,9 +1778,9 @@
                 </button>
                 <button
                   class="ordenar-fadiga-btn"
-                  class:ativo={porFadiga}
-                  onclick={() => alternarOrdemFadiga(treino.id)}
-                  aria-label="Ordenar por fadiga"
+                  class:ativo={ordemTreino !== "ponderado"}
+                  onclick={() => alternarOrdemTreino(treino.id)}
+                  aria-label="Ordenar por Total/Ponderada/Acumulada"
                 >{@render iconOrdenarFadiga()}</button>
                 <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino)} aria-label="Ver anel por dominância">
                   {@render iconGrafico()}
@@ -2706,22 +2693,6 @@
   .rotina-nome {
     font-size: var(--font-size-base);
     margin: 0;
-  }
-  .rotina-nome-btn {
-    width: 100%;
-    text-align: left;
-    background: none;
-    border: none;
-    padding: 0;
-    margin: 0;
-    font-family: inherit;
-    font-size: inherit;
-    font-weight: inherit;
-    color: inherit;
-    cursor: pointer;
-  }
-  .rotina-nome-btn.ativo {
-    color: var(--color-primary);
   }
   .dia-tag {
     font-size: 11px;
