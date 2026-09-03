@@ -3,6 +3,7 @@
 
   let { consumido, meta }: { consumido: number; meta: number } = $props();
 
+  const passouMeta = $derived(consumido > meta);
   const restantes = $derived(Math.max(0, meta - consumido));
   const largura = $derived(Math.min(100, meta > 0 ? (consumido / meta) * 100 : 0));
 </script>
@@ -11,7 +12,13 @@
   <p class="card-titulo">Calorias</p>
   <div class="calorias-linha">
     <span class="calorias-valor"><strong>{consumido.toFixed(0)}</strong> cal <span class="calorias-meta">/ {meta.toFixed(0)}</span></span>
-    <span class="calorias-restantes"><strong>{restantes.toFixed(0)}</strong> restantes</span>
+    <span class="calorias-restantes">
+      {#if passouMeta}
+        <strong>{(consumido - meta).toFixed(0)}</strong> acima
+      {:else}
+        <strong>{restantes.toFixed(0)}</strong> restantes
+      {/if}
+    </span>
   </div>
   <div class="barra-wrap-grande">
     <div class="barra-grande" style={`width:${largura}%; background:var(--color-secondary);`}></div>

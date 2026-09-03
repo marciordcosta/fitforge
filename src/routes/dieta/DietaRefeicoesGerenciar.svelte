@@ -772,6 +772,11 @@
     return Math.max(0, meta - valor);
   }
 
+  /** Quando o consumido passa da meta, o texto vira "X acima" em vez de ficar travado em "0 restantes". */
+  function passouMeta(valor: number, meta: number): boolean {
+    return valor > meta;
+  }
+
   let modoRestanteRefeicoes = $state(false);
 
   async function carregar() {
@@ -1337,7 +1342,13 @@
           <p class="card-titulo">Calorias</p>
           <div class="calorias-linha">
             <span class="calorias-valor"><strong>{somaGrupo.calorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metaGrupo.calorias.toFixed(0)}</span></span>
-            <span class="calorias-restantes"><strong>{restante(somaGrupo.calorias, metaGrupo.calorias).toFixed(0)}</strong> restantes</span>
+            <span class="calorias-restantes">
+              {#if passouMeta(somaGrupo.calorias, metaGrupo.calorias)}
+                <strong>{(somaGrupo.calorias - metaGrupo.calorias).toFixed(0)}</strong> acima
+              {:else}
+                <strong>{restante(somaGrupo.calorias, metaGrupo.calorias).toFixed(0)}</strong> restantes
+              {/if}
+            </span>
           </div>
           <div class="barra-wrap-grande">
             <div class="barra-grande" style={`width:${larguraBarra(pctMeta(somaGrupo.calorias, metaGrupo.calorias))}%; background:var(--color-secondary);`}></div>
@@ -1357,7 +1368,9 @@
             <div class="macro-col">
               <p class="macro-nome">Carb</p>
               <p class="macro-valor">
-                {#if modoRestanteRefeicoes}
+                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG)}
+                  <strong>{(somaGrupo.carboidratoG - metaGrupo.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
                   <strong>{restante(somaGrupo.carboidratoG, metaGrupo.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
                 {:else}
                   <strong>{somaGrupo.carboidratoG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGrupo.carboidratoG.toFixed(0)}</span>
@@ -1370,7 +1383,9 @@
             <div class="macro-col">
               <p class="macro-nome">Gorduras</p>
               <p class="macro-valor">
-                {#if modoRestanteRefeicoes}
+                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.gorduraG, metaGrupo.gorduraG)}
+                  <strong>{(somaGrupo.gorduraG - metaGrupo.gorduraG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
                   <strong>{restante(somaGrupo.gorduraG, metaGrupo.gorduraG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
                 {:else}
                   <strong>{somaGrupo.gorduraG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGrupo.gorduraG.toFixed(0)}</span>
@@ -1383,7 +1398,9 @@
             <div class="macro-col">
               <p class="macro-nome">Proteínas</p>
               <p class="macro-valor">
-                {#if modoRestanteRefeicoes}
+                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.proteinaG, metaGrupo.proteinaG)}
+                  <strong>{(somaGrupo.proteinaG - metaGrupo.proteinaG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
                   <strong>{restante(somaGrupo.proteinaG, metaGrupo.proteinaG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
                 {:else}
                   <strong>{somaGrupo.proteinaG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGrupo.proteinaG.toFixed(0)}</span>
@@ -1396,7 +1413,9 @@
             <div class="macro-col">
               <p class="macro-nome">G. satur</p>
               <p class="macro-valor">
-                {#if modoRestanteRefeicoes}
+                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo)}
+                  <strong>{(somaGrupo.gorduraSaturadaG - gorduraSaturadaMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
                   <strong>{restante(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
                 {:else}
                   <strong>{somaGrupo.gorduraSaturadaG.toFixed(0)} g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxGrupo.toFixed(0)}</span>
@@ -1409,7 +1428,9 @@
             <div class="macro-col">
               <p class="macro-nome">Fibras</p>
               <p class="macro-valor">
-                {#if modoRestanteRefeicoes}
+                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.fibraG, fibrasMaxGrupo)}
+                  <strong>{(somaGrupo.fibraG - fibrasMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
                   <strong>{restante(somaGrupo.fibraG, fibrasMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
                 {:else}
                   <strong>{somaGrupo.fibraG.toFixed(0)} g</strong> <span class="macro-meta">/ {fibrasMaxGrupo.toFixed(0)}</span>
@@ -1465,7 +1486,13 @@
         <p class="card-titulo">Calorias</p>
         <div class="calorias-linha">
           <span class="calorias-valor"><strong>{somaGlobal.calorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metaGlobal.calorias.toFixed(0)}</span></span>
-          <span class="calorias-restantes"><strong>{restante(somaGlobal.calorias, metaGlobal.calorias).toFixed(0)}</strong> restantes</span>
+          <span class="calorias-restantes">
+            {#if passouMeta(somaGlobal.calorias, metaGlobal.calorias)}
+              <strong>{(somaGlobal.calorias - metaGlobal.calorias).toFixed(0)}</strong> acima
+            {:else}
+              <strong>{restante(somaGlobal.calorias, metaGlobal.calorias).toFixed(0)}</strong> restantes
+            {/if}
+          </span>
         </div>
         <div class="barra-wrap-grande">
           <div class="barra-grande" style={`width:${larguraBarra(pctMeta(somaGlobal.calorias, metaGlobal.calorias))}%; background:var(--color-secondary);`}></div>
@@ -1485,7 +1512,9 @@
           <div class="macro-col">
             <p class="macro-nome">Carb</p>
             <p class="macro-valor">
-              {#if modoRestanteRefeicoes}
+              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG)}
+                <strong>{(somaGlobal.carboidratoG - metaGlobal.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+              {:else if modoRestanteRefeicoes}
                 <strong>{restante(somaGlobal.carboidratoG, metaGlobal.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
               {:else}
                 <strong>{somaGlobal.carboidratoG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGlobal.carboidratoG.toFixed(0)}</span>
@@ -1498,7 +1527,9 @@
           <div class="macro-col">
             <p class="macro-nome">Gorduras</p>
             <p class="macro-valor">
-              {#if modoRestanteRefeicoes}
+              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.gorduraG, metaGlobal.gorduraG)}
+                <strong>{(somaGlobal.gorduraG - metaGlobal.gorduraG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+              {:else if modoRestanteRefeicoes}
                 <strong>{restante(somaGlobal.gorduraG, metaGlobal.gorduraG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
               {:else}
                 <strong>{somaGlobal.gorduraG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGlobal.gorduraG.toFixed(0)}</span>
@@ -1511,7 +1542,9 @@
           <div class="macro-col">
             <p class="macro-nome">Proteínas</p>
             <p class="macro-valor">
-              {#if modoRestanteRefeicoes}
+              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.proteinaG, metaGlobal.proteinaG)}
+                <strong>{(somaGlobal.proteinaG - metaGlobal.proteinaG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+              {:else if modoRestanteRefeicoes}
                 <strong>{restante(somaGlobal.proteinaG, metaGlobal.proteinaG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
               {:else}
                 <strong>{somaGlobal.proteinaG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGlobal.proteinaG.toFixed(0)}</span>
@@ -1524,7 +1557,9 @@
           <div class="macro-col">
             <p class="macro-nome">G. satur</p>
             <p class="macro-valor">
-              {#if modoRestanteRefeicoes}
+              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG)}
+                <strong>{(somaGlobal.gorduraSaturadaG - gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+              {:else if modoRestanteRefeicoes}
                 <strong>{restante(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
               {:else}
                 <strong>{somaGlobal.gorduraSaturadaG.toFixed(0)} g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
@@ -1537,7 +1572,9 @@
           <div class="macro-col">
             <p class="macro-nome">Fibras</p>
             <p class="macro-valor">
-              {#if modoRestanteRefeicoes}
+              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.fibraG, fibrasMaxG)}
+                <strong>{(somaGlobal.fibraG - fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
+              {:else if modoRestanteRefeicoes}
                 <strong>{restante(somaGlobal.fibraG, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
               {:else}
                 <strong>{somaGlobal.fibraG.toFixed(0)} g</strong> <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>

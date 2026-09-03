@@ -154,6 +154,11 @@
     return Math.max(0, meta - valor);
   }
 
+  /** Quando o feito passa do planejado, o texto vira "X acima" em vez de ficar travado em "0 restantes". */
+  function passouMeta(valor: number, meta: number): boolean {
+    return valor > meta;
+  }
+
   function pctMeta(valor: number, meta: number): number {
     return meta > 0 ? (valor / meta) * 100 : 0;
   }
@@ -211,7 +216,13 @@
       <p class="card-titulo">Séries</p>
       <div class="series-linha">
         <span class="series-valor"><strong>{executado}</strong> <span class="series-meta">/ {programado}</span></span>
-        <span class="series-restantes"><strong>{restante(executado, programado)}</strong> restantes</span>
+        <span class="series-restantes">
+          {#if passouMeta(executado, programado)}
+            <strong>{executado - programado}</strong> acima
+          {:else}
+            <strong>{restante(executado, programado)}</strong> restantes
+          {/if}
+        </span>
       </div>
       <div class="barra-wrap-grande">
         <div class="barra-grande" style={`width:${larguraBarra(pctMeta(executado, programado))}%; background:var(--color-secondary);`}></div>
@@ -235,7 +246,10 @@
                 style={`background: conic-gradient(var(--color-primary) 0% ${larguraBarra(pctMeta(item.feito, item.planejado))}%, var(--surface-border) ${larguraBarra(pctMeta(item.feito, item.planejado))}% 100%);`}
               >
                 <div class="musculo-anel-centro">
-                  {#if modoRestante}
+                  {#if modoRestante && passouMeta(item.feito, item.planejado)}
+                    <strong>{pctMeta(item.feito, item.planejado).toFixed(0)}%</strong>
+                    <span class="musculo-meta">{(item.feito - item.planejado).toFixed(0)} acima</span>
+                  {:else if modoRestante}
                     <strong>{pctMeta(item.feito, item.planejado).toFixed(0)}%</strong>
                     <span class="musculo-meta">{restante(item.feito, item.planejado).toFixed(0)} rest.</span>
                   {:else}

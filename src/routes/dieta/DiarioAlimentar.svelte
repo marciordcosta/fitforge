@@ -159,6 +159,11 @@
     return Math.max(0, meta - valor);
   }
 
+  /** Quando o consumido passa da meta, o texto vira "X acima" em vez de ficar travado em "0 restantes". */
+  function passouMeta(valor: number, meta: number): boolean {
+    return valor > meta;
+  }
+
   function alternarModoRefeicao(refeicaoId: string) {
     const novo = new Set(modoDiarioPorId);
     if (novo.has(refeicaoId)) novo.delete(refeicaoId);
@@ -294,7 +299,13 @@
         <p class="card-titulo">Calorias</p>
         <div class="calorias-linha">
           <span class="calorias-valor"><strong>{totalCalorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
-          <span class="calorias-restantes"><strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes</span>
+          <span class="calorias-restantes">
+            {#if passouMeta(totalCalorias, metas.calorias)}
+              <strong>{(totalCalorias - metas.calorias).toFixed(0)}</strong> acima
+            {:else}
+              <strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes
+            {/if}
+          </span>
         </div>
         <div class="barra-wrap-grande">
           <div class="barra-grande" style={`width:${larguraBarra(pctMeta(totalCalorias, metas.calorias))}%; background:var(--color-secondary);`}></div>
@@ -310,7 +321,10 @@
             <p class="macro-nome">Carb</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante}
+                {#if modoRestante && passouMeta(totalCarboidrato, metas.carboidratoG)}
+                  <strong>{(totalCarboidrato - metas.carboidratoG).toFixed(0)}g</strong>
+                  <span class="macro-meta">acima</span>
+                {:else if modoRestante}
                   <strong>{restante(totalCarboidrato, metas.carboidratoG).toFixed(0)}g</strong>
                   <span class="macro-meta">rest.</span>
                 {:else}
@@ -324,7 +338,10 @@
             <p class="macro-nome">Gorduras</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante}
+                {#if modoRestante && passouMeta(totalGordura, metas.gorduraG)}
+                  <strong>{(totalGordura - metas.gorduraG).toFixed(0)}g</strong>
+                  <span class="macro-meta">acima</span>
+                {:else if modoRestante}
                   <strong>{restante(totalGordura, metas.gorduraG).toFixed(0)}g</strong>
                   <span class="macro-meta">rest.</span>
                 {:else}
@@ -338,7 +355,10 @@
             <p class="macro-nome">Proteínas</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante}
+                {#if modoRestante && passouMeta(totalProteina, metas.proteinaG)}
+                  <strong>{(totalProteina - metas.proteinaG).toFixed(0)}g</strong>
+                  <span class="macro-meta">acima</span>
+                {:else if modoRestante}
                   <strong>{restante(totalProteina, metas.proteinaG).toFixed(0)}g</strong>
                   <span class="macro-meta">rest.</span>
                 {:else}
@@ -352,7 +372,10 @@
             <p class="macro-nome">Gordura Sat.</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante}
+                {#if modoRestante && passouMeta(totalGorduraSaturada, gorduraSaturadaMaxG)}
+                  <strong>{(totalGorduraSaturada - gorduraSaturadaMaxG).toFixed(0)}g</strong>
+                  <span class="macro-meta">acima</span>
+                {:else if modoRestante}
                   <strong>{restante(totalGorduraSaturada, gorduraSaturadaMaxG).toFixed(0)}g</strong>
                   <span class="macro-meta">rest.</span>
                 {:else}
@@ -366,7 +389,10 @@
             <p class="macro-nome">Fibras</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante}
+                {#if modoRestante && passouMeta(totalFibras, fibrasMaxG)}
+                  <strong>{(totalFibras - fibrasMaxG).toFixed(0)}g</strong>
+                  <span class="macro-meta">acima</span>
+                {:else if modoRestante}
                   <strong>{restante(totalFibras, fibrasMaxG).toFixed(0)}g</strong>
                   <span class="macro-meta">rest.</span>
                 {:else}
