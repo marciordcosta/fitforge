@@ -2599,9 +2599,20 @@
             0,
           )} séries
         </span>
-        <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
-          {@render iconGrafico()}
-        </button>
+        <div class="editor-totais-acoes">
+          <button
+            class="ordenar-fadiga-btn"
+            class:ativo={modoReordenarEditor}
+            onclick={() => {
+              editorFiltroMusculoId = null;
+              modoReordenarEditor = !modoReordenarEditor;
+            }}
+            aria-label="Reordenar exercícios"
+          >{@render iconOrdenarFadiga()}</button>
+          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
+            {@render iconGrafico()}
+          </button>
+        </div>
       </div>
       <div class="editor-botoes-fixos">
         <button class="adicionar-exercicio-editor-btn" onclick={() => (mostrarPickerEditor = true)}>+ Adicionar Exercício</button>
@@ -3663,6 +3674,12 @@
     margin-top: var(--space-3);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .editor-totais-acoes {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
   .rotina-rodape {
     display: flex;
