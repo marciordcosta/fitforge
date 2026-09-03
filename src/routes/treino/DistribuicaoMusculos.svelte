@@ -1716,10 +1716,25 @@
   </div>
 {/snippet}
 
-{#snippet caixasSeries(bruto: number, ponderado: number, acumulado: number, ordenandoPor: CampoOrdenacaoSeries | null = null)}
+{#snippet caixasSeries(
+  bruto: number,
+  ponderado: number,
+  acumulado: number,
+  ordenandoPor: CampoOrdenacaoSeries | null = null,
+  /** Só usado no editor de rotina: a meta manual (bruta, não ponderada) vai junto do total —
+   * "atual/meta" no lugar do total sozinho — em vez de uma linha à parte embaixo do nome. */
+  totalTexto: string | null = null,
+  totalClasse: "valor-subindo" | "valor-estavel" | "valor-caindo" | null = null,
+)}
   <div class="caixas-series">
     <div class="caixa-serie">
-      <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === "total"}>{formatValor(bruto)}</span>
+      <span
+        class="caixa-serie-valor"
+        class:caixa-serie-ativa={ordenandoPor === "total"}
+        class:valor-subindo={totalClasse === "valor-subindo"}
+        class:valor-estavel={totalClasse === "valor-estavel"}
+        class:valor-caindo={totalClasse === "valor-caindo"}
+      >{totalTexto ?? formatValor(bruto)}</span>
     </div>
     <div class="caixa-serie">
       <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === "ponderado"}>{formatValor(ponderado)}</span>
@@ -2554,6 +2569,9 @@
         {@render cabecalhoCaixas("ponderado")}
         <div class="editor-musculos-lista">
           {#each metasEditor as item (item.musculo.id)}
+            {@const totalTexto = item.meta != null ? `${item.atual}/${item.meta}` : null}
+            {@const totalClasse =
+              item.meta == null ? null : item.atual > item.meta ? "valor-caindo" : item.atual === item.meta ? "valor-subindo" : "valor-estavel"}
             <button
               type="button"
               class="item editor-musculo-linha"
@@ -2567,18 +2585,9 @@
                   <span class="editor-meta-badge" class:badge-mais={item.impactoPct > 0} class:badge-menos={item.impactoPct < 0}
                   >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
                 {/if}
-                {#if item.meta != null}
-                  {@const meta = item.meta}
-                  <span
-                    class="editor-musculo-meta"
-                    class:valor-caindo={item.atual > meta}
-                    class:valor-subindo={item.atual === meta}
-                    class:valor-estavel={item.atual < meta}
-                  >meta {item.atual}/{meta}</span>
-                {/if}
               </span>
               {@render barraFadiga(item.partes, item.partes.a + item.partes.b + item.partes.c)}
-              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, "ponderado")}
+              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, "ponderado", totalTexto, totalClasse)}
             </button>
           {/each}
         </div>
@@ -3607,10 +3616,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .editor-musculo-meta {
-    font-size: 10px;
-    font-weight: 600;
   }
   /* Balãozinho no canto, mesmo estilo do "x" nos cards de dia da tela de Dieta
      (DietaRefeicoesGerenciar.svelte .dia-card-x) — só que em pílula (o texto "+17%" não cabe
