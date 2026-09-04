@@ -2610,13 +2610,19 @@
                 <span class="editor-exercicio-nome-col">
                   <span class="editor-exercicio-nome" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
                   {#if textoTendencia(tendEx)}
-                    <span class="editor-tendencia-texto">{textoTendencia(tendEx)}</span>
+                    <span
+                      class="editor-tendencia-texto"
+                      class:valor-subindo={tendEx === "subindo"}
+                      class:valor-estavel={tendEx === "estavel"}
+                      class:valor-caindo={tendEx === "caindo"}
+                    >{textoTendencia(tendEx)}</span>
                   {/if}
                 </span>
                 <span class="editor-exercicio-series-col">
                   <span class="editor-serie-numero">{numeroExibidoSeries}</span>
                   <span class="editor-serie-label">{numeroExibidoSeries === 1 ? "série" : "séries"}</span>
                 </span>
+                <span class="editor-exercicio-posicao">{idx + 1}º</span>
               </button>
               {#if modoReordenarEditor}
                 <button
@@ -2654,7 +2660,12 @@
                     >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
                   {/if}
                   {#if textoTendencia(tendMusculo)}
-                    <span class="editor-tendencia-texto">{textoTendencia(tendMusculo)}</span>
+                    <span
+                      class="editor-tendencia-texto"
+                      class:valor-subindo={tendMusculo === "subindo"}
+                      class:valor-estavel={tendMusculo === "estavel"}
+                      class:valor-caindo={tendMusculo === "caindo"}
+                    >{textoTendencia(tendMusculo)}</span>
                   {/if}
                 </span>
               </button>
@@ -3630,6 +3641,23 @@
     flex-shrink: 0;
     font-size: 9px;
     line-height: 1;
+  }
+  /* Compound de propósito (mesma pegadinha de cascata de sempre): garante que a cor de
+     tendência vence independente de onde .valor-subindo/-estavel/-caindo caírem no arquivo. */
+  .editor-tendencia-texto.valor-subindo {
+    color: var(--color-success);
+  }
+  .editor-tendencia-texto.valor-estavel {
+    color: var(--color-neutral);
+  }
+  .editor-tendencia-texto.valor-caindo {
+    color: var(--color-negative);
+  }
+  .editor-exercicio-posicao {
+    position: absolute;
+    right: 8px;
+    bottom: 6px;
+    font-size: 9px;
     color: var(--surface-muted);
   }
   .handle-arraste-card {
