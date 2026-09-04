@@ -1,3 +1,10 @@
+<script module lang="ts">
+  /** Lembra o que estava digitado na busca entre navegar pro detalhe de um exercício e voltar —
+   * só pra essa tela (rota /treino/exercicios), não pro modo de seleção (picker por cima de outra
+   * tela), que já tem seu próprio buscaInicial vindo de fora. */
+  let ultimaBuscaExercicios = "";
+</script>
+
 <script lang="ts">
   import { untrack } from "svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
@@ -34,7 +41,11 @@
   let mostrarCriarMenu = $state(false);
   let selecionandoId = $state<string | null>(null);
 
-  let busca = $state(untrack(() => buscaInicial));
+  let busca = $state(untrack(() => (modoSelecao ? buscaInicial : ultimaBuscaExercicios)));
+
+  $effect(() => {
+    if (!modoSelecao) ultimaBuscaExercicios = busca;
+  });
 
   /** Primeira rotina (na ordem de exibição das rotinas) que usa cada exercício. */
   let rotinaPorExercicio = $state<Map<string, { id: string; nome: string }>>(new Map());
