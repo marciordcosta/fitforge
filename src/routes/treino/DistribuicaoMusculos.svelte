@@ -947,20 +947,55 @@
     return "estavel";
   }
 
-  /** Tendência de um músculo dentro da rotina aberta no editor — média da variação dos exercícios
-   * que o trabalham (mesma regra de tendenciaExercicio), texto discreto embaixo do nome. */
+  /** Peso de fadiga (0.4 a 1) de cada exercício da rotina, pela posição das séries dele —
+   * reaproveita a mesma faixa A/B/C por posição (contarSeriesPorFaixaDePosicao/valorEfetivoFadiga)
+   * que já desconta o "Acumulado": um exercício de fim de treino (mais fadigado) pesa menos na
+   * tendência por músculo, mas nunca some da conta (nunca zero). */
+  function pesosFadigaPorExercicio(treino: TreinoComExercicios): Map<string, number> {
+    const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+    const totalSeries = exerciciosOrdenados.reduce((acc, ex) => acc + ex.series.length, 0);
+    const partesPorExercicio = new Map<string, Partes>();
+    if (!totalSeries) return new Map();
+    let posicao = 0;
+    for (const ex of exerciciosOrdenados) {
+      const partes = partesPorExercicio.get(ex.id) ?? partesVazias();
+      for (let s = 0; s < ex.series.length; s++) {
+        posicao += 1;
+        const cor = corPorFaixa((posicao / totalSeries) * 100);
+        if (cor === CORES_FAIXA.a) partes.a += 1;
+        else if (cor === CORES_FAIXA.b) partes.b += 1;
+        else partes.c += 1;
+      }
+      partesPorExercicio.set(ex.id, partes);
+    }
+    const pesos = new Map<string, number>();
+    for (const [id, partes] of partesPorExercicio) {
+      const total = partes.a + partes.b + partes.c;
+      pesos.set(id, total > 0 ? valorEfetivoFadiga(partes) / total : 1);
+    }
+    return pesos;
+  }
+
+  /** Tendência de um músculo dentro da rotina aberta no editor — média PONDERADA (pesosFadigaPorExercicio)
+   * da variação dos exercícios que o trabalham (mesma regra de tendenciaExercicio): um exercício
+   * de fim de treino ainda entra na conta, só que com menos peso. Texto discreto embaixo do nome. */
   function tendenciaMusculoEditor(musculoId: string): "subindo" | "estavel" | "caindo" | null {
     if (!modalEditorRotina) return null;
-    const variacoes: number[] = [];
+    const pesos = pesosFadigaPorExercicio(modalEditorRotina);
+    let somaPonderada = 0;
+    let somaPesos = 0;
     for (const te of modalEditorRotina.exercicios) {
       if (!te.exercicio?.musculos.some((m) => m.musculo_id === musculoId)) continue;
       const pontos = historicoPorExercicio.get(te.exercicio_id);
       if (!pontos) continue;
       const v = variacaoExercicio(pontos);
-      if (v != null) variacoes.push(v);
+      if (v == null) continue;
+      const peso = pesos.get(te.id) ?? 1;
+      somaPonderada += v * peso;
+      somaPesos += peso;
     }
-    if (!variacoes.length) return null;
-    const media = variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
+    if (somaPesos === 0) return null;
+    const media = somaPonderada / somaPesos;
     if (media > 0.02) return "subindo";
     if (media < -0.02) return "caindo";
     return "estavel";
