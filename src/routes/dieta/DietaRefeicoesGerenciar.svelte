@@ -24,6 +24,7 @@
     definirModoCalorias,
     definirCaloriasDias,
     removerCaloriasDia,
+    reiniciarCalibracaoDieta,
     listMetasDiaModelo,
     carboidratoGDoDia,
     listRefeicoesModeloDia,
@@ -63,6 +64,10 @@
   let perfilCarregado = $state(false);
   let erroMetas = $state<string | null>(null);
   let salvandoCalorias = $state(false);
+  /** Feedback do botão "Reiniciar calibração da dieta" — escape-hatch pra forçar a janela de
+   * carência do status de aderência a recomeçar sem mudar meta_calorias (ex: depois de mexer na
+   * distribuição por dia da Ondulatória, que a detecção automática de salvarPerfilDieta não vê). */
+  let statusCalibracao = $state<"idle" | "salvando" | "feito">("idle");
 
   let pesoAtual = $state(76);
   let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
@@ -640,6 +645,18 @@
       alert("Erro ao salvar metas: " + (err as Error).message);
     } finally {
       salvandoCalorias = false;
+    }
+  }
+
+  async function aoReiniciarCalibracao() {
+    statusCalibracao = "salvando";
+    try {
+      await reiniciarCalibracaoDieta();
+      statusCalibracao = "feito";
+      setTimeout(() => (statusCalibracao = "idle"), 2000);
+    } catch (err) {
+      statusCalibracao = "idle";
+      alert("Erro ao reiniciar calibração: " + (err as Error).message);
     }
   }
 
@@ -1306,6 +1323,9 @@
       {/if}
 
       <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
+      <button type="button" class="reiniciar-calibracao-btn" onclick={aoReiniciarCalibracao} disabled={statusCalibracao === "salvando"}>
+        {statusCalibracao === "feito" ? "Calibração reiniciada ✓" : "Reiniciar calibração da dieta"}
+      </button>
   {:else}
     <div class="conteudo" class:carregando={loading}>
     {#if !modelos.length}
@@ -2455,6 +2475,23 @@
   }
   .acao-dia-btn:disabled {
     opacity: 0.4;
+    cursor: default;
+  }
+  .reiniciar-calibracao-btn {
+    display: block;
+    width: 100%;
+    margin-top: var(--space-2);
+    padding: var(--space-2);
+    border: none;
+    background: none;
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    text-align: center;
+    cursor: pointer;
+  }
+  .reiniciar-calibracao-btn:disabled {
+    opacity: 0.6;
     cursor: default;
   }
 

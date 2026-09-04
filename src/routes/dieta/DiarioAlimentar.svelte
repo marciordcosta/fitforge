@@ -11,6 +11,7 @@
     listRefeicoesModelo,
     getParametros,
     getPerfilDietaEditavel,
+    getStatusAdesaoDieta,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
     gramasDoParametro,
@@ -19,9 +20,10 @@
     type MetasDiarias,
     type LimiteParametro,
     type RefeicaoModelo,
+    type StatusAdesaoDieta,
   } from "../../lib/dietaApi";
   import { listTreinos, type Treino } from "../../lib/treinoApi";
-  import { getDiasParaObjetivo, formatDiasObjetivo, getPesoMedioAtual } from "../../lib/pesoApi";
+  import { getPesoMedioAtual } from "../../lib/pesoApi";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -44,8 +46,14 @@
   let mostrarData = $state(false);
   let modoRestante = $state(false);
   let rotinaHoje = $state<Treino | null>(null);
-  /** "X dias/meses para o objetivo" — mesma informação e cálculo do topo da tela de Peso. */
-  let textoObjetivo = $state<string | null>(null);
+  /** Status de aderência à dieta (ritmo real de peso vs. ritmo esperado pela meta) — mesmo chip
+   * que antes mostrava "X dias para o objetivo". */
+  let statusAdesao = $state<StatusAdesaoDieta | null>(null);
+  const TEXTO_STATUS_ADESAO: Record<StatusAdesaoDieta, string> = {
+    dentro_do_plano: "Dentro do plano",
+    ajustar_calorias: "Ajustar calorias",
+    calibrando: "Calibrando…",
+  };
   let metasRefeicaoPorNome = $state<Map<string, RefeicaoModelo>>(new Map());
   let modoDiarioPorId = $state<Set<string>>(new Set());
   let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
@@ -81,10 +89,10 @@
 
   async function carregarInfoTopo() {
     try {
-      const [treinos, dias] = await Promise.all([listTreinos(), getDiasParaObjetivo()]);
+      const [treinos, status] = await Promise.all([listTreinos(), getStatusAdesaoDieta()]);
       const diaSemanaHoje = new Date().getDay();
       rotinaHoje = treinos.find((t: Treino) => t.dia_semana === diaSemanaHoje) ?? null;
-      textoObjetivo = dias != null ? formatDiasObjetivo(dias, true) : null;
+      statusAdesao = status;
     } catch {
       // informativo, não impede o uso do diário se falhar
     }
@@ -277,10 +285,18 @@
             <span class="chip-texto">{rotinaHoje.nome_treino}</span>
           </button>
         {/if}
-        {#if textoObjetivo}
-          <button class="chip-info" onclick={() => navigate("/peso")}>
+        {#if statusAdesao}
+          <button
+            class="chip-info"
+            onclick={() => navigate(statusAdesao === "ajustar_calorias" ? "/dieta/refeicoes/gerenciar" : "/peso")}
+          >
             {@render iconPesoMeta()}
-            <span class="chip-texto">{textoObjetivo}</span>
+            <span
+              class="chip-texto"
+              class:status-dentro={statusAdesao === "dentro_do_plano"}
+              class:status-calibrando={statusAdesao === "calibrando"}
+              class:status-ajustar={statusAdesao === "ajustar_calorias"}
+            >{TEXTO_STATUS_ADESAO[statusAdesao]}</span>
           </button>
         {/if}
       </div>
@@ -633,6 +649,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .chip-texto.status-dentro {
+    color: var(--color-success);
+  }
+  .chip-texto.status-calibrando {
+    color: var(--color-neutral);
+  }
+  .chip-texto.status-ajustar {
+    color: var(--color-negative);
   }
   .icon-btn {
     flex-shrink: 0;

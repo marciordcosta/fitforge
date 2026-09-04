@@ -209,3 +209,29 @@ export async function getPesoMedioAtual(): Promise<number | null> {
   return janela.reduce((acc, p) => acc + p.peso, 0) / janela.length;
 }
 
+/** Taxa de variação (kg/semana) das últimas 2 semanas: compara a média dos últimos 7 dias com a
+ * média dos 7 dias anteriores (mesma janela de 7 dias de getPesoMedioAtual, só que em dois
+ * blocos) — mais estável que comparar dois pontos isolados, sem introduzir um tipo de
+ * suavização novo no projeto (segue o mesmo padrão de média móvel simples já usado aqui).
+ * Exige pelo menos 3 pesagens em cada janela — com poucos pontos o resultado é ruído, não
+ * tendência real; nesse caso retorna null (quem chama trata como "sem dado suficiente"). */
+export async function getTaxaVariacaoSemanal(): Promise<number | null> {
+  const registros = await getPesosDoPeriodo("1900-01-01", hojeISO());
+  if (!registros.length) return null;
+  const ordenados = [...registros].sort((a, b) => a.data.localeCompare(b.data));
+  const dataMaisRecente = ordenados[ordenados.length - 1].data;
+  const d = parseISODate(dataMaisRecente);
+  const fimRecente = dataMaisRecente;
+  const inicioRecente = toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 6));
+  const fimAnterior = toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7));
+  const inicioAnterior = toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 13));
+
+  const janelaRecente = ordenados.filter((p) => p.data >= inicioRecente && p.data <= fimRecente);
+  const janelaAnterior = ordenados.filter((p) => p.data >= inicioAnterior && p.data <= fimAnterior);
+  if (janelaRecente.length < 3 || janelaAnterior.length < 3) return null;
+
+  const mediaRecente = janelaRecente.reduce((acc, p) => acc + p.peso, 0) / janelaRecente.length;
+  const mediaAnterior = janelaAnterior.reduce((acc, p) => acc + p.peso, 0) / janelaAnterior.length;
+  return mediaRecente - mediaAnterior;
+}
+

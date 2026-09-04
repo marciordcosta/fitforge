@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { DIAS_SEMANA_ABREV } from "./treinoApi";
-import { getPesoMedioAtual } from "./pesoApi";
+import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
 import { parseISODate } from "./dates";
 
 function uid(): string {
@@ -873,6 +873,10 @@ export interface PerfilDietaEditavel {
   proteinaGKg: number;
   gorduraGKg: number;
   carboidratoGKg: number;
+  /** Última vez que meta_calorias mudou de valor de fato (não conta editar só macros mantendo o
+   * mesmo total) — usado pra dar carência ao status de aderência à dieta (getStatusAdesaoDieta).
+   * null = nunca rastreado (perfil de antes dessa coluna existir, ou nunca mexeu nas calorias). */
+  caloriasAjustadasEm: string | null;
 }
 
 const PERFIL_PADRAO: PerfilDietaEditavel = {
@@ -881,12 +885,13 @@ const PERFIL_PADRAO: PerfilDietaEditavel = {
   proteinaGKg: 2.17,
   gorduraGKg: 0.66,
   carboidratoGKg: 2.93,
+  caloriasAjustadasEm: null,
 };
 
 export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
   const { data, error } = await supabase
     .from("dieta_perfil")
-    .select("peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg")
+    .select("peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg, calorias_ajustadas_em")
     .maybeSingle();
   if (error) throw error;
   if (!data) return PERFIL_PADRAO;
@@ -896,9 +901,16 @@ export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
     proteinaGKg: data.proteina_g_kg,
     gorduraGKg: data.gordura_g_kg,
     carboidratoGKg: data.carboidrato_g_kg,
+    caloriasAjustadasEm: data.calorias_ajustadas_em,
   };
 }
 
+/** Grava o perfil de metas — se `metaCalorias` mudou de valor de fato (±1 kcal de tolerância)
+ * em relação ao que já estava gravado, marca `calorias_ajustadas_em` agora; senão preserva o
+ * valor anterior. Cobre o único ponto que grava a meta calórica (aba Calorias do Gerenciar,
+ * um só botão "Salvar" pra calorias+macros juntos) sem precisar que quem chama saiba se o
+ * usuário editou calorias ou só rebalanceou macros — o que importa é se o alvo calórico final
+ * mudou, não qual campo foi digitado. */
 export async function salvarPerfilDieta(input: {
   pesoAtual: number;
   metaCalorias: number;
@@ -908,9 +920,18 @@ export async function salvarPerfilDieta(input: {
   fibrasG: number;
   aguaL: number;
 }): Promise<void> {
+  const userId = uid();
+  const { data: atual } = await supabase
+    .from("dieta_perfil")
+    .select("meta_calorias, calorias_ajustadas_em")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const mudouCalorias = atual == null || Math.abs(atual.meta_calorias - input.metaCalorias) > 1;
+  const caloriasAjustadasEm = mudouCalorias ? new Date().toISOString() : (atual?.calorias_ajustadas_em ?? null);
+
   const { error } = await supabase.from("dieta_perfil").upsert(
     {
-      user_id: uid(),
+      user_id: userId,
       peso_atual: input.pesoAtual,
       meta_calorias: input.metaCalorias,
       proteina_g_kg: input.proteinaGKg,
@@ -918,10 +939,23 @@ export async function salvarPerfilDieta(input: {
       carboidrato_g_kg: input.carboidratoGKg,
       fibras_g: input.fibrasG,
       agua_l: input.aguaL,
+      calorias_ajustadas_em: caloriasAjustadasEm,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },
   );
+  if (error) throw error;
+}
+
+/** Força a janela de carência do status de aderência à dieta a recomeçar agora, sem alterar
+ * meta_calorias — escape-hatch pra ajustes que a detecção automática de salvarPerfilDieta não
+ * cobre (ex: redistribuição de calorias por dia na Ondulatória, que grava em dieta_calorias_dia,
+ * não em meta_calorias). */
+export async function reiniciarCalibracaoDieta(): Promise<void> {
+  const { error } = await supabase
+    .from("dieta_perfil")
+    .update({ calorias_ajustadas_em: new Date().toISOString() })
+    .eq("user_id", uid());
   if (error) throw error;
 }
 
@@ -1156,6 +1190,39 @@ export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
     gorduraG: gorduraResolvida,
     carboidratoG: carboidratoGDoDia(diaResolvido.calorias, proteinaG, gorduraResolvida),
   };
+}
+
+export type StatusAdesaoDieta = "dentro_do_plano" | "ajustar_calorias" | "calibrando";
+
+/** Compara o ritmo real de variação de peso (getTaxaVariacaoSemanal, pesoApi.ts) com o ritmo
+ * esperado pela meta (peso_metas.percentual, sempre semanal). Só avalia depois de ~14 dias do
+ * último ajuste real nas calorias (dieta_perfil.calorias_ajustadas_em) — antes disso a média de
+ * peso ainda não "enxergou" o ajuste recente, e mostrar um veredito seria enganoso
+ * ("calibrando"). Banda de tolerância generosa (40%-160% do ritmo esperado, mesmo sinal) — uma
+ * semana de ruído normal não deve disparar "ajustar calorias" à toa. null = sem meta definida ou
+ * sem pesagens suficientes pra calcular uma tendência (chip escondido por quem chama). */
+export async function getStatusAdesaoDieta(): Promise<StatusAdesaoDieta | null> {
+  const [meta, perfil, taxaAtual] = await Promise.all([getMeta(), getPerfilDietaEditavel(), getTaxaVariacaoSemanal()]);
+  if (!meta || taxaAtual == null) return null;
+
+  if (perfil.caloriasAjustadasEm) {
+    const dias = Math.floor((Date.now() - new Date(perfil.caloriasAjustadasEm).getTime()) / 86_400_000);
+    if (dias < 14) return "calibrando";
+  }
+
+  if (meta.tipo === "manutencao") {
+    return Math.abs(taxaAtual) <= 0.3 ? "dentro_do_plano" : "ajustar_calorias";
+  }
+  if (meta.percentual == null || meta.percentual === 0) return null;
+
+  const mediaAtual = await getPesoMedioAtual();
+  if (mediaAtual == null) return null;
+  const taxaEsperada = mediaAtual * (meta.percentual / 100);
+  const dentro =
+    Math.sign(taxaAtual) === Math.sign(taxaEsperada) &&
+    Math.abs(taxaAtual) >= Math.abs(taxaEsperada) * 0.4 &&
+    Math.abs(taxaAtual) <= Math.abs(taxaEsperada) * 1.6;
+  return dentro ? "dentro_do_plano" : "ajustar_calorias";
 }
 
 // ---------------- Receitas (combo reutilizável de vários alimentos já cadastrados) ----------------
