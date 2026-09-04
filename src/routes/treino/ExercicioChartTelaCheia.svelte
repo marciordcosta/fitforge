@@ -1,13 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { Chart, type ChartDataset } from "chart.js/auto";
-  import {
-    getHistoricoExercicio,
-    listExercicios,
-    listTreinos,
-    type HistoricoPonto,
-    type Exercicio,
-  } from "../../lib/treinoApi";
+  import { getHistoricoExercicio, listExercicios, type HistoricoPonto, type Exercicio } from "../../lib/treinoApi";
   import { chaveSemana, parseISODate } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
@@ -51,8 +45,9 @@
   const historicoFiltrado = $derived(filtroQtd == null ? historico : historico.slice(-filtroQtd));
 
   // ---------------- Comparação com outros exercícios ----------------
-  // Mostra exercícios que estão em alguma rotina atual e que trabalham algum dos
-  // mesmos músculos do exercício atual.
+  // Mostra exercícios que trabalham algum dos mesmos músculos do exercício atual e têm
+  // histórico registrado — não precisa mais estar numa rotina ATUAL: um exercício que já saiu
+  // da rotina (trocado, removido) mas tem registros antigos continua útil pra comparar.
   let comparando = $state(false);
   let carregandoComparaveis = $state(false);
   let comparaveis = $state<{ exercicio: Exercicio; historico: HistoricoPonto[] }[]>([]);
@@ -63,14 +58,8 @@
     carregandoComparaveis = true;
     try {
       const musculoIds = new Set(exercicio.musculos.map((m) => m.musculo_id));
-      const [todos, treinos] = await Promise.all([listExercicios(), listTreinos()]);
-      const emRotina = new Set<string>();
-      for (const t of treinos) {
-        for (const te of t.exercicios) emRotina.add(te.exercicio_id);
-      }
-      const candidatos = todos.filter(
-        (ex) => ex.id !== exercicio.id && emRotina.has(ex.id) && ex.musculos.some((m) => musculoIds.has(m.musculo_id)),
-      );
+      const todos = await listExercicios();
+      const candidatos = todos.filter((ex) => ex.id !== exercicio.id && ex.musculos.some((m) => musculoIds.has(m.musculo_id)));
       const resultados = await Promise.all(
         candidatos.map(async (ex) => ({ exercicio: ex, historico: await getHistoricoExercicio(ex.id) })),
       );
