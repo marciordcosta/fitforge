@@ -134,28 +134,6 @@
     return mapa;
   }
 
-  /** Modo alternativo dos anéis de dominância: soma total de séries PONDERADA (peso_contribuicao)
-   * por GRUPO muscular (agrupamento_id — Ombro junta Deltoide Anterior/Lateral/Posterior, Costas
-   * junta Superiores/Latíssimo etc.), sem separar por posição/fadiga — só quantidade. Um músculo
-   * sem agrupamento cadastrado fica sozinho no próprio grupo. A contagem crua (sem peso) fica só
-   * na grade "Distribuição na Semana" e nos cards de meta do editor de rotina, que precisam bater
-   * com o mesmo número um do outro. */
-  function itensGrupoPonderado(treinosLista: TreinoComExercicios[]): { nome: string; valor: number }[] {
-    const porGrupo = new Map<string, { nome: string; valor: number }>();
-    for (const t of treinosLista) {
-      const mapaPonderado = contarSeriesPorMusculoPonderado(t);
-      for (const m of musculos) {
-        const valor = mapaPonderado.get(m.id) ?? 0;
-        if (valor <= 0) continue;
-        const chave = m.agrupamento_id ?? `solo:${m.id}`;
-        const atual = porGrupo.get(chave) ?? { nome: m.agrupamento?.nome ?? m.nome, valor: 0 };
-        atual.valor += valor;
-        porGrupo.set(chave, atual);
-      }
-    }
-    return Array.from(porGrupo.values()).sort((a, b) => b.valor - a.valor);
-  }
-
   /** Modo de contribuição: cada série soma peso_contribuicao (0.25 a 1) pra cada músculo que
    * trabalha — igual à Distribuição Semanal — em vez de contar a série inteira pra todo mundo.
    * Um músculo secundário (ex: tríceps no supino, peso 0.25) aparece proporcional ao quanto ele
@@ -398,6 +376,33 @@
           : item,
       )
       .sort((a, b) => valorPorCampoOrdenacao(b, campo) - valorPorCampoOrdenacao(a, campo));
+  }
+
+  /** Dados pros anéis de dominância (Distribuição Semanal e por rotina) na coluna escolhida —
+   * mesma lista já usada pelos cards (bruto/ponderado/acumulado embutidos em cada linha/subitem),
+   * só reprojetada pro valor da coluna em vez de sempre ponderado. `itensGrupo` soma por
+   * agrupamento (modo padrão do anel); `itens` é por músculo individual (modo dominância/ABC). */
+  function itensParaGrafico<
+    T extends {
+      nome: string;
+      valor: number;
+      bruto: number;
+      partes: Partes;
+      musculo: Musculo | null;
+      subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes }[] | null;
+    },
+  >(lista: T[], campo: CampoOrdenacaoSeries): { itensGrupo: { nome: string; valor: number }[]; itens: { musculo: Musculo; valor: number }[]; total: number } {
+    const itensGrupo = lista
+      .map((item) => ({ nome: item.nome, valor: valorPorCampoOrdenacao(item, campo) }))
+      .filter((i) => i.valor > 0)
+      .sort((a, b) => b.valor - a.valor);
+    const itens = lista
+      .flatMap((item) => item.subItens ?? (item.musculo ? [{ musculo: item.musculo, valor: item.valor, bruto: item.bruto, partes: item.partes }] : []))
+      .map((item) => ({ musculo: item.musculo, valor: valorPorCampoOrdenacao(item, campo) }))
+      .filter((i) => i.valor > 0)
+      .sort((a, b) => b.valor - a.valor);
+    const total = itens.reduce((acc, i) => acc + i.valor, 0);
+    return { itensGrupo, itens, total };
   }
 
   const totaisSemanais = $derived.by(() => {
@@ -1686,15 +1691,17 @@
     definirModalEditor(editorUrlTreino);
   });
 
-  /** Abre o anel da Distribuição Semanal direto — mesmo padrão do anel por rotina (bar clicável, sem menu). */
+  /** Abre o anel da Distribuição Semanal direto — mesmo padrão do anel por rotina (bar clicável, sem menu).
+   * Segue a mesma coluna (Total/Pond./Acum.) selecionada no card, igual à grade. */
   function abrirGraficoSemanal(): void {
+    const { itensGrupo, itens, total } = itensParaGrafico(linhasSemanal, ordemSemanal);
     abrirDetalheRotina(
       "Distribuição Semanal",
-      distribuicaoSemanal,
-      totaisSemanais.series,
+      itens,
+      formatValor(total),
       "séries",
-      coresAbcAcumulado(distribuicaoSemanal),
-      itensGrupoPonderado(treinos),
+      coresAbcAcumulado(itens),
+      itensGrupo,
       // Acompanha a visualização do card: ordenado por ponderado (padrão) abre no modo Grupo,
       // ordenado por total ou acumulado abre no modo ABC (músculo individual).
       ordemSemanal === "ponderado",
@@ -1712,7 +1719,7 @@
   let modalDetalheRotina = $state<{
     titulo: string;
     itens: ItemDetalheRotina[];
-    centroValor?: number;
+    centroValor?: number | string;
     centroLabel?: string;
     cores?: string[];
     itensGrupo?: { nome: string; valor: number }[];
@@ -1726,7 +1733,7 @@
   function abrirDetalheRotina(
     titulo: string,
     itens: { musculo: Musculo; valor: number }[],
-    centroValor?: number,
+    centroValor?: number | string,
     centroLabel?: string,
     cores?: string[],
     itensGrupo?: { nome: string; valor: number }[],
@@ -1766,26 +1773,22 @@
   }
 
   /** Anel por dominância (mesma conta da Distribuição Semanal, coresAbcAcumulado), só que
-   * dessa rotina isolada: séries válidas (ponderadas por peso_contribuicao) por músculo,
-   * coloridas pela faixa 20/30/50 de dominância — diferente do anel por posição/fadiga
-   * (abrirGraficoTreino), que é o que a barra já abre. */
-  function abrirGraficoTreinoDominancia(treino: TreinoComExercicios): void {
-    const mapa = contarSeriesPorMusculoPonderado(treino);
-    const itens = musculos
-      .map((m) => ({ musculo: m, valor: mapa.get(m.id) ?? 0 }))
-      .filter((item) => item.valor > 0)
-      .sort((a, b) => b.valor - a.valor);
-    const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
+   * dessa rotina isolada — mesma lista já usada pelo card (distribuicaoPorTreino), reprojetada
+   * pra coluna (Total/Pond./Acum.) selecionada nele, igual à grade. Diferente do anel por
+   * posição/fadiga (abrirGraficoTreino), que é o que a barra já abre. */
+  function abrirGraficoTreinoDominancia(treino: TreinoComExercicios, campo: CampoOrdenacaoSeries): void {
+    const lista = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
+    const { itensGrupo, itens, total } = itensParaGrafico(lista, campo);
     abrirDetalheRotina(
       treino.nome_treino,
       itens,
-      totalSeries,
+      formatValor(total),
       "séries",
       coresAbcAcumulado(itens),
-      itensGrupoPonderado([treino]),
+      itensGrupo,
       // Acompanha a visualização do card: ordenado por ponderado (padrão) abre no modo Grupo,
       // ordenado por total ou acumulado abre no modo ABC (músculo individual).
-      (ordemPorTreino.get(treino.id) ?? "ponderado") === "ponderado",
+      campo === "ponderado",
     );
   }
 </script>
@@ -1987,7 +1990,7 @@
                     0,
                   )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
                 </button>
-                <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino)} aria-label="Ver anel por dominância">
+                <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino, ordemTreino)} aria-label="Ver anel por dominância">
                   {@render iconGrafico()}
                 </button>
               </div>
@@ -2721,7 +2724,7 @@
           <button class="rotina-grafico-btn" onclick={() => abrirGradeSemanal(null)} aria-label="Ver distribuição na semana">
             {@render iconGrade()}
           </button>
-          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
+          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!, ordemMusculosEditor)} aria-label="Ver anel por dominância">
             {@render iconGrafico()}
           </button>
         </div>
