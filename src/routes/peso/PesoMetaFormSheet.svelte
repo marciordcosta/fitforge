@@ -27,6 +27,18 @@
   let salvando = $state(false);
   let temMetaSalva = $state(false);
 
+  /** Faixa segura de ritmo semanal pra fisiculturismo natural (perda ~0,5-1%/semana, ganho magro
+   * ~0,25-0,5%/semana — aqui uma faixa única, generosa o bastante pros dois casos, já que o tipo
+   * de dieta é quem decide a direção): abaixo disso o progresso é ruído/estagnação, acima disso
+   * o ritmo tende a vir com perda de músculo (cutting) ou gordura em excesso (bulking). */
+  const PERCENTUAL_MIN = 0.25;
+  const PERCENTUAL_MAX = 1;
+
+  function clampPercentual(): void {
+    if (percentual == null) return;
+    percentual = Math.min(PERCENTUAL_MAX, Math.max(PERCENTUAL_MIN, percentual));
+  }
+
   async function carregar() {
     carregando = true;
     try {
@@ -35,6 +47,7 @@
       temMetaSalva = metaAtual != null;
       pesoAlvo = metaAtual?.pesoAlvo ?? ultimoPeso;
       percentual = metaAtual?.tipo === "percentual" && metaAtual.percentual != null ? Math.abs(metaAtual.percentual) : null;
+      clampPercentual();
     } finally {
       carregando = false;
     }
@@ -88,7 +101,18 @@
     {#if precisaPercentual}
       <div class="campo">
         <label for="meta-percentual">Percentual semanal (%)</label>
-        <input id="meta-percentual" type="number" inputmode="decimal" step="0.1" min="0" placeholder="-" bind:value={percentual} />
+        <input
+          id="meta-percentual"
+          type="number"
+          inputmode="decimal"
+          step="0.1"
+          min={PERCENTUAL_MIN}
+          max={PERCENTUAL_MAX}
+          placeholder="-"
+          bind:value={percentual}
+          onblur={clampPercentual}
+        />
+        <span class="campo-dica">Entre {PERCENTUAL_MIN}% e {PERCENTUAL_MAX}% — ritmo seguro pra fisiculturismo natural</span>
       </div>
     {/if}
 
@@ -136,6 +160,10 @@
   }
   .campo label {
     font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .campo-dica {
+    font-size: 12px;
     color: var(--surface-muted);
   }
   .campo input {
