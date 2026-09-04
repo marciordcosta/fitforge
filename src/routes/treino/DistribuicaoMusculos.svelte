@@ -342,14 +342,13 @@
     });
   });
 
-  /** Qual coluna (Total/Pond./Acum.) está ordenando o card de cada rotina — mesmo ciclo de 3
-   * estados da Distribuição Semanal. Ausência no mapa = padrão ("ponderado"). */
+  /** Qual coluna (Total/Pond./Acum.) está ordenando o card de cada rotina — toca em qualquer
+   * valor/rótulo da coluna pra escolher. Ausência no mapa = padrão ("ponderado"). */
   let ordemPorTreino = $state<Map<string, CampoOrdenacaoSeries>>(new Map());
 
-  function alternarOrdemTreino(treinoId: string): void {
-    const atual = ordemPorTreino.get(treinoId) ?? "ponderado";
+  function definirOrdemTreino(treinoId: string, campo: CampoOrdenacaoSeries): void {
     const copia = new Map(ordemPorTreino);
-    copia.set(treinoId, proximoCampoOrdenacao(atual));
+    copia.set(treinoId, campo);
     ordemPorTreino = copia;
   }
 
@@ -372,14 +371,9 @@
 
   type CampoOrdenacaoSeries = "total" | "ponderado" | "acumulado";
 
-  /** Qual coluna (Total/Pond./Acum.) está ordenando a Distribuição Semanal — clicar no título cicla entre as 3. */
+  /** Qual coluna (Total/Pond./Acum.) está ordenando a Distribuição Semanal — toca em qualquer
+   * rótulo/valor da coluna pra escolher. */
   let ordemSemanal = $state<CampoOrdenacaoSeries>("ponderado");
-
-  function proximoCampoOrdenacao(atual: CampoOrdenacaoSeries): CampoOrdenacaoSeries {
-    if (atual === "total") return "ponderado";
-    if (atual === "ponderado") return "acumulado";
-    return "total";
-  }
 
   function valorPorCampoOrdenacao(item: { valor: number; bruto: number; partes: Partes }, campo: CampoOrdenacaoSeries): number {
     if (campo === "total") return item.bruto;
@@ -511,6 +505,8 @@
         treinoId: treino?.id ?? null,
         treinoNome: treino?.nome_treino ?? null,
         mapa: treino ? contarSeriesPorMusculo(treino) : new Map<string, number>(),
+        mapaPonderado: treino ? contarSeriesPorMusculoPonderado(treino) : new Map<string, number>(),
+        mapaPartes: treino ? contarSeriesPorFaixaDePosicao(treino) : new Map<string, Partes>(),
       };
     });
 
@@ -522,7 +518,9 @@
     }
 
     // Mesma coluna (Total/Pond./Acum.) escolhida no card "Distribuição Semanal" — a grade abre a
-    // partir dele, então a ordem dos músculos aqui dentro tem que bater com a de lá.
+    // partir dele, então tanto a ordem dos músculos quanto o número mostrado em cada célula tem
+    // que bater com o que está lá (o modo de editar meta é a única exceção: meta é sempre bruta,
+    // então mostra/edita sempre o total, nunca ponderado/acumulado).
     const totaisPonderado = new Map<string, number>();
     for (const t of treinos) {
       for (const [id, v] of contarSeriesPorMusculoPonderado(t)) {
@@ -546,7 +544,16 @@
         );
         return vb - va;
       })
-      .map((m) => ({ musculo: m, valores: colunas.map((col) => col.mapa.get(m.id) ?? 0) }));
+      .map((m) => ({
+        musculo: m,
+        valores: colunas.map((col) => {
+          const bruto = col.mapa.get(m.id) ?? 0;
+          const ponderado = col.mapaPonderado.get(m.id) ?? 0;
+          const acumulado = valorEfetivoFadiga(col.mapaPartes.get(m.id) ?? partesVazias());
+          const display = campo === "total" ? bruto : campo === "ponderado" ? ponderado : acumulado;
+          return { bruto, display };
+        }),
+      }));
 
     return { colunas, linhas };
   });
@@ -928,8 +935,8 @@
     return (mediaRecente - mediaAnterior) / mediaAnterior;
   }
 
-  /** Tendência de um exercício específico (não agregada por músculo) — usada pra colorir a
-   * pílula de séries no editor completo da rotina. */
+  /** Tendência de um exercício específico (não agregada por músculo) — mostrada como texto
+   * discreto embaixo do nome no editor completo da rotina. */
   function tendenciaExercicio(exercicioId: string): "subindo" | "estavel" | "caindo" | null {
     const pontos = historicoPorExercicio.get(exercicioId);
     if (!pontos) return null;
@@ -938,6 +945,32 @@
     if (v > 0.02) return "subindo";
     if (v < -0.02) return "caindo";
     return "estavel";
+  }
+
+  /** Tendência de um músculo dentro da rotina aberta no editor — média da variação dos exercícios
+   * que o trabalham (mesma regra de tendenciaExercicio), texto discreto embaixo do nome. */
+  function tendenciaMusculoEditor(musculoId: string): "subindo" | "estavel" | "caindo" | null {
+    if (!modalEditorRotina) return null;
+    const variacoes: number[] = [];
+    for (const te of modalEditorRotina.exercicios) {
+      if (!te.exercicio?.musculos.some((m) => m.musculo_id === musculoId)) continue;
+      const pontos = historicoPorExercicio.get(te.exercicio_id);
+      if (!pontos) continue;
+      const v = variacaoExercicio(pontos);
+      if (v != null) variacoes.push(v);
+    }
+    if (!variacoes.length) return null;
+    const media = variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
+    if (media > 0.02) return "subindo";
+    if (media < -0.02) return "caindo";
+    return "estavel";
+  }
+
+  function textoTendencia(t: "subindo" | "estavel" | "caindo" | null): string | null {
+    if (t === "subindo") return "Progredindo";
+    if (t === "estavel") return "Estagnado";
+    if (t === "caindo") return "Regredindo";
+    return null;
   }
 
   /** Variação % bruta (não só a faixa) de um exercício específico — mostrada ao lado do nome no
@@ -1194,8 +1227,9 @@
    * exercícios e desliga o toque-pra-abrir-modal enquanto ativo. "Concluído" desliga de volta. */
   let modoReordenarEditor = $state(false);
 
-  /** Qual coluna (Total/Pond./Acum.) está ordenando a lista de músculos do editor — ícone no
-   * rodapé cicla entre as 3, mesmo padrão da Distribuição Semanal e dos cards por rotina. */
+  /** Qual coluna (Total/Pond./Acum.) está ordenando a lista de músculos do editor — toca em
+   * qualquer rótulo/valor da coluna pra escolher, mesmo padrão da Distribuição Semanal e dos
+   * cards por rotina. */
   let ordemMusculosEditor = $state<CampoOrdenacaoSeries>("ponderado");
 
   /** Pressionar-e-segurar (sem soltar cedo, sem arrastar) num card de exercício abre o menu —
@@ -1750,14 +1784,14 @@
   </div>
 {/snippet}
 
-{#snippet cabecalhoCaixas(ordenandoPor: CampoOrdenacaoSeries | null = null)}
+{#snippet cabecalhoCaixas(ordenandoPor: CampoOrdenacaoSeries | null, aoTocar: (campo: CampoOrdenacaoSeries) => void)}
   <div class="item item-cabecalho">
     <span></span>
     <span></span>
     <div class="caixas-series caixas-cabecalho">
-      <span class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "total"}>Total</span>
-      <span class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "ponderado"}>Pond.</span>
-      <span class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "acumulado"}>Acum.</span>
+      <button type="button" class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "total"} onclick={() => aoTocar("total")}>Total</button>
+      <button type="button" class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "ponderado"} onclick={() => aoTocar("ponderado")}>Pond.</button>
+      <button type="button" class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "acumulado"} onclick={() => aoTocar("acumulado")}>Acum.</button>
     </div>
   </div>
 {/snippet}
@@ -1766,14 +1800,15 @@
   bruto: number,
   ponderado: number,
   acumulado: number,
-  ordenandoPor: CampoOrdenacaoSeries | null = null,
+  ordenandoPor: CampoOrdenacaoSeries | null,
+  aoTocar: (campo: CampoOrdenacaoSeries) => void,
   /** Só usado no editor de rotina: a meta manual (bruta, não ponderada) vai junto do total —
    * "atual/meta" no lugar do total sozinho — em vez de uma linha à parte embaixo do nome. */
   totalTexto: string | null = null,
   totalClasse: "valor-subindo" | "valor-estavel" | "valor-caindo" | null = null,
 )}
   <div class="caixas-series">
-    <div class="caixa-serie">
+    <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar("total"); }}>
       <span
         class="caixa-serie-valor"
         class:caixa-serie-ativa={ordenandoPor === "total" && totalClasse == null}
@@ -1781,13 +1816,13 @@
         class:valor-estavel={totalClasse === "valor-estavel"}
         class:valor-caindo={totalClasse === "valor-caindo"}
       >{totalTexto ?? formatValor(bruto)}</span>
-    </div>
-    <div class="caixa-serie">
+    </button>
+    <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar("ponderado"); }}>
       <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === "ponderado"}>{formatValor(ponderado)}</span>
-    </div>
-    <div class="caixa-serie">
+    </button>
+    <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar("acumulado"); }}>
       <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === "acumulado"}>{formatValor(acumulado)}</span>
-    </div>
+    </button>
   </div>
 {/snippet}
 
@@ -1815,7 +1850,7 @@
           {#if !distribuicaoSemanal.length}
             <p class="muted">Nenhum volume planejado ainda.</p>
           {:else}
-            {@render cabecalhoCaixas(ordemSemanal)}
+            {@render cabecalhoCaixas(ordemSemanal, (campo) => (ordemSemanal = campo))}
             <div class="lista">
               {#each ordenarPorCampo(linhasSemanal, ordemSemanal) as linha (linha.chave)}
                 {@const aberto = linha.subItens != null && gruposExpandidos.has(linha.chave)}
@@ -1829,14 +1864,14 @@
                     <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(linha.musculo)}>{linha.nome}</button>
                   {/if}
                   {@render barraFadiga(linha.partes, linha.partes.a + linha.partes.b + linha.partes.c)}
-                  {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes), ordemSemanal)}
+                  {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes), ordemSemanal, (campo) => (ordemSemanal = campo))}
                 </div>
                 {#if aberto && linha.subItens}
                   {#each linha.subItens as sub (sub.musculo.id)}
                     <div class="item item-sub">
                       <button class="nome-btn" onclick={() => abrirExercicios(sub.musculo)}>{sub.musculo.nome}</button>
                       {@render barraFadiga(sub.partes, sub.partes.a + sub.partes.b + sub.partes.c)}
-                      {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes), ordemSemanal)}
+                      {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes), ordemSemanal, (campo) => (ordemSemanal = campo))}
                     </div>
                   {/each}
                 {/if}
@@ -1846,12 +1881,6 @@
               <button class="rotina-totais-texto" onclick={() => abrirGradeSemanal(null)}>
                 {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
               </button>
-              <button
-                class="ordenar-fadiga-btn"
-                class:ativo={ordemSemanal !== "ponderado"}
-                onclick={() => (ordemSemanal = proximoCampoOrdenacao(ordemSemanal))}
-                aria-label="Ordenar por Total/Ponderada/Acumulada"
-              >{@render iconOrdenarFadiga()}</button>
               <button class="rotina-grafico-btn" onclick={() => abrirGraficoSemanal()} aria-label="Ver anel por dominância">
                 {@render iconGrafico()}
               </button>
@@ -1887,7 +1916,7 @@
               {#if !lista.length}
                 <p class="muted">Nenhuma série definida ainda.</p>
               {:else}
-                {@render cabecalhoCaixas(ordemTreino)}
+                {@render cabecalhoCaixas(ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
                 <div class="lista">
                   {#each listaExibida as linha (linha.chave)}
                     {@const grupoChave = `${treino.id}:${linha.chave}`}
@@ -1902,14 +1931,14 @@
                         <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                       {/if}
                       {@render barraFadiga(linha.partes, linha.valor)}
-                      {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes), ordemTreino)}
+                      {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes), ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
                     </div>
                     {#if aberto && linha.subItens}
                       {#each linha.subItens as sub (sub.musculo.id)}
                         <div class="item item-sub">
                           <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                           {@render barraFadiga(sub.partes, sub.valor)}
-                          {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes), ordemTreino)}
+                          {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes), ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
                         </div>
                       {/each}
                     {/if}
@@ -1923,12 +1952,6 @@
                     0,
                   )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
                 </button>
-                <button
-                  class="ordenar-fadiga-btn"
-                  class:ativo={ordemTreino !== "ponderado"}
-                  onclick={() => alternarOrdemTreino(treino.id)}
-                  aria-label="Ordenar por Total/Ponderada/Acumulada"
-                >{@render iconOrdenarFadiga()}</button>
                 <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino)} aria-label="Ver anel por dominância">
                   {@render iconGrafico()}
                 </button>
@@ -2005,13 +2028,6 @@
   {/if}
 </div>
 
-{#snippet iconOrdenarFadiga()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="4" y1="19" x2="4" y2="13" />
-    <line x1="12" y1="19" x2="12" y2="9" />
-    <line x1="20" y1="19" x2="20" y2="5" />
-  </svg>
-{/snippet}
 {#snippet iconGrafico()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
@@ -2152,17 +2168,19 @@
               {#each linha.valores as valor, i (i)}
                 {@const treinoId = gradeSemanal.colunas[i].treinoId}
                 {@const meta = treinoId ? metasMusculo.get(chaveMeta(treinoId, linha.musculo.id)) : undefined}
+                {@const mostrado = modoEdicaoMetas ? valor.bruto : valor.display}
+                {@const texto = modoEdicaoMetas ? String(mostrado) : formatValor(mostrado)}
                 <td class="grade-valor">
                   {#if modoEdicaoMetas && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-meta-edit"
-                      style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
-                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, valor)}
-                    >{valor}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</button>
-                  {:else if valor > 0 && treinoId}
+                      style={`color: ${corVolume(mostrado)}; background: color-mix(in srgb, ${corVolume(mostrado)} 20%, transparent);`}
+                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, valor.bruto)}
+                    >{texto}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</button>
+                  {:else if valor.bruto > 0 && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-link"
-                      style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
+                      style={`color: ${corVolume(mostrado)}; background: color-mix(in srgb, ${corVolume(mostrado)} 20%, transparent);`}
                       onclick={() => {
                         const treino = treinos.find((t) => t.id === treinoId);
                         if (treino) {
@@ -2171,12 +2189,12 @@
                           abrirEditorRotina(treino, linha.musculo.id);
                         }
                       }}
-                    >{valor}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</button>
-                  {:else if valor > 0}
+                    >{texto}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</button>
+                  {:else if valor.bruto > 0}
                     <span
                       class="grade-valor-caixa"
-                      style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
-                    >{valor}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</span>
+                      style={`color: ${corVolume(mostrado)}; background: color-mix(in srgb, ${corVolume(mostrado)} 20%, transparent);`}
+                    >{texto}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</span>
                   {:else if meta != null}
                     <span
                       class="grade-valor-caixa grade-valor-vazio"
@@ -2589,14 +2607,14 @@
                 {#if deltaTotal !== 0}
                   <span class="editor-serie-badge">{valorAnteriorSeries}{deltaTotal > 0 ? "+" : ""}{deltaTotal}</span>
                 {/if}
-                <span class="editor-exercicio-nome" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
+                <span class="editor-exercicio-nome-col">
+                  <span class="editor-exercicio-nome" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
+                  {#if textoTendencia(tendEx)}
+                    <span class="editor-tendencia-texto">{textoTendencia(tendEx)}</span>
+                  {/if}
+                </span>
                 <span class="editor-exercicio-series-col">
-                  <span
-                    class="editor-serie-numero"
-                    class:valor-subindo={tendEx === "subindo"}
-                    class:valor-estavel={tendEx === "estavel"}
-                    class:valor-caindo={tendEx === "caindo"}
-                  >{numeroExibidoSeries}</span>
+                  <span class="editor-serie-numero">{numeroExibidoSeries}</span>
                   <span class="editor-serie-label">{numeroExibidoSeries === 1 ? "série" : "séries"}</span>
                 </span>
               </button>
@@ -2615,29 +2633,34 @@
         {/if}
       {/if}
       {#if metasEditor.length}
-        {@render cabecalhoCaixas(ordemMusculosEditor)}
+        {@render cabecalhoCaixas(ordemMusculosEditor, (campo) => (ordemMusculosEditor = campo))}
         <div class="editor-musculos-lista">
           {#each metasEditor as item (item.musculo.id)}
             {@const totalTexto = item.meta != null ? `${item.atual}/${item.meta}` : null}
             {@const totalClasse =
               item.meta == null ? null : item.atual > item.meta ? "valor-caindo" : item.atual === item.meta ? "valor-subindo" : "valor-estavel"}
-            <button
-              type="button"
-              class="item editor-musculo-linha"
-              class:editor-musculo-ativo={editorFiltroMusculoId === item.musculo.id}
-              disabled={modoReordenarEditor}
-              onclick={() => (editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id)}
-            >
-              <span class="editor-musculo-nome-col">
-                <span class="editor-musculo-nome">{abreviarMusculo(item.musculo.nome)}</span>
-                {#if item.impactoPct !== 0}
-                  <span class="editor-meta-badge" class:badge-mais={item.impactoPct > 0} class:badge-menos={item.impactoPct < 0}
-                  >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
-                {/if}
-              </span>
+            {@const tendMusculo = tendenciaMusculoEditor(item.musculo.id)}
+            <div class="item editor-musculo-linha" class:editor-musculo-ativo={editorFiltroMusculoId === item.musculo.id}>
+              <button
+                type="button"
+                class="nome-btn"
+                disabled={modoReordenarEditor}
+                onclick={() => (editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id)}
+              >
+                <span class="editor-musculo-nome-col">
+                  <span class="editor-musculo-nome">{abreviarMusculo(item.musculo.nome)}</span>
+                  {#if item.impactoPct !== 0}
+                    <span class="editor-meta-badge" class:badge-mais={item.impactoPct > 0} class:badge-menos={item.impactoPct < 0}
+                    >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
+                  {/if}
+                  {#if textoTendencia(tendMusculo)}
+                    <span class="editor-tendencia-texto">{textoTendencia(tendMusculo)}</span>
+                  {/if}
+                </span>
+              </button>
               {@render barraFadiga(item.partes, item.partes.a + item.partes.b + item.partes.c)}
-              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemMusculosEditor, totalTexto, totalClasse)}
-            </button>
+              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemMusculosEditor, (campo) => (ordemMusculosEditor = campo), totalTexto, totalClasse)}
+            </div>
           {/each}
         </div>
       {/if}
@@ -2652,12 +2675,6 @@
           <button class="rotina-grafico-btn" onclick={() => abrirGradeSemanal(null)} aria-label="Ver distribuição na semana">
             {@render iconGrade()}
           </button>
-          <button
-            class="ordenar-fadiga-btn"
-            class:ativo={ordemMusculosEditor !== "ponderado"}
-            onclick={() => (ordemMusculosEditor = proximoCampoOrdenacao(ordemMusculosEditor))}
-            aria-label="Ordenar músculos por Total/Ponderada/Acumulada"
-          >{@render iconOrdenarFadiga()}</button>
           <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!)} aria-label="Ver anel por dominância">
             {@render iconGrafico()}
           </button>
@@ -2842,26 +2859,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .ordenar-fadiga-btn {
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: none;
-    color: var(--surface-muted);
-    padding: 0;
-    cursor: pointer;
-  }
-  .ordenar-fadiga-btn svg {
-    width: 18px;
-    height: 18px;
-  }
-  .ordenar-fadiga-btn.ativo {
-    color: var(--color-primary);
   }
   .chevron-rotina {
     flex-shrink: 0;
@@ -3054,6 +3051,11 @@
     font-size: 9px;
     color: var(--surface-muted);
     white-space: nowrap;
+    border: none;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    cursor: pointer;
   }
   .caixa-cabecalho-label.cabecalho-ativo {
     color: var(--color-primary);
@@ -3068,6 +3070,9 @@
     padding: 4px 2px;
     border-radius: var(--radius-sm);
     background: #232a3b;
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
   }
   .caixa-serie-valor {
     font-size: 11px;
@@ -3600,6 +3605,13 @@
   .editor-exercicio-conteudo:disabled {
     cursor: default;
   }
+  .editor-exercicio-nome-col {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
   .editor-exercicio-nome {
     flex: 1;
     overflow: hidden;
@@ -3613,6 +3625,12 @@
   .editor-exercicio-nome.editor-nome-destacado {
     color: var(--color-primary);
     font-weight: 700;
+  }
+  .editor-tendencia-texto {
+    flex-shrink: 0;
+    font-size: 9px;
+    line-height: 1;
+    color: var(--surface-muted);
   }
   .handle-arraste-card {
     position: absolute;
@@ -3639,17 +3657,10 @@
   .editor-musculo-linha {
     width: 100%;
     padding: var(--space-2) 0;
-    background: none;
-    border: none;
     border-bottom: 1px solid var(--surface-border);
-    font-family: inherit;
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
   }
-  .editor-musculo-linha:disabled {
+  .editor-musculo-linha:has(.nome-btn:disabled) {
     opacity: 0.5;
-    cursor: default;
   }
   .editor-musculo-linha:last-child {
     border-bottom: none;
