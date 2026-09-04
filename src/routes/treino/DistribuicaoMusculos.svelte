@@ -521,10 +521,31 @@
       }
     }
 
+    // Mesma coluna (Total/Pond./Acum.) escolhida no card "Distribuição Semanal" — a grade abre a
+    // partir dele, então a ordem dos músculos aqui dentro tem que bater com a de lá.
+    const totaisPonderado = new Map<string, number>();
+    for (const t of treinos) {
+      for (const [id, v] of contarSeriesPorMusculoPonderado(t)) {
+        totaisPonderado.set(id, (totaisPonderado.get(id) ?? 0) + v);
+      }
+    }
+    const partesPorMusculo = partesFadigaSemanal();
+    const campo = ordemSemanal;
+
     const linhas = musculos
       .filter((m) => (totais.get(m.id) ?? 0) > 0)
       .filter((m) => filtroMusculosGrade === null || filtroMusculosGrade.has(m.id))
-      .sort((a, b) => (totais.get(b.id) ?? 0) - (totais.get(a.id) ?? 0))
+      .sort((a, b) => {
+        const va = valorPorCampoOrdenacao(
+          { valor: totaisPonderado.get(a.id) ?? 0, bruto: totais.get(a.id) ?? 0, partes: partesPorMusculo.get(a.id) ?? partesVazias() },
+          campo,
+        );
+        const vb = valorPorCampoOrdenacao(
+          { valor: totaisPonderado.get(b.id) ?? 0, bruto: totais.get(b.id) ?? 0, partes: partesPorMusculo.get(b.id) ?? partesVazias() },
+          campo,
+        );
+        return vb - va;
+      })
       .map((m) => ({ musculo: m, valores: colunas.map((col) => col.mapa.get(m.id) ?? 0) }));
 
     return { colunas, linhas };
@@ -2628,6 +2649,9 @@
           )} séries
         </span>
         <div class="editor-totais-acoes">
+          <button class="rotina-grafico-btn" onclick={() => abrirGradeSemanal(null)} aria-label="Ver distribuição na semana">
+            {@render iconGrade()}
+          </button>
           <button
             class="ordenar-fadiga-btn"
             class:ativo={ordemMusculosEditor !== "ponderado"}
