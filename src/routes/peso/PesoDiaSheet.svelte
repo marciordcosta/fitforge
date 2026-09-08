@@ -154,11 +154,15 @@
   <div class="titulo-dia">
     <strong>{diaSemanaLabel}</strong><span class="titulo-data-complemento">, {dataComplementoLabel}</span>
   </div>
-  {#if nomeRotina && treinoIdRotina}
+  {#if nomeRotina}
     <button
       class="link-rotina"
       onclick={() =>
-        navigate(treinoEfetuado ? `/treino/historico/${treinoIdRotina}/${data}` : `/treino/rotina/${treinoIdRotina}/ver`)}
+        navigate(
+          treinoEfetuado
+            ? `/treino/historico/${treinoIdRotina ?? "avulso"}/${data}`
+            : `/treino/rotina/${treinoIdRotina}/ver`,
+        )}
     >
       Dia de <span class="link-rotina-nome">"{nomeRotina}"</span>
     </button>
