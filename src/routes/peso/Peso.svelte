@@ -10,7 +10,7 @@
     type PesoRegistro,
     type PesoMeta,
   } from "../../lib/pesoApi";
-  import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
+  import { getDiasComTreino } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
   import PesoGraficoTelaCheia from "./PesoGraficoTelaCheia.svelte";
@@ -71,9 +71,6 @@
   let loadingGrafico = $state(true);
   let mostrarFiltro = $state(false);
   let mostrarGraficoCheio = $state(false);
-  /** Dia da semana (0=dom..6=sáb) -> nome da rotina agendada — usado pro nome pequeno no
-   * calendário mesmo em dias sem treino_registro ainda (ex: hoje ou um dia futuro do mês). */
-  let diasSemanaComRotina = $state<Map<number, string>>(new Map());
 
   /** "diário" = peso bruto de cada dia; "média" = média móvel dos últimos 7 dias em cada dia (padrão de mercado — MacroFactor, Trendweight etc.), padrão do app. */
   let modoGrafico = $state<"diario" | "media">("diario");
@@ -93,17 +90,6 @@
   function selecionarModoGrafico(m: "diario" | "media") {
     modoGrafico = m;
   }
-
-  async function carregarRotinasAgendadas() {
-    const treinos = await listTreinos();
-    const mapa = new Map<number, string>();
-    for (const t of treinos) {
-      if (t.dia_semana != null && !mapa.has(t.dia_semana)) mapa.set(t.dia_semana, t.nome_treino);
-    }
-    diasSemanaComRotina = mapa;
-  }
-
-  void carregarRotinasAgendadas();
 
   let meta = $state<PesoMeta | null>(null);
   let mostrarFormMeta = $state(false);
@@ -215,7 +201,7 @@
     for (let dia = 1; dia <= totalDias; dia++) {
       const data = new Date(mesBase.getFullYear(), mesBase.getMonth(), dia);
       const iso = toISODate(data);
-      const nomeTreino = diasComTreino.get(iso) ?? diasSemanaComRotina.get(data.getDay()) ?? null;
+      const nomeTreino = diasComTreino.get(iso) ?? null;
       lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null, nomeTreino });
     }
     return lista;
