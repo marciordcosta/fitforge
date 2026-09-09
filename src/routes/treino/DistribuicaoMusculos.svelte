@@ -2308,10 +2308,12 @@
                 {/if}
               </th>
             {/each}
+            <th class="grade-col-total">Total</th>
           </tr>
         </thead>
         <tbody>
           {#each gradeSemanal.linhas as linha (linha.musculo.id)}
+            {@const totalLinha = linha.valores.reduce((acc, v) => acc + (modoEdicaoMetas ? v.bruto : v.display), 0)}
             <tr>
               <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
               {#each linha.valores as valor, i (i)}
@@ -2352,6 +2354,12 @@
                   {/if}
                 </td>
               {/each}
+              <td class="grade-valor grade-col-total">
+                <span
+                  class="grade-valor-caixa grade-valor-total"
+                  style={`color: ${corVolume(totalLinha)}; background: color-mix(in srgb, ${corVolume(totalLinha)} 20%, transparent);`}
+                >{formatValor(totalLinha)}</span>
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -3365,6 +3373,19 @@
     max-width: 68px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  /* Soma dos dias — separada com uma borda mais forte pra não confundir com mais um dia da semana. */
+  .grade-tabela th.grade-col-total {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: var(--surface-fg);
+    border-left: 1px solid var(--surface-fg) !important;
+  }
+  .grade-tabela td.grade-col-total {
+    border-left: 1px solid var(--surface-fg) !important;
+  }
+  .grade-valor-total {
+    font-weight: 700;
   }
   .grade-valor-caixa {
     display: inline-flex;
