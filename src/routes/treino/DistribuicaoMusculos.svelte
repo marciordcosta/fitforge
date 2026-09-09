@@ -2111,6 +2111,17 @@
               {/if}
               <span class="chevron-rotina" class:aberto={expandido}>›</span>
             </div>
+            <div class="rotina-rodape">
+              <button class="rotina-totais-texto" onclick={() => abrirEditorRotina(treino)}>
+                {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
+                  (acc, ex) => acc + ex.series.length,
+                  0,
+                )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
+              </button>
+              <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino, ordemTreino)} aria-label="Ver anel por dominância">
+                {@render iconGrafico()}
+              </button>
+            </div>
             {#if expandido}
               {#if !lista.length}
                 <p class="muted">Nenhuma série definida ainda.</p>
@@ -2144,17 +2155,6 @@
                   {/each}
                 </div>
               {/if}
-              <div class="rotina-rodape">
-                <button class="rotina-totais-texto" onclick={() => abrirEditorRotina(treino)}>
-                  {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
-                    (acc, ex) => acc + ex.series.length,
-                    0,
-                  )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
-                </button>
-                <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino, ordemTreino)} aria-label="Ver anel por dominância">
-                  {@render iconGrafico()}
-                </button>
-              </div>
             {/if}
           </div>
         {/each}
@@ -3081,8 +3081,9 @@
     flex: 1;
   }
   /* Cabeçalho dos cards de rotina (não o Semanal): sangra até a borda do card (compensa o
-     padding dele com margem negativa) e fica com o fundo padrão de card — vira o único conteúdo
-     visível quando recolhido, com cantos arredondados nos 4 lados; expandido, só os de cima. */
+     padding dele com margem negativa) e fica com o fundo padrão de card — o rodapé (exercícios/
+     séries/registros + anel) agora sempre aparece embaixo, recolhido ou não, então o cabeçalho
+     sempre arredonda só os cantos de cima (nunca os 4, mesmo recolhido). */
   .rotina-cabecalho-clicavel {
     display: flex;
     align-items: center;
@@ -3092,10 +3093,6 @@
     background: var(--surface-card);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     cursor: pointer;
-  }
-  .rotina-cabecalho-clicavel.colapsado {
-    margin-bottom: calc(-1 * var(--space-4));
-    border-radius: var(--radius-lg);
   }
   .rotina-cabecalho-clicavel .rotina-nome {
     flex: 1;
