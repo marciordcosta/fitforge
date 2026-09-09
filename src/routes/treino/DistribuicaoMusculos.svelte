@@ -987,6 +987,9 @@
   let modalMusculoRotina = $state<{ musculo: Musculo; itens: ItemMusculoRotina[]; multiRotina: boolean } | null>(null);
   /** Feedback visível no modal sobre o resultado da última troca de exercício. */
   let statusAjusteMusculo = $state<{ tipo: "ok" | "info" | "erro"; texto: string } | null>(null);
+  /** Item tocado na lista do modal por músculo — abre o menu "Detalhes"/"Rotina" em vez de ir
+   * direto pro detalhe do exercício. */
+  let menuItemMusculoModal = $state<ItemMusculoRotina | null>(null);
   /** Item cujo menu "Ver Exercício / Trocar Exercício" está aberto — usado tanto pelo modal
    * por músculo (read-only) quanto pelo editor completo da rotina. */
   let menuExercicioMusculo = $state<ItemMusculoRotina | null>(null);
@@ -1404,6 +1407,10 @@
    * novo no mesmo card limpa o filtro. Reordenar (arrastar) fica desligado enquanto ativo, pra não
    * bagunçar a ordem com itens escondidos no meio da lista. */
   let editorFiltroMusculoId = $state<string | null>(null);
+  /** Filtro com que o editor deve abrir já ativo (ex: veio de "Rotina" no menu de um exercício
+   * dentro do modal por músculo) — consumido uma vez em definirModalEditor, diferente de
+   * editorDestaqueMusculoId (que só realça, sem esconder o resto). */
+  let editorFiltroInicialId = $state<string | null>(null);
 
   /** Ligado pelo menu "Reordenar" de qualquer card — mostra a alça de arrastar em todos os
    * exercícios e desliga o toque-pra-abrir-modal enquanto ativo. "Concluído" desliga de volta. */
@@ -1593,16 +1600,20 @@
     modalEditorRotina = treino;
     capturarBaselineEditor(treino);
     editorSujo = false;
-    editorFiltroMusculoId = null;
+    editorFiltroMusculoId = editorFiltroInicialId;
+    editorFiltroInicialId = null;
     modoReordenarEditor = false;
     ordemMusculosEditor = "ponderado";
   }
 
   /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o
    * editor. `destaqueMusculoId` (opcional) marca qual músculo destacar nos exercícios do editor —
-   * usado quando se chega ali pela célula de um músculo específico na grade semanal. */
-  function abrirEditorRotina(treino: TreinoComExercicios, destaqueMusculoId: string | null = null): void {
+   * usado quando se chega ali pela célula de um músculo específico na grade semanal.
+   * `filtrarMusculoId` (opcional) já abre com o filtro daquele músculo ativo, escondendo o resto —
+   * usado ao escolher "Rotina" no menu de um exercício dentro do modal por músculo. */
+  function abrirEditorRotina(treino: TreinoComExercicios, destaqueMusculoId: string | null = null, filtrarMusculoId: string | null = null): void {
     editorDestaqueMusculoId = destaqueMusculoId;
+    editorFiltroInicialId = filtrarMusculoId;
     navigate(`/treino/distribuicao/rotina/${treino.id}/editor`);
   }
 
@@ -2240,6 +2251,14 @@
     <path d="M22 12A10 10 0 0 0 12 2v10z" />
   </svg>
 {/snippet}
+{#snippet iconRotina()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" />
+    <rect x="9" y="2" width="6" height="4" rx="1" />
+    <line x1="9" y1="12" x2="15" y2="12" />
+    <line x1="9" y1="16" x2="15" y2="16" />
+  </svg>
+{/snippet}
 {#snippet iconVerExercicio()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
@@ -2582,7 +2601,7 @@
           {@const variacaoPct = variacaoExercicioPct(item.exercicioId)}
           <button
             class="exercicio-musculo-item exercicio-musculo-item-btn"
-            onclick={() => navigate(`/treino/exercicios/${item.exercicioId}`)}
+            onclick={() => (menuItemMusculoModal = item)}
           >
             <span class="exercicio-musculo-coluna">
               <span class="exercicio-musculo-info">
@@ -2627,6 +2646,29 @@
       </div>
     {/if}
   </Sheet>
+{/if}
+
+{#if menuItemMusculoModal && modalMusculoRotina}
+  {@const item = menuItemMusculoModal}
+  {@const musculoId = modalMusculoRotina.musculo.id}
+  <!-- Precisa ficar acima do modal por músculo (Sheet, z-index 100). -->
+  <div class="acima-editor">
+    <ActionSheet
+      titulo={item.exercicioNome}
+      onFechar={() => (menuItemMusculoModal = null)}
+      opcoes={[
+        { label: "Detalhes", icon: iconVerExercicio, onSelect: () => navigate(`/treino/exercicios/${item.exercicioId}`) },
+        {
+          label: "Rotina",
+          icon: iconRotina,
+          onSelect: () => {
+            const treino = treinos.find((t) => t.id === item.treinoId);
+            if (treino) abrirEditorRotina(treino, null, musculoId);
+          },
+        },
+      ]}
+    />
+  </div>
 {/if}
 
 {#if menuExercicioMusculo}
