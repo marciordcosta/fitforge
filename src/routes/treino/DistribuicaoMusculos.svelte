@@ -588,10 +588,14 @@
     }
   }
 
-  /** Grade semanal: uma coluna por dia (seg→dom), com a rotina daquele dia (ou descanso) e as séries por músculo. */
+  /** Grade semanal: uma coluna por dia (seg→dom), com a rotina daquele dia (ou descanso) e as séries por músculo.
+   * Quando o editor completo de uma rotina está aberto (modalEditorRotina), essa rotina entra com o
+   * RASCUNHO ao vivo em vez do que está salvo — sem isso, inserir um exercício ou ajustar séries só
+   * refletia aqui depois de "Salvar". As outras rotinas da semana continuam vindo do que está salvo. */
   const gradeSemanal = $derived.by(() => {
+    const treinosParaGrade = modalEditorRotina ? treinos.map((t) => (t.id === modalEditorRotina!.id ? modalEditorRotina! : t)) : treinos;
     const colunas = ORDEM_DIAS.map((dia) => {
-      const treino = treinos.find((t) => t.dia_semana === dia) ?? null;
+      const treino = treinosParaGrade.find((t) => t.dia_semana === dia) ?? null;
       return {
         dia,
         treinoId: treino?.id ?? null,
@@ -615,14 +619,14 @@
     // que bater com o que está lá (o modo de editar meta é a única exceção: meta é sempre bruta,
     // então mostra/edita sempre o total, nunca ponderado/acumulado).
     const totaisPonderado = new Map<string, number>();
-    for (const t of treinos) {
+    for (const t of treinosParaGrade) {
       for (const [id, v] of contarSeriesPorMusculoPonderado(t)) {
         totaisPonderado.set(id, (totaisPonderado.get(id) ?? 0) + v);
       }
     }
-    const partesPorMusculo = partesFadigaSemanal();
+    const partesPorMusculo = partesFadigaSemanal(treinosParaGrade);
     const totaisGradual = new Map<string, number>();
-    for (const t of treinos) {
+    for (const t of treinosParaGrade) {
       for (const [id, v] of contarPesoGradualPorMusculo(t)) {
         totaisGradual.set(id, (totaisGradual.get(id) ?? 0) + v);
       }
@@ -677,9 +681,9 @@
    * rotinas, sem tentar achar uma "posição única" entre rotinas diferentes (que não existiria).
    * Mesma regra 20/30/50 das barras de cada rotina, agora funcionando com rotinas diferentes
    * porque a soma acontece DEPOIS de cada rotina já ter feito sua própria classificação. */
-  function partesFadigaSemanal(): Map<string, Partes> {
+  function partesFadigaSemanal(treinosLista: TreinoComExercicios[] = treinos): Map<string, Partes> {
     const mapa = new Map<string, Partes>();
-    for (const t of treinos) {
+    for (const t of treinosLista) {
       for (const [musculoId, partes] of contarSeriesPorFaixaDePosicao(t)) {
         mapa.set(musculoId, somarPartes(mapa.get(musculoId) ?? partesVazias(), partes));
       }
