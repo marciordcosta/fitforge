@@ -476,9 +476,14 @@
   let mostrarGradeSemanal = $state(false);
   /** null = mostra todos os músculos; caso contrário, restringe a grade a esses ids (série clicada ou rotina do card). */
   let filtroMusculosGrade = $state<Set<string> | null>(null);
+  /** Dia da rotina sendo editada, quando a grade é aberta a partir do editor completo — destaca
+   * essa coluna no cabeçalho (os outros dias continuam aparecendo, pra dar contexto da semana
+   * toda, já que o filtro é por músculo, não por dia). null = nenhum destaque. */
+  let diaDestacadoGrade = $state<number | null>(null);
 
-  function abrirGradeSemanal(musculoIds: string[] | null): void {
+  function abrirGradeSemanal(musculoIds: string[] | null, diaDestaque: number | null = null): void {
     filtroMusculosGrade = musculoIds ? new Set(musculoIds) : null;
+    diaDestacadoGrade = diaDestaque;
     modoEdicaoMetas = false;
     mostrarGradeSemanal = true;
   }
@@ -2330,7 +2335,7 @@
           <tr>
             <th class="grade-col-musculo"></th>
             {#each gradeSemanal.colunas as col (col.dia)}
-              <th>
+              <th class:grade-col-destacada={col.dia === diaDestacadoGrade}>
                 {#if col.treinoId && col.treinoNome && modoEdicaoMetas}
                   <button
                     class="grade-cabecalho-btn"
@@ -2904,7 +2909,7 @@
               // Acompanha a coluna selecionada no card do editor — sem isso a grade sempre abria
               // em "Pond." (padrão de ordemSemanal), ignorando Total/Acum. escolhido ali.
               ordemSemanal = ordemMusculosEditor;
-              abrirGradeSemanal(metasEditor.map((item) => item.musculo.id));
+              abrirGradeSemanal(metasEditor.map((item) => item.musculo.id), modalEditorRotina!.dia_semana);
             }}
             aria-label="Ver distribuição na semana"
           >
@@ -3438,6 +3443,13 @@
     max-width: 80px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  /* Dia da rotina sendo editada (grade aberta a partir do editor completo) — os outros dias
+     continuam com os valores deles, só esse ganha destaque pra achar rápido em qual coluna
+     olhar. */
+  .grade-tabela th.grade-col-destacada {
+    background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   }
   .grade-tabela .grade-col-musculo {
     text-align: left;
