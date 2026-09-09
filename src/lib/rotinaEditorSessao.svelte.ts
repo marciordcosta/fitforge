@@ -22,11 +22,17 @@ export interface Linha {
   series: LinhaSerie[];
 }
 
+/** Picker de exercício deixado aberto quando a tela foi abandonada (ex: tocar no nome pra ver o
+ * detalhe do exercício) — restaurado ao remontar, com a busca digitada preservada, em vez de
+ * cair de volta na tela de rotina "pelada". null = nenhum picker aberto. */
+export type PickerRotinaAberto = { modo: "adicionar"; busca: string } | { modo: "substituir"; idx: number; busca: string } | null;
+
 export interface SessaoEdicaoRotina {
   treinoId: string | null;
   nomeTreino: string;
   diaSemana: number | null;
   linhas: Linha[];
+  picker: PickerRotinaAberto;
 }
 
 interface EstadoPersistido {

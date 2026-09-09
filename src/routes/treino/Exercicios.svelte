@@ -29,6 +29,11 @@
     tituloSelecao = "Adicionar Exercício",
     buscaInicial = "",
     excluirIds = [],
+    // Bindable — o padrão cobre os dois usos que não se importam com o valor (tela cheia lembra
+    // sozinha via ultimaBuscaExercicios; um picker novo começa em buscaInicial); quem PRECISA
+    // sobreviver a uma navegação (ex: ver detalhe de um exercício e voltar) faz bind:busca e
+    // persiste esse valor no lugar certo (ex: rotinaEditorSessao), reabrindo o picker com ele.
+    busca = $bindable(untrack(() => (modoSelecao ? buscaInicial : ultimaBuscaExercicios))),
     onSelecionar,
     onFechar,
   }: {
@@ -36,6 +41,7 @@
     tituloSelecao?: string;
     buscaInicial?: string;
     excluirIds?: string[];
+    busca?: string;
     onSelecionar?: (ex: Exercicio) => void | Promise<void>;
     onFechar?: () => void;
   } = $props();
@@ -44,8 +50,6 @@
   let loading = $state(true);
   let mostrarCriarMenu = $state(false);
   let selecionandoId = $state<string | null>(null);
-
-  let busca = $state(untrack(() => (modoSelecao ? buscaInicial : ultimaBuscaExercicios)));
 
   $effect(() => {
     if (!modoSelecao) ultimaBuscaExercicios = busca;

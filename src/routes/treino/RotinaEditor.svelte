@@ -27,6 +27,10 @@
   let loading = $state(true);
   let salvando = $state(false);
   let mostrarPicker = $state(false);
+  /** Busca digitada no picker (Adicionar/Substituir) — persistida em rotinaEditorSessao (junto
+   * com qual picker estava aberto) pra sobreviver a tocar no nome de um exercício pra ver o
+   * detalhe e voltar, em vez de cair de volta na tela de rotina "pelada". */
+  let buscaPicker = $state("");
   let mostrarDiaPicker = $state(false);
 
   const opcoesDia = [
@@ -56,6 +60,13 @@
         nomeTreino = salva.nomeTreino;
         diaSemana = salva.diaSemana;
         linhas = salva.linhas;
+        if (salva.picker?.modo === "adicionar") {
+          mostrarPicker = true;
+          buscaPicker = salva.picker.busca;
+        } else if (salva.picker?.modo === "substituir") {
+          substituindoIdx = salva.picker.idx;
+          buscaPicker = salva.picker.busca;
+        }
         loading = false;
         return;
       }
@@ -104,7 +115,12 @@
 
   $effect(() => {
     if (loading || erroCarregar) return;
-    rotinaEditorSessao.iniciar({ treinoId, nomeTreino, diaSemana, linhas });
+    const picker = mostrarPicker
+      ? ({ modo: "adicionar", busca: buscaPicker } as const)
+      : substituindoIdx != null
+        ? ({ modo: "substituir", idx: substituindoIdx, busca: buscaPicker } as const)
+        : null;
+    rotinaEditorSessao.iniciar({ treinoId, nomeTreino, diaSemana, linhas, picker });
   });
 
   void carregar();
@@ -177,6 +193,7 @@
 
   function fecharSubstituir() {
     substituindoIdx = null;
+    buscaPicker = "";
   }
 
   /** Troca o exercício da linha mantendo a mesma quantidade de séries, com metas
@@ -435,7 +452,7 @@
 {/if}
 
 {#if substituindoIdx !== null}
-  <Exercicios modoSelecao tituloSelecao="Substituir por" onSelecionar={substituirExercicio} onFechar={fecharSubstituir} />
+  <Exercicios modoSelecao tituloSelecao="Substituir por" bind:busca={buscaPicker} onSelecionar={substituirExercicio} onFechar={fecharSubstituir} />
 {/if}
 
 {#if mostrarPicker}
@@ -443,8 +460,12 @@
     modoSelecao
     tituloSelecao="Adicionar Exercício"
     excluirIds={linhas.map((l) => l.exercicio_id)}
+    bind:busca={buscaPicker}
     onSelecionar={adicionarRapido}
-    onFechar={() => (mostrarPicker = false)}
+    onFechar={() => {
+      mostrarPicker = false;
+      buscaPicker = "";
+    }}
   />
 {/if}
 
