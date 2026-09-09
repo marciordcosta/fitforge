@@ -3381,13 +3381,22 @@
   }
   .grade-tabela {
     border-collapse: collapse;
-    width: 100%;
+    /* table-layout: fixed + largura explícita em cada coluna (abaixo) — sem isso, um dia de
+       descanso (sem nada além do 💤) ficava mais estreito que um dia com rotina, coluna a
+       coluna com larguras diferentes em vez de uma grade uniforme. Sem width:100%: a tabela
+       fica só do tamanho que precisa (soma das colunas), rolando por dentro de .grade-scroll
+       quando não couber, em vez de esticar pra preencher a tela. */
+    table-layout: fixed;
   }
   .grade-tabela th,
   .grade-tabela td {
     padding: var(--space-1);
     text-align: center;
     white-space: nowrap;
+  }
+  .grade-tabela th:not(.grade-col-musculo):not(.grade-col-total),
+  .grade-tabela td.grade-valor:not(.grade-col-total) {
+    width: 56px;
   }
   .grade-tabela th:not(:first-child),
   .grade-tabela td:not(:first-child) {
@@ -3428,18 +3437,21 @@
     left: 0;
     background: var(--surface-card);
     padding-left: 0;
-    max-width: 68px;
+    width: 68px;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* Soma dos dias — separada com uma borda mais forte pra não confundir com mais um dia da semana. */
+  /* Soma dos dias — separada com uma borda mais forte pra não confundir com mais um dia da semana;
+     mais larga que os dias porque o texto "atual/meta" (ex: "9/11.5") não cabe em 56px. */
   .grade-tabela th.grade-col-total {
+    width: 72px;
     font-size: var(--font-size-sm);
     font-weight: 700;
     color: var(--surface-fg);
     border-left: 1px solid var(--surface-fg) !important;
   }
   .grade-tabela td.grade-col-total {
+    width: 72px;
     border-left: 1px solid var(--surface-fg) !important;
   }
   .grade-valor-total {
