@@ -22,6 +22,9 @@
     salvarMetaMusculo,
     limparMetasMusculoRotina,
     getRegistrosPorTreinoDesde,
+    getParametrosDistribuicao,
+    fatorPerformanceGradual,
+    PARAMETROS_DISTRIBUICAO_PADRAO,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
     abreviarMusculo,
@@ -29,11 +32,16 @@
     type TreinoComExercicios,
     type TreinoExercicio,
     type Exercicio,
+    type ParametrosDistribuicao,
   } from "../../lib/treinoApi";
 
   let aba = $state<"planejado" | "realizado">("planejado");
   let musculos = $state<Musculo[]>([]);
   let treinos = $state<TreinoComExercicios[]>([]);
+  /** Configurações de volume (Manutenção/Foco) e modo de fadiga (Fases/Gradual) — telas de
+   * Parametrização (engrenagem em Rotinas). Ausência de linha salva = usa os padrões, mesmo
+   * comportamento de antes dessa tela existir. */
+  let parametrosDistribuicao = $state<ParametrosDistribuicao>(PARAMETROS_DISTRIBUICAO_PADRAO);
 
   let mesBase = $state(new Date());
   let linhasRealizadoMes = $state<{ data: string; musculo_id: string; series_equivalentes: number }[]>([]);
@@ -106,14 +114,16 @@
   }
 
   async function carregarBase() {
-    const [musculosCarregados, treinosCarregados, metasCarregadas] = await Promise.all([
+    const [musculosCarregados, treinosCarregados, metasCarregadas, parametros] = await Promise.all([
       listMusculos(),
       listTreinos(),
       listMetasMusculo(),
+      getParametrosDistribuicao(),
     ]);
     musculos = musculosCarregados;
     treinos = ordenarPorDia(treinosCarregados);
     metasMusculo = new Map(metasCarregadas.map((m) => [chaveMeta(m.treino_id, m.musculo_id), m.meta_series]));
+    parametrosDistribuicao = parametros;
     void carregarHistoricoTodos(treinosCarregados);
     void carregarRegistrosPorTreino(treinosCarregados);
     await carregarRealizado();
@@ -240,6 +250,26 @@
     return mapa;
   }
 
+  /** Mesmo loop de posição de contarSeriesPorFaixaDePosicao, só que somando o fator de
+   * performance contínuo (fatorPerformanceGradual) em vez de bucketizar em 3 faixas fixas —
+   * usado quando o modo de fadiga (Parametrização) é "gradual" em vez de "fases". */
+  function contarPesoGradualPorMusculo(treino: TreinoComExercicios): Map<string, number> {
+    const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+    const mapa = new Map<string, number>();
+    let posicao = 0;
+    for (const ex of exerciciosOrdenados) {
+      const musculosEx = ex.exercicio?.musculos ?? [];
+      for (let s = 0; s < ex.series.length; s++) {
+        posicao += 1;
+        const fator = fatorPerformanceGradual(posicao, parametrosDistribuicao.fadigaGradualC, parametrosDistribuicao.fadigaGradualD);
+        for (const m of musculosEx) {
+          mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + m.peso_contribuicao * fator);
+        }
+      }
+    }
+    return mapa;
+  }
+
   /**
    * Distribuição estática de cada rotina (sem acompanhamento ao vivo — isso fica só no
    * card semanal). Modo de contribuição: cada série soma peso_contribuicao pra cada
@@ -255,8 +285,9 @@
     bruto: number;
     pct: number;
     partes: Partes;
+    pesoGradual: number;
     musculo: Musculo | null;
-    subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes }[] | null;
+    subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes; pesoGradual: number }[] | null;
   }
 
   const distribuicaoPorTreino = $derived.by(() => {
@@ -265,12 +296,14 @@
       const mapaValor = contarSeriesPorMusculoPonderado(t);
       const mapaBruto = contarSeriesPorMusculo(t);
       const mapaFaixaPosicao = contarSeriesPorFaixaDePosicao(t);
+      const mapaGradual = contarPesoGradualPorMusculo(t);
       const itens = musculos
         .map((m) => ({
           musculo: m,
           valor: mapaValor.get(m.id) ?? 0,
           bruto: mapaBruto.get(m.id) ?? 0,
           partes: mapaFaixaPosicao.get(m.id) ?? partesVazias(),
+          pesoGradual: mapaGradual.get(m.id) ?? 0,
         }))
         .filter((item) => item.valor > 0);
 
@@ -295,6 +328,7 @@
           valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
           bruto: grupo.itens.reduce((acc, i) => acc + i.bruto, 0),
           partes: somarPartes(...grupo.itens.map((i) => i.partes)),
+          pesoGradual: grupo.itens.reduce((acc, i) => acc + i.pesoGradual, 0),
           musculo: null,
           subItens: grupo.itens,
         });
@@ -306,6 +340,7 @@
           valor: item.valor,
           bruto: item.bruto,
           partes: item.partes,
+          pesoGradual: item.pesoGradual,
           musculo: item.musculo,
           subItens: null,
         });
@@ -340,11 +375,21 @@
     treinosExpandidos = copia;
   }
 
-  /** Número de séries "efetivo" no modo por fadiga: desconta pela faixa em que cada série caiu
-   * (A = fresco, conta cheio; B = meio, 70%; C = mais fatigado, 40%) — uma forma de aproximar
-   * quanto do volume bruto realmente equivale a estímulo de qualidade. */
+  /** Número de séries "efetivo" no modo por fadiga "Fases": desconta pela faixa em que cada série
+   * caiu (A = fresco, conta cheio; B = meio, 70%; C = mais fatigado, 40%) — uma forma de
+   * aproximar quanto do volume bruto realmente equivale a estímulo de qualidade. */
   function valorEfetivoFadiga(partes: Partes): number {
     return partes.a * 1 + partes.b * 0.7 + partes.c * 0.4;
+  }
+
+  /** Ponto único de decisão do modo de fadiga (Parametrização): no modo "gradual" usa a soma do
+   * fator de performance contínuo (contarPesoGradualPorMusculo), já calculada e anexada ao item
+   * como pesoGradual; no modo "fases" (padrão) usa a escada de 3 faixas de sempre. Só um lugar
+   * pra trocar de fórmula em vez de espalhar o `if` do modo pelos ~10 lugares que mostravam
+   * valorEfetivoFadiga(partes) direto. */
+  function valorAcumulado(item: { partes: Partes; pesoGradual?: number }): number {
+    if (parametrosDistribuicao.fadigaModo === "gradual" && item.pesoGradual != null) return item.pesoGradual;
+    return valorEfetivoFadiga(item.partes);
   }
 
   type CampoOrdenacaoSeries = "total" | "ponderado" | "acumulado";
@@ -353,16 +398,22 @@
    * rótulo/valor da coluna pra escolher. */
   let ordemSemanal = $state<CampoOrdenacaoSeries>("ponderado");
 
-  function valorPorCampoOrdenacao(item: { valor: number; bruto: number; partes: Partes }, campo: CampoOrdenacaoSeries): number {
+  function valorPorCampoOrdenacao(item: { valor: number; bruto: number; partes: Partes; pesoGradual?: number }, campo: CampoOrdenacaoSeries): number {
     if (campo === "total") return item.bruto;
-    if (campo === "acumulado") return valorEfetivoFadiga(item.partes);
+    if (campo === "acumulado") return valorAcumulado(item);
     return item.valor;
   }
 
   /** Ordena pela coluna escolhida (total bruto, ponderado ou acumulado/fadiga) — usado tanto na
    * Distribuição Semanal quanto nos cards de cada rotina, pra manter os 2 lugares consistentes. */
   function ordenarPorCampo<
-    T extends { valor: number; bruto: number; partes: Partes; subItens: { valor: number; bruto: number; partes: Partes }[] | null },
+    T extends {
+      valor: number;
+      bruto: number;
+      partes: Partes;
+      pesoGradual?: number;
+      subItens: { valor: number; bruto: number; partes: Partes; pesoGradual?: number }[] | null;
+    },
   >(lista: T[], campo: CampoOrdenacaoSeries): T[] {
     return lista
       .map((item) =>
@@ -388,8 +439,9 @@
       valor: number;
       bruto: number;
       partes: Partes;
+      pesoGradual?: number;
       musculo: Musculo | null;
-      subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes }[] | null;
+      subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes; pesoGradual?: number }[] | null;
     },
   >(lista: T[], campo: CampoOrdenacaoSeries): { itensGrupo: { nome: string; valor: number }[]; itens: { musculo: Musculo; valor: number }[]; total: number } {
     const itensGrupo = lista
@@ -397,7 +449,11 @@
       .filter((i) => i.valor > 0)
       .sort((a, b) => b.valor - a.valor);
     const itens = lista
-      .flatMap((item) => item.subItens ?? (item.musculo ? [{ musculo: item.musculo, valor: item.valor, bruto: item.bruto, partes: item.partes }] : []))
+      .flatMap(
+        (item) =>
+          item.subItens ??
+          (item.musculo ? [{ musculo: item.musculo, valor: item.valor, bruto: item.bruto, partes: item.partes, pesoGradual: item.pesoGradual }] : []),
+      )
       .map((item) => ({ musculo: item.musculo, valor: valorPorCampoOrdenacao(item, campo) }))
       .filter((i) => i.valor > 0)
       .sort((a, b) => b.valor - a.valor);
@@ -512,6 +568,7 @@
         mapa: treino ? contarSeriesPorMusculo(treino) : new Map<string, number>(),
         mapaPonderado: treino ? contarSeriesPorMusculoPonderado(treino) : new Map<string, number>(),
         mapaPartes: treino ? contarSeriesPorFaixaDePosicao(treino) : new Map<string, Partes>(),
+        mapaGradual: treino ? contarPesoGradualPorMusculo(treino) : new Map<string, number>(),
       };
     });
 
@@ -533,6 +590,12 @@
       }
     }
     const partesPorMusculo = partesFadigaSemanal();
+    const totaisGradual = new Map<string, number>();
+    for (const t of treinos) {
+      for (const [id, v] of contarPesoGradualPorMusculo(t)) {
+        totaisGradual.set(id, (totaisGradual.get(id) ?? 0) + v);
+      }
+    }
     const campo = ordemSemanal;
 
     const linhas = musculos
@@ -540,11 +603,21 @@
       .filter((m) => filtroMusculosGrade === null || filtroMusculosGrade.has(m.id))
       .sort((a, b) => {
         const va = valorPorCampoOrdenacao(
-          { valor: totaisPonderado.get(a.id) ?? 0, bruto: totais.get(a.id) ?? 0, partes: partesPorMusculo.get(a.id) ?? partesVazias() },
+          {
+            valor: totaisPonderado.get(a.id) ?? 0,
+            bruto: totais.get(a.id) ?? 0,
+            partes: partesPorMusculo.get(a.id) ?? partesVazias(),
+            pesoGradual: totaisGradual.get(a.id) ?? 0,
+          },
           campo,
         );
         const vb = valorPorCampoOrdenacao(
-          { valor: totaisPonderado.get(b.id) ?? 0, bruto: totais.get(b.id) ?? 0, partes: partesPorMusculo.get(b.id) ?? partesVazias() },
+          {
+            valor: totaisPonderado.get(b.id) ?? 0,
+            bruto: totais.get(b.id) ?? 0,
+            partes: partesPorMusculo.get(b.id) ?? partesVazias(),
+            pesoGradual: totaisGradual.get(b.id) ?? 0,
+          },
           campo,
         );
         return vb - va;
@@ -554,7 +627,10 @@
         valores: colunas.map((col) => {
           const bruto = col.mapa.get(m.id) ?? 0;
           const ponderado = col.mapaPonderado.get(m.id) ?? 0;
-          const acumulado = valorEfetivoFadiga(col.mapaPartes.get(m.id) ?? partesVazias());
+          const acumulado = valorAcumulado({
+            partes: col.mapaPartes.get(m.id) ?? partesVazias(),
+            pesoGradual: col.mapaGradual.get(m.id) ?? 0,
+          });
           const display = campo === "total" ? bruto : campo === "ponderado" ? ponderado : acumulado;
           return { bruto, display };
         }),
@@ -580,6 +656,18 @@
     return mapa;
   }
 
+  /** Peso gradual (fatorPerformanceGradual) de cada músculo, somado entre TODAS as rotinas da
+   * semana — mesmo princípio de partesFadigaSemanal, só que pro modo de fadiga "gradual". */
+  function pesoGradualSemanal(): Map<string, number> {
+    const mapa = new Map<string, number>();
+    for (const t of treinos) {
+      for (const [musculoId, peso] of contarPesoGradualPorMusculo(t)) {
+        mapa.set(musculoId, (mapa.get(musculoId) ?? 0) + peso);
+      }
+    }
+    return mapa;
+  }
+
   const distribuicaoSemanal = $derived.by(() => {
     const mapa = new Map<string, number>();
     const mapaBruto = new Map<string, number>();
@@ -596,12 +684,14 @@
       }
     }
     const partesPorMusculo = partesFadigaSemanal();
+    const gradualPorMusculo = pesoGradualSemanal();
     return musculos
       .map((m) => {
         const valor = Math.round(mapa.get(m.id) ?? 0);
         const bruto = Math.round(mapaBruto.get(m.id) ?? 0);
         const partes = partesPorMusculo.get(m.id) ?? partesVazias();
-        return { musculo: m, valor, bruto, partes };
+        const pesoGradual = gradualPorMusculo.get(m.id) ?? 0;
+        return { musculo: m, valor, bruto, partes, pesoGradual };
       })
       .filter((item) => item.valor > 0)
       .sort((a, b) => b.valor - a.valor);
@@ -613,10 +703,11 @@
     valor: number;
     bruto: number;
     partes: Partes;
+    pesoGradual: number;
     /** Preenchido só quando a linha é um músculo avulso (sem agrupamento) — usado pra abrir os exercícios dele. */
     musculo: Musculo | null;
     /** null = músculo avulso; senão, os músculos que compõem o total do grupo. */
-    subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes }[] | null;
+    subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes; pesoGradual: number }[] | null;
   }
 
   let gruposExpandidos = $state<Set<string>>(new Set());
@@ -653,8 +744,9 @@
         valor: grupo.itens.reduce((acc, i) => acc + i.valor, 0),
         bruto: grupo.itens.reduce((acc, i) => acc + i.bruto, 0),
         partes: somarPartes(...grupo.itens.map((i) => i.partes)),
+        pesoGradual: grupo.itens.reduce((acc, i) => acc + i.pesoGradual, 0),
         musculo: null,
-        subItens: grupo.itens.map((i) => ({ musculo: i.musculo, valor: i.valor, bruto: i.bruto, partes: i.partes })),
+        subItens: grupo.itens.map((i) => ({ musculo: i.musculo, valor: i.valor, bruto: i.bruto, partes: i.partes, pesoGradual: i.pesoGradual })),
       });
     }
     for (const item of avulsos) {
@@ -664,6 +756,7 @@
         valor: item.valor,
         bruto: item.bruto,
         partes: item.partes,
+        pesoGradual: item.pesoGradual,
         musculo: item.musculo,
         subItens: null,
       });
@@ -702,9 +795,13 @@
     void carregarRealizado();
   }
 
+  /** Classifica o volume semanal por músculo pelos landmarks configuráveis em Parametrização —
+   * 12+ séries é bom pra hipertrofia (não "demais"/errado), por isso ganha destaque em vez do
+   * vermelho que a régua fixa antiga usava pra "acima do normal". */
   function corVolume(v: number): string {
-    if (v > 10) return "var(--color-negative)";
-    if (v >= 5) return "var(--color-success)";
+    const p = parametrosDistribuicao;
+    if (v >= p.seriesFocoMin) return "var(--color-primary)";
+    if (v >= p.seriesManutencaoMin) return "var(--color-success)";
     return "var(--color-neutral)";
   }
 
@@ -911,7 +1008,8 @@
       totalBruto += contarSeriesPorMusculo(treino).get(musculo.id) ?? 0;
       totalValido += contarSeriesPorMusculoPonderado(treino).get(musculo.id) ?? 0;
       const partes = contarSeriesPorFaixaDePosicao(treino).get(musculo.id) ?? partesVazias();
-      totalAcumulado += valorEfetivoFadiga(partes);
+      const pesoGradual = contarPesoGradualPorMusculo(treino).get(musculo.id) ?? 0;
+      totalAcumulado += valorAcumulado({ partes, pesoGradual });
     }
     return { totalBruto, totalValido, totalAcumulado };
   });
@@ -952,31 +1050,40 @@
     return "estavel";
   }
 
-  /** Peso de fadiga (0.4 a 1) de cada exercício da rotina, pela posição das séries dele —
-   * reaproveita a mesma faixa A/B/C por posição (contarSeriesPorFaixaDePosicao/valorEfetivoFadiga)
-   * que já desconta o "Acumulado": um exercício de fim de treino (mais fadigado) pesa menos na
-   * tendência por músculo, mas nunca some da conta (nunca zero). */
+  /** Peso de fadiga (0 a 1) de cada exercício da rotina, pela posição das séries dele —
+   * reaproveita a mesma conta do "Acumulado" (valorAcumulado, sensível ao modo Fases/Gradual
+   * escolhido em Parametrização) que já desconta o volume: um exercício de fim de treino (mais
+   * fadigado) pesa menos na tendência por músculo, mas nunca some da conta (nunca zero). */
   function pesosFadigaPorExercicio(treino: TreinoComExercicios): Map<string, number> {
     const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
     const totalSeries = exerciciosOrdenados.reduce((acc, ex) => acc + ex.series.length, 0);
     const partesPorExercicio = new Map<string, Partes>();
+    const gradualPorExercicio = new Map<string, number>();
     if (!totalSeries) return new Map();
     let posicao = 0;
     for (const ex of exerciciosOrdenados) {
       const partes = partesPorExercicio.get(ex.id) ?? partesVazias();
+      let somaGradual = gradualPorExercicio.get(ex.id) ?? 0;
       for (let s = 0; s < ex.series.length; s++) {
         posicao += 1;
         const cor = corPorFaixa((posicao / totalSeries) * 100);
         if (cor === CORES_FAIXA.a) partes.a += 1;
         else if (cor === CORES_FAIXA.b) partes.b += 1;
         else partes.c += 1;
+        somaGradual += fatorPerformanceGradual(posicao, parametrosDistribuicao.fadigaGradualC, parametrosDistribuicao.fadigaGradualD);
       }
       partesPorExercicio.set(ex.id, partes);
+      gradualPorExercicio.set(ex.id, somaGradual);
     }
     const pesos = new Map<string, number>();
     for (const [id, partes] of partesPorExercicio) {
       const total = partes.a + partes.b + partes.c;
-      pesos.set(id, total > 0 ? valorEfetivoFadiga(partes) / total : 1);
+      if (total <= 0) {
+        pesos.set(id, 1);
+        continue;
+      }
+      const pesoGradual = gradualPorExercicio.get(id) ?? 0;
+      pesos.set(id, valorAcumulado({ partes, pesoGradual }) / total);
     }
     return pesos;
   }
@@ -1408,6 +1515,7 @@
     const atual = contarSeriesPorMusculo(modalEditorRotina);
     const ponderado = contarSeriesPorMusculoPonderado(modalEditorRotina);
     const posicao = contarSeriesPorFaixaDePosicao(modalEditorRotina);
+    const posicaoGradual = contarPesoGradualPorMusculo(modalEditorRotina);
     const resultado: {
       musculo: Musculo;
       meta: number | null;
@@ -1415,6 +1523,7 @@
       ponderado: number;
       acumulado: number;
       partes: Partes;
+      pesoGradual: number;
       impactoPct: number;
     }[] = [];
     for (const m of musculos) {
@@ -1422,13 +1531,15 @@
       const meta = metasMusculo.get(chaveMeta(modalEditorRotina.id, m.id)) ?? null;
       if (valorAtual <= 0 && meta == null) continue;
       const partes = posicao.get(m.id) ?? partesVazias();
+      const pesoGradual = posicaoGradual.get(m.id) ?? 0;
       resultado.push({
         musculo: m,
         meta,
         atual: valorAtual,
         ponderado: ponderado.get(m.id) ?? 0,
-        acumulado: valorEfetivoFadiga(partes),
+        acumulado: valorAcumulado({ partes, pesoGradual }),
         partes,
+        pesoGradual,
         impactoPct: impactoTotalMusculo(m.id),
       });
     }
@@ -1438,8 +1549,8 @@
     const campo = ordemMusculosEditor;
     return resultado.sort(
       (a, b) =>
-        valorPorCampoOrdenacao({ valor: b.ponderado, bruto: b.atual, partes: b.partes }, campo) -
-        valorPorCampoOrdenacao({ valor: a.ponderado, bruto: a.atual, partes: a.partes }, campo),
+        valorPorCampoOrdenacao({ valor: b.ponderado, bruto: b.atual, partes: b.partes, pesoGradual: b.pesoGradual }, campo) -
+        valorPorCampoOrdenacao({ valor: a.ponderado, bruto: a.atual, partes: a.partes, pesoGradual: a.pesoGradual }, campo),
     );
   });
 
@@ -1902,14 +2013,14 @@
                     <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(linha.musculo)}>{linha.nome}</button>
                   {/if}
                   {@render barraFadiga(linha.partes, linha.partes.a + linha.partes.b + linha.partes.c)}
-                  {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes), ordemSemanal, (campo) => (ordemSemanal = campo))}
+                  {@render caixasSeries(linha.bruto, linha.valor, valorAcumulado(linha), ordemSemanal, (campo) => (ordemSemanal = campo))}
                 </div>
                 {#if aberto && linha.subItens}
                   {#each linha.subItens as sub (sub.musculo.id)}
                     <div class="item item-sub">
                       <button class="nome-btn" onclick={() => abrirExercicios(sub.musculo)}>{sub.musculo.nome}</button>
                       {@render barraFadiga(sub.partes, sub.partes.a + sub.partes.b + sub.partes.c)}
-                      {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes), ordemSemanal, (campo) => (ordemSemanal = campo))}
+                      {@render caixasSeries(sub.bruto, sub.valor, valorAcumulado(sub), ordemSemanal, (campo) => (ordemSemanal = campo))}
                     </div>
                   {/each}
                 {/if}
@@ -1969,14 +2080,14 @@
                         <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                       {/if}
                       {@render barraFadiga(linha.partes, linha.valor)}
-                      {@render caixasSeries(linha.bruto, linha.valor, valorEfetivoFadiga(linha.partes), ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
+                      {@render caixasSeries(linha.bruto, linha.valor, valorAcumulado(linha), ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
                     </div>
                     {#if aberto && linha.subItens}
                       {#each linha.subItens as sub (sub.musculo.id)}
                         <div class="item item-sub">
                           <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                           {@render barraFadiga(sub.partes, sub.valor)}
-                          {@render caixasSeries(sub.bruto, sub.valor, valorEfetivoFadiga(sub.partes), ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
+                          {@render caixasSeries(sub.bruto, sub.valor, valorAcumulado(sub), ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
                         </div>
                       {/each}
                     {/if}

@@ -1165,3 +1165,67 @@ export async function getRegistrosPorTreinoPeriodo(
   if (error) throw error;
   return data ?? [];
 }
+
+// ---------------- Parametrização (Distribuição): volume semanal e modo de fadiga por posição ----------------
+
+export type FadigaModo = "fases" | "gradual";
+
+export interface ParametrosDistribuicao {
+  seriesManutencaoMin: number;
+  seriesManutencaoMax: number;
+  seriesFocoMin: number;
+  fadigaModo: FadigaModo;
+  fadigaGradualC: number;
+  fadigaGradualD: number;
+}
+
+export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
+  seriesManutencaoMin: 4,
+  seriesManutencaoMax: 6,
+  seriesFocoMin: 12,
+  fadigaModo: "fases",
+  fadigaGradualC: 0.12,
+  fadigaGradualD: 0.025,
+};
+
+export async function getParametrosDistribuicao(): Promise<ParametrosDistribuicao> {
+  const { data, error } = await supabase
+    .from("treino_parametros")
+    .select("series_manutencao_min, series_manutencao_max, series_foco_min, fadiga_modo, fadiga_gradual_c, fadiga_gradual_d")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return PARAMETROS_DISTRIBUICAO_PADRAO;
+  return {
+    seriesManutencaoMin: data.series_manutencao_min,
+    seriesManutencaoMax: data.series_manutencao_max,
+    seriesFocoMin: data.series_foco_min,
+    fadigaModo: data.fadiga_modo === "gradual" ? "gradual" : "fases",
+    fadigaGradualC: data.fadiga_gradual_c,
+    fadigaGradualD: data.fadiga_gradual_d,
+  };
+}
+
+export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): Promise<void> {
+  const { error } = await supabase.from("treino_parametros").upsert({
+    user_id: uid(),
+    series_manutencao_min: p.seriesManutencaoMin,
+    series_manutencao_max: p.seriesManutencaoMax,
+    series_foco_min: p.seriesFocoMin,
+    fadiga_modo: p.fadigaModo,
+    fadiga_gradual_c: p.fadigaGradualC,
+    fadiga_gradual_d: p.fadigaGradualD,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+/** Fator de performance da série `n` (1-indexada) no modo Gradual — decaimento contínuo em vez
+ * da escada de 3 fases fixas (Fases). `F_acumulado = c·ln(n) + (n-1)·d`: `c` é a queda rápida
+ * das primeiras séries, `d` é o desgaste residual constante que o descanso não recupera. Nunca
+ * negativo: numa rotina muito longa o fator só chega a zero, não vira "fadiga a mais" sem
+ * sentido. Pura e sem I/O — reaproveitada tanto pelo motor de cálculo quanto pela pré-
+ * visualização da tela de Parametrização. */
+export function fatorPerformanceGradual(n: number, c: number, d: number): number {
+  const fAcumulado = c * Math.log(n) + (n - 1) * d;
+  return Math.max(0, 1 - fAcumulado);
+}

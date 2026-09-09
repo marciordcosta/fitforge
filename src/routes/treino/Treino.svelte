@@ -17,6 +17,7 @@
   import AgrupamentoMuscularDetalhe from "./AgrupamentoMuscularDetalhe.svelte";
   import AgrupamentoMuscularForm from "./AgrupamentoMuscularForm.svelte";
   import DistribuicaoMusculos from "./DistribuicaoMusculos.svelte";
+  import DistribuicaoParametrizacao from "./DistribuicaoParametrizacao.svelte";
   import HistoricoCalendario from "./HistoricoCalendario.svelte";
   import HistoricoDia from "./HistoricoDia.svelte";
 
@@ -63,6 +64,8 @@
   <AgrupamentosMusculares />
 {:else if segmentos[0] === "distribuicao"}
   <DistribuicaoMusculos />
+{:else if segmentos[0] === "parametrizacao"}
+  <DistribuicaoParametrizacao />
 {:else if segmentos[0] === "historico" && segmentos[1] === "avulso" && segmentos[2]}
   <HistoricoDia treinoId={null} data={segmentos[2]} destaqueExercicioId={segmentos[3] ?? null} />
 {:else if segmentos[0] === "historico" && segmentos[1] && segmentos[2]}
