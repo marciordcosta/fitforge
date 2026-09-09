@@ -2898,7 +2898,11 @@
           )} séries
         </span>
         <div class="editor-totais-acoes">
-          <button class="rotina-grafico-btn" onclick={() => abrirGradeSemanal(null)} aria-label="Ver distribuição na semana">
+          <button
+            class="rotina-grafico-btn"
+            onclick={() => abrirGradeSemanal(metasEditor.map((item) => item.musculo.id))}
+            aria-label="Ver distribuição na semana"
+          >
             {@render iconGrade()}
           </button>
           <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!, ordemMusculosEditor)} aria-label="Ver anel por dominância">
