@@ -503,6 +503,14 @@
     return `${treinoId}:${musculoId}`;
   }
 
+  /** Meta salva pra esse treino+músculo, só se tiver sido definida na mesma coluna `campo` que
+   * está selecionada agora (unidades diferentes não se comparam) — usado tanto célula a célula
+   * quanto pra somar a "meta total" da linha na grade. */
+  function metaParaCampo(treinoId: string, musculoId: string, campo: CampoOrdenacaoSeries): number | undefined {
+    const metaObj = metasMusculo.get(chaveMeta(treinoId, musculoId));
+    return metaObj && metaObj.tipo === campo ? metaObj.valor : undefined;
+  }
+
   /** `valorAtualSeries` é o valor JÁ MOSTRADO naquela célula (não a meta), na mesma coluna que
    * está sendo editada — guardado à parte pra, ao salvar, detectar quando a meta escolhida bate
    * com o que já foi feito. Uma meta salva antes numa coluna DIFERENTE de `campo` não é reusada
@@ -2347,12 +2355,20 @@
         <tbody>
           {#each gradeSemanal.linhas as linha (linha.musculo.id)}
             {@const totalLinha = linha.valores.reduce((acc, v) => acc + v.display, 0)}
+            {@const temMetaNaLinha = linha.valores.some((v, i) => {
+              const treinoId = gradeSemanal.colunas[i].treinoId;
+              return treinoId != null && metaParaCampo(treinoId, linha.musculo.id, ordemSemanal) != null;
+            })}
+            {@const totalMetaLinha = linha.valores.reduce((acc, v, i) => {
+              const treinoId = gradeSemanal.colunas[i].treinoId;
+              const metaDia = treinoId ? metaParaCampo(treinoId, linha.musculo.id, ordemSemanal) : undefined;
+              return acc + (metaDia ?? v.display);
+            }, 0)}
             <tr>
               <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
               {#each linha.valores as valor, i (i)}
                 {@const treinoId = gradeSemanal.colunas[i].treinoId}
-                {@const metaObj = treinoId ? metasMusculo.get(chaveMeta(treinoId, linha.musculo.id)) : undefined}
-                {@const meta = metaObj && metaObj.tipo === ordemSemanal ? metaObj.valor : undefined}
+                {@const meta = treinoId ? metaParaCampo(treinoId, linha.musculo.id, ordemSemanal) : undefined}
                 {@const mostrado = valor.display}
                 {@const texto = formatValor(mostrado)}
                 <td class="grade-valor">
@@ -2392,7 +2408,7 @@
                 <span
                   class="grade-valor-caixa grade-valor-total"
                   style={`color: ${corVolume(totalLinha)}; background: color-mix(in srgb, ${corVolume(totalLinha)} 20%, transparent);`}
-                >{formatValor(totalLinha)}</span>
+                >{formatValor(totalLinha)}{#if temMetaNaLinha}<span class="grade-meta-sub">/{formatValor(totalMetaLinha)}</span>{/if}</span>
               </td>
             </tr>
           {/each}
