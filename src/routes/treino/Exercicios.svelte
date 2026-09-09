@@ -15,7 +15,11 @@
     textoBuscavelExercicio,
     distribuicaoMusculosExercicio,
     abreviarMusculo,
+    salvarExerciciosRotina,
+    construirSeriesPadrao,
     type Exercicio,
+    type TreinoComExercicios,
+    type ItemRotina,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
@@ -49,13 +53,17 @@
 
   /** Primeira rotina (na ordem de exibição das rotinas) que usa cada exercício. */
   let rotinaPorExercicio = $state<Map<string, { id: string; nome: string }>>(new Map());
+  /** Rotinas cadastradas — guardada pra alimentar o ActionSheet "adicionar a uma rotina" sem
+   * precisar buscar de novo. */
+  let treinos = $state<TreinoComExercicios[]>([]);
 
   async function carregar() {
     loading = true;
-    const [exs, treinos] = await Promise.all([listExercicios(), listTreinos()]);
+    const [exs, treinosCarregados] = await Promise.all([listExercicios(), listTreinos()]);
     exercicios = exs;
+    treinos = treinosCarregados;
     const mapa = new Map<string, { id: string; nome: string }>();
-    for (const t of treinos) {
+    for (const t of treinosCarregados) {
       for (const te of t.exercicios) {
         if (!mapa.has(te.exercicio_id)) mapa.set(te.exercicio_id, { id: t.id, nome: t.nome_treino });
       }
@@ -65,6 +73,39 @@
   }
 
   void carregar();
+
+  /** Exercício sem rotina associada, cujo avatar foi tocado — abre o ActionSheet de rotinas pra
+   * escolher onde inserir. */
+  let escolhendoRotinaPara = $state<Exercicio | null>(null);
+  let salvandoNaRotina = $state(false);
+
+  /** Insere o exercício ao final da rotina escolhida, com 3 séries pré-preenchidas pelo último
+   * histórico (mesmo padrão de RotinaEditor.svelte ao adicionar exercício direto na rotina) —
+   * remonta a composição inteira porque salvarExerciciosRotina substitui tudo de uma vez. */
+  async function adicionarNaRotina(treino: TreinoComExercicios, ex: Exercicio): Promise<void> {
+    salvandoNaRotina = true;
+    try {
+      const itens: ItemRotina[] = treino.exercicios.map((e) => ({
+        exercicio_id: e.exercicio_id,
+        descanso_seg: e.descanso_seg,
+        observacao: e.observacao,
+        series: e.series.map((s) => ({ serie: s.serie, peso_alvo: s.peso_alvo, rep_min: s.rep_min, rep_max: s.rep_max })),
+      }));
+      itens.push({
+        exercicio_id: ex.id,
+        descanso_seg: ex.descanso_padrao_seg ?? 180,
+        observacao: null,
+        series: await construirSeriesPadrao(ex.id, 3),
+      });
+      await salvarExerciciosRotina(treino.id, itens);
+      rotinaPorExercicio = new Map(rotinaPorExercicio).set(ex.id, { id: treino.id, nome: treino.nome_treino });
+      escolhendoRotinaPara = null;
+    } catch (err) {
+      alert("Erro ao adicionar exercício: " + (err as Error).message);
+    } finally {
+      salvandoNaRotina = false;
+    }
+  }
 
   function iniciais(nome: string): string {
     const partes = nome.trim().split(/\s+/);
@@ -213,9 +254,10 @@
                 class="avatar-btn"
                 onclick={() => {
                   const rotina = rotinaPorExercicio.get(ex.id);
-                  navigate(rotina ? `/treino/rotina/${rotina.id}/ver` : `/treino/exercicios/${ex.id}`);
+                  if (rotina) navigate(`/treino/rotina/${rotina.id}/ver`);
+                  else escolhendoRotinaPara = ex;
                 }}
-                aria-label={rotinaPorExercicio.has(ex.id) ? `Ver rotina ${rotinaPorExercicio.get(ex.id)?.nome}` : ex.nome}
+                aria-label={rotinaPorExercicio.has(ex.id) ? `Ver rotina ${rotinaPorExercicio.get(ex.id)?.nome}` : `Adicionar ${ex.nome} a uma rotina`}
               >
                 <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
                   {#if rotinaPorExercicio.has(ex.id)}
@@ -247,6 +289,26 @@
       { label: "Agrupamento", icon: iconAgrupamento, onSelect: () => navigate("/treino/agrupamentos") },
     ]}
   />
+{/if}
+
+{#if escolhendoRotinaPara}
+  {#if treinos.length}
+    <ActionSheet
+      titulo={`Adicionar "${escolhendoRotinaPara.nome}" em qual rotina?`}
+      onFechar={() => (escolhendoRotinaPara = null)}
+      opcoes={treinos.map((t) => ({
+        label: t.nome_treino,
+        disabled: salvandoNaRotina,
+        onSelect: () => adicionarNaRotina(t, escolhendoRotinaPara!),
+      }))}
+    />
+  {:else}
+    <ActionSheet
+      titulo="Nenhuma rotina cadastrada ainda"
+      onFechar={() => (escolhendoRotinaPara = null)}
+      opcoes={[{ label: "Criar rotina", onSelect: () => navigate("/treino/rotina/nova") }]}
+    />
+  {/if}
 {/if}
 
 <style>

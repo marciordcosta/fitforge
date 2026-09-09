@@ -1,6 +1,7 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import { toISODate, hojeISO } from "../../lib/dates";
   import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import {
@@ -21,6 +22,7 @@
   /** exercicio_id -> ids dos músculos trabalhados — pra cruzar registros salvos e a sessão ao vivo com músculos, sem ponderar (1 série = 1 pra cada músculo do exercício). */
   let musculosPorExercicio = $state<Map<string, string[]>>(new Map());
   let modoRestante = $state(false);
+  let mostrarMenuNovo = $state(false);
 
   /** Rotinas com dia informado sobem pro topo, ordenadas pelo dia mais próximo; sem dia, mantém a ordenação manual. */
   function ordenarPorDia(lista: TreinoComExercicios[]): TreinoComExercicios[] {
@@ -207,7 +209,7 @@
 <div class="container has-bottom-nav">
   <div class="header">
     <h1>Treino</h1>
-    <button class="icon-btn" onclick={() => navigate("/treino/rotina/nova")} aria-label="Nova rotina">+</button>
+    <button class="icon-btn" onclick={() => (mostrarMenuNovo = true)} aria-label="Novo">+</button>
   </div>
 
   {#if !loading}
@@ -314,6 +316,16 @@
     {/each}
   {/if}
 </div>
+
+{#if mostrarMenuNovo}
+  <ActionSheet
+    onFechar={() => (mostrarMenuNovo = false)}
+    opcoes={[
+      { label: "Nova Rotina", subtitulo: "Cadastro completo, com dias e metas", onSelect: () => navigate("/treino/rotina/nova") },
+      { label: "Treino Avulso", subtitulo: "Sessão livre de hoje, sem rotina fixa", onSelect: () => navigate("/treino/avulso") },
+    ]}
+  />
+{/if}
 
 <style>
   .container {

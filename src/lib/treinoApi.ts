@@ -1049,6 +1049,19 @@ export async function getUltimoRegistro(
     .sort((a, b) => a.serie - b.serie);
 }
 
+/** Monta uma série de "primeiro preenchimento" pra um exercício novo (numa rotina ou numa sessão
+ * avulsa) — puxa o último registro real (getUltimoRegistro) pra pré-preencher peso/reps quando
+ * existir, senão fica em branco. Mesma lógica que RotinaEditor.svelte já usa há tempo pra
+ * adicionar exercício direto na rotina (lá com 3 séries fixas); aqui parametrizada porque a
+ * sessão avulsa usa 2. */
+export async function construirSeriesPadrao(exercicioId: string, numSeries: number): Promise<ItemSerieRotina[]> {
+  const anterior = await getUltimoRegistro(exercicioId);
+  return Array.from({ length: numSeries }, (_, i) => {
+    const ant = anterior.find((a) => a.serie === i + 1);
+    return { serie: i + 1, peso_alvo: ant?.peso ?? null, rep_min: ant?.repeticoes ?? null, rep_max: ant?.repeticoes ?? null };
+  });
+}
+
 // ---------------- Configuração do usuário ----------------
 
 export async function getHistoricoFonte(): Promise<HistoricoFonte> {
