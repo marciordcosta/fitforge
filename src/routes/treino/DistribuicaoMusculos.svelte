@@ -3302,12 +3302,13 @@
   }
   .caixa-serie-valor {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 400;
     color: var(--surface-muted);
     white-space: nowrap;
   }
   .caixa-serie-valor.caixa-serie-ativa {
     color: var(--surface-fg);
+    font-weight: 700;
   }
   .muted {
     color: var(--surface-muted);
