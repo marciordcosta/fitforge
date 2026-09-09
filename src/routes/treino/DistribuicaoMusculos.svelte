@@ -2087,6 +2087,20 @@
           {/if}
         </div>
 
+        {#snippet rodapeTreino(treino: TreinoComExercicios, ordemTreino: CampoOrdenacaoSeries)}
+          <div class="rotina-rodape">
+            <button class="rotina-totais-texto" onclick={() => abrirEditorRotina(treino)}>
+              {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
+                (acc, ex) => acc + ex.series.length,
+                0,
+              )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
+            </button>
+            <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino, ordemTreino)} aria-label="Ver anel por dominância">
+              {@render iconGrafico()}
+            </button>
+          </div>
+        {/snippet}
+
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
           {@const ordemTreino = ordemPorTreino.get(treino.id) ?? "ponderado"}
           {@const listaExibida = ordenarPorCampo(lista, ordemTreino)}
@@ -2111,17 +2125,9 @@
               {/if}
               <span class="chevron-rotina" class:aberto={expandido}>›</span>
             </div>
-            <div class="rotina-rodape">
-              <button class="rotina-totais-texto" onclick={() => abrirEditorRotina(treino)}>
-                {treino.exercicios.length} {treino.exercicios.length === 1 ? "exercício" : "exercícios"} · {treino.exercicios.reduce(
-                  (acc, ex) => acc + ex.series.length,
-                  0,
-                )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
-              </button>
-              <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino, ordemTreino)} aria-label="Ver anel por dominância">
-                {@render iconGrafico()}
-              </button>
-            </div>
+            {#if !expandido}
+              {@render rodapeTreino(treino, ordemTreino)}
+            {/if}
             {#if expandido}
               {#if !lista.length}
                 <p class="muted">Nenhuma série definida ainda.</p>
@@ -2155,6 +2161,7 @@
                   {/each}
                 </div>
               {/if}
+              {@render rodapeTreino(treino, ordemTreino)}
             {/if}
           </div>
         {/each}
