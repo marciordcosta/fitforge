@@ -199,6 +199,19 @@
     <polyline points="12 6 12 12 16 14" />
   </svg>
 {/snippet}
+{#snippet iconNovaRotina()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" />
+    <rect x="9" y="2" width="6" height="4" rx="1" />
+    <line x1="12" y1="11" x2="12" y2="17" />
+    <line x1="9" y1="14" x2="15" y2="14" />
+  </svg>
+{/snippet}
+{#snippet iconTreinoAvulso()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="13 2 3 14 11 14 11 22 21 10 13 10 13 2" />
+  </svg>
+{/snippet}
 {#snippet iconEngrenagem()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="3" />
@@ -321,8 +334,8 @@
   <ActionSheet
     onFechar={() => (mostrarMenuNovo = false)}
     opcoes={[
-      { label: "Nova Rotina", subtitulo: "Cadastro completo, com dias e metas", onSelect: () => navigate("/treino/rotina/nova") },
-      { label: "Treino Avulso", subtitulo: "Sessão livre de hoje, sem rotina fixa", onSelect: () => navigate("/treino/avulso") },
+      { label: "Nova Rotina", subtitulo: "Cadastro completo, com dias e metas", icon: iconNovaRotina, onSelect: () => navigate("/treino/rotina/nova") },
+      { label: "Treino Avulso", subtitulo: "Sessão livre de hoje, sem rotina fixa", icon: iconTreinoAvulso, onSelect: () => navigate("/treino/avulso") },
     ]}
   />
 {/if}

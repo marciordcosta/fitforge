@@ -204,6 +204,7 @@
   </span>
 {/snippet}
 
+<div class="tela-selecao" class:ativo={modoSelecao}>
 <div class="container" class:has-bottom-nav={!modoSelecao} class:modo-selecao={modoSelecao}>
   <div class="header">
     <button
@@ -278,6 +279,7 @@
     </ul>
   {/if}
 </div>
+</div>
 
 {#if mostrarCriarMenu}
   <ActionSheet
@@ -320,6 +322,22 @@
     padding-right: var(--space-4);
   }
   .container.modo-selecao {
+    min-height: 100%;
+    padding-bottom: var(--space-4);
+    box-sizing: border-box;
+  }
+  /* Wrapper "transparente" fora do modo seleção (display: contents — não afeta o layout normal
+     da tela cheia de Exercícios) que vira o overlay fixo só quando ativo: precisa cobrir a
+     viewport INTEIRA (sem max-width) por fora, com o .container.modo-selecao cuidando só da
+     largura de leitura por dentro — mesmo padrão de duas camadas de .tela-editor-rotina/
+     .editor-conteudo em DistribuicaoMusculos.svelte. Antes disso tudo ficava numa única div com
+     max-width + inset:0 ao mesmo tempo, o que deixava o fundo só na faixa central em telas
+     largas (desktop), sobrando canto sem cobrir por cima da barra inferior. */
+  .tela-selecao {
+    display: contents;
+  }
+  .tela-selecao.ativo {
+    display: block;
     position: fixed;
     inset: 0;
     /* Precisa ficar acima de qualquer Sheet (z-index 100) e de telas cheias tipo o editor
@@ -328,7 +346,6 @@
     z-index: 120;
     background: var(--surface-bg);
     overflow-y: auto;
-    padding-bottom: var(--space-4);
   }
   .header-spacer {
     width: 36px;
