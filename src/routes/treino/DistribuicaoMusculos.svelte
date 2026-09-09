@@ -2900,7 +2900,12 @@
         <div class="editor-totais-acoes">
           <button
             class="rotina-grafico-btn"
-            onclick={() => abrirGradeSemanal(metasEditor.map((item) => item.musculo.id))}
+            onclick={() => {
+              // Acompanha a coluna selecionada no card do editor — sem isso a grade sempre abria
+              // em "Pond." (padrão de ordemSemanal), ignorando Total/Acum. escolhido ali.
+              ordemSemanal = ordemMusculosEditor;
+              abrirGradeSemanal(metasEditor.map((item) => item.musculo.id));
+            }}
             aria-label="Ver distribuição na semana"
           >
             {@render iconGrade()}
