@@ -1122,11 +1122,15 @@ export interface MetaMusculo {
 }
 
 /** Todas as metas manuais de séries por músculo (de todas as rotinas do usuário) — usado pra
- * mostrar tanto a meta na grade "Distribuição na Semana" quanto o saldo na edição de rotina. */
+ * mostrar tanto a meta na grade "Distribuição na Semana" quanto o saldo na edição de rotina.
+ * `meta_series` é `numeric` no banco — o PostgREST devolve colunas numeric como STRING (evita
+ * perda de precisão), então precisa converter aqui, senão comparações estritas (ex: WheelPicker
+ * achando a opção pré-selecionada) falham silenciosamente ("6" !== 6) e o picker abre em "Sem
+ * meta" mesmo com uma meta salva. */
 export async function listMetasMusculo(): Promise<MetaMusculo[]> {
   const { data, error } = await supabase.from("treino_metas_musculo").select("treino_id, musculo_id, meta_series, meta_tipo");
   if (error) throw error;
-  return (data ?? []).map((d) => ({ ...d, meta_tipo: (d.meta_tipo as CampoMeta) ?? "total" }));
+  return (data ?? []).map((d) => ({ ...d, meta_series: Number(d.meta_series), meta_tipo: (d.meta_tipo as CampoMeta) ?? "total" }));
 }
 
 /** Cria/atualiza a meta de um músculo dentro de uma rotina; `metaSeries` null remove a meta
