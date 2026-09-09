@@ -1109,22 +1109,30 @@ export async function getVolumeRealizadoBruto(
   return data ?? [];
 }
 
+/** Em qual coluna (Total/Pond./Acum.) a meta foi definida — mesmos valores de
+ * CampoOrdenacaoSeries (DistribuicaoMusculos.svelte); união repetida aqui de propósito, é só uma
+ * string, não vale a pena importar entre os dois arquivos. */
+export type CampoMeta = "total" | "ponderado" | "acumulado";
+
 export interface MetaMusculo {
   treino_id: string;
   musculo_id: string;
   meta_series: number;
+  meta_tipo: CampoMeta;
 }
 
 /** Todas as metas manuais de séries por músculo (de todas as rotinas do usuário) — usado pra
  * mostrar tanto a meta na grade "Distribuição na Semana" quanto o saldo na edição de rotina. */
 export async function listMetasMusculo(): Promise<MetaMusculo[]> {
-  const { data, error } = await supabase.from("treino_metas_musculo").select("treino_id, musculo_id, meta_series");
+  const { data, error } = await supabase.from("treino_metas_musculo").select("treino_id, musculo_id, meta_series, meta_tipo");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((d) => ({ ...d, meta_tipo: (d.meta_tipo as CampoMeta) ?? "total" }));
 }
 
-/** Cria/atualiza a meta de um músculo dentro de uma rotina; `metaSeries` null remove a meta (célula volta a não ter meta definida). */
-export async function salvarMetaMusculo(treinoId: string, musculoId: string, metaSeries: number | null): Promise<void> {
+/** Cria/atualiza a meta de um músculo dentro de uma rotina; `metaSeries` null remove a meta
+ * (célula volta a não ter meta definida). `metaTipo` guarda em qual coluna o valor foi definido —
+ * a meta só é comparada/exibida quando essa mesma coluna está selecionada. */
+export async function salvarMetaMusculo(treinoId: string, musculoId: string, metaSeries: number | null, metaTipo: CampoMeta): Promise<void> {
   if (metaSeries == null) {
     const { error } = await supabase
       .from("treino_metas_musculo")
@@ -1137,7 +1145,7 @@ export async function salvarMetaMusculo(treinoId: string, musculoId: string, met
   const { error } = await supabase
     .from("treino_metas_musculo")
     .upsert(
-      { user_id: uid(), treino_id: treinoId, musculo_id: musculoId, meta_series: metaSeries },
+      { user_id: uid(), treino_id: treinoId, musculo_id: musculoId, meta_series: metaSeries, meta_tipo: metaTipo },
       { onConflict: "treino_id,musculo_id" },
     );
   if (error) throw error;

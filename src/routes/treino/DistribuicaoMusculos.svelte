@@ -122,7 +122,7 @@
     ]);
     musculos = musculosCarregados;
     treinos = ordenarPorDia(treinosCarregados);
-    metasMusculo = new Map(metasCarregadas.map((m) => [chaveMeta(m.treino_id, m.musculo_id), m.meta_series]));
+    metasMusculo = new Map(metasCarregadas.map((m) => [chaveMeta(m.treino_id, m.musculo_id), { valor: m.meta_series, tipo: m.meta_tipo }]));
     parametrosDistribuicao = parametros;
     void carregarHistoricoTodos(treinosCarregados);
     void carregarRegistrosPorTreino(treinosCarregados);
@@ -484,44 +484,62 @@
   }
 
   /** Meta manual de séries por músculo dentro de uma rotina (opcional, célula a célula na grade
-   * "Distribuição na Semana"), chave `${treinoId}:${musculoId}`. Puramente informativa: some na
-   * grade como "atual/meta" e vira o saldo mostrado na edição de rotina — nada aqui trava a
-   * gravação se o saldo ficar negativo (o usuário só vê em vermelho). */
-  let metasMusculo = $state<Map<string, number>>(new Map());
+   * "Distribuição na Semana"), chave `${treinoId}:${musculoId}`. Guarda também em qual coluna
+   * (Total/Pond./Acum.) foi definida — "atual/meta" só aparece quando essa coluna está
+   * selecionada, pra não misturar unidades (ex: meta "7.5" ponderada não é "7.5" séries totais).
+   * Puramente informativa: some na grade como "atual/meta" e vira o saldo mostrado na edição de
+   * rotina — nada aqui trava a gravação se o saldo ficar negativo (o usuário só vê em vermelho). */
+  let metasMusculo = $state<Map<string, { valor: number; tipo: CampoOrdenacaoSeries }>>(new Map());
   let modoEdicaoMetas = $state(false);
-  let editandoMeta = $state<{ treinoId: string; musculo: Musculo; valorAtual: number | null; valorAtualSeries: number } | null>(null);
+  let editandoMeta = $state<{
+    treinoId: string;
+    musculo: Musculo;
+    campo: CampoOrdenacaoSeries;
+    valorAtual: number | null;
+    valorAtualSeries: number;
+  } | null>(null);
 
   function chaveMeta(treinoId: string, musculoId: string): string {
     return `${treinoId}:${musculoId}`;
   }
 
-  /** `valorAtualSeries` é o número de séries JÁ FEITAS naquela célula (não a meta) — guardado à
-   * parte pra, ao salvar, detectar quando a meta escolhida bate com o que já foi feito. */
-  function abrirEditarMeta(treinoId: string, musculo: Musculo, valorAtualSeries: number): void {
+  /** `valorAtualSeries` é o valor JÁ MOSTRADO naquela célula (não a meta), na mesma coluna que
+   * está sendo editada — guardado à parte pra, ao salvar, detectar quando a meta escolhida bate
+   * com o que já foi feito. Uma meta salva antes numa coluna DIFERENTE de `campo` não é reusada
+   * como valor inicial (unidades não batem). */
+  function abrirEditarMeta(treinoId: string, musculo: Musculo, valorAtualSeries: number, campo: CampoOrdenacaoSeries): void {
+    const existente = metasMusculo.get(chaveMeta(treinoId, musculo.id));
     editandoMeta = {
       treinoId,
       musculo,
-      valorAtual: metasMusculo.get(chaveMeta(treinoId, musculo.id)) ?? valorAtualSeries,
+      campo,
+      valorAtual: existente && existente.tipo === campo ? existente.valor : valorAtualSeries,
       valorAtualSeries,
     };
   }
 
-  const OPCOES_META: { valor: number | null; label: string }[] = [
-    { valor: null, label: "Sem meta" },
-    ...Array.from({ length: 31 }, (_, i) => ({ valor: i, label: String(i) })),
-  ];
+  const TEXTO_CAMPO_META: Record<CampoOrdenacaoSeries, string> = { total: "totais", ponderado: "ponderadas", acumulado: "acumuladas" };
+
+  /** Bruto (Total) continua em inteiros; ponderado/acumulado passam a aceitar meio em meio,
+   * mesmo grão dos valores que aparecem nessas colunas (ex: 4.5, 7.5). */
+  function opcoesMeta(campo: CampoOrdenacaoSeries): { valor: number | null; label: string }[] {
+    const passo = campo === "total" ? 1 : 0.5;
+    const opcoes: { valor: number | null; label: string }[] = [{ valor: null, label: "Sem meta" }];
+    for (let v = 0; v <= 30; v += passo) opcoes.push({ valor: v, label: formatValor(v) });
+    return opcoes;
+  }
 
   async function salvarMetaSelecionada(valorSelecionado: number | null): Promise<void> {
     if (!editandoMeta) return;
-    const { treinoId, musculo, valorAtualSeries } = editandoMeta;
+    const { treinoId, musculo, campo, valorAtualSeries } = editandoMeta;
     // Meta igual ao que já foi feito já está "batida" — limpa em vez de mostrar "6/6".
     const valor = valorSelecionado === valorAtualSeries ? null : valorSelecionado;
     try {
-      await salvarMetaMusculo(treinoId, musculo.id, valor);
+      await salvarMetaMusculo(treinoId, musculo.id, valor, campo);
       const mapa = new Map(metasMusculo);
       const chave = chaveMeta(treinoId, musculo.id);
       if (valor == null) mapa.delete(chave);
-      else mapa.set(chave, valor);
+      else mapa.set(chave, { valor, tipo: campo });
       metasMusculo = mapa;
     } catch (e) {
       alert("Erro ao salvar meta: " + (e as Error).message);
@@ -1518,7 +1536,7 @@
     const posicaoGradual = contarPesoGradualPorMusculo(modalEditorRotina);
     const resultado: {
       musculo: Musculo;
-      meta: number | null;
+      meta: { valor: number; tipo: CampoOrdenacaoSeries } | null;
       atual: number;
       ponderado: number;
       acumulado: number;
@@ -1951,26 +1969,41 @@
   acumulado: number,
   ordenandoPor: CampoOrdenacaoSeries | null,
   aoTocar: (campo: CampoOrdenacaoSeries) => void,
-  /** Só usado no editor de rotina: a meta manual (bruta, não ponderada) vai junto do total —
-   * "atual/meta" no lugar do total sozinho — em vez de uma linha à parte embaixo do nome. */
+  /** Só usado no editor de rotina: a meta manual vai junto do valor da coluna em que foi
+   * definida ("atual/meta" no lugar do valor sozinho, em vez de uma linha à parte embaixo do
+   * nome) — metaCampo diz qual das 3 caixas recebe esse tratamento (a mesma em que a meta foi
+   * salva; nas outras 2, mostra o valor normal). */
   totalTexto: string | null = null,
   totalClasse: "valor-subindo" | "valor-estavel" | "valor-caindo" | null = null,
+  metaCampo: CampoOrdenacaoSeries | null = null,
 )}
   <div class="caixas-series">
     <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar("total"); }}>
       <span
         class="caixa-serie-valor"
-        class:caixa-serie-ativa={ordenandoPor === "total" && totalClasse == null}
-        class:valor-subindo={totalClasse === "valor-subindo"}
-        class:valor-estavel={totalClasse === "valor-estavel"}
-        class:valor-caindo={totalClasse === "valor-caindo"}
-      >{totalTexto ?? formatValor(bruto)}</span>
+        class:caixa-serie-ativa={ordenandoPor === "total" && !(metaCampo === "total" && totalClasse != null)}
+        class:valor-subindo={metaCampo === "total" && totalClasse === "valor-subindo"}
+        class:valor-estavel={metaCampo === "total" && totalClasse === "valor-estavel"}
+        class:valor-caindo={metaCampo === "total" && totalClasse === "valor-caindo"}
+      >{metaCampo === "total" && totalTexto != null ? totalTexto : formatValor(bruto)}</span>
     </button>
     <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar("ponderado"); }}>
-      <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === "ponderado"}>{formatValor(ponderado)}</span>
+      <span
+        class="caixa-serie-valor"
+        class:caixa-serie-ativa={ordenandoPor === "ponderado" && !(metaCampo === "ponderado" && totalClasse != null)}
+        class:valor-subindo={metaCampo === "ponderado" && totalClasse === "valor-subindo"}
+        class:valor-estavel={metaCampo === "ponderado" && totalClasse === "valor-estavel"}
+        class:valor-caindo={metaCampo === "ponderado" && totalClasse === "valor-caindo"}
+      >{metaCampo === "ponderado" && totalTexto != null ? totalTexto : formatValor(ponderado)}</span>
     </button>
     <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar("acumulado"); }}>
-      <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === "acumulado"}>{formatValor(acumulado)}</span>
+      <span
+        class="caixa-serie-valor"
+        class:caixa-serie-ativa={ordenandoPor === "acumulado" && !(metaCampo === "acumulado" && totalClasse != null)}
+        class:valor-subindo={metaCampo === "acumulado" && totalClasse === "valor-subindo"}
+        class:valor-estavel={metaCampo === "acumulado" && totalClasse === "valor-estavel"}
+        class:valor-caindo={metaCampo === "acumulado" && totalClasse === "valor-caindo"}
+      >{metaCampo === "acumulado" && totalTexto != null ? totalTexto : formatValor(acumulado)}</span>
     </button>
   </div>
 {/snippet}
@@ -2313,21 +2346,22 @@
         </thead>
         <tbody>
           {#each gradeSemanal.linhas as linha (linha.musculo.id)}
-            {@const totalLinha = linha.valores.reduce((acc, v) => acc + (modoEdicaoMetas ? v.bruto : v.display), 0)}
+            {@const totalLinha = linha.valores.reduce((acc, v) => acc + v.display, 0)}
             <tr>
               <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
               {#each linha.valores as valor, i (i)}
                 {@const treinoId = gradeSemanal.colunas[i].treinoId}
-                {@const meta = treinoId ? metasMusculo.get(chaveMeta(treinoId, linha.musculo.id)) : undefined}
-                {@const mostrado = modoEdicaoMetas ? valor.bruto : valor.display}
-                {@const texto = modoEdicaoMetas ? String(mostrado) : formatValor(mostrado)}
+                {@const metaObj = treinoId ? metasMusculo.get(chaveMeta(treinoId, linha.musculo.id)) : undefined}
+                {@const meta = metaObj && metaObj.tipo === ordemSemanal ? metaObj.valor : undefined}
+                {@const mostrado = valor.display}
+                {@const texto = formatValor(mostrado)}
                 <td class="grade-valor">
                   {#if modoEdicaoMetas && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-meta-edit"
                       style={`color: ${corVolume(mostrado)}; background: color-mix(in srgb, ${corVolume(mostrado)} 20%, transparent);`}
-                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, valor.bruto)}
-                    >{texto}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</button>
+                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, mostrado, ordemSemanal)}
+                    >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0 && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-link"
@@ -2340,17 +2374,17 @@
                           abrirEditorRotina(treino, linha.musculo.id);
                         }
                       }}
-                    >{texto}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</button>
+                    >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0}
                     <span
                       class="grade-valor-caixa"
                       style={`color: ${corVolume(mostrado)}; background: color-mix(in srgb, ${corVolume(mostrado)} 20%, transparent);`}
-                    >{texto}{#if meta != null}<span class="grade-meta-sub">/{meta}</span>{/if}</span>
+                    >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</span>
                   {:else if meta != null}
                     <span
                       class="grade-valor-caixa grade-valor-vazio"
                       style={`color: ${corVolume(0)}; background: color-mix(in srgb, ${corVolume(0)} 20%, transparent);`}
-                    >0<span class="grade-meta-sub">/{meta}</span></span>
+                    >0<span class="grade-meta-sub">/{formatValor(meta)}</span></span>
                   {/if}
                 </td>
               {/each}
@@ -2390,8 +2424,8 @@
   <div class="acima-editor">
     <WheelPicker
       titulo={editandoMeta.musculo.nome}
-      subtitulo="Meta de séries nessa rotina"
-      opcoes={OPCOES_META}
+      subtitulo={`Meta de séries ${TEXTO_CAMPO_META[editandoMeta.campo]} nessa rotina`}
+      opcoes={opcoesMeta(editandoMeta.campo)}
       valorAtual={editandoMeta.valorAtual}
       onSelecionar={(v) => salvarMetaSelecionada(v)}
       onFechar={() => (editandoMeta = null)}
@@ -2799,9 +2833,17 @@
         {@render cabecalhoCaixas(ordemMusculosEditor, (campo) => (ordemMusculosEditor = campo))}
         <div class="editor-musculos-lista">
           {#each metasEditor as item (item.musculo.id)}
-            {@const totalTexto = item.meta != null ? `${item.atual}/${item.meta}` : null}
+            {@const metaCampo = item.meta?.tipo ?? null}
+            {@const valorNaMetaCampo = metaCampo === "total" ? item.atual : metaCampo === "ponderado" ? item.ponderado : metaCampo === "acumulado" ? item.acumulado : null}
+            {@const totalTexto = item.meta && valorNaMetaCampo != null ? `${formatValor(valorNaMetaCampo)}/${formatValor(item.meta.valor)}` : null}
             {@const totalClasse =
-              item.meta == null ? null : item.atual > item.meta ? "valor-caindo" : item.atual === item.meta ? "valor-subindo" : "valor-estavel"}
+              item.meta == null || valorNaMetaCampo == null
+                ? null
+                : valorNaMetaCampo > item.meta.valor
+                  ? "valor-caindo"
+                  : valorNaMetaCampo === item.meta.valor
+                    ? "valor-subindo"
+                    : "valor-estavel"}
             {@const tendMusculo = tendenciaMusculoEditor(item.musculo.id)}
             <div class="item editor-musculo-linha" class:editor-musculo-ativo={editorFiltroMusculoId === item.musculo.id}>
               <button
@@ -2827,7 +2869,7 @@
                 </span>
               </button>
               {@render barraFadiga(item.partes, item.partes.a + item.partes.b + item.partes.c)}
-              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemMusculosEditor, (campo) => (ordemMusculosEditor = campo), totalTexto, totalClasse)}
+              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemMusculosEditor, (campo) => (ordemMusculosEditor = campo), totalTexto, totalClasse, metaCampo)}
             </div>
           {/each}
         </div>
