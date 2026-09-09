@@ -3284,7 +3284,7 @@
     cursor: pointer;
   }
   .caixa-cabecalho-label.cabecalho-ativo {
-    color: var(--color-primary);
+    color: var(--surface-fg);
     font-weight: 700;
   }
   .caixa-serie {
@@ -3303,11 +3303,11 @@
   .caixa-serie-valor {
     font-size: 11px;
     font-weight: 700;
-    color: var(--surface-fg);
+    color: var(--surface-muted);
     white-space: nowrap;
   }
   .caixa-serie-valor.caixa-serie-ativa {
-    color: var(--color-primary);
+    color: var(--surface-fg);
   }
   .muted {
     color: var(--surface-muted);
