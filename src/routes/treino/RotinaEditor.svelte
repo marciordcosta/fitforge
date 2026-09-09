@@ -11,6 +11,7 @@
     createTreino,
     renameTreino,
     salvarExerciciosRotina,
+    limparMetasMusculoRotina,
     getUltimoRegistro,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
@@ -281,6 +282,10 @@
           series: l.series,
         })),
       );
+      // A meta é um alvo pra guiar o ajuste (grade "Distribuição na Semana") — uma vez salvo o
+      // resultado, ela deixa de fazer sentido e some, até definir um novo alvo. Mesma regra que
+      // já valia salvando pelo editor embutido em DistribuicaoMusculos.svelte.
+      await limparMetasMusculoRotina(id);
       rotinaEditorSessao.limpar();
       window.history.back();
     } catch (e) {
