@@ -5,24 +5,18 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DescansoPicker from "../../components/DescansoPicker.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
+  import Exercicios from "./Exercicios.svelte";
   import {
     getTreino,
-    listTreinos,
     createTreino,
     renameTreino,
     salvarExerciciosRotina,
-    listExercicios,
-    correspondeBusca,
-    textoBuscavelExercicio,
     getUltimoRegistro,
-    distribuicaoMusculosExercicio,
-    abreviarMusculo,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
     type Exercicio,
     type SetRegistro,
   } from "../../lib/treinoApi";
-  import { PALETA } from "../../components/PieChart.svelte";
   import { rotinaEditorSessao, type Linha, type LinhaSerie } from "../../lib/rotinaEditorSessao.svelte";
 
   let { treinoId }: { treinoId: string | null } = $props();
@@ -30,38 +24,10 @@
   let nomeTreino = $state("");
   let diaSemana = $state<number | null>(null);
   let linhas = $state<Linha[]>([]);
-  let todosExercicios = $state<Exercicio[]>([]);
   let loading = $state(true);
   let salvando = $state(false);
   let mostrarPicker = $state(false);
-  let buscaPicker = $state("");
   let mostrarDiaPicker = $state(false);
-  let mostrarCriarMenu = $state(false);
-
-  /** Primeira rotina (qualquer uma) que já usa cada exercício — mesmo destaque da lista de Exercícios. */
-  let rotinaPorExercicio = $state<Map<string, { id: string; nome: string }>>(new Map());
-
-  async function carregarRotinaPorExercicio() {
-    const treinos = await listTreinos();
-    const mapa = new Map<string, { id: string; nome: string }>();
-    for (const t of treinos) {
-      for (const te of t.exercicios) {
-        if (!mapa.has(te.exercicio_id)) mapa.set(te.exercicio_id, { id: t.id, nome: t.nome_treino });
-      }
-    }
-    rotinaPorExercicio = mapa;
-  }
-
-  void carregarRotinaPorExercicio();
-
-  function iniciais(nome: string): string {
-    const partes = nome.trim().split(/\s+/);
-    return (partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "");
-  }
-
-  function distribuicao(ex: Exercicio) {
-    return distribuicaoMusculosExercicio(ex).map((m, i) => ({ ...m, cor: PALETA[i % PALETA.length] }));
-  }
 
   const opcoesDia = [
     { valor: null, label: "Sem dia fixo" },
@@ -85,8 +51,6 @@
     loading = true;
     erroCarregar = null;
     try {
-      todosExercicios = await listExercicios();
-
       const salva = rotinaEditorSessao.atual;
       if (salva && salva.treinoId === treinoId) {
         nomeTreino = salva.nomeTreino;
@@ -144,14 +108,6 @@
   });
 
   void carregar();
-
-  const disponiveis = $derived(
-    todosExercicios.filter((ex) => {
-      if (linhas.some((l) => l.exercicio_id === ex.id)) return false;
-      if (!correspondeBusca(textoBuscavelExercicio(ex), buscaPicker)) return false;
-      return true;
-    }),
-  );
 
   let adicionandoId = $state<string | null>(null);
 
@@ -214,7 +170,6 @@
   let menuSerieAberto = $state<{ idx: number; setIdx: number } | null>(null);
   let mostrarConfirmCancelar = $state(false);
   let substituindoIdx = $state<number | null>(null);
-  let buscaSubstituir = $state("");
 
   function abrirSubstituir(idx: number) {
     substituindoIdx = idx;
@@ -222,12 +177,7 @@
 
   function fecharSubstituir() {
     substituindoIdx = null;
-    buscaSubstituir = "";
   }
-
-  const opcoesSubstituir = $derived(
-    todosExercicios.filter((e) => correspondeBusca(textoBuscavelExercicio(e), buscaSubstituir)),
-  );
 
   /** Troca o exercício da linha mantendo a mesma quantidade de séries, com metas
    * pré-preenchidas a partir do histórico do novo exercício (igual a construirLinha). */
@@ -334,12 +284,6 @@
     <polyline points="4 12 10 18 20 6" />
   </svg>
 {/snippet}
-{#snippet iconMais()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
-{/snippet}
 {#snippet iconReordenar()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8 7l-4 4 4 4M16 7l4 4-4 4" />
@@ -362,37 +306,6 @@
 {#snippet iconRemoverSerie()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
-  </svg>
-{/snippet}
-{#snippet iconExercicio()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="2" y="9" width="4" height="6" rx="1" />
-    <rect x="18" y="9" width="4" height="6" rx="1" />
-    <line x1="9" y1="9" x2="9" y2="15" />
-    <line x1="15" y1="9" x2="15" y2="15" />
-    <line x1="6" y1="12" x2="18" y2="12" />
-  </svg>
-{/snippet}
-{#snippet iconMovimento()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="17 3 21 7 17 11" />
-    <path d="M3 7h18" />
-    <polyline points="7 13 3 17 7 21" />
-    <path d="M21 17H3" />
-  </svg>
-{/snippet}
-{#snippet iconMusculo()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="9" />
-    <circle cx="12" cy="12" r="5" />
-    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-  </svg>
-{/snippet}
-{#snippet iconAgrupamento()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-    <polyline points="2 17 12 22 22 17" />
-    <polyline points="2 12 12 17 22 12" />
   </svg>
 {/snippet}
 
@@ -522,96 +435,16 @@
 {/if}
 
 {#if substituindoIdx !== null}
-  <div class="tela-picker">
-    <div class="picker-conteudo">
-      <div class="header">
-        <button class="back" onclick={fecharSubstituir} aria-label="Cancelar">{@render iconVoltar()}</button>
-        <h1>Substituir por</h1>
-        <span class="header-spacer"></span>
-      </div>
-      <input class="search" type="text" placeholder="Procurar exercício" bind:value={buscaSubstituir} />
-      <ul class="picker-lista">
-        {#each opcoesSubstituir as ex (ex.id)}
-          <li><button class="picker-item-full" onclick={() => substituirExercicio(ex)}>{ex.nome}</button></li>
-        {/each}
-        {#if !opcoesSubstituir.length}
-          <li class="muted-item">Nenhum exercício encontrado.</li>
-        {/if}
-      </ul>
-    </div>
-  </div>
+  <Exercicios modoSelecao tituloSelecao="Substituir por" onSelecionar={substituirExercicio} onFechar={fecharSubstituir} />
 {/if}
 
 {#if mostrarPicker}
-  <div class="tela-picker">
-    <div class="picker-conteudo">
-      <div class="header">
-        <button
-          class="back"
-          onclick={() => {
-            mostrarPicker = false;
-            buscaPicker = "";
-          }}
-          aria-label="Cancelar"
-        >
-          {@render iconVoltar()}
-        </button>
-        <h1>Adicionar Exercício</h1>
-        <button class="criar" onclick={() => (mostrarCriarMenu = true)} aria-label="Criar">{@render iconMais()}</button>
-      </div>
-      <input class="search" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
-      <ul class="picker-lista">
-        {#each disponiveis as ex (ex.id)}
-          <li class="picker-item">
-            <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
-              {#if rotinaPorExercicio.has(ex.id)}
-                <span class="avatar-rotina-texto">{rotinaPorExercicio.get(ex.id)?.nome}</span>
-              {:else}
-                {iniciais(ex.nome)}
-              {/if}
-            </span>
-            <span class="info">
-              <span class="nome">{ex.nome}</span>
-              {#if !ex.musculos.length}
-                <span class="sub">Sem músculo definido</span>
-              {:else}
-                <span class="musculos-linhas">
-                  {#each distribuicao(ex) as m (m.nome)}
-                    <span class="musculo-coluna">
-                      <span class="musculo-nome-mini">{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome}</span>
-                      <span class="musculo-linha-barra">
-                        <span class="musculo-barra-mini-wrap">
-                          <span class="musculo-barra-mini" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
-                        </span>
-                        <span class="musculo-pct-mini">{m.pct.toFixed(0)}%</span>
-                      </span>
-                    </span>
-                  {/each}
-                </span>
-              {/if}
-            </span>
-            <button class="add-btn" onclick={() => adicionarRapido(ex)} disabled={adicionandoId === ex.id} aria-label={`Adicionar ${ex.nome}`}>
-              {#if adicionandoId === ex.id}…{:else}{@render iconMais()}{/if}
-            </button>
-          </li>
-        {/each}
-        {#if !disponiveis.length}
-          <li class="muted-item">Nenhum exercício encontrado.</li>
-        {/if}
-      </ul>
-    </div>
-  </div>
-{/if}
-
-{#if mostrarCriarMenu}
-  <ActionSheet
-    onFechar={() => (mostrarCriarMenu = false)}
-    opcoes={[
-      { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo/voltar") },
-      { label: "Padrão de Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos") },
-      { label: "Grupo Muscular", icon: iconMusculo, onSelect: () => navigate("/treino/musculos") },
-      { label: "Agrupamento", icon: iconAgrupamento, onSelect: () => navigate("/treino/agrupamentos") },
-    ]}
+  <Exercicios
+    modoSelecao
+    tituloSelecao="Adicionar Exercício"
+    excluirIds={linhas.map((l) => l.exercicio_id)}
+    onSelecionar={adicionarRapido}
+    onFechar={() => (mostrarPicker = false)}
   />
 {/if}
 
@@ -619,7 +452,7 @@
   <div class="tela-reordenar">
     <div class="tela-picker-conteudo">
       <div class="header">
-        <button class="voltar-icon" onclick={() => (reordenando = false)} aria-label="Voltar">←</button>
+        <button class="back" onclick={() => (reordenando = false)} aria-label="Voltar">{@render iconVoltar()}</button>
         <h1>Reordenar</h1>
         <span class="header-spacer"></span>
       </div>
@@ -870,25 +703,12 @@
     cursor: pointer;
     margin-top: var(--space-2);
   }
-  .tela-picker {
-    position: fixed;
-    inset: 0;
-    background: var(--surface-bg);
-    z-index: 150;
-    overflow-y: auto;
-  }
   .tela-reordenar {
     position: fixed;
     inset: 0;
     background: var(--surface-bg);
     z-index: 150;
     overflow: hidden;
-  }
-  .picker-conteudo {
-    max-width: 480px;
-    margin: 0 auto;
-    padding: var(--space-4);
-    box-sizing: border-box;
   }
   .tela-picker-conteudo {
     max-width: 480px;
@@ -899,23 +719,13 @@
     display: flex;
     flex-direction: column;
   }
-  .tela-picker .header,
-  .tela-reordenar .header,
-  .picker-conteudo .header {
+  .tela-reordenar .header {
     margin-bottom: var(--space-4);
     flex-shrink: 0;
   }
   .header-spacer {
     width: 56px;
     flex-shrink: 0;
-  }
-  .voltar-icon {
-    background: none;
-    border: none;
-    color: var(--surface-fg);
-    font-size: var(--font-size-lg);
-    cursor: pointer;
-    padding: var(--space-1);
   }
   .back {
     flex-shrink: 0;
@@ -934,167 +744,6 @@
   .back svg {
     width: 18px;
     height: 18px;
-  }
-  .criar {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--surface-card);
-    border: none;
-    color: var(--surface-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    padding: 0;
-  }
-  .criar svg {
-    width: 18px;
-    height: 18px;
-  }
-  .search {
-    width: 100%;
-    box-sizing: border-box;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    margin-bottom: var(--space-3);
-    flex-shrink: 0;
-  }
-  .picker-lista {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .picker-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--surface-border);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-  }
-  .picker-item-full {
-    width: 100%;
-    text-align: left;
-    padding: var(--space-3) 0;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--surface-border);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    cursor: pointer;
-  }
-  .picker-item .avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--surface-border);
-    color: var(--surface-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-  .picker-item .avatar-rotina {
-    border: 2px solid var(--color-primary);
-  }
-  .picker-item .avatar-rotina-texto {
-    max-width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    padding: 0 3px;
-    font-size: 5px;
-    font-weight: 700;
-    text-align: center;
-  }
-  .picker-item .info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .picker-item .nome {
-    font-size: var(--font-size-base);
-    color: var(--surface-fg);
-  }
-  .picker-item .sub {
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
-  }
-  .picker-item .musculos-linhas {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-1);
-  }
-  .picker-item .musculo-coluna {
-    flex: 0 0 calc((100% - 3 * var(--space-3)) / 4);
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .picker-item .musculo-nome-mini {
-    font-size: 10px;
-    color: var(--surface-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .picker-item .musculo-linha-barra {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-  }
-  .picker-item .musculo-barra-mini-wrap {
-    flex: 1;
-    min-width: 0;
-    height: 4px;
-    border-radius: 2px;
-    overflow: hidden;
-    background: var(--surface-border);
-  }
-  .picker-item .musculo-barra-mini {
-    display: block;
-    height: 100%;
-  }
-  .picker-item .musculo-pct-mini {
-    flex-shrink: 0;
-    font-size: 9px;
-    color: var(--surface-muted);
-  }
-  .add-btn {
-    flex-shrink: 0;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: none;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-  .add-btn svg {
-    width: 16px;
-    height: 16px;
-  }
-  .add-btn:disabled {
-    opacity: 0.6;
-  }
-  .muted-item {
-    color: var(--surface-muted);
-    padding: var(--space-2);
-    font-size: var(--font-size-sm);
   }
   .reordenar-lista {
     overflow-y: auto;
