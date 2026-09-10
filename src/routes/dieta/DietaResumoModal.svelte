@@ -59,7 +59,7 @@
    * (ex: "2,2 g/kg" de proteína diz mais que "168 g" sozinho). */
   function formatGPorKg(gramas: number | null, pesoKg: number | null): string {
     if (gramas == null || pesoKg == null || pesoKg <= 0) return "—";
-    return `${(gramas / pesoKg).toFixed(1).replace(".", ",")} g/kg`;
+    return (gramas / pesoKg).toFixed(1).replace(".", ",");
   }
 
   function formatKg(v: number | null): string {
