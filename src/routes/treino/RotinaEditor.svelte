@@ -457,7 +457,14 @@
 {/if}
 
 {#if substituindoIdx !== null}
-  <Exercicios modoSelecao tituloSelecao="Substituir por" bind:busca={buscaPicker} onSelecionar={substituirExercicio} onFechar={fecharSubstituir} />
+  <Exercicios
+    modoSelecao
+    tituloSelecao="Substituir por"
+    substituirExercicioId={linhas[substituindoIdx]?.exercicio_id ?? null}
+    bind:busca={buscaPicker}
+    onSelecionar={substituirExercicio}
+    onFechar={fecharSubstituir}
+  />
 {/if}
 
 {#if mostrarPicker}

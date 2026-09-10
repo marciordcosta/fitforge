@@ -17,12 +17,16 @@
     abreviarMusculo,
     salvarExerciciosRotina,
     construirSeriesPadrao,
+    createExercicio,
+    construirMusculosInput,
     type Exercicio,
     type TreinoComExercicios,
     type ItemRotina,
+    type LinhaMusculoInput,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
+  import ExercicioCampos from "./ExercicioCampos.svelte";
 
   let {
     modoSelecao = false,
@@ -34,6 +38,11 @@
     // sobreviver a uma navegação (ex: ver detalhe de um exercício e voltar) faz bind:busca e
     // persiste esse valor no lugar certo (ex: rotinaEditorSessao), reabrindo o picker com ele.
     busca = $bindable(untrack(() => (modoSelecao ? buscaInicial : ultimaBuscaExercicios))),
+    // Id do exercício sendo substituído — quando informado, preenche a busca com o grupo
+    // muscular dominante dele assim que a lista carrega (só se `busca` ainda estiver vazia, pra
+    // não atropelar um valor restaurado de sessão). Evita quem chama precisar carregar o
+    // catálogo de exercícios só pra descobrir o músculo.
+    substituirExercicioId = null,
     onSelecionar,
     onFechar,
   }: {
@@ -42,6 +51,7 @@
     buscaInicial?: string;
     excluirIds?: string[];
     busca?: string;
+    substituirExercicioId?: string | null;
     onSelecionar?: (ex: Exercicio) => void | Promise<void>;
     onFechar?: () => void;
   } = $props();
@@ -50,6 +60,41 @@
   let loading = $state(true);
   let mostrarCriarMenu = $state(false);
   let selecionandoId = $state<string | null>(null);
+
+  let mostrarCriarExercicio = $state(false);
+  let nomeNovo = $state("");
+  let padraoIdNovo = $state("");
+  let linhasMusculosNovo = $state<LinhaMusculoInput[]>([]);
+  let salvandoNovo = $state(false);
+
+  function abrirCriarExercicio(): void {
+    nomeNovo = "";
+    padraoIdNovo = "";
+    linhasMusculosNovo = [];
+    mostrarCriarExercicio = true;
+  }
+
+  async function salvarNovoExercicio(): Promise<void> {
+    if (!nomeNovo.trim()) {
+      alert("Informe o nome do exercício.");
+      return;
+    }
+    const musculosInput = await construirMusculosInput(linhasMusculosNovo);
+    if (!musculosInput.length) {
+      alert("Informe ao menos um músculo envolvido.");
+      return;
+    }
+    salvandoNovo = true;
+    try {
+      await createExercicio({ nome: nomeNovo.trim(), padrao_id: padraoIdNovo || null, musculos: musculosInput });
+      mostrarCriarExercicio = false;
+      await carregar();
+    } catch (e) {
+      alert("Erro ao salvar: " + (e as Error).message);
+    } finally {
+      salvandoNovo = false;
+    }
+  }
 
   $effect(() => {
     if (!modoSelecao) ultimaBuscaExercicios = busca;
@@ -73,6 +118,11 @@
       }
     }
     rotinaPorExercicio = mapa;
+    if (substituirExercicioId && !busca) {
+      const atual = exs.find((e) => e.id === substituirExercicioId);
+      const musculo = atual ? distribuicaoMusculosExercicio(atual)[0]?.nome : null;
+      if (musculo) busca = musculo;
+    }
     loading = false;
   }
 
@@ -184,6 +234,11 @@
     <path d="M12 5v14M5 12h14" />
   </svg>
 {/snippet}
+{#snippet iconCheck()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <polyline points="4 12 10 18 20 6" />
+  </svg>
+{/snippet}
 
 {#snippet infoExercicio(ex: Exercicio)}
   <span class="info">
@@ -218,7 +273,7 @@
     >{@render iconVoltar()}</button>
     <h1>{modoSelecao ? tituloSelecao : "Exercícios"}</h1>
     {#if modoSelecao}
-      <span class="header-spacer"></span>
+      <button class="criar" onclick={abrirCriarExercicio} aria-label="Criar exercício">{@render iconMaisCriar()}</button>
     {:else}
       <button class="criar" onclick={() => (mostrarCriarMenu = true)} aria-label="Criar">{@render iconMaisCriar()}</button>
     {/if}
@@ -297,6 +352,19 @@
   />
 {/if}
 
+{#if mostrarCriarExercicio}
+  <div class="tela-criar-exercicio">
+    <div class="container">
+      <div class="header">
+        <button class="back" onclick={() => (mostrarCriarExercicio = false)} aria-label="Voltar">{@render iconVoltar()}</button>
+        <h1>Novo Exercício</h1>
+        <button class="criar" disabled={salvandoNovo} onclick={salvarNovoExercicio} aria-label="Criar">{@render iconCheck()}</button>
+      </div>
+      <ExercicioCampos bind:nome={nomeNovo} bind:padraoId={padraoIdNovo} bind:linhasMusculos={linhasMusculosNovo} />
+    </div>
+  </div>
+{/if}
+
 {#if escolhendoRotinaPara}
   {#if treinos.length}
     <ActionSheet
@@ -351,9 +419,14 @@
     background: var(--surface-bg);
     overflow-y: auto;
   }
-  .header-spacer {
-    width: 36px;
-    flex-shrink: 0;
+  /* Precisa ficar acima do overlay de seleção (.tela-selecao.ativo, z-index 120) que a abre —
+     mesmo padrão de "tela cheia sobre tela cheia" já usado por .tela-editor-rotina/.tela-selecao. */
+  .tela-criar-exercicio {
+    position: fixed;
+    inset: 0;
+    z-index: 130;
+    background: var(--surface-bg);
+    overflow-y: auto;
   }
   .header {
     display: flex;

@@ -12,9 +12,6 @@
     salvarExerciciosRotina,
     updateDescansoTreinoExercicio,
     updateObservacaoTreinoExercicio,
-    listExercicios,
-    correspondeBusca,
-    textoBuscavelExercicio,
     type TreinoComExercicios,
     type Exercicio,
   } from "../../lib/treinoApi";
@@ -23,6 +20,7 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DescansoPicker from "../../components/DescansoPicker.svelte";
   import Sheet from "../../components/Sheet.svelte";
+  import Exercicios from "./Exercicios.svelte";
   import { treinoLogSessao, type SetSessao, type ExercicioSessao } from "../../lib/treinoLogSessao.svelte";
 
   let { treinoId }: { treinoId: string } = $props();
@@ -347,21 +345,15 @@
   let substituindoExIdx = $state<number | null>(null);
   let reordenando = $state(false);
   let buscaSubstituir = $state("");
-  let todosExercicios = $state<Exercicio[]>([]);
 
-  async function abrirSubstituir(exIdx: number) {
+  function abrirSubstituir(exIdx: number) {
     substituindoExIdx = exIdx;
-    if (!todosExercicios.length) todosExercicios = await listExercicios();
   }
 
   function fecharSubstituir() {
     substituindoExIdx = null;
     buscaSubstituir = "";
   }
-
-  const opcoesSubstituir = $derived(
-    todosExercicios.filter((e) => correspondeBusca(textoBuscavelExercicio(e), buscaSubstituir)),
-  );
 
   async function substituirExercicio(novoEx: Exercicio) {
     if (substituindoExIdx == null) return;
@@ -409,37 +401,12 @@
 
   let mostrarPicker = $state(false);
   let buscaPicker = $state("");
-  let mostrarCriarMenu = $state(false);
-  let adicionandoId = $state<string | null>(null);
 
-  function iniciais(nome: string): string {
-    const partes = nome.trim().split(/\s+/);
-    return (partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "");
-  }
-
-  function subtitulo(ex: Exercicio): string {
-    if (!ex.musculos.length) return "Sem músculo definido";
-    return ex.musculos
-      .slice()
-      .sort((a, b) => b.peso_contribuicao - a.peso_contribuicao)
-      .map((m) => m.musculo?.nome)
-      .join(", ");
-  }
-
-  async function abrirPicker() {
-    if (!todosExercicios.length) todosExercicios = await listExercicios();
+  function abrirPicker(): void {
     mostrarPicker = true;
   }
 
-  const disponiveisPicker = $derived(
-    todosExercicios.filter((ex) => {
-      if (sessao.some((s) => s.exercicio_id === ex.id)) return false;
-      if (!correspondeBusca(textoBuscavelExercicio(ex), buscaPicker)) return false;
-      return true;
-    }),
-  );
-
-  function fecharPicker() {
+  function fecharPicker(): void {
     mostrarPicker = false;
     buscaPicker = "";
   }
@@ -486,14 +453,9 @@
   }
 
   async function adicionarRapido(ex: Exercicio) {
-    adicionandoId = ex.id;
-    try {
-      const novo = await construirExercicioSessao(ex);
-      sessao = [...sessao, novo];
-      houveAlteracaoEstrutura = true;
-    } finally {
-      adicionandoId = null;
-    }
+    const novo = await construirExercicioSessao(ex);
+    sessao = [...sessao, novo];
+    houveAlteracaoEstrutura = true;
   }
 
   let arrastandoIdx = $state<number | null>(null);
@@ -617,13 +579,15 @@
     </div>
     <div class="stat-inline">
       <span class="stat-label">Duração</span>
-      <span class="stat-valor destaque">{duracaoLabel}</span>
+      <span class="stat-valor destaque duracao">{duracaoLabel}</span>
     </div>
     <div class="stat-inline">
       <span class="stat-label">Séries</span>
       <span class="stat-valor">{seriesTotal}/{seriesPlanejadas}</span>
     </div>
-    <button class="concluir" disabled={salvando} onclick={concluirTreino}>Concluir</button>
+    <button class="concluir" disabled={salvando} onclick={concluirTreino} aria-label="Concluir treino">
+      {@render iconCheck()}
+    </button>
   </div>
 </div>
 
@@ -730,21 +694,15 @@
   </div>
 {/if}
 
-{#snippet iconVoltar()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="15 6 9 12 15 18" />
+{#snippet iconCheck()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
+    <polyline points="4 12 10 18 20 6" />
   </svg>
 {/snippet}
 {#snippet iconReordenar()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8 7l-4 4 4 4M16 7l4 4-4 4" />
     <path d="M4 11h16" />
-  </svg>
-{/snippet}
-{#snippet iconMais()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 {/snippet}
 {#snippet iconSubstituir()}
@@ -758,37 +716,6 @@
 {#snippet iconRemover()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
-  </svg>
-{/snippet}
-{#snippet iconExercicio()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="2" y="9" width="4" height="6" rx="1" />
-    <rect x="18" y="9" width="4" height="6" rx="1" />
-    <line x1="9" y1="9" x2="9" y2="15" />
-    <line x1="15" y1="9" x2="15" y2="15" />
-    <line x1="6" y1="12" x2="18" y2="12" />
-  </svg>
-{/snippet}
-{#snippet iconMovimento()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="17 3 21 7 17 11" />
-    <path d="M3 7h18" />
-    <polyline points="7 13 3 17 7 21" />
-    <path d="M21 17H3" />
-  </svg>
-{/snippet}
-{#snippet iconMusculo()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="9" />
-    <circle cx="12" cy="12" r="5" />
-    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-  </svg>
-{/snippet}
-{#snippet iconAgrupamento()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-    <polyline points="2 17 12 22 22 17" />
-    <polyline points="2 12 12 17 22 12" />
   </svg>
 {/snippet}
 {#snippet iconMedalha()}
@@ -826,65 +753,25 @@
 {/if}
 
 {#if substituindoExIdx !== null}
-  <div class="tela-picker">
-    <div class="tela-picker-conteudo">
-      <div class="picker-header">
-        <button class="cancelar" onclick={fecharSubstituir}>Cancelar</button>
-        <h1>Substituir por</h1>
-        <span class="header-spacer"></span>
-      </div>
-      <input class="nome-input" type="text" placeholder="Procurar exercício" bind:value={buscaSubstituir} />
-      <ul class="picker-lista">
-        {#each opcoesSubstituir as ex (ex.id)}
-          <li><button class="picker-item-full" onclick={() => substituirExercicio(ex)}>{ex.nome}</button></li>
-        {/each}
-        {#if !opcoesSubstituir.length}
-          <li class="muted-item">Nenhum exercício encontrado.</li>
-        {/if}
-      </ul>
-    </div>
-  </div>
+  {@const idxSubstituir = substituindoExIdx}
+  <Exercicios
+    modoSelecao
+    tituloSelecao="Substituir por"
+    substituirExercicioId={sessao[idxSubstituir]?.exercicio_id ?? null}
+    bind:busca={buscaSubstituir}
+    onSelecionar={substituirExercicio}
+    onFechar={fecharSubstituir}
+  />
 {/if}
 
 {#if mostrarPicker}
-  <div class="tela-picker">
-    <div class="tela-picker-conteudo">
-      <div class="picker-header">
-        <button class="back" onclick={fecharPicker} aria-label="Cancelar">{@render iconVoltar()}</button>
-        <h1>Adicionar Exercício</h1>
-        <button class="criar" onclick={() => (mostrarCriarMenu = true)} aria-label="Criar">{@render iconMais()}</button>
-      </div>
-      <input class="search" type="text" placeholder="Procurar exercício" bind:value={buscaPicker} />
-      <ul class="picker-lista">
-        {#each disponiveisPicker as ex (ex.id)}
-          <li class="picker-item">
-            <span class="avatar">{iniciais(ex.nome)}</span>
-            <span class="info">
-              <span class="nome">{ex.nome}</span>
-              <span class="sub-item">{subtitulo(ex)}</span>
-            </span>
-            <button class="add-btn" onclick={() => adicionarRapido(ex)} disabled={adicionandoId === ex.id} aria-label={`Adicionar ${ex.nome}`}>
-              {#if adicionandoId === ex.id}…{:else}{@render iconMais()}{/if}
-            </button>
-          </li>
-        {/each}
-        {#if !disponiveisPicker.length}
-          <li class="muted-item">Nenhum exercício encontrado.</li>
-        {/if}
-      </ul>
-    </div>
-  </div>
-{/if}
-
-{#if mostrarCriarMenu}
-  <ActionSheet
-    onFechar={() => (mostrarCriarMenu = false)}
-    opcoes={[
-      { label: "Exercício", icon: iconExercicio, onSelect: () => navigate("/treino/exercicios/novo/voltar") },
-      { label: "Padrão de Movimento", icon: iconMovimento, onSelect: () => navigate("/treino/movimentos") },
-      { label: "Grupo Muscular", icon: iconMusculo, onSelect: () => navigate("/treino/musculos") },
-      { label: "Agrupamento", icon: iconAgrupamento, onSelect: () => navigate("/treino/agrupamentos") },
-    ]}
+  <Exercicios
+    modoSelecao
+    tituloSelecao="Adicionar Exercício"
+    excluirIds={sessao.map((s) => s.exercicio_id)}
+    bind:busca={buscaPicker}
+    onSelecionar={adicionarRapido}
+    onFechar={fecharPicker}
   />
 {/if}
 
@@ -1061,15 +948,29 @@
     font-size: 17px;
     font-weight: 600;
   }
+  .stat-valor.duracao {
+    display: inline-block;
+    min-width: 84px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
   .concluir {
     flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--color-primary);
     color: var(--color-primary-fg);
     border: none;
-    border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-4);
-    font-weight: 600;
+    border-radius: 50%;
+    padding: 0;
     cursor: pointer;
+  }
+  .concluir svg {
+    width: 20px;
+    height: 20px;
   }
   .concluir:disabled {
     opacity: 0.6;
@@ -1318,13 +1219,6 @@
   .muted {
     color: var(--surface-muted);
   }
-  .tela-picker {
-    position: fixed;
-    inset: 0;
-    background: var(--surface-bg);
-    z-index: 150;
-    overflow-y: auto;
-  }
   .tela-reordenar {
     position: fixed;
     inset: 0;
@@ -1407,12 +1301,6 @@
     font-weight: 600;
     cursor: pointer;
   }
-  .tela-picker-conteudo {
-    max-width: 480px;
-    margin: 0 auto;
-    padding: var(--space-4);
-    box-sizing: border-box;
-  }
   .picker-header {
     display: flex;
     align-items: center;
@@ -1430,140 +1318,6 @@
   .header-spacer {
     width: 56px;
     flex-shrink: 0;
-  }
-  .cancelar {
-    background: none;
-    border: none;
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
-    cursor: pointer;
-    padding: var(--space-1);
-  }
-  .back {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--surface-card);
-    border: none;
-    color: var(--surface-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    padding: 0;
-  }
-  .back svg {
-    width: 18px;
-    height: 18px;
-  }
-  .criar {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--surface-card);
-    border: none;
-    color: var(--surface-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    padding: 0;
-  }
-  .criar svg {
-    width: 18px;
-    height: 18px;
-  }
-  .search {
-    width: 100%;
-    box-sizing: border-box;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    margin-bottom: var(--space-3);
-    flex-shrink: 0;
-  }
-  .nome-input {
-    box-sizing: border-box;
-    width: 100%;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-    margin-bottom: var(--space-3);
-    flex-shrink: 0;
-  }
-  .picker-lista {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .picker-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--surface-border);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
-  }
-  .picker-item .avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: var(--surface-border);
-    color: var(--surface-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    flex-shrink: 0;
-  }
-  .picker-item .info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .picker-item .nome {
-    font-size: var(--font-size-base);
-    color: var(--surface-fg);
-  }
-  .picker-item .sub-item {
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
-  }
-  .add-btn {
-    flex-shrink: 0;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: none;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-  .add-btn svg {
-    width: 16px;
-    height: 16px;
-  }
-  .add-btn:disabled {
-    opacity: 0.6;
-  }
-  .muted-item {
-    color: var(--surface-muted);
-    padding: var(--space-2);
-    font-size: var(--font-size-sm);
   }
   .descartar {
     width: 100%;
@@ -1636,17 +1390,6 @@
     color: var(--color-primary-fg);
     font-size: var(--font-size-base);
     font-weight: 600;
-    cursor: pointer;
-  }
-  .picker-item-full {
-    width: 100%;
-    text-align: left;
-    padding: var(--space-3) 0;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--surface-border);
-    color: var(--surface-fg);
-    font-size: var(--font-size-base);
     cursor: pointer;
   }
 </style>
