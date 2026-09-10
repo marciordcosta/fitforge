@@ -831,23 +831,12 @@
   }
 
   /** Estilo completo (texto + fundo) pra um valor de série numa "caixa" (grade semanal, Realizado
-   * em grade) — fora da faixa saudável (insuficiente ou excessivo) vira fundo vermelho sólido com
-   * texto branco; "foco" vira fundo azul sólido com texto branco, mesmo destaque forte, só que
-   * indicando "no alvo" em vez de "atenção". Manutenção e moderado mantêm o padrão mais discreto
-   * (texto colorido + fundo 20% dessa cor). Quem chama decide se `v` é bruto (dia/rotina
-   * específica, na grade semanal) ou ponderado (coluna Total da mesma grade, e Realizado — que já é
-   * ponderado por natureza) — ver comentários nos usos. */
+   * em grade) — mesmo padrão pras 5 faixas: texto na cor da classificação (corVolume), fundo
+   * translúcido (20%) dessa mesma cor. Quem chama decide se `v` é bruto (dia/rotina específica,
+   * na grade semanal) ou ponderado (coluna Total da mesma grade, e Realizado — que já é ponderado
+   * por natureza) — ver comentários nos usos. */
   function estiloCaixaVolume(v: number, musculo?: Musculo | null): string {
-    const classe = classificarVolumeSemanal(arredondarValor(v), parametrosParaMusculo(musculo));
-    if (classe === "insuficiente" || classe === "excessivo") {
-      return `color: #fff; background: var(--color-danger);`;
-    }
-    if (classe === "foco") {
-      // Azul mais escuro que --color-secondary (usado no texto/legenda) só aqui, de propósito:
-      // fundo sólido + texto branco precisa de mais contraste pra dar o mesmo destaque do vermelho.
-      return `color: #fff; background: #2563eb;`;
-    }
-    const cor = classe === "manutencao" ? "var(--color-neutral)" : "var(--color-success)";
+    const cor = corVolume(v, musculo);
     return `color: ${cor}; background: color-mix(in srgb, ${cor} 20%, transparent);`;
   }
 
