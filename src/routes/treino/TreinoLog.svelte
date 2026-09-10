@@ -1189,7 +1189,7 @@
   }
   .add-serie {
     width: 100%;
-    height: 36px;
+    height: 40px;
     margin-top: var(--space-3);
     padding: 0 var(--space-3);
     box-sizing: border-box;
