@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { DIAS_SEMANA_ABREV } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
-import { parseISODate } from "./dates";
+import { parseISODate, hojeISO, somarDias } from "./dates";
 
 function uid(): string {
   const id = auth.user?.id;
@@ -668,6 +668,45 @@ export async function getItemDiario(id: string): Promise<ItemDiario | null> {
   const { data, error } = await supabase.from("diario_alimentos").select(ITEM_DIARIO_SELECT).eq("id", id).maybeSingle();
   if (error) throw error;
   return data ? mapItemDiario(data as Record<string, unknown>) : null;
+}
+
+/** Média diária de calorias e macros logados nos últimos 7 dias (hoje incluso) — só entre os dias
+ * que têm algum registro (mesmo critério de janela do peso, getPesoMedioAtual em pesoApi.ts).
+ * null quando não há nenhum item logado no período. */
+export async function getMediaSemanalDiario(): Promise<{
+  calorias: number;
+  proteinaG: number;
+  gorduraG: number;
+  carboidratoG: number;
+} | null> {
+  const fim = hojeISO();
+  const inicio = somarDias(fim, -6);
+  const { data: linhas, error } = await supabase
+    .from("diario_alimentos")
+    .select("data, calorias, proteina_g, gordura_g, carboidrato_g")
+    .gte("data", inicio)
+    .lte("data", fim);
+  if (error) throw error;
+  if (!linhas?.length) return null;
+
+  const porDia = new Map<string, { calorias: number; proteinaG: number; gorduraG: number; carboidratoG: number }>();
+  for (const l of linhas) {
+    const dia = l.data as string;
+    const atual = porDia.get(dia) ?? { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 };
+    atual.calorias += l.calorias as number;
+    atual.proteinaG += l.proteina_g as number;
+    atual.gorduraG += l.gordura_g as number;
+    atual.carboidratoG += l.carboidrato_g as number;
+    porDia.set(dia, atual);
+  }
+  const dias = [...porDia.values()];
+  const n = dias.length;
+  return {
+    calorias: dias.reduce((acc, d) => acc + d.calorias, 0) / n,
+    proteinaG: dias.reduce((acc, d) => acc + d.proteinaG, 0) / n,
+    gorduraG: dias.reduce((acc, d) => acc + d.gorduraG, 0) / n,
+    carboidratoG: dias.reduce((acc, d) => acc + d.carboidratoG, 0) / n,
+  };
 }
 
 export async function getItensDaRefeicao(refeicaoId: string): Promise<ItemDiario[]> {

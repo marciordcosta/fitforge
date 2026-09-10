@@ -209,6 +209,20 @@ export async function getPesoMedioAtual(): Promise<number | null> {
   return janela.reduce((acc, p) => acc + p.peso, 0) / janela.length;
 }
 
+/** Peso-alvo da semana atual — pra meta "percentual", projeta um passo (%) a partir da média móvel
+ * mais recente (mesma fórmula do card "Meta semanal" da tela de Peso: mediaAtual * (1+percentual/100));
+ * pra "manutenção", é o próprio peso-alvo cadastrado (constante, sem ritmo). null sem meta ou sem
+ * peso suficiente pra calcular a média. */
+export async function getMetaSemanal(): Promise<number | null> {
+  const meta = await getMeta();
+  if (!meta) return null;
+  if (meta.tipo === "manutencao") return meta.pesoAlvo;
+  if (meta.percentual == null) return null;
+  const mediaAtual = await getPesoMedioAtual();
+  if (mediaAtual == null) return null;
+  return mediaAtual * (1 + meta.percentual / 100);
+}
+
 /** Taxa de variação (kg/semana) das últimas 2 semanas: compara a média dos últimos 7 dias com a
  * média dos 7 dias anteriores (mesma janela de 7 dias de getPesoMedioAtual, só que em dois
  * blocos) — mais estável que comparar dois pontos isolados, sem introduzir um tipo de

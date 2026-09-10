@@ -4,6 +4,7 @@
   import Sheet from "../../components/Sheet.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
+  import DietaResumoModal from "./DietaResumoModal.svelte";
   import {
     garantirRefeicoesPadraoDoDia,
     getDiarioDoDia,
@@ -46,6 +47,7 @@
   let mostrarData = $state(false);
   let modoRestante = $state(false);
   let rotinaHoje = $state<Treino | null>(null);
+  let mostrarResumo = $state(false);
   /** Status de aderência à dieta (ritmo real de peso vs. ritmo esperado pela meta) — mesmo chip
    * que antes mostrava "X dias para o objetivo". */
   let statusAdesao = $state<StatusAdesaoDieta | null>(null);
@@ -288,7 +290,10 @@
         {#if statusAdesao}
           <button
             class="chip-info"
-            onclick={() => navigate(statusAdesao === "ajustar_calorias" ? "/dieta/refeicoes/gerenciar" : "/peso")}
+            onclick={() => {
+              if (statusAdesao === "ajustar_calorias") navigate("/dieta/refeicoes/gerenciar");
+              else mostrarResumo = true;
+            }}
           >
             {@render iconPesoMeta()}
             <span
@@ -555,6 +560,10 @@
     </div>
   {/if}
 </div>
+
+{#if mostrarResumo}
+  <DietaResumoModal onFechar={() => (mostrarResumo = false)} />
+{/if}
 
 {#if mostrarMenuMais}
   <ActionSheet
