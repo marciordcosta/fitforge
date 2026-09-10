@@ -835,7 +835,11 @@
    * (ver estiloCaixaVolume pra isso, inclusive o caso vermelho/texto branco de insuficiente e
    * excessivo). */
   function corVolume(v: number): string {
-    const classe = classificarVolumeSemanal(v, parametrosDistribuicao);
+    // Arredonda pro mesmo passo de 0.5 que formatValor exibe — sem isso, um valor bruto tipo
+    // 9.8 (de somar frações de peso_contribuicao) comparava "9.8 < 10" como verdadeiro mesmo
+    // exibindo "10" na tela, classificando errado (ex: caindo em "moderado" quando devia ser
+    // "foco" pelo número que o usuário está vendo).
+    const classe = classificarVolumeSemanal(arredondarValor(v), parametrosDistribuicao);
     if (classe === "insuficiente" || classe === "excessivo") return "var(--color-danger)";
     if (classe === "foco") return "var(--color-secondary)";
     if (classe === "moderado") return "var(--color-success)";
@@ -844,16 +848,20 @@
 
   /** Estilo completo (texto + fundo) pra um valor de série numa "caixa" (grade semanal, Realizado
    * em grade) — fora da faixa saudável (insuficiente ou excessivo) vira fundo vermelho sólido com
-   * texto branco, bem mais chamativo que o padrão "texto colorido + fundo 20%" das outras faixas,
-   * de propósito: são os dois casos que pedem atenção. Quem chama decide se `v` é bruto (dia/rotina
+   * texto branco; "foco" vira fundo azul sólido com texto branco, mesmo destaque forte, só que
+   * indicando "no alvo" em vez de "atenção". Manutenção e moderado mantêm o padrão mais discreto
+   * (texto colorido + fundo 20% dessa cor). Quem chama decide se `v` é bruto (dia/rotina
    * específica, na grade semanal) ou ponderado (coluna Total da mesma grade, e Realizado — que já é
    * ponderado por natureza) — ver comentários nos usos. */
   function estiloCaixaVolume(v: number): string {
-    const classe = classificarVolumeSemanal(v, parametrosDistribuicao);
+    const classe = classificarVolumeSemanal(arredondarValor(v), parametrosDistribuicao);
     if (classe === "insuficiente" || classe === "excessivo") {
       return `color: #fff; background: var(--color-danger);`;
     }
-    const cor = classe === "manutencao" ? "var(--color-neutral)" : classe === "moderado" ? "var(--color-success)" : "var(--color-secondary)";
+    if (classe === "foco") {
+      return `color: #fff; background: var(--color-secondary);`;
+    }
+    const cor = classe === "manutencao" ? "var(--color-neutral)" : "var(--color-success)";
     return `color: ${cor}; background: color-mix(in srgb, ${cor} 20%, transparent);`;
   }
 
