@@ -811,12 +811,15 @@
 
 {#if menuSerieAberto !== null}
   {@const { exIdx: exIdxSerie, setIdx: setIdxSerie } = menuSerieAberto}
-  <ActionSheet
-    titulo={`Série ${sessao[exIdxSerie]?.sets[setIdxSerie]?.serie ?? ""}`}
-    onFechar={() => (menuSerieAberto = null)}
-    opcoes={[
-      { label: "Remover Série", icon: iconRemover, destructive: true, onSelect: () => removerSerie(exIdxSerie, setIdxSerie) },
-    ]}
+  <ConfirmDialog
+    titulo={`Remover a Série ${sessao[exIdxSerie]?.sets[setIdxSerie]?.serie ?? ""}?`}
+    textoConfirmar="Excluir"
+    textoCancelar="Cancelar"
+    onConfirmar={() => {
+      removerSerie(exIdxSerie, setIdxSerie);
+      menuSerieAberto = null;
+    }}
+    onCancelar={() => (menuSerieAberto = null)}
   />
 {/if}
 
@@ -870,13 +873,13 @@
 {/if}
 
 {#if mostrarEscolhaEstrutura}
-  <ActionSheet
+  <ConfirmDialog
     titulo="Você alterou os exercícios desta sessão"
-    onFechar={() => (mostrarEscolhaEstrutura = false)}
-    opcoes={[
-      { label: "Salvar Nova Rotina", onSelect: () => finalizarComEscolha(true) },
-      { label: "Manter Rotina", onSelect: () => finalizarComEscolha(false) },
-    ]}
+    textoConfirmar="Salvar Nova Rotina"
+    textoCancelar="Manter Rotina"
+    destrutivo={false}
+    onConfirmar={() => finalizarComEscolha(true)}
+    onCancelar={() => finalizarComEscolha(false)}
   />
 {/if}
 
