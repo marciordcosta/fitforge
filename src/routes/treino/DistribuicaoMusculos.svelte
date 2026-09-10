@@ -795,12 +795,22 @@
    * usado pra colorir barras/textos simples (Realizado), sem o fundo de "caixa" da grade semanal
    * (ver estiloCaixaVolume pra isso, inclusive o caso vermelho/texto branco de insuficiente e
    * excessivo). */
-  function corVolume(v: number): string {
+  /** Parâmetros efetivos pra classificar o volume de UM músculo: se ele tem um mínimo de séries
+   * próprio (MusculoDetalhe > "Séries mínimas"), sobrescreve só o mínimo de Manutenção, mantendo
+   * o resto (Manutenção Máx/Foco Min/Max) no valor geral de Parametrização — primeiro passo de
+   * landmarks por músculo (ex: panturrilha tolera mais volume que deltoide posterior), sem
+   * precisar configurar a faixa toda por músculo ainda. */
+  function parametrosParaMusculo(musculo: Musculo | null | undefined): ParametrosDistribuicao {
+    if (musculo?.series_minimas == null) return parametrosDistribuicao;
+    return { ...parametrosDistribuicao, seriesManutencaoMin: musculo.series_minimas };
+  }
+
+  function corVolume(v: number, musculo?: Musculo | null): string {
     // Arredonda pro mesmo passo de 0.5 que formatValor exibe — sem isso, um valor bruto tipo
     // 9.8 (de somar frações de peso_contribuicao) comparava "9.8 < 10" como verdadeiro mesmo
     // exibindo "10" na tela, classificando errado (ex: caindo em "moderado" quando devia ser
     // "foco" pelo número que o usuário está vendo).
-    const classe = classificarVolumeSemanal(arredondarValor(v), parametrosDistribuicao);
+    const classe = classificarVolumeSemanal(arredondarValor(v), parametrosParaMusculo(musculo));
     if (classe === "insuficiente" || classe === "excessivo") return "var(--color-danger)";
     if (classe === "foco") return "var(--color-secondary)";
     if (classe === "moderado") return "var(--color-success)";
@@ -814,8 +824,8 @@
    * (texto colorido + fundo 20% dessa cor). Quem chama decide se `v` é bruto (dia/rotina
    * específica, na grade semanal) ou ponderado (coluna Total da mesma grade, e Realizado — que já é
    * ponderado por natureza) — ver comentários nos usos. */
-  function estiloCaixaVolume(v: number): string {
-    const classe = classificarVolumeSemanal(arredondarValor(v), parametrosDistribuicao);
+  function estiloCaixaVolume(v: number, musculo?: Musculo | null): string {
+    const classe = classificarVolumeSemanal(arredondarValor(v), parametrosParaMusculo(musculo));
     if (classe === "insuficiente" || classe === "excessivo") {
       return `color: #fff; background: var(--color-danger);`;
     }
@@ -1905,8 +1915,8 @@
 
   /** Cor de cada fatia pela classificação de volume semanal (Parametrização) — em cima do
    * ponderado (anel geral) ou do bruto (anel por rotina), conforme `campo`. */
-  function coresPorVolume(itens: { valor: number; bruto?: number; ponderado?: number }[], campo: CampoVolume): string[] {
-    return itens.map((i) => corVolume((campo === "bruto" ? i.bruto : i.ponderado) ?? i.valor));
+  function coresPorVolume(itens: { musculo: Musculo; valor: number; bruto?: number; ponderado?: number }[], campo: CampoVolume): string[] {
+    return itens.map((i) => corVolume((campo === "bruto" ? i.bruto : i.ponderado) ?? i.valor, i.musculo));
   }
 
   /** Gráfico de uma rotina específica: mesmos dados do card da rotina (distribuicaoPorTreino
@@ -2203,9 +2213,9 @@
                 <span class="valor" style="color: var(--color-neutral);">{linha.valor} / {linha.meta}</span>
               {:else}
                 <div class="barra-wrap">
-                  <div class="barra" style={`width: ${Math.min(linha.valor * 8, 100)}%; background: ${corVolume(linha.valor)};`}></div>
+                  <div class="barra" style={`width: ${Math.min(linha.valor * 8, 100)}%; background: ${corVolume(linha.valor, linha.musculo)};`}></div>
                 </div>
-                <span class="valor" style={`color: ${corVolume(linha.valor)};`}>{linha.valor}</span>
+                <span class="valor" style={`color: ${corVolume(linha.valor, linha.musculo)};`}>{linha.valor}</span>
               {/if}
             </div>
             {#if aberto && linha.subItens}
@@ -2219,9 +2229,9 @@
                     <span class="valor" style="color: var(--color-neutral);">{sub.valor} / {sub.meta}</span>
                   {:else}
                     <div class="barra-wrap">
-                      <div class="barra" style={`width: ${Math.min(sub.valor * 8, 100)}%; background: ${corVolume(sub.valor)};`}></div>
+                      <div class="barra" style={`width: ${Math.min(sub.valor * 8, 100)}%; background: ${corVolume(sub.valor, sub.musculo)};`}></div>
                     </div>
-                    <span class="valor" style={`color: ${corVolume(sub.valor)};`}>{sub.valor}</span>
+                    <span class="valor" style={`color: ${corVolume(sub.valor, sub.musculo)};`}>{sub.valor}</span>
                   {/if}
                 </div>
               {/each}
@@ -2412,13 +2422,13 @@
                   {#if modoEdicaoMetas && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-meta-edit"
-                      style={estiloCaixaVolume(valor.bruto)}
+                      style={estiloCaixaVolume(valor.bruto, linha.musculo)}
                       onclick={() => abrirEditarMeta(treinoId!, linha.musculo, mostrado, "total")}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0 && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-link"
-                      style={estiloCaixaVolume(valor.bruto)}
+                      style={estiloCaixaVolume(valor.bruto, linha.musculo)}
                       onclick={() => {
                         const treino = treinos.find((t) => t.id === treinoId);
                         if (treino) {
@@ -2429,16 +2439,16 @@
                       }}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0}
-                    <span class="grade-valor-caixa" style={estiloCaixaVolume(valor.bruto)}
+                    <span class="grade-valor-caixa" style={estiloCaixaVolume(valor.bruto, linha.musculo)}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</span>
                   {:else if meta != null}
-                    <span class="grade-valor-caixa grade-valor-vazio" style={estiloCaixaVolume(0)}
+                    <span class="grade-valor-caixa grade-valor-vazio" style={estiloCaixaVolume(0, linha.musculo)}
                     >0<span class="grade-meta-sub">/{formatValor(meta)}</span></span>
                   {/if}
                 </td>
               {/each}
               <td class="grade-valor grade-col-total">
-                <span class="grade-valor-caixa grade-valor-total" style={estiloCaixaVolume(linha.ponderadoTotal)}
+                <span class="grade-valor-caixa grade-valor-total" style={estiloCaixaVolume(linha.ponderadoTotal, linha.musculo)}
                 >{formatValor(linha.ponderadoTotal)}{#if temMetaNaLinha}<span class="grade-meta-sub">/{formatValor(totalMetaLinha)}</span>{/if}</span>
               </td>
             </tr>
@@ -2502,7 +2512,7 @@
               {#each linha.valores as valor, i (i)}
                 <td class="grade-valor">
                   {#if valor > 0}
-                    <span class="grade-valor-caixa" style={estiloCaixaVolume(valor)}>{valor}</span>
+                    <span class="grade-valor-caixa" style={estiloCaixaVolume(valor, linha.musculo)}>{valor}</span>
                   {/if}
                 </td>
               {/each}

@@ -18,6 +18,9 @@ export interface Musculo {
   agrupamento_id: string | null;
   agrupamento?: AgrupamentoMuscular | null;
   ordem: number;
+  /** Override desse músculo pro mínimo de séries semanais (Manutenção) da classificação de
+   * volume — null = usa o mínimo global de Parametrização. Ver classificarVolumeSemanal. */
+  series_minimas: number | null;
 }
 
 export interface PadraoMovimento {
@@ -195,7 +198,7 @@ export async function deleteAgrupamentoMuscular(id: string): Promise<void> {
 
 // ---------------- Músculos ----------------
 
-const MUSCULO_SELECT = "id, nome, agrupamento_id, ordem, agrupamento:agrupamentos_musculares(id, nome, ordem)";
+const MUSCULO_SELECT = "id, nome, agrupamento_id, ordem, series_minimas, agrupamento:agrupamentos_musculares(id, nome, ordem)";
 
 export async function listMusculos(): Promise<Musculo[]> {
   const { data, error } = await supabase
@@ -235,10 +238,15 @@ export async function getMusculo(id: string): Promise<Musculo | null> {
   return data as unknown as Musculo | null;
 }
 
-export async function updateMusculo(id: string, nome: string, agrupamentoId: string | null): Promise<void> {
+export async function updateMusculo(
+  id: string,
+  nome: string,
+  agrupamentoId: string | null,
+  seriesMinimas: number | null = null,
+): Promise<void> {
   const { error } = await supabase
     .from("musculos")
-    .update({ nome: nome.trim(), agrupamento_id: agrupamentoId || null })
+    .update({ nome: nome.trim(), agrupamento_id: agrupamentoId || null, series_minimas: seriesMinimas })
     .eq("id", id);
   if (error) throw error;
 }

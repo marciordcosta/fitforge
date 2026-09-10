@@ -14,6 +14,7 @@
 
   let nome = $state("");
   let agrupamentoId = $state("");
+  let seriesMinimas = $state("");
   let encontrado = $state(true);
   let loading = $state(true);
   let salvando = $state(false);
@@ -29,6 +30,7 @@
     if (musculo) {
       nome = musculo.nome;
       agrupamentoId = musculo.agrupamento_id ?? "";
+      seriesMinimas = musculo.series_minimas != null ? String(musculo.series_minimas) : "";
     } else {
       encontrado = false;
     }
@@ -52,7 +54,8 @@
     }
     salvando = true;
     try {
-      await updateMusculo(musculoId, nome, agrupamentoId || null);
+      const seriesMinimasNum = seriesMinimas.trim() ? Number(seriesMinimas) : null;
+      await updateMusculo(musculoId, nome, agrupamentoId || null, seriesMinimasNum);
       voltar("/treino/musculos");
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
@@ -111,6 +114,16 @@
         Exercícios.
       </span>
     </div>
+
+    <label class="field">
+      <span>Séries mínimas (opcional)</span>
+      <input type="number" inputmode="numeric" min="0" step="1" placeholder="Usa o mínimo geral de Parametrização" bind:value={seriesMinimas} />
+      <span class="ajuda">
+        Sobrescreve o mínimo de Manutenção da Classificação de Volume Semanal (Parametrização) só
+        pra esse músculo — útil pra quem tolera/precisa de bem mais ou menos volume que a média
+        (ex: panturrilha vs. deltoide posterior). Em branco, usa o valor geral.
+      </span>
+    </label>
 
     <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Músculo</button>
   {/if}
