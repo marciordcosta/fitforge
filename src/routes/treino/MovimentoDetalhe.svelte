@@ -4,6 +4,8 @@
     getPadraoMovimentoComMusculos,
     updatePadraoMovimentoComMusculos,
     deletePadraoMovimento,
+    listExercicios,
+    type Exercicio,
   } from "../../lib/treinoApi";
   import MovimentoCampos from "./MovimentoCampos.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -17,12 +19,14 @@
   let erroCarregar = $state<string | null>(null);
   let salvando = $state(false);
   let mostrarConfirmExcluir = $state(false);
+  let exercicios = $state<Exercicio[]>([]);
 
   async function carregar() {
     loading = true;
     erroCarregar = null;
     try {
-      const padrao = await getPadraoMovimentoComMusculos(padraoId);
+      const [padrao, listaExercicios] = await Promise.all([getPadraoMovimentoComMusculos(padraoId), listExercicios()]);
+      exercicios = listaExercicios;
       if (padrao) {
         nome = padrao.nome;
         linhasMusculos = padrao.musculos.length ? padrao.musculos.map((m) => ({ nome: m.nome })) : [{ nome: "" }];
@@ -37,6 +41,8 @@
   }
 
   void carregar();
+
+  const exerciciosDoPadrao = $derived(exercicios.filter((ex) => ex.padrao_id === padraoId));
 
   async function salvar() {
     if (!nome.trim()) {
@@ -95,6 +101,23 @@
     <p class="muted">Movimento não encontrado.</p>
   {:else}
     <MovimentoCampos bind:nome bind:linhasMusculos />
+
+    {#if exerciciosDoPadrao.length}
+      <div class="field">
+        <span>Exercícios com esse padrão de movimento</span>
+        <ul class="lista-exercicios">
+          {#each exerciciosDoPadrao as ex (ex.id)}
+            <li>
+              <button type="button" class="exercicio-item" onclick={() => navigate(`/treino/exercicios/${ex.id}`)}>
+                <span class="exercicio-nome">{ex.nome}</span>
+                <span class="chevron">›</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+
     <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Movimento</button>
   {/if}
 </div>
@@ -171,6 +194,46 @@
   .atualizar:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-bottom: var(--space-4);
+  }
+  .field > span {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .lista-exercicios {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .exercicio-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--surface-border);
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    cursor: pointer;
+    text-align: left;
+  }
+  .exercicio-nome {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+  }
+  .chevron {
+    color: var(--surface-muted);
+    font-size: var(--font-size-lg);
   }
   .excluir-btn {
     width: 100%;

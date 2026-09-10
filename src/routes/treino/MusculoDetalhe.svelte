@@ -5,7 +5,9 @@
     updateMusculo,
     deleteMusculo,
     listAgrupamentosMusculares,
+    listExercicios,
     type AgrupamentoMuscular,
+    type Exercicio,
   } from "../../lib/treinoApi";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
@@ -22,11 +24,17 @@
 
   let agrupamentos = $state<AgrupamentoMuscular[]>([]);
   let mostrarAgrupamentoPicker = $state(false);
+  let exercicios = $state<Exercicio[]>([]);
 
   async function carregar() {
     loading = true;
-    const [musculo, listaAgrupamentos] = await Promise.all([getMusculo(musculoId), listAgrupamentosMusculares()]);
+    const [musculo, listaAgrupamentos, listaExercicios] = await Promise.all([
+      getMusculo(musculoId),
+      listAgrupamentosMusculares(),
+      listExercicios(),
+    ]);
     agrupamentos = listaAgrupamentos;
+    exercicios = listaExercicios;
     if (musculo) {
       nome = musculo.nome;
       agrupamentoId = musculo.agrupamento_id ?? "";
@@ -38,6 +46,13 @@
   }
 
   void carregar();
+
+  const exerciciosDoMusculo = $derived.by(() =>
+    exercicios
+      .map((ex) => ({ ex, pct: (ex.musculos.find((m) => m.musculo_id === musculoId)?.peso_contribuicao ?? 0) * 100 }))
+      .filter((item) => item.pct > 0)
+      .sort((a, b) => b.pct - a.pct),
+  );
 
   const opcoesAgrupamento = $derived([
     { valor: "", label: "Nenhum" },
@@ -108,22 +123,33 @@
       <button type="button" class="select-btn" onclick={() => (mostrarAgrupamentoPicker = true)}>
         {agrupamentos.find((a) => a.id === agrupamentoId)?.nome ?? "Nenhum"}
       </button>
-      <span class="ajuda">
-        Usado para somar músculos relacionados em totais futuros — ex: "Ombro Anterior", "Ombro
-        Lateral" e "Ombro Posterior" no agrupamento "Ombro". Cadastre agrupamentos no menu "+" em
-        Exercícios.
-      </span>
     </div>
 
     <label class="field">
       <span>Séries mínimas (opcional)</span>
       <input type="number" inputmode="numeric" min="0" step="1" placeholder="Usa o mínimo geral de Parametrização" bind:value={seriesMinimas} />
-      <span class="ajuda">
-        Sobrescreve o mínimo de Manutenção da Classificação de Volume Semanal (Parametrização) só
-        pra esse músculo — útil pra quem tolera/precisa de bem mais ou menos volume que a média
-        (ex: panturrilha vs. deltoide posterior). Em branco, usa o valor geral.
-      </span>
     </label>
+
+    {#if exerciciosDoMusculo.length}
+      <div class="field">
+        <span>Exercícios que trabalham esse músculo</span>
+        <ul class="lista-exercicios">
+          {#each exerciciosDoMusculo as item (item.ex.id)}
+            <li>
+              <button type="button" class="exercicio-item" onclick={() => navigate(`/treino/exercicios/${item.ex.id}`)}>
+                <span class="exercicio-nome">{item.ex.nome}</span>
+                <div
+                  class="exercicio-anel"
+                  style={`background: conic-gradient(var(--color-primary) 0% ${item.pct}%, var(--surface-border) ${item.pct}% 100%);`}
+                >
+                  <div class="exercicio-anel-centro">{item.pct.toFixed(0)}%</div>
+                </div>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
 
     <button class="excluir-btn" onclick={() => (mostrarConfirmExcluir = true)}>Excluir Músculo</button>
   {/if}
@@ -238,9 +264,50 @@
     text-align: left;
     cursor: pointer;
   }
-  .ajuda {
-    font-size: 12px;
-    color: var(--surface-muted);
+  .lista-exercicios {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .exercicio-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--surface-border);
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    cursor: pointer;
+    text-align: left;
+  }
+  .exercicio-nome {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+  }
+  .exercicio-anel {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 50%;
+  }
+  .exercicio-anel-centro {
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--surface-fg);
   }
   .excluir-btn {
     width: 100%;
