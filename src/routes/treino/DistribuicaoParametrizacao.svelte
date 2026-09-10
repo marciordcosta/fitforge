@@ -132,10 +132,6 @@
           </div>
         </div>
       </div>
-      <p class="param-card-desc">
-        Entre o máximo da Manutenção e o mínimo do Foco, o sistema classifica como
-        <strong>Moderado</strong> automaticamente — sem campo próprio.
-      </p>
       <p class="param-legenda">
         <span class="legenda-cor legenda-abaixo">●</span> abaixo de {seriesManutencaoMin} — insuficiente
         &nbsp;·&nbsp; <span class="legenda-cor legenda-manutencao">●</span> {seriesManutencaoMin}–{seriesManutencaoMax} — manutenção
@@ -147,10 +143,6 @@
 
     <div class="param-card">
       <p class="param-card-titulo">Fadiga por Posição</p>
-      <p class="param-card-desc">
-        Regra 80/20 de priorização dentro da sessão — não mede fadiga física real. Define quais
-        séries caem no bloco de maior retorno (afeta a coluna "Acum." e a tendência por músculo).
-      </p>
       <div class="fadiga-opcoes">
         {#each OPCOES_FADIGA as opcao (opcao.valor)}
           <button type="button" class:ativo={fadigaModo === opcao.valor} onclick={() => (fadigaModo = opcao.valor)}>{opcao.label}</button>
@@ -158,11 +150,6 @@
       </div>
 
       {#if fadigaModo === "fases"}
-        <p class="param-card-desc">
-          % da sessão (não nº de séries) até onde a posição ainda conta como bloco de maior
-          prioridade "A"; daí até o segundo corte é o bloco intermediário "B"; depois disso, o
-          bloco final "C". Independe do treino ter 8 ou 18 séries.
-        </p>
         <div class="param-linha">
           <div class="param-linha-topo">
             <p class="param-nome">Bloco A até <span class="legenda-cor legenda-fase-a">●</span></p>
