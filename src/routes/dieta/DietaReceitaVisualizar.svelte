@@ -203,7 +203,7 @@
   }
 
   function abrirDetalheItem(item: ReceitaItem) {
-    navigate(`/dieta/alimento/${item.alimentoId}/${hojeISO()}`);
+    navigate(`/dieta/alimento/${item.alimentoId}/${hojeISO()}/receita/${receitaId}`);
   }
 
   /** Tempo segurando o card parado antes do toque virar "pressionar" (abre a confirmação de excluir) — evita disparar sem querer num toque rápido/rolagem. */

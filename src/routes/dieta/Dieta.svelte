@@ -21,6 +21,8 @@
   <DietaItemForm itemDiarioId={segmentos[1]} />
 {:else if segmentos[0] === "alimento" && segmentos[1] && segmentos[2] === "receita"}
   <DietaItemForm alimentoId={segmentos[1]} modoReceita={true} receitaIdExistente={segmentos[3]} />
+{:else if segmentos[0] === "alimento" && segmentos[1] && segmentos[3] === "receita" && segmentos[4]}
+  <DietaItemForm alimentoId={segmentos[1]} data={segmentos[2]} voltarPara={`/dieta/receitas/ver/${segmentos[4]}`} />
 {:else if segmentos[0] === "alimento" && segmentos[1]}
   <DietaItemForm
     alimentoId={segmentos[1]}

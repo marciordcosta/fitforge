@@ -30,6 +30,7 @@
     itemDiarioId,
     modoReceita,
     receitaIdExistente,
+    voltarPara,
   }: {
     alimentoId?: string;
     data?: string;
@@ -37,6 +38,10 @@
     itemDiarioId?: string;
     modoReceita?: boolean;
     receitaIdExistente?: string;
+    /** Destino de voltar/salvar quando não há refeição nem modo receita — ex: aberto a partir do
+     * detalhe de um item já existente numa receita (visualizar, não adicionar), onde não faz
+     * sentido lançar no diário nem tratar como rascunho de receita nova. */
+    voltarPara?: string;
   } = $props();
 
   const editandoItem = untrack(() => itemDiarioId != null);

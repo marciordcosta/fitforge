@@ -868,7 +868,17 @@
     if (!nome.trim()) return;
     salvando = true;
     try {
-      await criarRefeicaoModelo(nome.trim());
+      // Grupos ANTES de criar: um dia sem nenhuma linha em modelosPorDia cai no catálogo inteiro
+      // (modelosDoDia) -- criar uma refeição nova faria ela aparecer só nesses dias "automáticos"
+      // e não nos que já têm lista própria, quebrando um bloco que antes era só um em dois. Grava
+      // a lista de cada grupo + a nova refeição explicitamente pra TODOS os dias, pra continuarem
+      // idênticos entre si.
+      const gruposAntes = modoCalorias === "ondulatoria" ? gruposDias : [];
+      const novoId = await criarRefeicaoModelo(nome.trim());
+      for (const g of gruposAntes) {
+        const ids = [...g.modelos.map((m) => m.id), novoId];
+        await Promise.all(g.dias.map((dia) => definirRefeicoesDoDia(dia, ids)));
+      }
       mostrarForm = false;
       await carregar();
     } catch (err) {
@@ -1514,9 +1524,7 @@
             </li>
           {/each}
         </ul>
-        {#if grupo.modelos.length < modelos.length}
-          <button type="button" class="add-refeicao-btn" onclick={() => abrirAdicionarRefeicao(grupo)}>+ Adicionar refeição</button>
-        {/if}
+        <button type="button" class="add-refeicao-btn" onclick={() => abrirAdicionarRefeicao(grupo)}>+ Adicionar refeição</button>
       {/each}
     {:else}
       {@const somaGlobal = somaMacrosGlobal()}
@@ -1774,10 +1782,9 @@
   <ActionSheet
     titulo="Adicionar refeição"
     onFechar={() => (mostrarAdicionarRefeicaoGrupo = false)}
-    opcoes={refeicoesDisponiveisParaGrupo.map((m) => ({
-      label: m.nome,
-      onSelect: () => adicionarAoGrupo(m),
-    }))}
+    opcoes={refeicoesDisponiveisParaGrupo.length
+      ? refeicoesDisponiveisParaGrupo.map((m) => ({ label: m.nome, onSelect: () => adicionarAoGrupo(m) }))
+      : [{ label: "Todas as refeições do catálogo já estão nesse bloco", disabled: true, onSelect: () => {} }]}
   />
 {/if}
 
