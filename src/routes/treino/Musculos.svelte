@@ -1,21 +1,47 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { listMusculos, correspondeBusca, type Musculo } from "../../lib/treinoApi";
+  import {
+    listMusculos,
+    listPadroesMovimentoComMusculos,
+    correspondeBusca,
+    type Musculo,
+    type PadraoMovimentoComMusculos,
+  } from "../../lib/treinoApi";
 
   let musculos = $state<Musculo[]>([]);
+  let padroes = $state<PadraoMovimentoComMusculos[]>([]);
   let loading = $state(true);
   let busca = $state("");
 
   async function carregar() {
     loading = true;
-    musculos = (await listMusculos()).slice().sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    const [listaMusculos, listaPadroes] = await Promise.all([listMusculos(), listPadroesMovimentoComMusculos()]);
+    musculos = listaMusculos.slice().sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    padroes = listaPadroes;
     loading = false;
   }
 
   void carregar();
 
+  const padroesPorMusculo = $derived.by(() => {
+    const mapa = new Map<string, string[]>();
+    for (const p of padroes) {
+      for (const m of p.musculos) {
+        const lista = mapa.get(m.id) ?? [];
+        lista.push(p.nome);
+        mapa.set(m.id, lista);
+      }
+    }
+    return mapa;
+  });
+
+  function subtitulo(m: Musculo): string {
+    const nomes = padroesPorMusculo.get(m.id);
+    return nomes?.length ? nomes.join(", ") : "Sem padrão de movimento";
+  }
+
   const filtrados = $derived(
-    musculos.filter((m) => correspondeBusca(`${m.nome} ${m.agrupamento?.nome ?? ""}`, busca)),
+    musculos.filter((m) => correspondeBusca(`${m.nome} ${m.agrupamento?.nome ?? ""} ${subtitulo(m)}`, busca)),
   );
 </script>
 
@@ -53,7 +79,10 @@
       {#each filtrados as m (m.id)}
         <li>
           <button class="item" onclick={() => navigate(`/treino/musculos/${m.id}`)}>
-            <span class="nome">{m.nome}</span>
+            <span class="info">
+              <span class="nome">{m.nome}</span>
+              <span class="sub">{subtitulo(m)}</span>
+            </span>
             <span class="chevron">›</span>
           </button>
         </li>
@@ -138,7 +167,6 @@
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-3);
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--surface-border);
@@ -149,9 +177,19 @@
     cursor: pointer;
     text-align: left;
   }
+  .info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
   .nome {
     font-size: var(--font-size-base);
     color: var(--surface-fg);
+  }
+  .sub {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .chevron {
     color: var(--surface-muted);
