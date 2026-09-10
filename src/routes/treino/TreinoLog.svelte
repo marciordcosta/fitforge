@@ -19,6 +19,7 @@
     type Exercicio,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import AlertDialog from "../../components/AlertDialog.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DescansoPicker from "../../components/DescansoPicker.svelte";
   import Sheet from "../../components/Sheet.svelte";
@@ -35,6 +36,11 @@
   let agora = $state(Date.now());
   let houveAlteracaoEstrutura = $state(false);
   let naoEncontrada = $state(false);
+  let alertaMsg = $state<string | null>(null);
+
+  function mostrarAlerta(msg: string): void {
+    alertaMsg = msg;
+  }
 
   function formatMMSS(segundos: number): string {
     const m = Math.floor(segundos / 60);
@@ -234,9 +240,15 @@
     const ex = sessao[exIdx];
     const serieItem = ex.sets[setIdx];
 
-    if (!serieItem.concluida && (serieItem.peso == null || serieItem.repeticoes == null)) {
-      alert("Informe peso e repetições antes de concluir a série.");
-      return;
+    if (!serieItem.concluida) {
+      const peso = serieItem.peso ?? serieItem.anteriorPeso;
+      const repeticoes = serieItem.repeticoes ?? serieItem.anteriorReps;
+      if (peso == null || repeticoes == null) {
+        mostrarAlerta("Informe peso e repetições antes de concluir a série.");
+        return;
+      }
+      serieItem.peso = peso;
+      serieItem.repeticoes = repeticoes;
     }
 
     serieItem.concluida = !serieItem.concluida;
@@ -314,7 +326,7 @@
     try {
       await updateDescansoTreinoExercicio(ex.treino_exercicio_id, novoSeg);
     } catch (e) {
-      alert("Erro ao salvar descanso: " + (e as Error).message);
+      mostrarAlerta("Erro ao salvar descanso: " + (e as Error).message);
     }
   }
 
@@ -325,7 +337,7 @@
     try {
       await updateObservacaoTreinoExercicio(ex.treino_exercicio_id, ex.observacao);
     } catch (e) {
-      alert("Erro ao salvar observação: " + (e as Error).message);
+      mostrarAlerta("Erro ao salvar observação: " + (e as Error).message);
     }
   }
 
@@ -336,14 +348,6 @@
   let reordenando = $state(false);
   let buscaSubstituir = $state("");
   let todosExercicios = $state<Exercicio[]>([]);
-
-  /** Altura real (medida em runtime) do botão "+ Adicionar Série", pra igualar a altura das caixas de série/kg/reps/check sem chutar um valor fixo. */
-  let addSerieEls = $state<(HTMLButtonElement | null)[]>([]);
-  let alturaCaixaSerie = $state<number | null>(null);
-  $effect(() => {
-    const el = addSerieEls.find((e) => e != null);
-    if (el) alturaCaixaSerie = el.getBoundingClientRect().height;
-  });
 
   async function abrirSubstituir(exIdx: number) {
     substituindoExIdx = exIdx;
@@ -535,9 +539,14 @@
   });
 
   let mostrarEscolhaEstrutura = $state(false);
+  let mostrarConfirmConcluir = $state(false);
 
-  async function concluirTreino() {
-    if (!confirm("Concluir e salvar este treino?")) return;
+  function concluirTreino() {
+    mostrarConfirmConcluir = true;
+  }
+
+  async function confirmarConcluirTreino() {
+    mostrarConfirmConcluir = false;
     salvando = true;
     try {
       const porExercicio = new Map(
@@ -557,7 +566,7 @@
       treinoLogSessao.limpar();
       navigate("/treino");
     } catch (e) {
-      alert("Erro ao salvar: " + (e as Error).message);
+      mostrarAlerta("Erro ao salvar: " + (e as Error).message);
       salvando = false;
     }
   }
@@ -585,7 +594,7 @@
       treinoLogSessao.limpar();
       navigate("/treino");
     } catch (e) {
-      alert("Erro ao salvar: " + (e as Error).message);
+      mostrarAlerta("Erro ao salvar: " + (e as Error).message);
     } finally {
       salvando = false;
     }
@@ -657,18 +666,13 @@
               {#if serieItem.prPeso || serieItem.pr1rm || serieItem.prVolume}
                 <button
                   class="serie-num medalha"
-                  style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
                   onclick={() => (recordeAberto = { exIdx, setIdx })}
                   aria-label="Ver recorde batido"
                 >
                   {@render iconMedalha()}
                 </button>
               {:else}
-                <button
-                  class="serie-num"
-                  style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
-                  onclick={() => toggleMenuSerie(exIdx, setIdx)}
-                >
+                <button class="serie-num" onclick={() => toggleMenuSerie(exIdx, setIdx)}>
                   {serieItem.serie}
                 </button>
               {/if}
@@ -682,21 +686,18 @@
               <input
                 type="number"
                 inputmode="decimal"
-                style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
                 placeholder={serieItem.anteriorPeso != null ? String(serieItem.anteriorPeso) : "-"}
                 bind:value={serieItem.peso}
               />
               <input
                 type="number"
                 inputmode="decimal"
-                style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
                 placeholder={serieItem.anteriorReps != null ? String(serieItem.anteriorReps) : "-"}
                 bind:value={serieItem.repeticoes}
               />
               <button
                 class="check"
                 class:ativo={serieItem.concluida}
-                style={alturaCaixaSerie ? `height:${alturaCaixaSerie}px` : ""}
                 onclick={() => toggleConcluida(exIdx, setIdx)}
                 aria-label="Marcar série concluída"
               >
@@ -705,7 +706,7 @@
             </div>
           {/each}
         </div>
-        <button class="add-serie" bind:this={addSerieEls[exIdx]} onclick={() => adicionarSerie(exIdx)}>+ Adicionar Série</button>
+        <button class="add-serie" onclick={() => adicionarSerie(exIdx)}>+ Adicionar Série</button>
       </div>
     {/each}
 
@@ -939,6 +940,20 @@
   />
 {/if}
 
+{#if mostrarConfirmConcluir}
+  <ConfirmDialog
+    titulo="Concluir e salvar este treino?"
+    textoConfirmar="Concluir Treino"
+    destrutivo={false}
+    onConfirmar={confirmarConcluirTreino}
+    onCancelar={() => (mostrarConfirmConcluir = false)}
+  />
+{/if}
+
+{#if alertaMsg}
+  <AlertDialog mensagem={alertaMsg} onFechar={() => (alertaMsg = null)} />
+{/if}
+
 {#if descansoEditandoIdx !== null}
   {@const idxDescanso = descansoEditandoIdx}
   <DescansoPicker
@@ -1167,7 +1182,7 @@
   }
   .serie-num {
     width: 40px;
-    height: 48px;
+    height: 36px;
     border-radius: 8px;
     background: var(--surface-card);
     border: none;
@@ -1203,7 +1218,7 @@
   .linha input {
     box-sizing: border-box;
     width: 100%;
-    height: 48px;
+    height: 36px;
     padding: 0 var(--space-1);
     border-radius: 8px;
     border: 1px solid var(--surface-border);
@@ -1214,7 +1229,7 @@
   }
   .check {
     width: 40px;
-    height: 48px;
+    height: 36px;
     border-radius: 8px;
     border: 1px solid var(--surface-border);
     background: var(--surface-card);

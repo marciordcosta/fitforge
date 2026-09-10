@@ -3,12 +3,14 @@
     titulo,
     textoConfirmar,
     textoCancelar = "Cancelar",
+    destrutivo = true,
     onConfirmar,
     onCancelar,
   }: {
     titulo: string;
     textoConfirmar: string;
     textoCancelar?: string;
+    destrutivo?: boolean;
     onConfirmar: () => void;
     onCancelar: () => void;
   } = $props();
@@ -17,7 +19,7 @@
 <div class="confirm-overlay" role="presentation" onclick={onCancelar}>
   <div class="confirm-card" role="presentation" onclick={(e) => e.stopPropagation()}>
     <p class="confirm-titulo">{titulo}</p>
-    <button class="confirm-btn destructive" onclick={onConfirmar}>{textoConfirmar}</button>
+    <button class="confirm-btn" class:destructive={destrutivo} onclick={onConfirmar}>{textoConfirmar}</button>
     <button class="confirm-btn" onclick={onCancelar}>{textoCancelar}</button>
   </div>
 </div>
