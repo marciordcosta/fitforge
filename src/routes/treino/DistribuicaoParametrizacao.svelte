@@ -316,7 +316,7 @@
     color: var(--color-success);
   }
   .legenda-foco {
-    color: var(--color-primary);
+    color: var(--color-secondary);
   }
   .param-legenda {
     margin: var(--space-2) 0 0;
