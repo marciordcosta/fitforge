@@ -280,6 +280,8 @@
     return `${formatPeso(alvos[alvos.length - 1])} kg`;
   });
 
+  const pesoAlvoTexto = $derived(meta?.pesoAlvo != null ? `${formatPeso(meta.pesoAlvo)} kg` : "Sem meta");
+
   /**
    * Linha reta de meta: do alvo calculado pro primeiro dia visível até o alvo de hoje (ambos
    * vindos de metaAlvoPorPonto, a mesma curva ancorada em hoje) — nunca a média REAL do primeiro
@@ -534,14 +536,6 @@
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 {/snippet}
-{#snippet iconEngrenagem()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path
-      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-    />
-  </svg>
-{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -593,8 +587,8 @@
       <span class="quick-card-valor">{metaSemanalTexto}</span>
     </button>
     <button class="quick-card quick-card-btn" onclick={() => (mostrarFormMeta = true)}>
-      <span class="quick-card-label">Configurações</span>
-      {@render iconEngrenagem()}
+      <span class="quick-card-label">Meta Alvo</span>
+      <span class="quick-card-valor">{pesoAlvoTexto}</span>
     </button>
   </div>
 
