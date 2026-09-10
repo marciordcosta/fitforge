@@ -236,7 +236,8 @@
       }
       g.dias.push(d.diaSemana);
     }
-    return [...grupos.values()];
+    // Bloco de maior caloria primeiro — mais fácil achar o dia "principal" da semana.
+    return [...grupos.values()].sort((a, b) => b.calorias - a.calorias);
   });
 
   async function carregarMetas() {
