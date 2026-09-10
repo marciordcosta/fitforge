@@ -103,6 +103,32 @@ export async function excluirFotoDoDia(foto: FotoRegistro): Promise<void> {
   if (error) throw error;
 }
 
+/** Adiciona uma foto a um dia SEM substituir as que já existem — diferente de salvarFotoDoDia
+ * (usado pelo registro de peso do dia, que mantém só uma foto "canônica" por dia). Usado pelo
+ * "+" da tela de Fotos, que aceita várias fotos por data (carrossel na comparação). */
+export async function adicionarFoto(data: string, arquivo: File): Promise<FotoItem> {
+  const userId = uid();
+  const extensao = arquivo.name.split(".").pop() || "jpg";
+  const path = `${userId}/${data}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extensao}`;
+
+  const { error: uploadError } = await supabase.storage.from("fotos").upload(path, arquivo);
+  if (uploadError) throw uploadError;
+
+  const { count } = await supabase
+    .from("fotos")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("data_foto", data);
+
+  const { data: linha, error } = await supabase
+    .from("fotos")
+    .insert({ user_id: userId, data_foto: data, url: path, ordem: count ?? 0 })
+    .select("id, url, data_foto")
+    .single();
+  if (error) throw error;
+  return { id: linha.id, path: linha.url, data: linha.data_foto };
+}
+
 export interface FotoItem {
   id: string;
   path: string;
