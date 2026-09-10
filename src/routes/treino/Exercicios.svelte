@@ -27,6 +27,7 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
   import ExercicioCampos from "./ExercicioCampos.svelte";
+  import ExercicioDetalhe from "./ExercicioDetalhe.svelte";
 
   let {
     modoSelecao = false,
@@ -60,6 +61,12 @@
   let loading = $state(true);
   let mostrarCriarMenu = $state(false);
   let selecionandoId = $state<string | null>(null);
+  /** Ver detalhe de um exercício no modo seleção abre embutido (por cima da lista) em vez de
+   * navegar de rota — "voltar" do detalhe fecha esse overlay e revela a lista de novo, sem passar
+   * pelo histórico do navegador. Fecha a lista com o próprio "‹" dela volta pra tela que abriu o
+   * picker (rotina/sessão) — junto, dá a sequência rotina > lista > detalhes, voltando um passo de
+   * cada vez, sem precisar remontar nada nem persistir estado de sessão pra sobreviver a isso. */
+  let verDetalheId = $state<string | null>(null);
 
   let mostrarCriarExercicio = $state(false);
   let nomeNovo = $state("");
@@ -298,7 +305,7 @@
                   {iniciais(ex.nome)}
                 {/if}
               </span>
-              <button class="conteudo-btn" onclick={() => navigate(`/treino/exercicios/${ex.id}`)}>
+              <button class="conteudo-btn" onclick={() => (verDetalheId = ex.id)}>
                 {@render infoExercicio(ex)}
               </button>
               <button
@@ -362,6 +369,12 @@
       </div>
       <ExercicioCampos bind:nome={nomeNovo} bind:padraoId={padraoIdNovo} bind:linhasMusculos={linhasMusculosNovo} />
     </div>
+  </div>
+{/if}
+
+{#if verDetalheId}
+  <div class="tela-criar-exercicio">
+    <ExercicioDetalhe exercicioId={verDetalheId} onFechar={() => (verDetalheId = null)} />
   </div>
 {/if}
 

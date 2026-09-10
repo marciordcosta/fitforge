@@ -19,7 +19,11 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
 
-  let { exercicioId }: { exercicioId: string } = $props();
+  /** `onFechar` (opcional): quando informado, o "voltar" fecha esse componente no lugar (ele foi
+   * aberto embutido, ex: dentro do picker de exercícios de uma rotina) em vez de navegar de rota —
+   * mantém "rotina > lista > detalhes" como uma sequência de telas só com estado local, sem depender
+   * do histórico do navegador pra voltar um passo de cada vez. */
+  let { exercicioId, onFechar }: { exercicioId: string; onFechar?: () => void } = $props();
 
   type Aba = "historico" | "edicao";
   let aba = $state<Aba>("historico");
@@ -162,7 +166,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/treino/exercicios")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={() => (onFechar ? onFechar() : voltar("/treino/exercicios"))} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>{exercicio?.nome ?? ""}</h1>
     {#if aba === "edicao"}
       <button class="atualizar" disabled={salvando} onclick={salvar} aria-label="Atualizar">{@render iconCheck()}</button>
