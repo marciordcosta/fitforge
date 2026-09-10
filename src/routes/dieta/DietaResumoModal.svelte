@@ -55,6 +55,13 @@
     return v == null ? "—" : `${Math.round(v)} g`;
   }
 
+  /** Gramas por kg de peso corporal — mais útil pra avaliar a meta do que o total isolado
+   * (ex: "2,2 g/kg" de proteína diz mais que "168 g" sozinho). */
+  function formatGPorKg(gramas: number | null, pesoKg: number | null): string {
+    if (gramas == null || pesoKg == null || pesoKg <= 0) return "—";
+    return `${(gramas / pesoKg).toFixed(1).replace(".", ",")} g/kg`;
+  }
+
   function formatKg(v: number | null): string {
     return v == null ? "—" : `${v.toFixed(1).replace(".", ",")} kg`;
   }
@@ -89,16 +96,19 @@
         <p class="resumo-label">Meta de macros</p>
         <div class="resumo-macros">
           <div class="resumo-macro-item">
-            <span class="resumo-macro-valor">{formatG(metaCarboidrato)}</span>
             <span class="resumo-macro-nome">Carb</span>
+            <span class="resumo-macro-gkg">{formatGPorKg(metaCarboidrato, pesoAtual)}</span>
+            <span class="resumo-macro-total">{formatG(metaCarboidrato)}</span>
           </div>
           <div class="resumo-macro-item">
-            <span class="resumo-macro-valor">{formatG(metaGordura)}</span>
             <span class="resumo-macro-nome">Gorduras</span>
+            <span class="resumo-macro-gkg">{formatGPorKg(metaGordura, pesoAtual)}</span>
+            <span class="resumo-macro-total">{formatG(metaGordura)}</span>
           </div>
           <div class="resumo-macro-item">
-            <span class="resumo-macro-valor">{formatG(metaProteina)}</span>
             <span class="resumo-macro-nome">Proteínas</span>
+            <span class="resumo-macro-gkg">{formatGPorKg(metaProteina, pesoAtual)}</span>
+            <span class="resumo-macro-total">{formatG(metaProteina)}</span>
           </div>
         </div>
       </div>
@@ -202,12 +212,16 @@
     border-radius: var(--radius-md);
     background: var(--surface-bg);
   }
-  .resumo-macro-valor {
-    font-size: var(--font-size-base);
+  .resumo-macro-nome {
+    font-size: 11px;
+    color: var(--surface-muted);
+  }
+  .resumo-macro-gkg {
+    font-size: var(--font-size-lg);
     font-weight: 700;
     color: var(--surface-fg);
   }
-  .resumo-macro-nome {
+  .resumo-macro-total {
     font-size: 11px;
     color: var(--surface-muted);
   }
