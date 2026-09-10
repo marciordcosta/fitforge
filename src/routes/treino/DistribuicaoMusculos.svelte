@@ -34,6 +34,7 @@
     type TreinoExercicio,
     type Exercicio,
     type ParametrosDistribuicao,
+    type ClasseVolumeSemanal,
   } from "../../lib/treinoApi";
 
   let aba = $state<"planejado" | "realizado">("planejado");
@@ -1154,6 +1155,26 @@
     if (t === "estavel") return "Estagnado";
     if (t === "caindo") return "Regredindo";
     return null;
+  }
+
+  /** Cruza a classificação de volume (Parametrização) com a tendência de força do músculo — os
+   * dois hoje são sinais separados (uma cor, um texto), mas juntos respondem uma pergunta mais
+   * útil que qualquer um sozinho: "esse volume está funcionando de verdade?". Insuficiente/
+   * excessivo já são sinalizados pela cor vermelha, então não repete aviso aqui; progredindo
+   * também não precisa de alerta (já está dando certo). Os casos que sobram:
+   * - Manutenção + estagnado: ainda não é claro que precisa de mais volume — mas também não foi
+   *   testado, então vale tentar subir antes de qualquer outra mudança.
+   * - Moderado/Foco + estagnado ou regredindo: o volume "parece certo" pelo número, mas o
+   *   músculo não está respondendo — sinal de que a recuperação pode não estar acompanhando o
+   *   volume configurado, mesmo dentro da faixa. Mais forte que a classificação sozinha, porque
+   *   reage ao resultado real, não só ao total de séries.
+   * - Manutenção + regredindo: regressão não costuma ser problema de pouco volume — não sugere
+   *   nada sobre volume, só sinaliza (a tendência em si já aparece separada). */
+  function alertaVolumeTendencia(classe: ClasseVolumeSemanal, tendencia: "subindo" | "estavel" | "caindo" | null): string | null {
+    if (tendencia == null || tendencia === "subindo") return null;
+    if (classe === "insuficiente" || classe === "excessivo") return null;
+    if (classe === "manutencao") return tendencia === "estavel" ? "Testar mais séries" : null;
+    return tendencia === "estavel" ? "Sem resposta nesse volume" : "Considerar reduzir";
   }
 
   /** Variação % bruta (não só a faixa) de um exercício específico — mostrada ao lado do nome no
@@ -2923,6 +2944,8 @@
                     ? "valor-subindo"
                     : "valor-estavel"}
             {@const tendMusculo = tendenciaMusculoEditor(item.musculo.id)}
+            {@const classeVolumeItem = classificarVolumeSemanal(arredondarValor(item.atual), parametrosParaMusculo(item.musculo))}
+            {@const alertaItem = alertaVolumeTendencia(classeVolumeItem, tendMusculo)}
             <div class="item editor-musculo-linha" class:editor-musculo-ativo={editorFiltroMusculoId === item.musculo.id}>
               <button
                 type="button"
@@ -2943,6 +2966,9 @@
                       class:valor-estavel={tendMusculo === "estavel"}
                       class:valor-caindo={tendMusculo === "caindo"}
                     >{textoTendencia(tendMusculo)}</span>
+                  {/if}
+                  {#if alertaItem}
+                    <span class="editor-alerta-texto">⚠ {alertaItem}</span>
                   {/if}
                 </span>
               </button>
@@ -3978,6 +4004,14 @@
   }
   .editor-tendencia-texto.valor-caindo {
     color: var(--color-negative);
+  }
+  /* Sinal combinado (volume + tendência) — cor de atenção própria, distinta de qualquer outra
+     usada aqui (não é erro/vermelho, nem progresso/verde: é "vale olhar"). */
+  .editor-alerta-texto {
+    flex-shrink: 0;
+    font-size: 9px;
+    line-height: 1;
+    color: #fbbf24;
   }
   .editor-exercicio-posicao {
     position: absolute;
