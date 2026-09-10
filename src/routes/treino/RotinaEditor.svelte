@@ -715,13 +715,19 @@
   }
   .add-serie {
     width: 100%;
+    height: 40px;
     margin-top: var(--space-3);
-    padding: var(--space-3);
+    padding: 0 var(--space-3);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
-    background: var(--surface-card);
+    background: none;
     color: var(--color-primary);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
+    font-weight: 600;
     cursor: pointer;
   }
   .adicionar-btn {
