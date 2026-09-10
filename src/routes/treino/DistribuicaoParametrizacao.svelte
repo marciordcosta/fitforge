@@ -39,8 +39,8 @@
   ];
 
   const OPCOES_GRAFICO: { valor: GraficoCampo; label: string }[] = [
-    { valor: "total", label: "Sempre Totais" },
-    { valor: "ponderado", label: "Sempre Ponderadas" },
+    { valor: "total", label: "Totais" },
+    { valor: "ponderado", label: "Ponderadas" },
     { valor: "destacada", label: "Destacada" },
   ];
 
