@@ -1226,6 +1226,13 @@ export interface ParametrosDistribuicao {
   seriesFocoMin: number;
   seriesFocoMax: number;
   fadigaModo: FadigaModo;
+  /** Nº absoluto de séries (posição na sessão, não % do total) até onde a fadiga por posição
+   * (modo Fases) considera "fresco" (faixa A) — depois disso até fadigaFasesCorteB é "médio"
+   * (faixa B), e além dele é "fatigado" (faixa C). Absoluto, não percentual: fadiga real se
+   * acumula pelo volume feito, não pela fração do que foi programado naquele dia — um treino
+   * curto e um longo não deviam entrar em fadiga em posições proporcionalmente diferentes. */
+  fadigaFasesCorteA: number;
+  fadigaFasesCorteB: number;
   fadigaGradualC: number;
   fadigaGradualD: number;
 }
@@ -1236,6 +1243,8 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   seriesFocoMin: 12,
   seriesFocoMax: 20,
   fadigaModo: "fases",
+  fadigaFasesCorteA: 6,
+  fadigaFasesCorteB: 15,
   fadigaGradualC: 0.12,
   fadigaGradualD: 0.025,
 };
@@ -1259,7 +1268,9 @@ export function classificarVolumeSemanal(v: number, p: ParametrosDistribuicao): 
 export async function getParametrosDistribuicao(): Promise<ParametrosDistribuicao> {
   const { data, error } = await supabase
     .from("treino_parametros")
-    .select("series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_gradual_c, fadiga_gradual_d")
+    .select(
+      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d",
+    )
     .maybeSingle();
   if (error) throw error;
   if (!data) return PARAMETROS_DISTRIBUICAO_PADRAO;
@@ -1269,6 +1280,8 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
     seriesFocoMin: data.series_foco_min,
     seriesFocoMax: data.series_foco_max,
     fadigaModo: data.fadiga_modo === "gradual" ? "gradual" : "fases",
+    fadigaFasesCorteA: data.fadiga_fases_corte_a,
+    fadigaFasesCorteB: data.fadiga_fases_corte_b,
     fadigaGradualC: data.fadiga_gradual_c,
     fadigaGradualD: data.fadiga_gradual_d,
   };
@@ -1282,6 +1295,8 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     series_foco_min: p.seriesFocoMin,
     series_foco_max: p.seriesFocoMax,
     fadiga_modo: p.fadigaModo,
+    fadiga_fases_corte_a: p.fadigaFasesCorteA,
+    fadiga_fases_corte_b: p.fadigaFasesCorteB,
     fadiga_gradual_c: p.fadigaGradualC,
     fadiga_gradual_d: p.fadigaGradualD,
     updated_at: new Date().toISOString(),

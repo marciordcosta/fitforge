@@ -220,30 +220,40 @@
     ];
   }
 
+  /** Faixa A/B/C pela posição ABSOLUTA da série na sessão (nº de séries já feitas, não % do
+   * total) — corte configurável em Parametrização (fadigaFasesCorteA/B). Deliberadamente
+   * independente de corPorFaixa/CORTE_A/CORTE_B: aquilo classifica dominância de músculo no
+   * volume total (outro fenômeno, 80/20), isto classifica fadiga por posição — usar os mesmos
+   * dois números pros dois já causou confusão de acoplamento sem necessidade. */
+  function faixaPorPosicaoAbsoluta(posicao: number, p: ParametrosDistribuicao): "a" | "b" | "c" {
+    if (posicao <= p.fadigaFasesCorteA) return "a";
+    if (posicao <= p.fadigaFasesCorteB) return "b";
+    return "c";
+  }
+
   /**
    * Classifica cada série da rotina pela POSIÇÃO no treino (não pelo músculo) — a fadiga
-   * acumula ao longo do treino, então uma série no início vale mais que uma no fim. Usa a
-   * mesma regra 80/20 (corPorFaixa) sobre o percentual acumulado de séries já feitas na
-   * ordem dos exercícios. Modo de contribuição: cada série soma peso_contribuicao (não 1
-   * inteiro) pra cada músculo que ela trabalha, igual contarSeriesPorMusculoPonderado — as
-   * partes de cada músculo somam o mesmo total ponderado dele.
+   * acumula ao longo do treino, então uma série no início vale mais que uma no fim. Corte em
+   * número ABSOLUTO de séries (faixaPorPosicaoAbsoluta), não percentual do total: fadiga real se
+   * acumula pelo volume feito, não pela fração do que foi programado naquele dia. Modo de
+   * contribuição: cada série soma peso_contribuicao (não 1 inteiro) pra cada músculo que ela
+   * trabalha, igual contarSeriesPorMusculoPonderado — as partes de cada músculo somam o mesmo
+   * total ponderado dele.
    */
   function contarSeriesPorFaixaDePosicao(treino: TreinoComExercicios): Map<string, Partes> {
     const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
-    const totalSeries = exerciciosOrdenados.reduce((acc, ex) => acc + ex.series.length, 0);
     const mapa = new Map<string, Partes>();
-    if (!totalSeries) return mapa;
 
     let posicao = 0;
     for (const ex of exerciciosOrdenados) {
       const musculosEx = ex.exercicio?.musculos ?? [];
       for (let s = 0; s < ex.series.length; s++) {
         posicao += 1;
-        const cor = corPorFaixa((posicao / totalSeries) * 100);
+        const faixa = faixaPorPosicaoAbsoluta(posicao, parametrosDistribuicao);
         for (const m of musculosEx) {
           const atual = mapa.get(m.musculo_id) ?? partesVazias();
-          if (cor === CORES_FAIXA.a) atual.a += m.peso_contribuicao;
-          else if (cor === CORES_FAIXA.b) atual.b += m.peso_contribuicao;
+          if (faixa === "a") atual.a += m.peso_contribuicao;
+          else if (faixa === "b") atual.b += m.peso_contribuicao;
           else atual.c += m.peso_contribuicao;
           mapa.set(m.musculo_id, atual);
         }
@@ -620,7 +630,9 @@
     const linhas = musculos
       .filter((m) => (totais.get(m.id) ?? 0) > 0)
       .filter((m) => filtroMusculosGrade === null || filtroMusculosGrade.has(m.id))
-      .sort((a, b) => (totais.get(b.id) ?? 0) - (totais.get(a.id) ?? 0))
+      // Ordena pelo mesmo valor mostrado na coluna Total (ponderado) — não pelo bruto (totais),
+      // que é usado só pelas colunas de dia.
+      .sort((a, b) => (totaisPonderado.get(b.id) ?? 0) - (totaisPonderado.get(a.id) ?? 0))
       .map((m) => ({
         musculo: m,
         // Total ponderado da semana pra esse músculo — mostrado E usado pra classificar a cor da

@@ -19,11 +19,13 @@
   let seriesFocoMin = $state(PARAMETROS_DISTRIBUICAO_PADRAO.seriesFocoMin);
   let seriesFocoMax = $state(PARAMETROS_DISTRIBUICAO_PADRAO.seriesFocoMax);
   let fadigaModo = $state<FadigaModo>(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaModo);
+  let fadigaFasesCorteA = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaFasesCorteA);
+  let fadigaFasesCorteB = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaFasesCorteB);
   let fadigaGradualC = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualC);
   let fadigaGradualD = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualD);
 
   const OPCOES_FADIGA: { valor: FadigaModo; label: string }[] = [
-    { valor: "fases", label: "Fases (20/30/50)" },
+    { valor: "fases", label: "Fases" },
     { valor: "gradual", label: "Gradual" },
   ];
 
@@ -50,6 +52,8 @@
       seriesFocoMin = p.seriesFocoMin;
       seriesFocoMax = p.seriesFocoMax;
       fadigaModo = p.fadigaModo;
+      fadigaFasesCorteA = p.fadigaFasesCorteA;
+      fadigaFasesCorteB = p.fadigaFasesCorteB;
       fadigaGradualC = p.fadigaGradualC;
       fadigaGradualD = p.fadigaGradualD;
     } catch (err) {
@@ -70,6 +74,8 @@
         seriesFocoMin,
         seriesFocoMax,
         fadigaModo,
+        fadigaFasesCorteA,
+        fadigaFasesCorteB,
         fadigaGradualC,
         fadigaGradualD,
       };
@@ -147,6 +153,29 @@
           <button type="button" class:ativo={fadigaModo === opcao.valor} onclick={() => (fadigaModo = opcao.valor)}>{opcao.label}</button>
         {/each}
       </div>
+
+      {#if fadigaModo === "fases"}
+        <p class="param-card-desc">
+          Nº de séries (posição na sessão, não % do total) até onde a série ainda conta como
+          "fresca" (A); daí até o segundo corte conta como "médio" (B); depois disso, "fatigado" (C).
+        </p>
+        <div class="param-linha">
+          <div class="param-linha-topo">
+            <p class="param-nome">Fresco até a série <span class="legenda-cor legenda-fase-a">●</span></p>
+            <div class="param-campos">
+              <input class="param-input" type="number" inputmode="numeric" min="1" step="1" aria-label="Corte A" bind:value={fadigaFasesCorteA} />
+            </div>
+          </div>
+        </div>
+        <div class="param-linha">
+          <div class="param-linha-topo">
+            <p class="param-nome">Médio até a série <span class="legenda-cor legenda-fase-b">●</span></p>
+            <div class="param-campos">
+              <input class="param-input" type="number" inputmode="numeric" min="1" step="1" aria-label="Corte B" bind:value={fadigaFasesCorteB} />
+            </div>
+          </div>
+        </div>
+      {/if}
 
       {#if fadigaModo === "gradual"}
         <p class="formula">
@@ -317,6 +346,12 @@
   }
   .legenda-foco {
     color: var(--color-secondary);
+  }
+  .legenda-fase-a {
+    color: #60a5fa;
+  }
+  .legenda-fase-b {
+    color: #fbbf24;
   }
   .param-legenda {
     margin: var(--space-2) 0 0;
