@@ -293,7 +293,7 @@
       {@render iconHistorico()}
     </button>
     <button class="quick-btn" onclick={() => navigate("/treino/parametrizacao")}>
-      <span class="quick-btn-label">Parametrização</span>
+      <span class="quick-btn-label">Parâmetros</span>
       {@render iconEngrenagem()}
     </button>
   </div>
@@ -495,6 +495,7 @@
   }
   .quick-btn {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -511,9 +512,12 @@
     cursor: default;
   }
   .quick-btn-label {
+    max-width: 100%;
     font-size: 12px;
     font-weight: 400;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .quick-btn svg {
     width: 20px;
