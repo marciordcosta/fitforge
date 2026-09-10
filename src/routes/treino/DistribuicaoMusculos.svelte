@@ -436,7 +436,10 @@
       musculo: Musculo | null;
       subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes; pesoGradual?: number }[] | null;
     },
-  >(lista: T[], campo: CampoOrdenacaoSeries): { itensGrupo: { nome: string; valor: number }[]; itens: { musculo: Musculo; valor: number }[]; total: number } {
+  >(
+    lista: T[],
+    campo: CampoOrdenacaoSeries,
+  ): { itensGrupo: { nome: string; valor: number }[]; itens: { musculo: Musculo; valor: number; ponderado: number }[]; total: number } {
     const itensGrupo = lista
       .map((item) => ({ nome: item.nome, valor: valorPorCampoOrdenacao(item, campo) }))
       .filter((i) => i.valor > 0)
@@ -447,7 +450,10 @@
           item.subItens ??
           (item.musculo ? [{ musculo: item.musculo, valor: item.valor, bruto: item.bruto, partes: item.partes, pesoGradual: item.pesoGradual }] : []),
       )
-      .map((item) => ({ musculo: item.musculo, valor: valorPorCampoOrdenacao(item, campo) }))
+      // `item.valor`, aqui, é sempre a série ponderada (mesmo campo que valorPorCampoOrdenacao usa
+      // por padrão) — preservado à parte pra classificar por volume (Parametrização) sempre em
+      // cima do ponderado, independente da coluna (Total/Pond./Acum.) escolhida pra exibição.
+      .map((item) => ({ musculo: item.musculo, valor: valorPorCampoOrdenacao(item, campo), ponderado: item.valor }))
       .filter((i) => i.valor > 0)
       .sort((a, b) => b.valor - a.valor);
     const total = itens.reduce((acc, i) => acc + i.valor, 0);
@@ -1881,7 +1887,13 @@
   interface ItemDetalheRotina {
     musculo: Musculo;
     valor: number;
+    /** Série ponderada, independente de qual coluna `valor` reflete — quando ausente, `valor` já
+     * é o ponderado (ex: Realizado, que não segue Total/Pond./Acum.). Usado só pra classificar
+     * por volume (modo "volume" do anel). */
+    ponderado?: number;
   }
+
+  type ModoDetalhe = "grupo" | "abc" | "volume";
 
   let modalDetalheRotina = $state<{
     titulo: string;
@@ -1893,13 +1905,18 @@
   } | null>(null);
 
   /** Alterna entre o anel por grupo muscular (Ombro, Costas etc. — soma bruta, uma cor por
-   * grupo, padrão) e o anel por músculo individual (dominância, cores A/B/C). Reseta pro
-   * modo padrão sempre que um anel novo é aberto. */
-  let modoGrupoDetalhe = $state(true);
+   * grupo, padrão), por músculo individual com cores de dominância (ABC) e por músculo
+   * individual com cores de classificação de volume semanal (Parametrização). Reseta pro modo
+   * padrão sempre que um anel novo é aberto. */
+  let modoDetalhe = $state<ModoDetalhe>("grupo");
+
+  function alternarModoDetalheCiclo(): void {
+    modoDetalhe = modoDetalhe === "grupo" ? "abc" : modoDetalhe === "abc" ? "volume" : "grupo";
+  }
 
   function abrirDetalheRotina(
     titulo: string,
-    itens: { musculo: Musculo; valor: number }[],
+    itens: ItemDetalheRotina[],
     centroValor?: number | string,
     centroLabel?: string,
     cores?: string[],
@@ -1907,7 +1924,7 @@
     modoGrupoInicial = true,
   ): void {
     modalDetalheRotina = { titulo, itens, centroValor, centroLabel, cores, itensGrupo };
-    modoGrupoDetalhe = modoGrupoInicial;
+    modoDetalhe = modoGrupoInicial ? "grupo" : "abc";
   }
 
   /** Cor de cada fatia pela faixa ABC do percentual acumulado (itens já precisam vir
@@ -1921,6 +1938,12 @@
       acumulado += pct;
       return corPorFaixa(acumulado);
     });
+  }
+
+  /** Cor de cada fatia pela classificação de volume semanal (Parametrização), sempre em cima da
+   * série ponderada de cada músculo — mesmo critério da coluna Total da grade semanal. */
+  function coresPorVolume(itens: { valor: number; ponderado?: number }[]): string[] {
+    return itens.map((i) => corVolume(i.ponderado ?? i.valor));
   }
 
   /** Gráfico de uma rotina específica: mesmos dados do card da rotina (distribuicaoPorTreino
@@ -2370,9 +2393,9 @@
 {#snippet alternarModoDetalhe()}
   <button
     class="abc-toggle-btn"
-    onclick={() => (modoGrupoDetalhe = !modoGrupoDetalhe)}
-    aria-label={modoGrupoDetalhe ? "Ver por faixa de dominância (ABC)" : "Ver por grupo muscular"}
-  >{modoGrupoDetalhe ? "Grupo" : "ABC"}</button>
+    onclick={alternarModoDetalheCiclo}
+    aria-label={modoDetalhe === "grupo" ? "Ver por dominância (ABC)" : modoDetalhe === "abc" ? "Ver por classificação de volume" : "Ver por grupo muscular"}
+  >{modoDetalhe === "grupo" ? "Grupo" : modoDetalhe === "abc" ? "ABC" : "Volume"}</button>
 {/snippet}
 
 {#if modalAberto}
@@ -2578,9 +2601,16 @@
       acaoTituloDireita={modalDetalheRotina.itensGrupo?.length ? alternarModoDetalhe : undefined}
     >
       <div class="pizza-wrap">
-        {#if modoGrupoDetalhe && modalDetalheRotina.itensGrupo}
+        {#if modoDetalhe === "grupo" && modalDetalheRotina.itensGrupo}
           <PieChart
             dados={modalDetalheRotina.itensGrupo.map((i) => ({ nome: i.nome, valor: i.valor }))}
+            centroValor={modalDetalheRotina.centroValor}
+            centroLabel={modalDetalheRotina.centroLabel}
+          />
+        {:else if modoDetalhe === "volume"}
+          <PieChart
+            dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
+            cores={coresPorVolume(modalDetalheRotina.itens)}
             centroValor={modalDetalheRotina.centroValor}
             centroLabel={modalDetalheRotina.centroLabel}
           />
