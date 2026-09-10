@@ -1863,7 +1863,9 @@
    * Segue a mesma coluna (Total/Pond./Acum.) selecionada no card, igual à grade. */
   function abrirGraficoSemanal(): void {
     const { itens, total } = itensParaGrafico(linhasSemanal, ordemSemanal);
-    abrirDetalheRotina("Distribuição Semanal", itens, formatValor(total), "séries", coresAbcAcumulado(itens));
+    // Anel geral: mesma regra da coluna Total da grade semanal — classifica por volume sempre
+    // pelo ponderado.
+    abrirDetalheRotina("Distribuição Semanal", itens, formatValor(total), "séries", coresAbcAcumulado(itens), "ponderado");
   }
 
 
@@ -1881,6 +1883,11 @@
   }
 
   type ModoDetalhe = "volume" | "abc";
+  /** Qual valor de cada músculo o modo "volume" do anel classifica: "ponderado" (anel geral —
+   * mesma regra da coluna Total da grade semanal) ou "bruto" (anel por rotina — mesma regra das
+   * colunas de rotina/dia). Só muda a COR; a contagem/tamanho das fatias continua seguindo a
+   * coluna selecionada (Total/Pond./Acum.) normalmente. */
+  type CampoVolume = "bruto" | "ponderado";
 
   let modalDetalheRotina = $state<{
     titulo: string;
@@ -1888,6 +1895,7 @@
     centroValor?: number | string;
     centroLabel?: string;
     cores?: string[];
+    campoVolume: CampoVolume;
   } | null>(null);
 
   /** Alterna entre o anel por músculo individual com cores de classificação de volume semanal
@@ -1905,8 +1913,9 @@
     centroValor?: number | string,
     centroLabel?: string,
     cores?: string[],
+    campoVolume: CampoVolume = "ponderado",
   ): void {
-    modalDetalheRotina = { titulo, itens, centroValor, centroLabel, cores };
+    modalDetalheRotina = { titulo, itens, centroValor, centroLabel, cores, campoVolume };
     modoDetalhe = "volume";
   }
 
@@ -1923,11 +1932,10 @@
     });
   }
 
-  /** Cor de cada fatia pela classificação de volume semanal (Parametrização), sempre em cima do
-   * total de séries (sem ponderar) de cada músculo — mesmo critério "por séries total" das
-   * colunas de rotina/dia na grade semanal. */
-  function coresPorVolume(itens: { valor: number; bruto?: number }[]): string[] {
-    return itens.map((i) => corVolume(i.bruto ?? i.valor));
+  /** Cor de cada fatia pela classificação de volume semanal (Parametrização) — em cima do
+   * ponderado (anel geral) ou do bruto (anel por rotina), conforme `campo`. */
+  function coresPorVolume(itens: { valor: number; bruto?: number; ponderado?: number }[], campo: CampoVolume): string[] {
+    return itens.map((i) => corVolume((campo === "bruto" ? i.bruto : i.ponderado) ?? i.valor));
   }
 
   /** Gráfico de uma rotina específica: mesmos dados do card da rotina (distribuicaoPorTreino
@@ -1953,7 +1961,9 @@
   function abrirGraficoTreinoDominancia(treino: TreinoComExercicios, campo: CampoOrdenacaoSeries): void {
     const lista = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
     const { itens, total } = itensParaGrafico(lista, campo);
-    abrirDetalheRotina(treino.nome_treino, itens, formatValor(total), "séries", coresAbcAcumulado(itens));
+    // Anel por rotina: mesma regra das colunas de rotina/dia da grade semanal — classifica por
+    // volume sempre pelo total bruto.
+    abrirDetalheRotina(treino.nome_treino, itens, formatValor(total), "séries", coresAbcAcumulado(itens), "bruto");
   }
 </script>
 
@@ -2578,7 +2588,7 @@
         {#if modoDetalhe === "volume"}
           <PieChart
             dados={modalDetalheRotina.itens.map((i) => ({ nome: i.musculo.nome, valor: i.valor }))}
-            cores={coresPorVolume(modalDetalheRotina.itens)}
+            cores={coresPorVolume(modalDetalheRotina.itens, modalDetalheRotina.campoVolume)}
             centroValor={modalDetalheRotina.centroValor}
             centroLabel={modalDetalheRotina.centroLabel}
           />
