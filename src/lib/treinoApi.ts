@@ -1216,6 +1216,7 @@ export interface ParametrosDistribuicao {
   seriesManutencaoMin: number;
   seriesManutencaoMax: number;
   seriesFocoMin: number;
+  seriesFocoMax: number;
   fadigaModo: FadigaModo;
   fadigaGradualC: number;
   fadigaGradualD: number;
@@ -1225,15 +1226,32 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   seriesManutencaoMin: 4,
   seriesManutencaoMax: 6,
   seriesFocoMin: 12,
+  seriesFocoMax: 20,
   fadigaModo: "fases",
   fadigaGradualC: 0.12,
   fadigaGradualD: 0.025,
 };
 
+export type ClasseVolumeSemanal = "insuficiente" | "manutencao" | "moderado" | "foco" | "excessivo";
+
+/** Classifica um total semanal de séries (SEMPRE ponderado — ver comentário em
+ * DistribuicaoMusculos.svelte sobre onde isso é aplicado) pelos landmarks de Parametrização:
+ * abaixo da Manutenção = insuficiente; dentro da Manutenção = manutenção; entre o máximo da
+ * Manutenção e o mínimo do Foco = "moderado" (faixa automática, sem campo próprio); dentro do
+ * Foco = foco; acima do máximo do Foco = excessivo. Insuficiente e excessivo são os dois extremos
+ * "fora da faixa saudável", tratados como o mesmo alerta (vermelho) por quem exibe. */
+export function classificarVolumeSemanal(v: number, p: ParametrosDistribuicao): ClasseVolumeSemanal {
+  if (v < p.seriesManutencaoMin) return "insuficiente";
+  if (v <= p.seriesManutencaoMax) return "manutencao";
+  if (v < p.seriesFocoMin) return "moderado";
+  if (v <= p.seriesFocoMax) return "foco";
+  return "excessivo";
+}
+
 export async function getParametrosDistribuicao(): Promise<ParametrosDistribuicao> {
   const { data, error } = await supabase
     .from("treino_parametros")
-    .select("series_manutencao_min, series_manutencao_max, series_foco_min, fadiga_modo, fadiga_gradual_c, fadiga_gradual_d")
+    .select("series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_gradual_c, fadiga_gradual_d")
     .maybeSingle();
   if (error) throw error;
   if (!data) return PARAMETROS_DISTRIBUICAO_PADRAO;
@@ -1241,6 +1259,7 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
     seriesManutencaoMin: data.series_manutencao_min,
     seriesManutencaoMax: data.series_manutencao_max,
     seriesFocoMin: data.series_foco_min,
+    seriesFocoMax: data.series_foco_max,
     fadigaModo: data.fadiga_modo === "gradual" ? "gradual" : "fases",
     fadigaGradualC: data.fadiga_gradual_c,
     fadigaGradualD: data.fadiga_gradual_d,
@@ -1253,6 +1272,7 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     series_manutencao_min: p.seriesManutencaoMin,
     series_manutencao_max: p.seriesManutencaoMax,
     series_foco_min: p.seriesFocoMin,
+    series_foco_max: p.seriesFocoMax,
     fadiga_modo: p.fadigaModo,
     fadiga_gradual_c: p.fadigaGradualC,
     fadiga_gradual_d: p.fadigaGradualD,

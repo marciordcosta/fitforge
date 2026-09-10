@@ -24,6 +24,7 @@
     getRegistrosPorTreinoDesde,
     getParametrosDistribuicao,
     fatorPerformanceGradual,
+    classificarVolumeSemanal,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
@@ -652,6 +653,11 @@
       })
       .map((m) => ({
         musculo: m,
+        // Total ponderado da semana pra esse músculo — usado SÓ pra classificar a cor da coluna
+        // Total (estiloCaixaVolume), independente de qual coluna (Total/Pond./Acum.) está
+        // selecionada pra exibição; ver comentário em Parametrização sobre a classificação de
+        // volume ser sempre em cima do ponderado.
+        ponderadoTotal: totaisPonderado.get(m.id) ?? 0,
         valores: colunas.map((col) => {
           const bruto = col.mapa.get(m.id) ?? 0;
           const ponderado = col.mapaPonderado.get(m.id) ?? 0;
@@ -824,13 +830,30 @@
   }
 
   /** Classifica o volume semanal por músculo pelos landmarks configuráveis em Parametrização —
-   * 12+ séries é bom pra hipertrofia (não "demais"/errado), por isso ganha destaque em vez do
-   * vermelho que a régua fixa antiga usava pra "acima do normal". */
+   * usado pra colorir barras/textos simples (Realizado), sem o fundo de "caixa" da grade semanal
+   * (ver estiloCaixaVolume pra isso, inclusive o caso vermelho/texto branco de insuficiente e
+   * excessivo). */
   function corVolume(v: number): string {
-    const p = parametrosDistribuicao;
-    if (v >= p.seriesFocoMin) return "var(--color-primary)";
-    if (v >= p.seriesManutencaoMin) return "var(--color-success)";
+    const classe = classificarVolumeSemanal(v, parametrosDistribuicao);
+    if (classe === "insuficiente" || classe === "excessivo") return "var(--color-danger)";
+    if (classe === "foco") return "var(--color-primary)";
+    if (classe === "moderado") return "var(--color-success)";
     return "var(--color-neutral)";
+  }
+
+  /** Estilo completo (texto + fundo) pra um valor de série numa "caixa" (grade semanal, Realizado
+   * em grade) — fora da faixa saudável (insuficiente ou excessivo) vira fundo vermelho sólido com
+   * texto branco, bem mais chamativo que o padrão "texto colorido + fundo 20%" das outras faixas,
+   * de propósito: são os dois casos que pedem atenção. Quem chama decide se `v` é bruto (dia/rotina
+   * específica, na grade semanal) ou ponderado (coluna Total da mesma grade, e Realizado — que já é
+   * ponderado por natureza) — ver comentários nos usos. */
+  function estiloCaixaVolume(v: number): string {
+    const classe = classificarVolumeSemanal(v, parametrosDistribuicao);
+    if (classe === "insuficiente" || classe === "excessivo") {
+      return `color: #fff; background: var(--color-danger);`;
+    }
+    const cor = classe === "manutencao" ? "var(--color-neutral)" : classe === "moderado" ? "var(--color-success)" : "var(--color-primary)";
+    return `color: ${cor}; background: color-mix(in srgb, ${cor} 20%, transparent);`;
   }
 
   const SEMANAS_MES = [
@@ -2371,6 +2394,13 @@
   >
     <div class="grade-scroll">
       <table class="grade-tabela">
+        <colgroup>
+          <col class="grade-colgroup-musculo" />
+          {#each gradeSemanal.colunas as col (col.dia)}
+            <col class="grade-colgroup-dia" />
+          {/each}
+          <col class="grade-colgroup-total" />
+        </colgroup>
         <thead>
           <tr>
             <th class="grade-col-musculo"></th>
@@ -2420,13 +2450,13 @@
                   {#if modoEdicaoMetas && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-meta-edit"
-                      style={`color: ${corVolume(mostrado)}; background: color-mix(in srgb, ${corVolume(mostrado)} 20%, transparent);`}
+                      style={estiloCaixaVolume(valor.bruto)}
                       onclick={() => abrirEditarMeta(treinoId!, linha.musculo, mostrado, ordemSemanal)}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0 && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-link"
-                      style={`color: ${corVolume(mostrado)}; background: color-mix(in srgb, ${corVolume(mostrado)} 20%, transparent);`}
+                      style={estiloCaixaVolume(valor.bruto)}
                       onclick={() => {
                         const treino = treinos.find((t) => t.id === treinoId);
                         if (treino) {
@@ -2437,22 +2467,16 @@
                       }}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0}
-                    <span
-                      class="grade-valor-caixa"
-                      style={`color: ${corVolume(mostrado)}; background: color-mix(in srgb, ${corVolume(mostrado)} 20%, transparent);`}
+                    <span class="grade-valor-caixa" style={estiloCaixaVolume(valor.bruto)}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</span>
                   {:else if meta != null}
-                    <span
-                      class="grade-valor-caixa grade-valor-vazio"
-                      style={`color: ${corVolume(0)}; background: color-mix(in srgb, ${corVolume(0)} 20%, transparent);`}
+                    <span class="grade-valor-caixa grade-valor-vazio" style={estiloCaixaVolume(0)}
                     >0<span class="grade-meta-sub">/{formatValor(meta)}</span></span>
                   {/if}
                 </td>
               {/each}
               <td class="grade-valor grade-col-total">
-                <span
-                  class="grade-valor-caixa grade-valor-total"
-                  style={`color: ${corVolume(totalLinha)}; background: color-mix(in srgb, ${corVolume(totalLinha)} 20%, transparent);`}
+                <span class="grade-valor-caixa grade-valor-total" style={estiloCaixaVolume(linha.ponderadoTotal)}
                 >{formatValor(totalLinha)}{#if temMetaNaLinha}<span class="grade-meta-sub">/{formatValor(totalMetaLinha)}</span>{/if}</span>
               </td>
             </tr>
@@ -2532,10 +2556,7 @@
               {#each linha.valores as valor, i (i)}
                 <td class="grade-valor">
                   {#if valor > 0}
-                    <span
-                      class="grade-valor-caixa"
-                      style={`color: ${corVolume(valor)}; background: color-mix(in srgb, ${corVolume(valor)} 20%, transparent);`}
-                    >{valor}</span>
+                    <span class="grade-valor-caixa" style={estiloCaixaVolume(valor)}>{valor}</span>
                   {/if}
                 </td>
               {/each}
@@ -3483,6 +3504,19 @@
   .grade-tabela th:not(.grade-col-musculo):not(.grade-col-total),
   .grade-tabela td.grade-valor:not(.grade-col-total) {
     width: 56px;
+  }
+  /* <colgroup> é a forma que os navegadores respeitam de forma mais confiável com table-layout:
+     fixed — largura via CSS numa célula específica podia "encolher" quando a célula ficava
+     totalmente vazia (dia de descanso sem série nenhuma), mesmo com table-layout:fixed, fazendo
+     aquela coluna parecer mais estreita que as com conteúdo. */
+  .grade-colgroup-musculo {
+    width: 68px;
+  }
+  .grade-colgroup-dia {
+    width: 56px;
+  }
+  .grade-colgroup-total {
+    width: 72px;
   }
   .grade-tabela th:not(:first-child),
   .grade-tabela td:not(:first-child) {

@@ -17,6 +17,7 @@
   let seriesManutencaoMin = $state(PARAMETROS_DISTRIBUICAO_PADRAO.seriesManutencaoMin);
   let seriesManutencaoMax = $state(PARAMETROS_DISTRIBUICAO_PADRAO.seriesManutencaoMax);
   let seriesFocoMin = $state(PARAMETROS_DISTRIBUICAO_PADRAO.seriesFocoMin);
+  let seriesFocoMax = $state(PARAMETROS_DISTRIBUICAO_PADRAO.seriesFocoMax);
   let fadigaModo = $state<FadigaModo>(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaModo);
   let fadigaGradualC = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualC);
   let fadigaGradualD = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualD);
@@ -47,6 +48,7 @@
       seriesManutencaoMin = p.seriesManutencaoMin;
       seriesManutencaoMax = p.seriesManutencaoMax;
       seriesFocoMin = p.seriesFocoMin;
+      seriesFocoMax = p.seriesFocoMax;
       fadigaModo = p.fadigaModo;
       fadigaGradualC = p.fadigaGradualC;
       fadigaGradualD = p.fadigaGradualD;
@@ -66,6 +68,7 @@
         seriesManutencaoMin,
         seriesManutencaoMax,
         seriesFocoMin,
+        seriesFocoMax,
         fadigaModo,
         fadigaGradualC,
         fadigaGradualD,
@@ -118,14 +121,21 @@
         <div class="param-linha-topo">
           <p class="param-nome">Foco <span class="legenda-cor legenda-foco">●</span></p>
           <div class="param-campos">
-            <input class="param-input" type="number" inputmode="numeric" min="0" step="1" placeholder="Mín" aria-label="Foco mínimo" bind:value={seriesFocoMin} />
+            <input class="param-input" type="number" inputmode="numeric" min="0" step="1" aria-label="Foco mínimo" bind:value={seriesFocoMin} />
+            <input class="param-input" type="number" inputmode="numeric" min="0" step="1" aria-label="Foco máximo" bind:value={seriesFocoMax} />
           </div>
         </div>
       </div>
+      <p class="param-card-desc">
+        Entre o máximo da Manutenção e o mínimo do Foco, o sistema classifica como
+        <strong>Moderado</strong> automaticamente — sem campo próprio.
+      </p>
       <p class="param-legenda">
         <span class="legenda-cor legenda-abaixo">●</span> abaixo de {seriesManutencaoMin} — insuficiente
-        &nbsp;·&nbsp; <span class="legenda-cor legenda-manutencao">●</span> {seriesManutencaoMin}–{seriesFocoMin - 1} — manutenção
-        &nbsp;·&nbsp; <span class="legenda-cor legenda-foco">●</span> {seriesFocoMin}+ — foco
+        &nbsp;·&nbsp; <span class="legenda-cor legenda-manutencao">●</span> {seriesManutencaoMin}–{seriesManutencaoMax} — manutenção
+        &nbsp;·&nbsp; <span class="legenda-cor legenda-moderado">●</span> {seriesManutencaoMax + 1}–{seriesFocoMin - 1} — moderado
+        &nbsp;·&nbsp; <span class="legenda-cor legenda-foco">●</span> {seriesFocoMin}–{seriesFocoMax} — foco
+        &nbsp;·&nbsp; <span class="legenda-cor legenda-abaixo">●</span> acima de {seriesFocoMax} — excessivo
       </p>
     </div>
 
@@ -297,9 +307,12 @@
     font-size: 10px;
   }
   .legenda-abaixo {
-    color: var(--color-neutral);
+    color: var(--color-danger);
   }
   .legenda-manutencao {
+    color: var(--color-neutral);
+  }
+  .legenda-moderado {
     color: var(--color-success);
   }
   .legenda-foco {
