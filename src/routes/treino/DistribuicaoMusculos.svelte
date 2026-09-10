@@ -490,7 +490,6 @@
    * rotina — nada aqui trava a gravação se o saldo ficar negativo (o usuário só vê em vermelho). */
   let metasMusculo = $state<Map<string, { valor: number; tipo: CampoOrdenacaoSeries }>>(new Map());
   let modoEdicaoMetas = $state(false);
-  let mostrarMenuVisaoGrade = $state(false);
   let editandoMeta = $state<{
     treinoId: string;
     musculo: Musculo;
@@ -597,8 +596,6 @@
         treinoNome: treino?.nome_treino ?? null,
         mapa: treino ? contarSeriesPorMusculo(treino) : new Map<string, number>(),
         mapaPonderado: treino ? contarSeriesPorMusculoPonderado(treino) : new Map<string, number>(),
-        mapaPartes: treino ? contarSeriesPorFaixaDePosicao(treino) : new Map<string, Partes>(),
-        mapaGradual: treino ? contarPesoGradualPorMusculo(treino) : new Map<string, number>(),
       };
     });
 
@@ -609,66 +606,30 @@
       }
     }
 
-    // Mesma coluna (Total/Pond./Acum.) escolhida no card "Distribuição Semanal" — a grade abre a
-    // partir dele, então tanto a ordem dos músculos quanto o número mostrado em cada célula tem
-    // que bater com o que está lá (o modo de editar meta é a única exceção: meta é sempre bruta,
-    // então mostra/edita sempre o total, nunca ponderado/acumulado).
+    // Fixo, sem seguir a coluna (Total/Pond./Acum.) selecionada nos cards — essa grade sempre
+    // mostra o total de séries em cada dia, e a coluna Total sempre soma o ponderado (ver pedido
+    // do usuário: simplificar a tela, sem alternância de visualização aqui).
     const totaisPonderado = new Map<string, number>();
     for (const t of treinosParaGrade) {
       for (const [id, v] of contarSeriesPorMusculoPonderado(t)) {
         totaisPonderado.set(id, (totaisPonderado.get(id) ?? 0) + v);
       }
     }
-    const partesPorMusculo = partesFadigaSemanal(treinosParaGrade);
-    const totaisGradual = new Map<string, number>();
-    for (const t of treinosParaGrade) {
-      for (const [id, v] of contarPesoGradualPorMusculo(t)) {
-        totaisGradual.set(id, (totaisGradual.get(id) ?? 0) + v);
-      }
-    }
-    const campo = ordemSemanal;
 
     const linhas = musculos
       .filter((m) => (totais.get(m.id) ?? 0) > 0)
       .filter((m) => filtroMusculosGrade === null || filtroMusculosGrade.has(m.id))
-      .sort((a, b) => {
-        const va = valorPorCampoOrdenacao(
-          {
-            valor: totaisPonderado.get(a.id) ?? 0,
-            bruto: totais.get(a.id) ?? 0,
-            partes: partesPorMusculo.get(a.id) ?? partesVazias(),
-            pesoGradual: totaisGradual.get(a.id) ?? 0,
-          },
-          campo,
-        );
-        const vb = valorPorCampoOrdenacao(
-          {
-            valor: totaisPonderado.get(b.id) ?? 0,
-            bruto: totais.get(b.id) ?? 0,
-            partes: partesPorMusculo.get(b.id) ?? partesVazias(),
-            pesoGradual: totaisGradual.get(b.id) ?? 0,
-          },
-          campo,
-        );
-        return vb - va;
-      })
+      .sort((a, b) => (totais.get(b.id) ?? 0) - (totais.get(a.id) ?? 0))
       .map((m) => ({
         musculo: m,
-        // Total ponderado da semana pra esse músculo — usado SÓ pra classificar a cor da coluna
-        // Total (estiloCaixaVolume), independente de qual coluna (Total/Pond./Acum.) está
-        // selecionada pra exibição; ver comentário em Parametrização sobre a classificação de
-        // volume ser sempre em cima do ponderado.
+        // Total ponderado da semana pra esse músculo — mostrado E usado pra classificar a cor da
+        // coluna Total (estiloCaixaVolume); ver comentário em Parametrização sobre a
+        // classificação de volume da coluna Total ser sempre em cima do ponderado.
         ponderadoTotal: totaisPonderado.get(m.id) ?? 0,
-        valores: colunas.map((col) => {
-          const bruto = col.mapa.get(m.id) ?? 0;
-          const ponderado = col.mapaPonderado.get(m.id) ?? 0;
-          const acumulado = valorAcumulado({
-            partes: col.mapaPartes.get(m.id) ?? partesVazias(),
-            pesoGradual: col.mapaGradual.get(m.id) ?? 0,
-          });
-          const display = campo === "total" ? bruto : campo === "ponderado" ? ponderado : acumulado;
-          return { bruto, display };
-        }),
+        valores: colunas.map((col) => ({
+          bruto: col.mapa.get(m.id) ?? 0,
+          ponderado: col.mapaPonderado.get(m.id) ?? 0,
+        })),
       }));
 
     return { colunas, linhas };
@@ -2354,24 +2315,6 @@
   <button class="grade-voltar" onclick={() => (mostrarGradeSemanal = false)} aria-label="Voltar">{@render iconVoltar()}</button>
 {/snippet}
 
-{#snippet iconAlternarVisao()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="4" y1="6" x2="20" y2="6" />
-    <line x1="4" y1="12" x2="14" y2="12" />
-    <line x1="4" y1="18" x2="20" y2="18" />
-  </svg>
-{/snippet}
-
-{#snippet acaoEsquerdaGrade()}
-  {#if modalMusculoRotina?.multiRotina}
-    {@render voltarGradeSemanal()}
-  {:else}
-    <button class="grade-editar-metas-btn" onclick={() => (mostrarMenuVisaoGrade = true)} aria-label="Alternar entre Total, Ponderada e Acumulada">
-      {@render iconAlternarVisao()}
-    </button>
-  {/if}
-{/snippet}
-
 {#snippet acaoDireitaGrade()}
   <button
     class="grade-editar-metas-btn"
@@ -2404,7 +2347,7 @@
       mostrarGradeSemanal = false;
       if (modalMusculoRotina?.multiRotina) modalMusculoRotina = null;
     }}
-    acaoTituloEsquerda={acaoEsquerdaGrade}
+    acaoTituloEsquerda={modalMusculoRotina?.multiRotina ? voltarGradeSemanal : undefined}
     acaoTituloDireita={acaoDireitaGrade}
   >
     <div class="grade-scroll">
@@ -2439,34 +2382,36 @@
                 {/if}
               </th>
             {/each}
-            <th class="grade-col-total">Total</th>
+            <th class="grade-col-total">
+              <div class="grade-dia">Total</div>
+              <div class="grade-rotina-nome">ponderado</div>
+            </th>
           </tr>
         </thead>
         <tbody>
           {#each gradeSemanal.linhas as linha (linha.musculo.id)}
-            {@const totalLinha = linha.valores.reduce((acc, v) => acc + v.display, 0)}
             {@const temMetaNaLinha = linha.valores.some((v, i) => {
               const treinoId = gradeSemanal.colunas[i].treinoId;
-              return treinoId != null && metaParaCampo(treinoId, linha.musculo.id, ordemSemanal) != null;
+              return treinoId != null && metaParaCampo(treinoId, linha.musculo.id, "ponderado") != null;
             })}
             {@const totalMetaLinha = linha.valores.reduce((acc, v, i) => {
               const treinoId = gradeSemanal.colunas[i].treinoId;
-              const metaDia = treinoId ? metaParaCampo(treinoId, linha.musculo.id, ordemSemanal) : undefined;
-              return acc + (metaDia ?? v.display);
+              const metaDia = treinoId ? metaParaCampo(treinoId, linha.musculo.id, "ponderado") : undefined;
+              return acc + (metaDia ?? v.ponderado);
             }, 0)}
             <tr>
               <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
               {#each linha.valores as valor, i (i)}
                 {@const treinoId = gradeSemanal.colunas[i].treinoId}
-                {@const meta = treinoId ? metaParaCampo(treinoId, linha.musculo.id, ordemSemanal) : undefined}
-                {@const mostrado = valor.display}
+                {@const meta = treinoId ? metaParaCampo(treinoId, linha.musculo.id, "total") : undefined}
+                {@const mostrado = valor.bruto}
                 {@const texto = formatValor(mostrado)}
                 <td class="grade-valor" class:grade-col-destacada={gradeSemanal.colunas[i].dia === diaDestacadoGrade}>
                   {#if modoEdicaoMetas && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-meta-edit"
                       style={estiloCaixaVolume(valor.bruto)}
-                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, mostrado, ordemSemanal)}
+                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, mostrado, "total")}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0 && treinoId}
                     <button
@@ -2492,7 +2437,7 @@
               {/each}
               <td class="grade-valor grade-col-total">
                 <span class="grade-valor-caixa grade-valor-total" style={estiloCaixaVolume(linha.ponderadoTotal)}
-                >{formatValor(totalLinha)}{#if temMetaNaLinha}<span class="grade-meta-sub">/{formatValor(totalMetaLinha)}</span>{/if}</span>
+                >{formatValor(linha.ponderadoTotal)}{#if temMetaNaLinha}<span class="grade-meta-sub">/{formatValor(totalMetaLinha)}</span>{/if}</span>
               </td>
             </tr>
           {/each}
@@ -2500,22 +2445,6 @@
       </table>
     </div>
   </Sheet>
-  </div>
-{/if}
-
-{#if mostrarMenuVisaoGrade}
-  <!-- Precisa ficar acima da grade semanal (Sheet dentro de .acima-editor) — vem depois no DOM,
-       então já ganha por ordem mesmo com o mesmo z-index. -->
-  <div class="acima-editor">
-    <ActionSheet
-      titulo="Visualizar por"
-      onFechar={() => (mostrarMenuVisaoGrade = false)}
-      opcoes={[
-        { label: "Total", valor: ordemSemanal === "total" ? "✓" : undefined, onSelect: () => (ordemSemanal = "total") },
-        { label: "Ponderada", valor: ordemSemanal === "ponderado" ? "✓" : undefined, onSelect: () => (ordemSemanal = "ponderado") },
-        { label: "Acumulada", valor: ordemSemanal === "acumulado" ? "✓" : undefined, onSelect: () => (ordemSemanal = "acumulado") },
-      ]}
-    />
   </div>
 {/if}
 
