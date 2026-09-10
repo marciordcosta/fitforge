@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
-import { toISODate, parseISODate, hojeISO } from "./dates";
+import { toISODate, parseISODate, hojeISO, somarDias } from "./dates";
 
 export interface PesoRegistro {
   data: string;
@@ -101,6 +101,85 @@ export async function excluirFotoDoDia(foto: FotoRegistro): Promise<void> {
   await supabase.storage.from("fotos").remove([foto.path]);
   const { error } = await supabase.from("fotos").delete().eq("id", foto.id);
   if (error) throw error;
+}
+
+export interface FotoItem {
+  id: string;
+  path: string;
+  data: string;
+}
+
+export interface FotoGrupoData {
+  data: string;
+  fotos: FotoItem[];
+}
+
+/** Todas as fotos de acompanhamento, agrupadas por dia (mais recente primeiro) — base da galeria
+ * da aba Fotos. Um dia pode ter mais de uma foto (ordenadas por `ordem`), viram o carrossel na
+ * tela de comparação. */
+export async function listFotosAgrupadas(): Promise<FotoGrupoData[]> {
+  const { data, error } = await supabase
+    .from("fotos")
+    .select("id, url, data_foto")
+    .eq("user_id", uid())
+    .order("data_foto", { ascending: false })
+    .order("ordem", { ascending: true });
+  if (error) throw error;
+
+  const grupos: FotoGrupoData[] = [];
+  for (const linha of data ?? []) {
+    const item: FotoItem = { id: linha.id, path: linha.url, data: linha.data_foto };
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.data === item.data) ultimo.fotos.push(item);
+    else grupos.push({ data: item.data, fotos: [item] });
+  }
+  return grupos;
+}
+
+/** Todas as fotos de um dia específico, na ordem salva — base do carrossel da tela de comparação
+ * (trocar de foto sem sair da data selecionada). */
+export async function getFotosDaData(data: string): Promise<FotoItem[]> {
+  const { data: linhas, error } = await supabase
+    .from("fotos")
+    .select("id, url, data_foto")
+    .eq("user_id", uid())
+    .eq("data_foto", data)
+    .order("ordem", { ascending: true });
+  if (error) throw error;
+  return (linhas ?? []).map((l) => ({ id: l.id, path: l.url, data: l.data_foto }));
+}
+
+export async function getFotoPorId(id: string): Promise<FotoItem | null> {
+  const { data, error } = await supabase
+    .from("fotos")
+    .select("id, url, data_foto")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? { id: data.id, path: data.url, data: data.data_foto } : null;
+}
+
+/** Assina várias fotos de uma vez (1h de validade, mesmo prazo de getUrlAssinadaFoto) — evita uma
+ * chamada por foto numa galeria com muitas imagens. */
+export async function getUrlsAssinadas(paths: string[]): Promise<Map<string, string>> {
+  const mapa = new Map<string, string>();
+  if (!paths.length) return mapa;
+  const { data, error } = await supabase.storage.from("fotos").createSignedUrls(paths, 3600);
+  if (error) throw error;
+  for (const item of data ?? []) {
+    if (item.signedUrl) mapa.set(item.path ?? "", item.signedUrl);
+  }
+  return mapa;
+}
+
+/** Média móvel dos 7 dias terminando na data informada (mesma janela de getPesoMedioAtual, só que
+ * ancorada numa data arbitrária em vez de sempre no registro mais recente) — usada na tela de
+ * comparação de fotos pra mostrar "a média da semana" daquele dia. null sem pesagem na janela. */
+export async function getPesoMedioNaData(data: string): Promise<number | null> {
+  const limite = somarDias(data, -6);
+  const registros = await getPesosDoPeriodo(limite, data);
+  if (!registros.length) return null;
+  return registros.reduce((acc, p) => acc + p.peso, 0) / registros.length;
 }
 
 export async function getUltimoPeso(): Promise<number | null> {

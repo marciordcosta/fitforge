@@ -10,7 +10,6 @@
 
   const sectionTitles: Record<string, string> = {
     "/treino": "Treino",
-    "/fotos": "Fotos",
   };
 
   let blockedAlertShown = false;
@@ -67,12 +66,18 @@
     {:then { default: Dieta }}
       <Dieta />
     {/await}
+  {:else if router.path.startsWith("/fotos")}
+    {#await import("./routes/fotos/Fotos.svelte")}
+      <div class="loading">Carregando…</div>
+    {:then { default: Fotos }}
+      <Fotos />
+    {/await}
   {:else if sectionTitles[router.path]}
     <Placeholder titulo={sectionTitles[router.path]} />
   {:else}
     <Home />
   {/if}
-  {#if !router.path.startsWith("/treino/log/")}
+  {#if !router.path.startsWith("/treino/log/") && !router.path.startsWith("/fotos/comparar/")}
     {#if treinoLogSessao.atual}
       <TreinoMinimizado />
     {/if}
