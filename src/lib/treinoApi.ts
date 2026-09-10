@@ -381,10 +381,13 @@ export async function deletePadraoMovimento(id: string): Promise<void> {
 
 const EXERCICIO_SELECT = `id, padrao_id, nome, descanso_padrao_seg, ordem, padrao:padroes_movimento(id, nome, cor_fundo, cor_fonte, ordem), musculos:exercicio_musculos(musculo_id, papel, peso_contribuicao, musculo:musculos(${MUSCULO_SELECT}))`;
 
+/** Exclui exercícios avulsos (criados direto numa sessão ao vivo pra uso pontual) — só existem
+ * pra manter o histórico daquele treino, nunca aparecem no catálogo reutilizável. */
 export async function listExercicios(): Promise<Exercicio[]> {
   const { data, error } = await supabase
     .from("exercicios")
     .select(EXERCICIO_SELECT)
+    .eq("avulso", false)
     .order("nome", { ascending: true });
   if (error) throw error;
   return (data ?? []) as unknown as Exercicio[];
@@ -410,6 +413,20 @@ export async function createExercicio(input: SalvarExercicioInput): Promise<stri
   const { data, error } = await supabase
     .from("exercicios")
     .insert({ user_id: uid(), nome: input.nome, padrao_id: input.padrao_id, ordem: 0 })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await salvarMusculosExercicio(data.id, input.musculos);
+  return data.id;
+}
+
+/** Cria um exercício "avulso" (marcado no banco, ver listExercicios) direto de uma sessão de
+ * treino ao vivo — pra registrar um exercício pontual (aparelho de outra academia, variação de
+ * uma vez) sem sujar o catálogo reutilizável de exercícios. */
+export async function createExercicioAvulso(input: SalvarExercicioInput): Promise<string> {
+  const { data, error } = await supabase
+    .from("exercicios")
+    .insert({ user_id: uid(), nome: input.nome, padrao_id: input.padrao_id, ordem: 0, avulso: true })
     .select("id")
     .single();
   if (error) throw error;

@@ -12,8 +12,12 @@
     salvarExerciciosRotina,
     updateDescansoTreinoExercicio,
     updateObservacaoTreinoExercicio,
+    createExercicioAvulso,
+    construirMusculosInput,
+    getExercicio,
     type TreinoComExercicios,
     type Exercicio,
+    type LinhaMusculoInput,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import AlertDialog from "../../components/AlertDialog.svelte";
@@ -21,6 +25,7 @@
   import DescansoPicker from "../../components/DescansoPicker.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Exercicios from "./Exercicios.svelte";
+  import ExercicioCampos from "./ExercicioCampos.svelte";
   import { treinoLogSessao, type SetSessao, type ExercicioSessao } from "../../lib/treinoLogSessao.svelte";
 
   let { treinoId }: { treinoId: string } = $props();
@@ -458,6 +463,54 @@
     houveAlteracaoEstrutura = true;
   }
 
+  /** Escolha entre buscar na lista (Exercicios.svelte) ou criar um exercício avulso — só pra essa
+   * sessão, sem entrar no catálogo reutilizável (ver createExercicioAvulso). */
+  let mostrarEscolhaAdicionar = $state(false);
+
+  let mostrarCriarAvulso = $state(false);
+  let nomeAvulso = $state("");
+  let padraoIdAvulso = $state("");
+  let linhasMusculosAvulso = $state<LinhaMusculoInput[]>([]);
+  let salvandoAvulso = $state(false);
+
+  function abrirCriarAvulso(): void {
+    nomeAvulso = "";
+    padraoIdAvulso = "";
+    linhasMusculosAvulso = [];
+    mostrarCriarAvulso = true;
+  }
+
+  async function salvarExercicioAvulso(): Promise<void> {
+    if (!nomeAvulso.trim()) {
+      mostrarAlerta("Informe o nome do exercício.");
+      return;
+    }
+    const musculosInput = await construirMusculosInput(linhasMusculosAvulso);
+    if (!musculosInput.length) {
+      mostrarAlerta("Informe ao menos um músculo envolvido.");
+      return;
+    }
+    salvandoAvulso = true;
+    try {
+      const novoId = await createExercicioAvulso({
+        nome: nomeAvulso.trim(),
+        padrao_id: padraoIdAvulso || null,
+        musculos: musculosInput,
+      });
+      const novoExercicio = await getExercicio(novoId);
+      if (novoExercicio) {
+        const novo = await construirExercicioSessao(novoExercicio);
+        sessao = [...sessao, novo];
+        houveAlteracaoEstrutura = true;
+      }
+      mostrarCriarAvulso = false;
+    } catch (e) {
+      mostrarAlerta("Erro ao criar exercício: " + (e as Error).message);
+    } finally {
+      salvandoAvulso = false;
+    }
+  }
+
   let arrastandoIdx = $state<number | null>(null);
   let itemReordenarRefs: (HTMLElement | null)[] = [];
 
@@ -674,7 +727,7 @@
       </div>
     {/each}
 
-    <button class="adicionar-btn" onclick={abrirPicker}>+ Adicionar Exercício</button>
+    <button class="adicionar-btn" onclick={() => (mostrarEscolhaAdicionar = true)}>+ Adicionar Exercício</button>
 
     <button class="descartar" onclick={() => (mostrarConfirmDescartar = true)} disabled={salvando}>Descartar Treino</button>
   {/if}
@@ -728,6 +781,21 @@
     <path d="M8 21h8" stroke="#d97706" stroke-width="1.4" stroke-linecap="round" />
   </svg>
 {/snippet}
+{#snippet iconLista()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6" />
+    <line x1="8" y1="12" x2="21" y2="12" />
+    <line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="6" x2="3.01" y2="6" />
+    <line x1="3" y1="12" x2="3.01" y2="12" />
+    <line x1="3" y1="18" x2="3.01" y2="18" />
+  </svg>
+{/snippet}
+{#snippet iconAvulso()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+  </svg>
+{/snippet}
 
 {#if menuExercicioAberto !== null}
   {@const exIdxMenu = menuExercicioAberto}
@@ -750,6 +818,32 @@
       { label: "Remover Série", icon: iconRemover, destructive: true, onSelect: () => removerSerie(exIdxSerie, setIdxSerie) },
     ]}
   />
+{/if}
+
+{#if mostrarEscolhaAdicionar}
+  <ActionSheet
+    titulo="Adicionar Exercício"
+    onFechar={() => (mostrarEscolhaAdicionar = false)}
+    opcoes={[
+      { label: "Lista", icon: iconLista, onSelect: abrirPicker },
+      { label: "Avulso", subtitulo: "Só pra esse treino, não entra no catálogo", icon: iconAvulso, onSelect: abrirCriarAvulso },
+    ]}
+  />
+{/if}
+
+{#if mostrarCriarAvulso}
+  <div class="tela-avulso">
+    <div class="tela-avulso-conteudo">
+      <div class="picker-header">
+        <button class="voltar-icon" onclick={() => (mostrarCriarAvulso = false)} aria-label="Cancelar">←</button>
+        <h1>Exercício Avulso</h1>
+        <button class="criar" disabled={salvandoAvulso} onclick={salvarExercicioAvulso} aria-label="Adicionar">
+          {@render iconCheck()}
+        </button>
+      </div>
+      <ExercicioCampos bind:nome={nomeAvulso} bind:padraoId={padraoIdAvulso} bind:linhasMusculos={linhasMusculosAvulso} />
+    </div>
+  </div>
 {/if}
 
 {#if substituindoExIdx !== null}
@@ -1225,6 +1319,41 @@
     background: var(--surface-bg);
     z-index: 150;
     overflow: hidden;
+  }
+  .tela-avulso {
+    position: fixed;
+    inset: 0;
+    background: var(--surface-bg);
+    z-index: 150;
+    overflow-y: auto;
+  }
+  .tela-avulso-conteudo {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: var(--space-4);
+    box-sizing: border-box;
+  }
+  .criar {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .criar svg {
+    width: 18px;
+    height: 18px;
+  }
+  .criar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .reordenar-conteudo {
     max-width: 480px;
