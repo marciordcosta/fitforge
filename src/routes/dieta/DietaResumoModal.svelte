@@ -1,15 +1,16 @@
 <script lang="ts">
-  import { getPerfilDietaEditavel, getMediaSemanalDiario } from "../../lib/dietaApi";
+  import { getPerfilDietaEditavel, getMetasDoDia } from "../../lib/dietaApi";
   import { getUltimoPeso, getPesoMedioAtual, getMeta, getMetaSemanal, getDiasParaObjetivo, formatDiasObjetivo } from "../../lib/pesoApi";
+  import { hojeISO } from "../../lib/dates";
 
   let { onFechar }: { onFechar: () => void } = $props();
 
   let loading = $state(true);
 
-  let mediaCalorias = $state<number | null>(null);
-  let mediaProteina = $state<number | null>(null);
-  let mediaGordura = $state<number | null>(null);
-  let mediaCarboidrato = $state<number | null>(null);
+  let metaCalorias = $state<number | null>(null);
+  let metaProteina = $state<number | null>(null);
+  let metaGordura = $state<number | null>(null);
+  let metaCarboidrato = $state<number | null>(null);
   let caloriasAjustadasEm = $state<string | null>(null);
 
   let pesoAtual = $state<number | null>(null);
@@ -21,9 +22,9 @@
 
   async function carregar(): Promise<void> {
     loading = true;
-    const [perfil, mediaDiario, ultimoPeso, mediaPeso, meta, metaSemanal, dias] = await Promise.all([
+    const [perfil, metasHoje, ultimoPeso, mediaPeso, meta, metaSemanal, dias] = await Promise.all([
       getPerfilDietaEditavel(),
-      getMediaSemanalDiario(),
+      getMetasDoDia(hojeISO()),
       getUltimoPeso(),
       getPesoMedioAtual(),
       getMeta(),
@@ -31,10 +32,10 @@
       getDiasParaObjetivo(),
     ]);
     caloriasAjustadasEm = perfil.caloriasAjustadasEm;
-    mediaCalorias = mediaDiario?.calorias ?? null;
-    mediaProteina = mediaDiario?.proteinaG ?? null;
-    mediaGordura = mediaDiario?.gorduraG ?? null;
-    mediaCarboidrato = mediaDiario?.carboidratoG ?? null;
+    metaCalorias = metasHoje.calorias;
+    metaProteina = metasHoje.proteinaG;
+    metaGordura = metasHoje.gorduraG;
+    metaCarboidrato = metasHoje.carboidratoG;
     pesoAtual = ultimoPeso;
     mediaSemanaPeso = mediaPeso;
     temMeta = meta != null;
@@ -78,25 +79,25 @@
     {:else}
       <div class="resumo-secao">
         <div class="resumo-linha">
-          <span class="resumo-label">Calorias (média semanal)</span>
-          <span class="resumo-valor">{formatKcal(mediaCalorias)}</span>
+          <span class="resumo-label">Meta de calorias</span>
+          <span class="resumo-valor">{formatKcal(metaCalorias)}</span>
         </div>
         <p class="resumo-sub">{formatDataAjuste(caloriasAjustadasEm)}</p>
       </div>
 
       <div class="resumo-secao">
-        <p class="resumo-label">Macros (média semanal)</p>
+        <p class="resumo-label">Meta de macros</p>
         <div class="resumo-macros">
           <div class="resumo-macro-item">
-            <span class="resumo-macro-valor">{formatG(mediaCarboidrato)}</span>
+            <span class="resumo-macro-valor">{formatG(metaCarboidrato)}</span>
             <span class="resumo-macro-nome">Carb</span>
           </div>
           <div class="resumo-macro-item">
-            <span class="resumo-macro-valor">{formatG(mediaGordura)}</span>
+            <span class="resumo-macro-valor">{formatG(metaGordura)}</span>
             <span class="resumo-macro-nome">Gorduras</span>
           </div>
           <div class="resumo-macro-item">
-            <span class="resumo-macro-valor">{formatG(mediaProteina)}</span>
+            <span class="resumo-macro-valor">{formatG(metaProteina)}</span>
             <span class="resumo-macro-nome">Proteínas</span>
           </div>
         </div>
