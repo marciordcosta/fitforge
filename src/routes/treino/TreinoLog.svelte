@@ -1288,11 +1288,16 @@
   }
   .add-serie {
     width: 100%;
+    height: 36px;
     margin-top: var(--space-3);
-    padding: var(--space-3);
+    padding: 0 var(--space-3);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
-    background: var(--surface-card);
+    background: none;
     color: var(--color-primary);
     font-size: var(--font-size-base);
     font-weight: 600;
