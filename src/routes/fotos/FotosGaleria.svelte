@@ -13,6 +13,10 @@
   /** Até 2 ids de foto — tocar numa terceira enquanto já há 2 selecionadas não faz nada. */
   let selecionadas = $state<string[]>([]);
 
+  /** Miniaturas embaçadas por padrão (fotos pessoais) — só o "olho" no topo revela sem filtro;
+   * a tela de comparação (ao abrir uma foto de fato) sempre mostra sem embaçar. */
+  let mostrarNormal = $state(false);
+
   let mostrarAdicionar = $state(false);
   let dataNovaFoto = $state(hojeISO());
   let mostrarOpcoesFoto = $state(false);
@@ -107,10 +111,30 @@
     <path d="M21 15l-5-5-9 9" />
   </svg>
 {/snippet}
+{#snippet iconOlho()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+{/snippet}
+{#snippet iconOlhoFechado()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 4.22-5.44M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a20.3 20.3 0 0 1-2.16 3.19" />
+    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
     <h1>Fotos</h1>
+    <button
+      class="icon-btn"
+      onclick={() => (mostrarNormal = !mostrarNormal)}
+      aria-label={mostrarNormal ? "Embaçar miniaturas" : "Mostrar miniaturas sem filtro"}
+    >
+      {@render (mostrarNormal ? iconOlho : iconOlhoFechado)()}
+    </button>
     <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar foto">{@render iconMais()}</button>
   </div>
 
@@ -133,7 +157,7 @@
             aria-label="Selecionar foto"
           >
             {#if urls.get(foto.path)}
-              <img src={urls.get(foto.path)} alt="" loading="lazy" />
+              <img src={urls.get(foto.path)} alt="" loading="lazy" class:embacada={!mostrarNormal} />
             {/if}
             {#if selecionadas.includes(foto.id)}
               <span class="foto-check">{@render iconCheck()}</span>
@@ -272,6 +296,10 @@
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+  .foto-item img.embacada {
+    filter: blur(14px);
+    transform: scale(1.15);
   }
   .foto-item.selecionada img {
     opacity: 0.6;
