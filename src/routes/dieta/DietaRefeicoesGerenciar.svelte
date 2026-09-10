@@ -671,6 +671,17 @@
   let salvando = $state(false);
   let paraExcluir = $state<RefeicaoModelo | null>(null);
   let excluindo = $state(false);
+  /** Remover uma refeição de um grupo de dias (Ondulatória) — diferente de excluir do catálogo
+   * inteiro (paraExcluir): só desvincula esse dia/bloco, a refeição continua existindo pros
+   * outros. Mesmo gesto de pressionar/botão direito do catálogo (Fixa), pra ficar consistente. */
+  let paraRemoverDoGrupo = $state<{ grupo: GrupoDias; modelo: RefeicaoModelo } | null>(null);
+
+  async function confirmarRemoverDoGrupo() {
+    if (!paraRemoverDoGrupo) return;
+    const { grupo, modelo } = paraRemoverDoGrupo;
+    paraRemoverDoGrupo = null;
+    await removerDoGrupo(grupo, modelo);
+  }
 
   let itemRefs: (HTMLLIElement | null)[] = [];
   let itemRefsDia: (HTMLLIElement | null)[][] = [[], [], [], [], [], [], []];
@@ -887,7 +898,9 @@
   let pressionarNomeY = 0;
   let pressionouLongoNome = false;
 
-  function aoPointerDownNome(e: PointerEvent, m: RefeicaoModelo) {
+  /** grupo presente = Ondulatória (desvincula desse bloco de dias, paraRemoverDoGrupo); ausente =
+   * Fixa (exclui a refeição do catálogo inteiro, paraExcluir). */
+  function aoPointerDownNome(e: PointerEvent, m: RefeicaoModelo, grupo?: GrupoDias) {
     pressionarNomeX = e.clientX;
     pressionarNomeY = e.clientY;
     pressionouLongoNome = false;
@@ -897,15 +910,17 @@
       pressionouLongoNome = true;
       cancelarPressionarNome();
       if (navigator.vibrate) navigator.vibrate(10);
-      paraExcluir = m;
+      if (grupo) paraRemoverDoGrupo = { grupo, modelo: m };
+      else paraExcluir = m;
     }, ATRASO_PRESSIONAR_MS);
   }
 
-  function aoContextMenuNome(e: MouseEvent, m: RefeicaoModelo) {
+  function aoContextMenuNome(e: MouseEvent, m: RefeicaoModelo, grupo?: GrupoDias) {
     e.preventDefault();
     cancelarPressionarNome();
     pressionouLongoNome = false;
-    paraExcluir = m;
+    if (grupo) paraRemoverDoGrupo = { grupo, modelo: m };
+    else paraExcluir = m;
   }
 
   function cancelarPressionarNome() {
@@ -925,12 +940,12 @@
     cancelarPressionarNome();
   }
 
-  function aoClickNome(m: RefeicaoModelo) {
+  function aoClickNome(m: RefeicaoModelo, diasGrupo?: number[]) {
     if (pressionouLongoNome) {
       pressionouLongoNome = false;
       return;
     }
-    abrirMeta(m);
+    abrirMeta(m, diasGrupo);
   }
 
   /** Tempo segurando o handle parado antes do arrasto realmente começar — evita que um toque de rolagem vire reordenação sem querer. */
@@ -1475,7 +1490,12 @@
               <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, grupo.dias[0])} aria-label="Reordenar">
                 {@render iconArrastar()}
               </button>
-              <button class="nome-btn" onclick={() => abrirMeta(m, grupo.dias)}>
+              <button
+                class="nome-btn"
+                onpointerdown={(e) => aoPointerDownNome(e, m, grupo)}
+                onclick={() => aoClickNome(m, grupo.dias)}
+                oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
+              >
                 <span class="nome-linha">
                   <span class="nome">{m.nome}</span>
                   {#if meta.calorias != null}<span class="nome-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
@@ -1490,7 +1510,6 @@
                   meta.calorias == null,
                 )}
               </button>
-              <button class="remover-btn" onclick={() => removerDoGrupo(grupo, m)} aria-label={`Remover ${m.nome} desse dia`}>✕</button>
             </li>
           {/each}
         </ul>
@@ -1659,6 +1678,15 @@
     textoConfirmar="Excluir"
     onConfirmar={excluir}
     onCancelar={() => (paraExcluir = null)}
+  />
+{/if}
+
+{#if paraRemoverDoGrupo}
+  <ConfirmDialog
+    titulo={`Remover "${paraRemoverDoGrupo.modelo.nome}" desse dia?`}
+    textoConfirmar="Remover"
+    onConfirmar={confirmarRemoverDoGrupo}
+    onCancelar={() => (paraRemoverDoGrupo = null)}
   />
 {/if}
 
@@ -2119,15 +2147,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .remover-btn {
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    color: var(--color-danger);
-    font-size: var(--font-size-base);
-    cursor: pointer;
-    padding: var(--space-2);
   }
   .conteudo {
     transition: opacity 0.15s;
