@@ -101,12 +101,12 @@
 
 <Sheet titulo={editando ? "Editar Alimento" : "Novo Alimento"} {onFechar}>
   <div class="lista">
-    <div class="linha">
+    <div class="linha linha-texto">
       <label for="af-nome">Nome</label>
       <input id="af-nome" type="text" bind:value={nome} />
     </div>
 
-    <div class="linha">
+    <div class="linha linha-texto">
       <label for="af-marca">Marca (opcional)</label>
       <input id="af-marca" type="text" bind:value={marca} />
     </div>
@@ -219,6 +219,14 @@
   .linha:last-child {
     border-bottom: none;
   }
+  /* Nome/Marca: rótulo só do tamanho do texto, campo ocupa o resto — bem mais espaço pra digitar
+     do que a coluna fixa de 68px+74px usada pelos campos numéricos. */
+  .linha-texto {
+    grid-template-columns: auto 1fr;
+  }
+  .linha-texto input[type="text"] {
+    grid-column: 2;
+  }
   .linha label,
   .rotulo-estatico,
   .rotulo-com-seta {
@@ -284,6 +292,20 @@
   }
   .linha input:focus {
     outline: none;
+  }
+  /* Sem isso, o spinner nativo de input[type=number] reserva espaço à direita e o valor fica
+     desalinhado do texto estático de Calorias, que não tem spinner. */
+  .valor-num::-webkit-outer-spin-button,
+  .valor-num::-webkit-inner-spin-button,
+  .valor-num-inline::-webkit-outer-spin-button,
+  .valor-num-inline::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .valor-num,
+  .valor-num-inline {
+    -moz-appearance: textfield;
+    appearance: textfield;
   }
   .valor-calculado {
     color: var(--surface-muted);
