@@ -1,80 +1,164 @@
 <script lang="ts">
   import { router } from "../../lib/router.svelte";
   import Rotinas from "./Rotinas.svelte";
-  import RotinaVisualizar from "./RotinaVisualizar.svelte";
-  import RotinaEditor from "./RotinaEditor.svelte";
-  import TreinoLog from "./TreinoLog.svelte";
-  import Exercicios from "./Exercicios.svelte";
-  import ExercicioDetalhe from "./ExercicioDetalhe.svelte";
-  import ExercicioForm from "./ExercicioForm.svelte";
-  import Movimentos from "./Movimentos.svelte";
-  import MovimentoDetalhe from "./MovimentoDetalhe.svelte";
-  import MovimentoForm from "./MovimentoForm.svelte";
-  import Musculos from "./Musculos.svelte";
-  import MusculoDetalhe from "./MusculoDetalhe.svelte";
-  import MusculoForm from "./MusculoForm.svelte";
-  import AgrupamentosMusculares from "./AgrupamentosMusculares.svelte";
-  import AgrupamentoMuscularDetalhe from "./AgrupamentoMuscularDetalhe.svelte";
-  import AgrupamentoMuscularForm from "./AgrupamentoMuscularForm.svelte";
-  import DistribuicaoMusculos from "./DistribuicaoMusculos.svelte";
-  import DistribuicaoParametrizacao from "./DistribuicaoParametrizacao.svelte";
-  import TreinoAvulso from "./TreinoAvulso.svelte";
-  import HistoricoCalendario from "./HistoricoCalendario.svelte";
-  import HistoricoDia from "./HistoricoDia.svelte";
 
   const segmentos = $derived(
     router.path.replace(/^\/treino\/?/, "").split("/").filter(Boolean),
   );
 </script>
 
+{#snippet carregando()}
+  <p class="tab-carregando">Carregando…</p>
+{/snippet}
+
 {#if segmentos.length === 0}
   <Rotinas />
 {:else if segmentos[0] === "rotina" && segmentos[1] === "nova"}
-  <RotinaEditor treinoId={null} />
+  {#await import("./RotinaEditor.svelte")}
+    {@render carregando()}
+  {:then { default: RotinaEditor }}
+    <RotinaEditor treinoId={null} />
+  {/await}
 {:else if segmentos[0] === "rotina" && segmentos[1] && segmentos[2] === "ver"}
-  <RotinaVisualizar treinoId={segmentos[1]} />
+  {#await import("./RotinaVisualizar.svelte")}
+    {@render carregando()}
+  {:then { default: RotinaVisualizar }}
+    <RotinaVisualizar treinoId={segmentos[1]} />
+  {/await}
 {:else if segmentos[0] === "rotina" && segmentos[1]}
-  <RotinaEditor treinoId={segmentos[1]} />
+  {#await import("./RotinaEditor.svelte")}
+    {@render carregando()}
+  {:then { default: RotinaEditor }}
+    <RotinaEditor treinoId={segmentos[1]} />
+  {/await}
 {:else if segmentos[0] === "log" && segmentos[1]}
-  <TreinoLog treinoId={segmentos[1]} />
+  {#await import("./TreinoLog.svelte")}
+    {@render carregando()}
+  {:then { default: TreinoLog }}
+    <TreinoLog treinoId={segmentos[1]} />
+  {/await}
 {:else if segmentos[0] === "exercicios" && segmentos[1] === "novo" && segmentos[2] === "voltar"}
-  <ExercicioForm voltarAoSalvar={true} />
+  {#await import("./ExercicioForm.svelte")}
+    {@render carregando()}
+  {:then { default: ExercicioForm }}
+    <ExercicioForm voltarAoSalvar={true} />
+  {/await}
 {:else if segmentos[0] === "exercicios" && segmentos[1] === "novo"}
-  <ExercicioForm />
+  {#await import("./ExercicioForm.svelte")}
+    {@render carregando()}
+  {:then { default: ExercicioForm }}
+    <ExercicioForm />
+  {/await}
 {:else if segmentos[0] === "exercicios" && segmentos[1]}
-  <ExercicioDetalhe exercicioId={segmentos[1]} />
+  {#await import("./ExercicioDetalhe.svelte")}
+    {@render carregando()}
+  {:then { default: ExercicioDetalhe }}
+    <ExercicioDetalhe exercicioId={segmentos[1]} />
+  {/await}
 {:else if segmentos[0] === "exercicios"}
-  <Exercicios />
+  {#await import("./Exercicios.svelte")}
+    {@render carregando()}
+  {:then { default: Exercicios }}
+    <Exercicios />
+  {/await}
 {:else if segmentos[0] === "movimentos" && segmentos[1] === "novo"}
-  <MovimentoForm />
+  {#await import("./MovimentoForm.svelte")}
+    {@render carregando()}
+  {:then { default: MovimentoForm }}
+    <MovimentoForm />
+  {/await}
 {:else if segmentos[0] === "movimentos" && segmentos[1]}
-  <MovimentoDetalhe padraoId={segmentos[1]} />
+  {#await import("./MovimentoDetalhe.svelte")}
+    {@render carregando()}
+  {:then { default: MovimentoDetalhe }}
+    <MovimentoDetalhe padraoId={segmentos[1]} />
+  {/await}
 {:else if segmentos[0] === "movimentos"}
-  <Movimentos />
+  {#await import("./Movimentos.svelte")}
+    {@render carregando()}
+  {:then { default: Movimentos }}
+    <Movimentos />
+  {/await}
 {:else if segmentos[0] === "musculos" && segmentos[1] === "novo"}
-  <MusculoForm />
+  {#await import("./MusculoForm.svelte")}
+    {@render carregando()}
+  {:then { default: MusculoForm }}
+    <MusculoForm />
+  {/await}
 {:else if segmentos[0] === "musculos" && segmentos[1]}
-  <MusculoDetalhe musculoId={segmentos[1]} />
+  {#await import("./MusculoDetalhe.svelte")}
+    {@render carregando()}
+  {:then { default: MusculoDetalhe }}
+    <MusculoDetalhe musculoId={segmentos[1]} />
+  {/await}
 {:else if segmentos[0] === "musculos"}
-  <Musculos />
+  {#await import("./Musculos.svelte")}
+    {@render carregando()}
+  {:then { default: Musculos }}
+    <Musculos />
+  {/await}
 {:else if segmentos[0] === "agrupamentos" && segmentos[1] === "novo"}
-  <AgrupamentoMuscularForm />
+  {#await import("./AgrupamentoMuscularForm.svelte")}
+    {@render carregando()}
+  {:then { default: AgrupamentoMuscularForm }}
+    <AgrupamentoMuscularForm />
+  {/await}
 {:else if segmentos[0] === "agrupamentos" && segmentos[1]}
-  <AgrupamentoMuscularDetalhe agrupamentoId={segmentos[1]} />
+  {#await import("./AgrupamentoMuscularDetalhe.svelte")}
+    {@render carregando()}
+  {:then { default: AgrupamentoMuscularDetalhe }}
+    <AgrupamentoMuscularDetalhe agrupamentoId={segmentos[1]} />
+  {/await}
 {:else if segmentos[0] === "agrupamentos"}
-  <AgrupamentosMusculares />
+  {#await import("./AgrupamentosMusculares.svelte")}
+    {@render carregando()}
+  {:then { default: AgrupamentosMusculares }}
+    <AgrupamentosMusculares />
+  {/await}
 {:else if segmentos[0] === "distribuicao"}
-  <DistribuicaoMusculos />
+  {#await import("./DistribuicaoMusculos.svelte")}
+    {@render carregando()}
+  {:then { default: DistribuicaoMusculos }}
+    <DistribuicaoMusculos />
+  {/await}
 {:else if segmentos[0] === "parametrizacao"}
-  <DistribuicaoParametrizacao />
+  {#await import("./DistribuicaoParametrizacao.svelte")}
+    {@render carregando()}
+  {:then { default: DistribuicaoParametrizacao }}
+    <DistribuicaoParametrizacao />
+  {/await}
 {:else if segmentos[0] === "avulso"}
-  <TreinoAvulso />
+  {#await import("./TreinoAvulso.svelte")}
+    {@render carregando()}
+  {:then { default: TreinoAvulso }}
+    <TreinoAvulso />
+  {/await}
 {:else if segmentos[0] === "historico" && segmentos[1] === "avulso" && segmentos[2]}
-  <HistoricoDia treinoId={null} data={segmentos[2]} destaqueExercicioId={segmentos[3] ?? null} />
+  {#await import("./HistoricoDia.svelte")}
+    {@render carregando()}
+  {:then { default: HistoricoDia }}
+    <HistoricoDia treinoId={null} data={segmentos[2]} destaqueExercicioId={segmentos[3] ?? null} />
+  {/await}
 {:else if segmentos[0] === "historico" && segmentos[1] && segmentos[2]}
-  <HistoricoDia treinoId={segmentos[1]} data={segmentos[2]} destaqueExercicioId={segmentos[3] ?? null} />
+  {#await import("./HistoricoDia.svelte")}
+    {@render carregando()}
+  {:then { default: HistoricoDia }}
+    <HistoricoDia treinoId={segmentos[1]} data={segmentos[2]} destaqueExercicioId={segmentos[3] ?? null} />
+  {/await}
 {:else if segmentos[0] === "historico"}
-  <HistoricoCalendario />
+  {#await import("./HistoricoCalendario.svelte")}
+    {@render carregando()}
+  {:then { default: HistoricoCalendario }}
+    <HistoricoCalendario />
+  {/await}
 {:else}
   <Rotinas />
 {/if}
+
+<style>
+  .tab-carregando {
+    text-align: center;
+    color: var(--surface-muted);
+    padding-top: var(--space-6);
+  }
+</style>
