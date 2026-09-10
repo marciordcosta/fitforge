@@ -399,11 +399,46 @@
 
   type CampoOrdenacaoSeries = "total" | "ponderado" | "acumulado";
 
+  const LABEL_CAMPO_CURTO: Record<CampoOrdenacaoSeries, string> = { total: "Total", ponderado: "Pond.", acumulado: "Acum." };
+
+  /** Quais das 3 colunas (Total/Pond./Acum.) aparecem — configurável em Parametrização
+   * (mostrarSeries*); nunca fica vazio (a tela de Parametrização já impede desmarcar a última). */
+  const colunasAtivas = $derived.by((): CampoOrdenacaoSeries[] => {
+    const ativas: CampoOrdenacaoSeries[] = [];
+    if (parametrosDistribuicao.mostrarSeriesTotais) ativas.push("total");
+    if (parametrosDistribuicao.mostrarSeriesPonderadas) ativas.push("ponderado");
+    if (parametrosDistribuicao.mostrarSeriesAcumuladas) ativas.push("acumulado");
+    return ativas.length ? ativas : ["ponderado"];
+  });
+
   /** Qual coluna (Total/Pond./Acum.) está selecionada — GLOBAL pra toda a tela de Distribuição
    * (Distribuição Semanal, cada card de rotina, o editor completo): tocar em qualquer
    * rótulo/valor da coluna, em qualquer um desses lugares, muda essa mesma variável, então a
    * visualização fica sempre padronizada em vez de cada card guardar sua própria escolha. */
   let ordemSemanal = $state<CampoOrdenacaoSeries>("ponderado");
+
+  /** Se a coluna destacada for desativada em Parametrização enquanto essa tela está aberta, cai
+   * pra primeira que continuar ativa em vez de ficar destacando uma coluna escondida. */
+  $effect(() => {
+    if (!colunasAtivas.includes(ordemSemanal)) ordemSemanal = colunasAtivas[0];
+  });
+
+  /** Campo usado pelas células de dia/rotina da grade semanal — configurável em Parametrização
+   * (usarTotalNaGrade); comportamento fixo anterior: sempre "total". */
+  const campoGradeDia = $derived<CampoOrdenacaoSeries>(parametrosDistribuicao.usarTotalNaGrade ? "total" : "ponderado");
+
+  /** Campo usado pela coluna Total da grade semanal — configurável em Parametrização
+   * (usarPonderadoNoTotal); comportamento fixo anterior: sempre "ponderado". */
+  const campoTotalColuna = $derived<CampoOrdenacaoSeries>(parametrosDistribuicao.usarPonderadoNoTotal ? "ponderado" : "total");
+
+  /** Campo que os gráficos (anéis) usam como tamanho de fatia — configurável em Parametrização
+   * (graficoCampo): "destacada" segue a coluna que o usuário tocou por último (ordemSemanal,
+   * comportamento fixo anterior); "total"/"ponderado" ignoram a coluna destacada. */
+  const campoGrafico = $derived.by((): CampoOrdenacaoSeries => {
+    if (parametrosDistribuicao.graficoCampo === "total") return "total";
+    if (parametrosDistribuicao.graficoCampo === "ponderado") return "ponderado";
+    return ordemSemanal;
+  });
 
   function valorPorCampoOrdenacao(item: { valor: number; bruto: number; partes: Partes; pesoGradual?: number }, campo: CampoOrdenacaoSeries): number {
     if (campo === "total") return item.bruto;
@@ -620,9 +655,6 @@
       }
     }
 
-    // Fixo, sem seguir a coluna (Total/Pond./Acum.) selecionada nos cards — essa grade sempre
-    // mostra o total de séries em cada dia, e a coluna Total sempre soma o ponderado (ver pedido
-    // do usuário: simplificar a tela, sem alternância de visualização aqui).
     const totaisPonderado = new Map<string, number>();
     for (const t of treinosParaGrade) {
       for (const [id, v] of contarSeriesPorMusculoPonderado(t)) {
@@ -630,18 +662,20 @@
       }
     }
 
+    // Qual dos dois totais a coluna Total soma/mostra/classifica — configurável em Parametrização
+    // (campoTotalColuna, "usarPonderadoNoTotal"); comportamento fixo anterior: sempre ponderado.
+    const totaisColuna = campoTotalColuna === "ponderado" ? totaisPonderado : totais;
+
     const linhas = musculos
       .filter((m) => (totais.get(m.id) ?? 0) > 0)
       .filter((m) => filtroMusculosGrade === null || filtroMusculosGrade.has(m.id))
-      // Ordena pelo mesmo valor mostrado na coluna Total (ponderado) — não pelo bruto (totais),
-      // que é usado só pelas colunas de dia.
-      .sort((a, b) => (totaisPonderado.get(b.id) ?? 0) - (totaisPonderado.get(a.id) ?? 0))
+      // Ordena pelo mesmo valor mostrado na coluna Total, não pelo bruto por dia (totais).
+      .sort((a, b) => (totaisColuna.get(b.id) ?? 0) - (totaisColuna.get(a.id) ?? 0))
       .map((m) => ({
         musculo: m,
-        // Total ponderado da semana pra esse músculo — mostrado E usado pra classificar a cor da
-        // coluna Total (estiloCaixaVolume); ver comentário em Parametrização sobre a
-        // classificação de volume da coluna Total ser sempre em cima do ponderado.
-        ponderadoTotal: totaisPonderado.get(m.id) ?? 0,
+        // Total da semana pra esse músculo no campo escolhido pra coluna Total — mostrado E
+        // usado pra classificar a cor da coluna (estiloCaixaVolume).
+        totalColuna: totaisColuna.get(m.id) ?? 0,
         valores: colunas.map((col) => ({
           bruto: col.mapa.get(m.id) ?? 0,
           ponderado: col.mapaPonderado.get(m.id) ?? 0,
@@ -1881,9 +1915,10 @@
   });
 
   /** Abre o anel da Distribuição Semanal direto — mesmo padrão do anel por rotina (bar clicável, sem menu).
-   * Segue a mesma coluna (Total/Pond./Acum.) selecionada no card, igual à grade. */
+   * Segue campoGrafico — por padrão a mesma coluna (Total/Pond./Acum.) selecionada no card, igual
+   * à grade, mas configurável em Parametrização pra sempre usar total ou sempre ponderado. */
   function abrirGraficoSemanal(): void {
-    const { itens, total } = itensParaGrafico(linhasSemanal, ordemSemanal);
+    const { itens, total } = itensParaGrafico(linhasSemanal, campoGrafico);
     // Anel geral: mesma regra da coluna Total da grade semanal — classifica por volume sempre
     // pelo ponderado.
     abrirDetalheRotina("Distribuição Semanal", itens, formatValor(total), "séries", coresAbcAcumulado(itens), "ponderado");
@@ -2022,9 +2057,9 @@
     <span></span>
     <span></span>
     <div class="caixas-series caixas-cabecalho">
-      <button type="button" class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "total"} onclick={() => aoTocar("total")}>Total</button>
-      <button type="button" class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "ponderado"} onclick={() => aoTocar("ponderado")}>Pond.</button>
-      <button type="button" class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === "acumulado"} onclick={() => aoTocar("acumulado")}>Acum.</button>
+      {#each colunasAtivas as campo (campo)}
+        <button type="button" class="caixa-cabecalho-label" class:cabecalho-ativo={ordenandoPor === campo} onclick={() => aoTocar(campo)}>{LABEL_CAMPO_CURTO[campo]}</button>
+      {/each}
     </div>
   </div>
 {/snippet}
@@ -2043,34 +2078,19 @@
   totalClasse: "valor-subindo" | "valor-estavel" | "valor-caindo" | null = null,
   metaCampo: CampoOrdenacaoSeries | null = null,
 )}
+  {@const valoresPorCampo: Record<CampoOrdenacaoSeries, number> = { total: bruto, ponderado, acumulado }}
   <div class="caixas-series">
-    <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar("total"); }}>
-      <span
-        class="caixa-serie-valor"
-        class:caixa-serie-ativa={ordenandoPor === "total" && !(metaCampo === "total" && totalClasse != null)}
-        class:valor-subindo={metaCampo === "total" && totalClasse === "valor-subindo"}
-        class:valor-estavel={metaCampo === "total" && totalClasse === "valor-estavel"}
-        class:valor-caindo={metaCampo === "total" && totalClasse === "valor-caindo"}
-      >{metaCampo === "total" && totalTexto != null ? totalTexto : formatValor(bruto)}</span>
-    </button>
-    <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar("ponderado"); }}>
-      <span
-        class="caixa-serie-valor"
-        class:caixa-serie-ativa={ordenandoPor === "ponderado" && !(metaCampo === "ponderado" && totalClasse != null)}
-        class:valor-subindo={metaCampo === "ponderado" && totalClasse === "valor-subindo"}
-        class:valor-estavel={metaCampo === "ponderado" && totalClasse === "valor-estavel"}
-        class:valor-caindo={metaCampo === "ponderado" && totalClasse === "valor-caindo"}
-      >{metaCampo === "ponderado" && totalTexto != null ? totalTexto : formatValor(ponderado)}</span>
-    </button>
-    <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar("acumulado"); }}>
-      <span
-        class="caixa-serie-valor"
-        class:caixa-serie-ativa={ordenandoPor === "acumulado" && !(metaCampo === "acumulado" && totalClasse != null)}
-        class:valor-subindo={metaCampo === "acumulado" && totalClasse === "valor-subindo"}
-        class:valor-estavel={metaCampo === "acumulado" && totalClasse === "valor-estavel"}
-        class:valor-caindo={metaCampo === "acumulado" && totalClasse === "valor-caindo"}
-      >{metaCampo === "acumulado" && totalTexto != null ? totalTexto : formatValor(acumulado)}</span>
-    </button>
+    {#each colunasAtivas as campo (campo)}
+      <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar(campo); }}>
+        <span
+          class="caixa-serie-valor"
+          class:caixa-serie-ativa={ordenandoPor === campo && !(metaCampo === campo && totalClasse != null)}
+          class:valor-subindo={metaCampo === campo && totalClasse === "valor-subindo"}
+          class:valor-estavel={metaCampo === campo && totalClasse === "valor-estavel"}
+          class:valor-caindo={metaCampo === campo && totalClasse === "valor-caindo"}
+        >{metaCampo === campo && totalTexto != null ? totalTexto : formatValor(valoresPorCampo[campo])}</span>
+      </button>
+    {/each}
   </div>
 {/snippet}
 
@@ -2144,7 +2164,7 @@
                 0,
               )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
             </button>
-            <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino, ordemTreino)} aria-label="Ver anel por dominância">
+            <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino, campoGrafico)} aria-label="Ver anel por dominância">
               {@render iconGrafico()}
             </button>
           </div>
@@ -2436,7 +2456,7 @@
             {/each}
             <th class="grade-col-total">
               <div class="grade-dia">Total</div>
-              <div class="grade-rotina-nome">ponderado</div>
+              <div class="grade-rotina-nome">{campoTotalColuna === "ponderado" ? "ponderado" : "total"}</div>
             </th>
           </tr>
         </thead>
@@ -2444,31 +2464,31 @@
           {#each gradeSemanal.linhas as linha (linha.musculo.id)}
             {@const temMetaNaLinha = linha.valores.some((v, i) => {
               const treinoId = gradeSemanal.colunas[i].treinoId;
-              return treinoId != null && metaParaCampo(treinoId, linha.musculo.id, "ponderado") != null;
+              return treinoId != null && metaParaCampo(treinoId, linha.musculo.id, campoTotalColuna) != null;
             })}
             {@const totalMetaLinha = linha.valores.reduce((acc, v, i) => {
               const treinoId = gradeSemanal.colunas[i].treinoId;
-              const metaDia = treinoId ? metaParaCampo(treinoId, linha.musculo.id, "ponderado") : undefined;
-              return acc + (metaDia ?? v.ponderado);
+              const metaDia = treinoId ? metaParaCampo(treinoId, linha.musculo.id, campoTotalColuna) : undefined;
+              return acc + (metaDia ?? (campoTotalColuna === "ponderado" ? v.ponderado : v.bruto));
             }, 0)}
             <tr>
               <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
               {#each linha.valores as valor, i (i)}
                 {@const treinoId = gradeSemanal.colunas[i].treinoId}
-                {@const meta = treinoId ? metaParaCampo(treinoId, linha.musculo.id, "total") : undefined}
-                {@const mostrado = valor.bruto}
+                {@const meta = treinoId ? metaParaCampo(treinoId, linha.musculo.id, campoGradeDia) : undefined}
+                {@const mostrado = campoGradeDia === "total" ? valor.bruto : valor.ponderado}
                 {@const texto = formatValor(mostrado)}
                 <td class="grade-valor" class:grade-col-destacada={gradeSemanal.colunas[i].dia === diaDestacadoGrade}>
                   {#if modoEdicaoMetas && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-meta-edit"
-                      style={estiloCaixaVolume(valor.bruto, linha.musculo)}
-                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, mostrado, "total")}
+                      style={estiloCaixaVolume(mostrado, linha.musculo)}
+                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, mostrado, campoGradeDia)}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0 && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-link"
-                      style={estiloCaixaVolume(valor.bruto, linha.musculo)}
+                      style={estiloCaixaVolume(mostrado, linha.musculo)}
                       onclick={() => {
                         const treino = treinos.find((t) => t.id === treinoId);
                         if (treino) {
@@ -2479,7 +2499,7 @@
                       }}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0}
-                    <span class="grade-valor-caixa" style={estiloCaixaVolume(valor.bruto, linha.musculo)}
+                    <span class="grade-valor-caixa" style={estiloCaixaVolume(mostrado, linha.musculo)}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</span>
                   {:else if meta != null}
                     <span class="grade-valor-caixa grade-valor-vazio" style={estiloCaixaVolume(0, linha.musculo)}
@@ -2488,8 +2508,8 @@
                 </td>
               {/each}
               <td class="grade-valor grade-col-total">
-                <span class="grade-valor-caixa grade-valor-total" style={estiloCaixaVolume(linha.ponderadoTotal, linha.musculo)}
-                >{formatValor(linha.ponderadoTotal)}{#if temMetaNaLinha}<span class="grade-meta-sub">/{formatValor(totalMetaLinha)}</span>{/if}</span>
+                <span class="grade-valor-caixa grade-valor-total" style={estiloCaixaVolume(linha.totalColuna, linha.musculo)}
+                >{formatValor(linha.totalColuna)}{#if temMetaNaLinha}<span class="grade-meta-sub">/{formatValor(totalMetaLinha)}</span>{/if}</span>
               </td>
             </tr>
           {/each}
@@ -3012,7 +3032,7 @@
           >
             {@render iconGrade()}
           </button>
-          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!, ordemSemanal)} aria-label="Ver anel por dominância">
+          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!, campoGrafico)} aria-label="Ver anel por dominância">
             {@render iconGrafico()}
           </button>
         </div>

@@ -1220,6 +1220,16 @@ export async function getRegistrosPorTreinoPeriodo(
 
 export type FadigaModo = "fases" | "gradual";
 
+/** Qual campo os gráficos (anéis) usam como tamanho de fatia: "destacada" segue a coluna
+ * Total/Pond./Acum. que o usuário tocou por último na grade (comportamento fixo anterior);
+ * "total"/"ponderado" ignoram a coluna destacada e usam sempre o mesmo campo. */
+export type GraficoCampo = "total" | "ponderado" | "destacada";
+
+/** Modo dos anéis de grupo muscular na tela de Rotinas: "todos" soma o volume planejado de
+ * todas as rotinas da semana (comportamento fixo anterior); "proximo" usa só a rotina que já
+ * sobe pro topo da lista (mais próxima por dia, ou primeira da ordem manual). */
+export type HomeModoGrupos = "todos" | "proximo";
+
 export interface ParametrosDistribuicao {
   seriesManutencaoMin: number;
   seriesManutencaoMax: number;
@@ -1235,6 +1245,19 @@ export interface ParametrosDistribuicao {
   fadigaFasesCorteB: number;
   fadigaGradualC: number;
   fadigaGradualD: number;
+  /** Quais colunas de séries aparecem na Distribuição (grade, cards, editor de rotina) — pelo
+   * menos uma sempre fica ativa (a tela força isso na hora de alternar). */
+  mostrarSeriesTotais: boolean;
+  mostrarSeriesPonderadas: boolean;
+  mostrarSeriesAcumuladas: boolean;
+  /** Campo que classifica/colore as células de dia e rotina na grade semanal — true = total
+   * (bruto), false = ponderado. Comportamento fixo anterior: sempre total. */
+  usarTotalNaGrade: boolean;
+  /** Campo que soma e classifica/colore a coluna Total da grade semanal — true = ponderado,
+   * false = total (bruto). Comportamento fixo anterior: sempre ponderado. */
+  usarPonderadoNoTotal: boolean;
+  graficoCampo: GraficoCampo;
+  homeModoGrupos: HomeModoGrupos;
 }
 
 export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
@@ -1247,6 +1270,13 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   fadigaFasesCorteB: 50,
   fadigaGradualC: 0.12,
   fadigaGradualD: 0.025,
+  mostrarSeriesTotais: true,
+  mostrarSeriesPonderadas: true,
+  mostrarSeriesAcumuladas: true,
+  usarTotalNaGrade: true,
+  usarPonderadoNoTotal: true,
+  graficoCampo: "destacada",
+  homeModoGrupos: "todos",
 };
 
 export type ClasseVolumeSemanal = "insuficiente" | "manutencao" | "moderado" | "foco" | "excessivo";
@@ -1269,7 +1299,7 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
   const { data, error } = await supabase
     .from("treino_parametros")
     .select(
-      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d",
+      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, usar_total_na_grade, usar_ponderado_no_total, grafico_campo, home_modo_grupos",
     )
     .maybeSingle();
   if (error) throw error;
@@ -1284,6 +1314,13 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
     fadigaFasesCorteB: data.fadiga_fases_corte_b,
     fadigaGradualC: data.fadiga_gradual_c,
     fadigaGradualD: data.fadiga_gradual_d,
+    mostrarSeriesTotais: data.mostrar_series_totais,
+    mostrarSeriesPonderadas: data.mostrar_series_ponderadas,
+    mostrarSeriesAcumuladas: data.mostrar_series_acumuladas,
+    usarTotalNaGrade: data.usar_total_na_grade,
+    usarPonderadoNoTotal: data.usar_ponderado_no_total,
+    graficoCampo: data.grafico_campo === "total" || data.grafico_campo === "ponderado" ? data.grafico_campo : "destacada",
+    homeModoGrupos: data.home_modo_grupos === "proximo" ? "proximo" : "todos",
   };
 }
 
@@ -1299,6 +1336,13 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     fadiga_fases_corte_b: p.fadigaFasesCorteB,
     fadiga_gradual_c: p.fadigaGradualC,
     fadiga_gradual_d: p.fadigaGradualD,
+    mostrar_series_totais: p.mostrarSeriesTotais,
+    mostrar_series_ponderadas: p.mostrarSeriesPonderadas,
+    mostrar_series_acumuladas: p.mostrarSeriesAcumuladas,
+    usar_total_na_grade: p.usarTotalNaGrade,
+    usar_ponderado_no_total: p.usarPonderadoNoTotal,
+    grafico_campo: p.graficoCampo,
+    home_modo_grupos: p.homeModoGrupos,
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;

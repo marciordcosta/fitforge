@@ -8,6 +8,8 @@
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type ParametrosDistribuicao,
     type FadigaModo,
+    type GraficoCampo,
+    type HomeModoGrupos,
   } from "../../lib/treinoApi";
 
   let carregando = $state(true);
@@ -23,11 +25,43 @@
   let fadigaFasesCorteB = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaFasesCorteB);
   let fadigaGradualC = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualC);
   let fadigaGradualD = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualD);
+  let mostrarSeriesTotais = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesTotais);
+  let mostrarSeriesPonderadas = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesPonderadas);
+  let mostrarSeriesAcumuladas = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesAcumuladas);
+  let usarTotalNaGrade = $state(PARAMETROS_DISTRIBUICAO_PADRAO.usarTotalNaGrade);
+  let usarPonderadoNoTotal = $state(PARAMETROS_DISTRIBUICAO_PADRAO.usarPonderadoNoTotal);
+  let graficoCampo = $state<GraficoCampo>(PARAMETROS_DISTRIBUICAO_PADRAO.graficoCampo);
+  let homeModoGrupos = $state<HomeModoGrupos>(PARAMETROS_DISTRIBUICAO_PADRAO.homeModoGrupos);
 
   const OPCOES_FADIGA: { valor: FadigaModo; label: string }[] = [
     { valor: "fases", label: "Fases" },
     { valor: "gradual", label: "Gradual" },
   ];
+
+  const OPCOES_GRAFICO: { valor: GraficoCampo; label: string }[] = [
+    { valor: "total", label: "Sempre Totais" },
+    { valor: "ponderado", label: "Sempre Ponderadas" },
+    { valor: "destacada", label: "Destacada" },
+  ];
+
+  const OPCOES_HOME_GRUPOS: { valor: HomeModoGrupos; label: string }[] = [
+    { valor: "todos", label: "Todos os grupos" },
+    { valor: "proximo", label: "Próximo treino" },
+  ];
+
+  /** Impede desmarcar a última coluna ativa — sempre precisa sobrar pelo menos uma. */
+  function alternarColuna(campo: "totais" | "ponderadas" | "acumuladas", e: Event): void {
+    const input = e.currentTarget as HTMLInputElement;
+    const ativas = [mostrarSeriesTotais, mostrarSeriesPonderadas, mostrarSeriesAcumuladas].filter(Boolean).length;
+    const atual = campo === "totais" ? mostrarSeriesTotais : campo === "ponderadas" ? mostrarSeriesPonderadas : mostrarSeriesAcumuladas;
+    if (atual && ativas <= 1) {
+      input.checked = true;
+      return;
+    }
+    if (campo === "totais") mostrarSeriesTotais = input.checked;
+    else if (campo === "ponderadas") mostrarSeriesPonderadas = input.checked;
+    else mostrarSeriesAcumuladas = input.checked;
+  }
 
   /** Preview ao vivo das primeiras 8 séries — mesma função pura usada no motor de cálculo, só
    * pra o usuário ver o efeito de mexer em c/d antes de salvar. */
@@ -56,6 +90,13 @@
       fadigaFasesCorteB = p.fadigaFasesCorteB;
       fadigaGradualC = p.fadigaGradualC;
       fadigaGradualD = p.fadigaGradualD;
+      mostrarSeriesTotais = p.mostrarSeriesTotais;
+      mostrarSeriesPonderadas = p.mostrarSeriesPonderadas;
+      mostrarSeriesAcumuladas = p.mostrarSeriesAcumuladas;
+      usarTotalNaGrade = p.usarTotalNaGrade;
+      usarPonderadoNoTotal = p.usarPonderadoNoTotal;
+      graficoCampo = p.graficoCampo;
+      homeModoGrupos = p.homeModoGrupos;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -78,6 +119,13 @@
         fadigaFasesCorteB,
         fadigaGradualC,
         fadigaGradualD,
+        mostrarSeriesTotais,
+        mostrarSeriesPonderadas,
+        mostrarSeriesAcumuladas,
+        usarTotalNaGrade,
+        usarPonderadoNoTotal,
+        graficoCampo,
+        homeModoGrupos,
       };
       await salvarParametrosDistribuicao(p);
       navigate("/treino");
@@ -204,6 +252,47 @@
           </div>
         </div>
       {/if}
+    </div>
+
+    <div class="param-card">
+      <p class="param-card-titulo">Modo de Distribuição</p>
+
+      <p class="param-subtitulo">Colunas</p>
+      <label class="checkbox-linha">
+        <input type="checkbox" checked={mostrarSeriesTotais} onchange={(e) => alternarColuna("totais", e)} />
+        <span>Séries Totais</span>
+      </label>
+      <label class="checkbox-linha">
+        <input type="checkbox" checked={mostrarSeriesPonderadas} onchange={(e) => alternarColuna("ponderadas", e)} />
+        <span>Séries Ponderadas</span>
+      </label>
+      <label class="checkbox-linha">
+        <input type="checkbox" checked={mostrarSeriesAcumuladas} onchange={(e) => alternarColuna("acumuladas", e)} />
+        <span>Séries Acumuladas</span>
+      </label>
+
+      <label class="checkbox-linha checkbox-linha-desc">
+        <input type="checkbox" bind:checked={usarTotalNaGrade} />
+        <span>Usar séries totais na distribuição semanal <em>(desmarcado mostra ponderada)</em></span>
+      </label>
+      <label class="checkbox-linha checkbox-linha-desc">
+        <input type="checkbox" bind:checked={usarPonderadoNoTotal} />
+        <span>Usar séries ponderadas no Total <em>(desmarcado mostra séries totais)</em></span>
+      </label>
+
+      <p class="param-subtitulo">Gráficos</p>
+      <div class="opcoes-toggle">
+        {#each OPCOES_GRAFICO as opcao (opcao.valor)}
+          <button type="button" class:ativo={graficoCampo === opcao.valor} onclick={() => (graficoCampo = opcao.valor)}>{opcao.label}</button>
+        {/each}
+      </div>
+
+      <p class="param-subtitulo">Grupos musculares (Início)</p>
+      <div class="opcoes-toggle">
+        {#each OPCOES_HOME_GRUPOS as opcao (opcao.valor)}
+          <button type="button" class:ativo={homeModoGrupos === opcao.valor} onclick={() => (homeModoGrupos = opcao.valor)}>{opcao.label}</button>
+        {/each}
+      </div>
     </div>
 
     <Button onclick={salvar} disabled={salvando}>Salvar</Button>
@@ -371,6 +460,63 @@
     cursor: pointer;
   }
   .fadiga-opcoes button.ativo {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    border-color: var(--color-primary);
+  }
+  .param-subtitulo {
+    margin: var(--space-3) 0 var(--space-2);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--surface-muted);
+  }
+  .param-subtitulo:first-of-type {
+    margin-top: 0;
+  }
+  .checkbox-linha {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+    cursor: pointer;
+  }
+  .checkbox-linha input {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    accent-color: var(--color-primary);
+  }
+  .checkbox-linha span {
+    font-size: var(--font-size-base);
+    color: var(--surface-fg);
+  }
+  .checkbox-linha-desc span {
+    font-size: var(--font-size-sm);
+  }
+  .checkbox-linha-desc em {
+    display: block;
+    font-style: normal;
+    color: var(--surface-muted);
+    font-size: 12px;
+  }
+  .opcoes-toggle {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .opcoes-toggle button {
+    flex: 1;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .opcoes-toggle button.ativo {
     background: var(--color-primary);
     color: var(--color-primary-fg);
     border-color: var(--color-primary);

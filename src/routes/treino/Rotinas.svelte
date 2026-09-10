@@ -8,12 +8,16 @@
     listTreinos,
     listMusculos,
     getRegistrosPorTreinoPeriodo,
+    getParametrosDistribuicao,
     DIAS_SEMANA_COMPLETO,
+    PARAMETROS_DISTRIBUICAO_PADRAO,
     type TreinoComExercicios,
     type Musculo,
+    type ParametrosDistribuicao,
   } from "../../lib/treinoApi";
 
   let treinos = $state<TreinoComExercicios[]>([]);
+  let parametrosDistribuicao = $state<ParametrosDistribuicao>(PARAMETROS_DISTRIBUICAO_PADRAO);
   let loading = $state(true);
   let erroCarregar = $state<string | null>(null);
   let musculos = $state<Musculo[]>([]);
@@ -47,13 +51,15 @@
     loading = true;
     erroCarregar = null;
     try {
-      const [treinosCarregados, musculosCarregados, registros] = await Promise.all([
+      const [treinosCarregados, musculosCarregados, registros, parametros] = await Promise.all([
         listTreinos(),
         listMusculos(),
         getRegistrosPorTreinoPeriodo(segundaISO(), hojeISO()),
+        getParametrosDistribuicao(),
       ]);
       treinos = ordenarPorDia(treinosCarregados);
       musculos = musculosCarregados;
+      parametrosDistribuicao = parametros;
 
       const mapaMusculos = new Map<string, { musculo_id: string; peso: number }[]>();
       for (const t of treinosCarregados) {
@@ -136,10 +142,10 @@
 
   /** Volume planejado por músculo — séries ponderadas pelo peso_contribuicao de cada exercício
    * (mesmo critério da coluna "Pond." da Distribuição Semanal). É a "meta" de cada músculo: as
-   * próprias rotinas cadastradas. */
-  const planejadoPorMusculo = $derived.by(() => {
+   * rotinas cadastradas na lista dada. */
+  function planejadoPorMusculoDe(lista: TreinoComExercicios[]): Map<string, number> {
     const mapa = new Map<string, number>();
-    for (const t of treinos) {
+    for (const t of lista) {
       for (const ex of t.exercicios) {
         const numSeries = ex.series.length;
         if (!numSeries) continue;
@@ -149,9 +155,19 @@
       }
     }
     return mapa;
-  });
+  }
 
-  /** Os 6 músculos com maior volume planejado na semana — só entram os que aparecem em alguma rotina. */
+  /** "todos" (padrão) soma o volume planejado de todas as rotinas da semana; "proximo"
+   * (Parametrização > Modo de Distribuição) usa só a rotina que já sobe pro topo da lista
+   * (ordenarPorDia — dia mais próximo, ou primeira da ordem manual sem dia definido). */
+  const planejadoPorMusculo = $derived(
+    parametrosDistribuicao.homeModoGrupos === "proximo"
+      ? planejadoPorMusculoDe(treinos.slice(0, 1))
+      : planejadoPorMusculoDe(treinos),
+  );
+
+  /** Os 6 músculos com maior volume planejado — só entram os que aparecem em alguma rotina
+   * considerada (todas, ou só a próxima, conforme planejadoPorMusculo). */
   const top6 = $derived.by(() =>
     musculos
       .map((m) => ({ musculo: m, planejado: planejadoPorMusculo.get(m.id) ?? 0, feito: feitoPorMusculo.get(m.id) ?? 0 }))
