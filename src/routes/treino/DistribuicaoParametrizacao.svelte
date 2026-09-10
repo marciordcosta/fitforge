@@ -147,7 +147,10 @@
 
     <div class="param-card">
       <p class="param-card-titulo">Fadiga por Posição</p>
-      <p class="param-card-desc">Como cada série perde "performance" ao longo da rotina — afeta a coluna "Acum." e a tendência por músculo.</p>
+      <p class="param-card-desc">
+        Regra 80/20 de priorização dentro da sessão — não mede fadiga física real. Define quais
+        séries caem no bloco de maior retorno (afeta a coluna "Acum." e a tendência por músculo).
+      </p>
       <div class="fadiga-opcoes">
         {#each OPCOES_FADIGA as opcao (opcao.valor)}
           <button type="button" class:ativo={fadigaModo === opcao.valor} onclick={() => (fadigaModo = opcao.valor)}>{opcao.label}</button>
@@ -156,22 +159,25 @@
 
       {#if fadigaModo === "fases"}
         <p class="param-card-desc">
-          Nº de séries (posição na sessão, não % do total) até onde a série ainda conta como
-          "fresca" (A); daí até o segundo corte conta como "médio" (B); depois disso, "fatigado" (C).
+          % da sessão (não nº de séries) até onde a posição ainda conta como bloco de maior
+          prioridade "A"; daí até o segundo corte é o bloco intermediário "B"; depois disso, o
+          bloco final "C". Independe do treino ter 8 ou 18 séries.
         </p>
         <div class="param-linha">
           <div class="param-linha-topo">
-            <p class="param-nome">Fresco até a série <span class="legenda-cor legenda-fase-a">●</span></p>
+            <p class="param-nome">Bloco A até <span class="legenda-cor legenda-fase-a">●</span></p>
             <div class="param-campos">
-              <input class="param-input" type="number" inputmode="numeric" min="1" step="1" aria-label="Corte A" bind:value={fadigaFasesCorteA} />
+              <input class="param-input" type="number" inputmode="numeric" min="1" max="99" step="5" aria-label="Corte A" bind:value={fadigaFasesCorteA} />
+              <span class="param-unidade">%</span>
             </div>
           </div>
         </div>
         <div class="param-linha">
           <div class="param-linha-topo">
-            <p class="param-nome">Médio até a série <span class="legenda-cor legenda-fase-b">●</span></p>
+            <p class="param-nome">Bloco B até <span class="legenda-cor legenda-fase-b">●</span></p>
             <div class="param-campos">
-              <input class="param-input" type="number" inputmode="numeric" min="1" step="1" aria-label="Corte B" bind:value={fadigaFasesCorteB} />
+              <input class="param-input" type="number" inputmode="numeric" min="1" max="99" step="5" aria-label="Corte B" bind:value={fadigaFasesCorteB} />
+              <span class="param-unidade">%</span>
             </div>
           </div>
         </div>

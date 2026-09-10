@@ -1226,11 +1226,11 @@ export interface ParametrosDistribuicao {
   seriesFocoMin: number;
   seriesFocoMax: number;
   fadigaModo: FadigaModo;
-  /** Nº absoluto de séries (posição na sessão, não % do total) até onde a fadiga por posição
-   * (modo Fases) considera "fresco" (faixa A) — depois disso até fadigaFasesCorteB é "médio"
-   * (faixa B), e além dele é "fatigado" (faixa C). Absoluto, não percentual: fadiga real se
-   * acumula pelo volume feito, não pela fração do que foi programado naquele dia — um treino
-   * curto e um longo não deviam entrar em fadiga em posições proporcionalmente diferentes. */
+  /** % da sessão (não nº de séries) até onde a posição na rotina (modo Fases) conta como
+   * bloco de maior prioridade/retorno (faixa A) — depois disso até fadigaFasesCorteB é o
+   * bloco intermediário (faixa B), e além dele o bloco final (faixa C). Não modela fadiga
+   * física real (isso varia dia a dia e não dá pra medir de forma confiável) — é uma
+   * heurística 80/20 de priorização: exercícios foco devem cair no bloco A. */
   fadigaFasesCorteA: number;
   fadigaFasesCorteB: number;
   fadigaGradualC: number;
@@ -1243,8 +1243,8 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   seriesFocoMin: 12,
   seriesFocoMax: 20,
   fadigaModo: "fases",
-  fadigaFasesCorteA: 6,
-  fadigaFasesCorteB: 15,
+  fadigaFasesCorteA: 20,
+  fadigaFasesCorteB: 50,
   fadigaGradualC: 0.12,
   fadigaGradualD: 0.025,
 };

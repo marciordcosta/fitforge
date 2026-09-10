@@ -220,28 +220,31 @@
     ];
   }
 
-  /** Faixa A/B/C pela posição ABSOLUTA da série na sessão (nº de séries já feitas, não % do
-   * total) — corte configurável em Parametrização (fadigaFasesCorteA/B). Deliberadamente
-   * independente de corPorFaixa/CORTE_A/CORTE_B: aquilo classifica dominância de músculo no
-   * volume total (outro fenômeno, 80/20), isto classifica fadiga por posição — usar os mesmos
-   * dois números pros dois já causou confusão de acoplamento sem necessidade. */
-  function faixaPorPosicaoAbsoluta(posicao: number, p: ParametrosDistribuicao): "a" | "b" | "c" {
-    if (posicao <= p.fadigaFasesCorteA) return "a";
-    if (posicao <= p.fadigaFasesCorteB) return "b";
+  /** Faixa A/B/C pela posição RELATIVA da série na sessão (% do total de séries do treino,
+   * não nº absoluto) — corte configurável em Parametrização (fadigaFasesCorteA/B, em %). Isto
+   * não modela fadiga fisiológica real (impossível de medir de forma confiável, varia dia a
+   * dia) — é uma heurística de priorização 80/20: os primeiros X% da sessão são o "bloco" de
+   * maior retorno, e exercícios foco devem cair ali, independente do treino ter 8 ou 18 séries.
+   * Deliberadamente independente de corPorFaixa/CORTE_A/CORTE_B: aquilo classifica dominância
+   * de músculo no volume total (outro fenômeno 80/20), isto classifica posição dentro da sessão —
+   * usar os mesmos dois números pros dois já causou confusão de acoplamento sem necessidade. */
+  function faixaPorPosicaoRelativa(posicao: number, totalSeries: number, p: ParametrosDistribuicao): "a" | "b" | "c" {
+    const percentual = totalSeries > 0 ? (posicao / totalSeries) * 100 : 100;
+    if (percentual <= p.fadigaFasesCorteA) return "a";
+    if (percentual <= p.fadigaFasesCorteB) return "b";
     return "c";
   }
 
   /**
-   * Classifica cada série da rotina pela POSIÇÃO no treino (não pelo músculo) — a fadiga
-   * acumula ao longo do treino, então uma série no início vale mais que uma no fim. Corte em
-   * número ABSOLUTO de séries (faixaPorPosicaoAbsoluta), não percentual do total: fadiga real se
-   * acumula pelo volume feito, não pela fração do que foi programado naquele dia. Modo de
+   * Classifica cada série da rotina pela POSIÇÃO no treino (não pelo músculo) — serve pra
+   * priorização 80/20 (ver faixaPorPosicaoRelativa), não pra medir fadiga real. Modo de
    * contribuição: cada série soma peso_contribuicao (não 1 inteiro) pra cada músculo que ela
    * trabalha, igual contarSeriesPorMusculoPonderado — as partes de cada músculo somam o mesmo
    * total ponderado dele.
    */
   function contarSeriesPorFaixaDePosicao(treino: TreinoComExercicios): Map<string, Partes> {
     const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+    const totalSeries = exerciciosOrdenados.reduce((soma, ex) => soma + ex.series.length, 0);
     const mapa = new Map<string, Partes>();
 
     let posicao = 0;
@@ -249,7 +252,7 @@
       const musculosEx = ex.exercicio?.musculos ?? [];
       for (let s = 0; s < ex.series.length; s++) {
         posicao += 1;
-        const faixa = faixaPorPosicaoAbsoluta(posicao, parametrosDistribuicao);
+        const faixa = faixaPorPosicaoRelativa(posicao, totalSeries, parametrosDistribuicao);
         for (const m of musculosEx) {
           const atual = mapa.get(m.musculo_id) ?? partesVazias();
           if (faixa === "a") atual.a += m.peso_contribuicao;
@@ -980,6 +983,9 @@
     exercicioId: string;
     exercicioNome: string;
     series: number;
+    /** Posição (1-indexada) do exercício na ordem da rotina — mostrada ao lado do nome da
+     * rotina no modal por músculo, pra saber de cara se é cedo ou tarde no treino. */
+    posicao: number;
   }
 
   /** multiRotina=true quando aberto a partir da Distribuição Semanal (agrega várias rotinas
@@ -999,16 +1005,26 @@
   /** Só preenchido quando a troca parte do modal por músculo (filtra o picker pelo nome dele). */
   let buscaInicialTroca = $state("");
 
+  /** Posição (1-indexada) de um treino_exercicio na ordem da rotina — mesmo critério de
+   * itensMusculoRotina, reaproveitado nos menus que constroem um ItemMusculoRotina avulso. */
+  function posicaoNaRotina(treino: TreinoComExercicios, treinoExercicioId: string): number {
+    const ordenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+    return ordenados.findIndex((te) => te.id === treinoExercicioId) + 1;
+  }
+
   function itensMusculoRotina(treino: TreinoComExercicios, musculoId: string): ItemMusculoRotina[] {
-    return treino.exercicios
-      .filter((te) => te.exercicio?.musculos.some((m) => m.musculo_id === musculoId))
-      .map((te) => ({
+    const ordenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+    return ordenados
+      .map((te, idx) => ({ te, posicao: idx + 1 }))
+      .filter(({ te }) => te.exercicio?.musculos.some((m) => m.musculo_id === musculoId))
+      .map(({ te, posicao }) => ({
         treinoId: treino.id,
         treinoNome: treino.nome_treino,
         treinoExercicioId: te.id,
         exercicioId: te.exercicio_id,
         exercicioNome: te.exercicio?.nome ?? "",
         series: te.series.length,
+        posicao,
       }));
   }
 
@@ -1464,6 +1480,7 @@
         exercicioId: te.exercicio_id,
         exercicioNome: te.exercicio?.nome ?? "",
         series: te.series.length,
+        posicao: posicaoNaRotina(modalEditorRotina!, te.id),
       };
     }, ATRASO_PRESSIONAR_EDITOR_MS);
   }
@@ -1506,6 +1523,7 @@
       exercicioId: te.exercicio_id,
       exercicioNome: te.exercicio?.nome ?? "",
       series: te.series.length,
+      posicao: posicaoNaRotina(modalEditorRotina!, te.id),
     };
   }
 
@@ -2642,7 +2660,7 @@
                 {/if}
               </span>
               {#if modalMusculoRotina.multiRotina}
-                <span class="exercicio-musculo-rotina">{item.treinoNome}</span>
+                <span class="exercicio-musculo-rotina">{item.treinoNome} · {item.posicao}º exercício</span>
               {/if}
             </span>
             <span
