@@ -19,8 +19,10 @@
   let musculos = $state<Musculo[]>([]);
   let seriesPorTreino = $state<Map<string, number>>(new Map());
   let feitoPorMusculoSalvo = $state<Map<string, number>>(new Map());
-  /** exercicio_id -> ids dos músculos trabalhados — pra cruzar registros salvos e a sessão ao vivo com músculos, sem ponderar (1 série = 1 pra cada músculo do exercício). */
-  let musculosPorExercicio = $state<Map<string, string[]>>(new Map());
+  /** exercicio_id -> músculos trabalhados com seu peso_contribuicao — pra cruzar registros salvos
+   * e a sessão ao vivo com músculos, ponderando cada série pelo peso configurado no exercício
+   * (mesmo critério da coluna "Pond." da Distribuição Semanal). */
+  let musculosPorExercicio = $state<Map<string, { musculo_id: string; peso: number }[]>>(new Map());
   let modoRestante = $state(false);
   let mostrarMenuNovo = $state(false);
 
@@ -53,11 +55,14 @@
       treinos = ordenarPorDia(treinosCarregados);
       musculos = musculosCarregados;
 
-      const mapaMusculos = new Map<string, string[]>();
+      const mapaMusculos = new Map<string, { musculo_id: string; peso: number }[]>();
       for (const t of treinosCarregados) {
         for (const ex of t.exercicios) {
           if (!mapaMusculos.has(ex.exercicio_id)) {
-            mapaMusculos.set(ex.exercicio_id, (ex.exercicio?.musculos ?? []).map((m) => m.musculo_id));
+            mapaMusculos.set(
+              ex.exercicio_id,
+              (ex.exercicio?.musculos ?? []).map((m) => ({ musculo_id: m.musculo_id, peso: m.peso_contribuicao })),
+            );
           }
         }
       }
@@ -69,8 +74,8 @@
         if (r.treino_id) {
           mapaSeriesPorTreino.set(r.treino_id, (mapaSeriesPorTreino.get(r.treino_id) ?? 0) + 1);
         }
-        for (const musculoId of mapaMusculos.get(r.exercicio_id) ?? []) {
-          mapaFeito.set(musculoId, (mapaFeito.get(musculoId) ?? 0) + 1);
+        for (const m of mapaMusculos.get(r.exercicio_id) ?? []) {
+          mapaFeito.set(m.musculo_id, (mapaFeito.get(m.musculo_id) ?? 0) + m.peso);
         }
       }
       seriesPorTreino = mapaSeriesPorTreino;
@@ -84,14 +89,15 @@
 
   void carregar();
 
-  /** Séries concluídas na sessão ao vivo (ainda não salvas), contadas por músculo — soma em cima do que já está salvo, sem ponderar. */
+  /** Séries concluídas na sessão ao vivo (ainda não salvas), contadas por músculo e ponderadas
+   * pelo peso_contribuicao — soma em cima do que já está salvo. */
   const feitoAoVivoPorMusculo = $derived.by(() => {
     const mapa = new Map<string, number>();
     for (const exSessao of treinoLogSessao.atual?.sessao ?? []) {
       const concluidas = exSessao.sets.filter((s) => s.concluida).length;
       if (!concluidas) continue;
-      for (const musculoId of musculosPorExercicio.get(exSessao.exercicio_id) ?? []) {
-        mapa.set(musculoId, (mapa.get(musculoId) ?? 0) + concluidas);
+      for (const m of musculosPorExercicio.get(exSessao.exercicio_id) ?? []) {
+        mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + concluidas * m.peso);
       }
     }
     return mapa;
@@ -128,7 +134,9 @@
   /** Total de séries feitas na semana (salvas + sessão ao vivo em andamento), somando todas as rotinas. */
   const executado = $derived([...seriesPorTreino.values()].reduce((acc, v) => acc + v, 0) + seriesAoVivo);
 
-  /** Volume planejado por músculo — total de séries bruto (1 série conta 1 pra cada músculo do exercício, sem ponderar por peso_contribuicao; a versão ponderada fica só pra grade de Distribuição Semanal). É a "meta" de cada músculo: as próprias rotinas cadastradas. */
+  /** Volume planejado por músculo — séries ponderadas pelo peso_contribuicao de cada exercício
+   * (mesmo critério da coluna "Pond." da Distribuição Semanal). É a "meta" de cada músculo: as
+   * próprias rotinas cadastradas. */
   const planejadoPorMusculo = $derived.by(() => {
     const mapa = new Map<string, number>();
     for (const t of treinos) {
@@ -136,7 +144,7 @@
         const numSeries = ex.series.length;
         if (!numSeries) continue;
         for (const m of ex.exercicio?.musculos ?? []) {
-          mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + numSeries);
+          mapa.set(m.musculo_id, (mapa.get(m.musculo_id) ?? 0) + numSeries * m.peso_contribuicao);
         }
       }
     }
