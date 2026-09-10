@@ -52,14 +52,16 @@ export async function excluirPeso(data: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Uma foto de acompanhamento por dia (a mais recente registrada, se houver mais de uma). */
+/** Foto "atual" de um dia pra exibição no registro de peso: a mais recente adicionada (maior
+ * ordem) — um dia pode ter várias fotos (histórico preservado pra galeria/comparação), esse é só
+ * o preview de um slot só. */
 export async function getFotoDoDia(data: string): Promise<FotoRegistro | null> {
   const { data: linhas, error } = await supabase
     .from("fotos")
     .select("id, url")
     .eq("user_id", uid())
     .eq("data_foto", data)
-    .order("ordem", { ascending: true })
+    .order("ordem", { ascending: false })
     .limit(1);
   if (error) throw error;
   const linha = linhas?.[0];
@@ -70,31 +72,6 @@ export async function getUrlAssinadaFoto(path: string): Promise<string> {
   const { data, error } = await supabase.storage.from("fotos").createSignedUrl(path, 3600);
   if (error) throw error;
   return data.signedUrl;
-}
-
-export async function salvarFotoDoDia(
-  data: string,
-  arquivo: File,
-  fotoAnterior: FotoRegistro | null,
-): Promise<FotoRegistro> {
-  const userId = uid();
-  const extensao = arquivo.name.split(".").pop() || "jpg";
-  const path = `${userId}/${data}/${Date.now()}.${extensao}`;
-
-  const { error: uploadError } = await supabase.storage.from("fotos").upload(path, arquivo);
-  if (uploadError) throw uploadError;
-
-  if (fotoAnterior) {
-    await excluirFotoDoDia(fotoAnterior);
-  }
-
-  const { data: linha, error } = await supabase
-    .from("fotos")
-    .insert({ user_id: userId, data_foto: data, url: path, ordem: 0 })
-    .select("id, url")
-    .single();
-  if (error) throw error;
-  return { id: linha.id, path: linha.url };
 }
 
 export async function excluirFotoDoDia(foto: FotoRegistro): Promise<void> {

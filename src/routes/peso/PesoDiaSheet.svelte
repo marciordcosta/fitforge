@@ -11,7 +11,7 @@
     getUrlAssinadaFoto,
     salvarPeso,
     excluirPeso,
-    salvarFotoDoDia,
+    adicionarFoto,
     excluirFotoDoDia,
     type FotoRegistro,
   } from "../../lib/pesoApi";
@@ -86,7 +86,9 @@
     if (!arquivo) return;
     salvando = true;
     try {
-      foto = await salvarFotoDoDia(data, arquivo, foto);
+      // Adiciona sem apagar a foto que já estava aqui — mantém o histórico pra galeria/comparação
+      // (só troca qual é a "atual" mostrada nesse slot, pra mais recente).
+      foto = await adicionarFoto(data, arquivo);
       fotoUrl = await getUrlAssinadaFoto(foto.path);
     } catch (err) {
       alert("Erro ao salvar foto: " + (err as Error).message);
@@ -177,15 +179,23 @@
     <span class="foto-label">Foto de acompanhamento</span>
     {#if carregando}
       <p class="muted">Carregando…</p>
-    {:else if fotoUrl}
-      <div class="foto-preview">
-        <img src={fotoUrl} alt="Foto de acompanhamento" />
-        <button class="foto-remover" onclick={removerFoto} disabled={salvando} aria-label="Remover foto">✕</button>
-      </div>
     {:else}
-      <button class="foto-btn" onclick={() => (mostrarOpcoesFoto = true)} disabled={salvando} aria-label="Adicionar foto">
-        {@render iconCamera()}
-      </button>
+      <div class="foto-linha">
+        {#if fotoUrl}
+          <div class="foto-preview">
+            <img src={fotoUrl} alt="Foto de acompanhamento" />
+            <button class="foto-remover" onclick={removerFoto} disabled={salvando} aria-label="Remover foto">✕</button>
+          </div>
+        {/if}
+        <button
+          class="foto-btn"
+          onclick={() => (mostrarOpcoesFoto = true)}
+          disabled={salvando}
+          aria-label={fotoUrl ? "Adicionar outra foto" : "Adicionar foto"}
+        >
+          {@render iconCamera()}
+        </button>
+      </div>
     {/if}
     <input bind:this={inputCamera} type="file" accept="image/*" capture="environment" class="foto-input" onchange={selecionarFoto} />
     <input bind:this={inputGaleria} type="file" accept="image/*" class="foto-input" onchange={selecionarFoto} />
@@ -269,6 +279,11 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
     margin-bottom: var(--space-2);
+  }
+  .foto-linha {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
   .foto-btn {
     width: 72px;
