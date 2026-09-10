@@ -820,7 +820,9 @@
       return `color: #fff; background: var(--color-danger);`;
     }
     if (classe === "foco") {
-      return `color: #fff; background: var(--color-secondary);`;
+      // Azul mais escuro que --color-secondary (usado no texto/legenda) só aqui, de propósito:
+      // fundo sólido + texto branco precisa de mais contraste pra dar o mesmo destaque do vermelho.
+      return `color: #fff; background: #2563eb;`;
     }
     const cor = classe === "manutencao" ? "var(--color-neutral)" : "var(--color-success)";
     return `color: ${cor}; background: color-mix(in srgb, ${cor} 20%, transparent);`;
