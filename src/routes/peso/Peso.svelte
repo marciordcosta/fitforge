@@ -253,6 +253,12 @@
    * `mediaAtual * (1+percentual/100)`, igual ao valor mostrado no card "Meta semanal". Calculado
    * sempre (não só quando a linha está visível no gráfico) pra bater com o card independente do
    * toggle. */
+  /** Janela-base da média móvel (getPesoMedioAtual/calcularMediaMovel): 7 dias. Projetar a taxa
+   * semanal pra trás por cima dessa janela é razoável, mas além dela a curva exponencial diverge
+   * rápido da realidade — compõe o mesmo % por meses sem que o peso real tenha seguido esse ritmo,
+   * "inventando" uma média histórica que nunca existiu (ver correção abaixo). */
+  const JANELA_BASE_MEDIA_DIAS = 7;
+
   const metaAlvoPorPonto = $derived.by(() => {
     if (!meta || !mediaMovelGrafico.length) return null;
     const ultimo = mediaMovelGrafico[mediaMovelGrafico.length - 1];
@@ -265,6 +271,22 @@
     const percentual = meta.percentual;
     const pesoAlvoAtual = ultimo.peso * (1 + percentual / 100);
     const dataHoje = parseISODate(ultimo.data);
+
+    const primeiro = mediaMovelGrafico[0];
+    const spanDias = Math.round((dataHoje.getTime() - parseISODate(primeiro.data).getTime()) / 86400000);
+
+    // Filtro mais largo que a janela-base: a linha vira reta, do início real (média real do
+    // primeiro ponto visível) até a meta de hoje — em vez de uma média imaginária calculada de
+    // trás pra frente.
+    if (spanDias > JANELA_BASE_MEDIA_DIAS) {
+      const mediaRealInicio = primeiro.peso;
+      if (spanDias === 0) return mediaMovelGrafico.map(() => pesoAlvoAtual);
+      return mediaMovelGrafico.map((p) => {
+        const diasDesdeInicio = Math.round((parseISODate(p.data).getTime() - parseISODate(primeiro.data).getTime()) / 86400000);
+        return mediaRealInicio + (pesoAlvoAtual - mediaRealInicio) * (diasDesdeInicio / spanDias);
+      });
+    }
+
     return mediaMovelGrafico.map((p) => {
       const diasAtras = Math.round((dataHoje.getTime() - parseISODate(p.data).getTime()) / 86400000);
       return pesoAlvoAtual * Math.pow(1 + percentual / 100, -diasAtras / 7);
