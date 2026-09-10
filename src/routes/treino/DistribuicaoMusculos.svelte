@@ -355,16 +355,6 @@
     });
   });
 
-  /** Qual coluna (Total/Pond./Acum.) está ordenando o card de cada rotina — toca em qualquer
-   * valor/rótulo da coluna pra escolher. Ausência no mapa = padrão ("ponderado"). */
-  let ordemPorTreino = $state<Map<string, CampoOrdenacaoSeries>>(new Map());
-
-  function definirOrdemTreino(treinoId: string, campo: CampoOrdenacaoSeries): void {
-    const copia = new Map(ordemPorTreino);
-    copia.set(treinoId, campo);
-    ordemPorTreino = copia;
-  }
-
   /** Cards de rotina começam ocultos (só o cabeçalho) — tocar no cabeçalho expande/recolhe. */
   let treinosExpandidos = $state<Set<string>>(new Set());
 
@@ -394,8 +384,10 @@
 
   type CampoOrdenacaoSeries = "total" | "ponderado" | "acumulado";
 
-  /** Qual coluna (Total/Pond./Acum.) está ordenando a Distribuição Semanal — toca em qualquer
-   * rótulo/valor da coluna pra escolher. */
+  /** Qual coluna (Total/Pond./Acum.) está selecionada — GLOBAL pra toda a tela de Distribuição
+   * (Distribuição Semanal, cada card de rotina, o editor completo): tocar em qualquer
+   * rótulo/valor da coluna, em qualquer um desses lugares, muda essa mesma variável, então a
+   * visualização fica sempre padronizada em vez de cada card guardar sua própria escolha. */
   let ordemSemanal = $state<CampoOrdenacaoSeries>("ponderado");
 
   function valorPorCampoOrdenacao(item: { valor: number; bruto: number; partes: Partes; pesoGradual?: number }, campo: CampoOrdenacaoSeries): number {
@@ -496,6 +488,7 @@
    * rotina — nada aqui trava a gravação se o saldo ficar negativo (o usuário só vê em vermelho). */
   let metasMusculo = $state<Map<string, { valor: number; tipo: CampoOrdenacaoSeries }>>(new Map());
   let modoEdicaoMetas = $state(false);
+  let mostrarMenuVisaoGrade = $state(false);
   let editandoMeta = $state<{
     treinoId: string;
     musculo: Musculo;
@@ -1416,11 +1409,6 @@
    * exercícios e desliga o toque-pra-abrir-modal enquanto ativo. "Concluído" desliga de volta. */
   let modoReordenarEditor = $state(false);
 
-  /** Qual coluna (Total/Pond./Acum.) está ordenando a lista de músculos do editor — toca em
-   * qualquer rótulo/valor da coluna pra escolher, mesmo padrão da Distribuição Semanal e dos
-   * cards por rotina. */
-  let ordemMusculosEditor = $state<CampoOrdenacaoSeries>("ponderado");
-
   /** Pressionar-e-segurar (sem soltar cedo, sem arrastar) num card de exercício abre o menu —
    * mesma ideia de qualquer outro long-press do app, só que aqui dispara um menu em vez de um
    * arrasto. `disparouPressionarEditor` evita que o "click" nativo que sempre segue o pointerup,
@@ -1588,7 +1576,7 @@
     // Ordena pela coluna escolhida (ícone no rodapé) — padrão "ponderado", o valor que melhor
     // reflete o volume real (leva em conta o peso_contribuicao de cada músculo secundário),
     // diferente do bruto que infla exercícios multi-músculo.
-    const campo = ordemMusculosEditor;
+    const campo = ordemSemanal;
     return resultado.sort(
       (a, b) =>
         valorPorCampoOrdenacao({ valor: b.ponderado, bruto: b.atual, partes: b.partes, pesoGradual: b.pesoGradual }, campo) -
@@ -1603,7 +1591,6 @@
     editorFiltroMusculoId = editorFiltroInicialId;
     editorFiltroInicialId = null;
     modoReordenarEditor = false;
-    ordemMusculosEditor = "ponderado";
   }
 
   /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o
@@ -2113,7 +2100,7 @@
         {/snippet}
 
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
-          {@const ordemTreino = ordemPorTreino.get(treino.id) ?? "ponderado"}
+          {@const ordemTreino = ordemSemanal}
           {@const listaExibida = ordenarPorCampo(lista, ordemTreino)}
           {@const expandido = treinosExpandidos.has(treino.id)}
           <div class="rotina-card">
@@ -2143,7 +2130,7 @@
               {#if !lista.length}
                 <p class="muted">Nenhuma série definida ainda.</p>
               {:else}
-                {@render cabecalhoCaixas(ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
+                {@render cabecalhoCaixas(ordemTreino, (campo) => (ordemSemanal = campo))}
                 <div class="lista">
                   {#each listaExibida as linha (linha.chave)}
                     {@const grupoChave = `${treino.id}:${linha.chave}`}
@@ -2158,14 +2145,14 @@
                         <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                       {/if}
                       {@render barraFadiga(linha.partes, linha.valor)}
-                      {@render caixasSeries(linha.bruto, linha.valor, valorAcumulado(linha), ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
+                      {@render caixasSeries(linha.bruto, linha.valor, valorAcumulado(linha), ordemTreino, (campo) => (ordemSemanal = campo))}
                     </div>
                     {#if aberto && linha.subItens}
                       {#each linha.subItens as sub (sub.musculo.id)}
                         <div class="item item-sub">
                           <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                           {@render barraFadiga(sub.partes, sub.valor)}
-                          {@render caixasSeries(sub.bruto, sub.valor, valorAcumulado(sub), ordemTreino, (campo) => definirOrdemTreino(treino.id, campo))}
+                          {@render caixasSeries(sub.bruto, sub.valor, valorAcumulado(sub), ordemTreino, (campo) => (ordemSemanal = campo))}
                         </div>
                       {/each}
                     {/if}
@@ -2329,6 +2316,34 @@
   <button class="grade-voltar" onclick={() => (mostrarGradeSemanal = false)} aria-label="Voltar">{@render iconVoltar()}</button>
 {/snippet}
 
+{#snippet iconAlternarVisao()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="4" y1="6" x2="20" y2="6" />
+    <line x1="4" y1="12" x2="14" y2="12" />
+    <line x1="4" y1="18" x2="20" y2="18" />
+  </svg>
+{/snippet}
+
+{#snippet acaoEsquerdaGrade()}
+  {#if modalMusculoRotina?.multiRotina}
+    {@render voltarGradeSemanal()}
+  {:else}
+    <button class="grade-editar-metas-btn" onclick={() => (mostrarMenuVisaoGrade = true)} aria-label="Alternar entre Total, Ponderada e Acumulada">
+      {@render iconAlternarVisao()}
+    </button>
+  {/if}
+{/snippet}
+
+{#snippet acaoDireitaGrade()}
+  <button
+    class="grade-editar-metas-btn"
+    onclick={() => (modoEdicaoMetas = !modoEdicaoMetas)}
+    aria-label={modoEdicaoMetas ? "Concluir edição de metas" : "Editar metas"}
+  >
+    {#if modoEdicaoMetas}{@render iconConcluir()}{:else}{@render iconEditarMeta()}{/if}
+  </button>
+{/snippet}
+
 {#snippet alternarModoDetalhe()}
   <button
     class="abc-toggle-btn"
@@ -2351,14 +2366,9 @@
       mostrarGradeSemanal = false;
       if (modalMusculoRotina?.multiRotina) modalMusculoRotina = null;
     }}
-    acaoTitulo={modalMusculoRotina?.multiRotina ? voltarGradeSemanal : undefined}
-    acaoTituloLado="esquerda"
+    acaoTituloEsquerda={acaoEsquerdaGrade}
+    acaoTituloDireita={acaoDireitaGrade}
   >
-    <div class="grade-toolbar">
-      <button class="grade-editar-metas-btn" onclick={() => (modoEdicaoMetas = !modoEdicaoMetas)}>
-        {#if modoEdicaoMetas}{@render iconConcluir()} Concluir{:else}{@render iconEditarMeta()} Editar{/if}
-      </button>
-    </div>
     <div class="grade-scroll">
       <table class="grade-tabela">
         <thead>
@@ -2454,6 +2464,22 @@
   </div>
 {/if}
 
+{#if mostrarMenuVisaoGrade}
+  <!-- Precisa ficar acima da grade semanal (Sheet dentro de .acima-editor) — vem depois no DOM,
+       então já ganha por ordem mesmo com o mesmo z-index. -->
+  <div class="acima-editor">
+    <ActionSheet
+      titulo="Visualizar por"
+      onFechar={() => (mostrarMenuVisaoGrade = false)}
+      opcoes={[
+        { label: "Total", valor: ordemSemanal === "total" ? "✓" : undefined, onSelect: () => (ordemSemanal = "total") },
+        { label: "Ponderada", valor: ordemSemanal === "ponderado" ? "✓" : undefined, onSelect: () => (ordemSemanal = "ponderado") },
+        { label: "Acumulada", valor: ordemSemanal === "acumulado" ? "✓" : undefined, onSelect: () => (ordemSemanal = "acumulado") },
+      ]}
+    />
+  </div>
+{/if}
+
 {#if movendoDiaTreino}
   <!-- Precisa ficar acima da grade semanal (Sheet dentro de .acima-editor) — vem depois no DOM,
        então já ganha por ordem mesmo com o mesmo z-index. -->
@@ -2528,7 +2554,7 @@
     <Sheet
       titulo={modalDetalheRotina.titulo}
       onFechar={() => (modalDetalheRotina = null)}
-      acaoTitulo={modalDetalheRotina.itensGrupo?.length ? alternarModoDetalhe : undefined}
+      acaoTituloDireita={modalDetalheRotina.itensGrupo?.length ? alternarModoDetalhe : undefined}
     >
       <div class="pizza-wrap">
         {#if modoGrupoDetalhe && modalDetalheRotina.itensGrupo}
@@ -2582,7 +2608,7 @@
       modalMusculoRotina = null;
       if (musculoUrlContexto) window.history.back();
     }}
-    acaoTitulo={modalMusculoRotina.multiRotina ? linkDistribuicao : undefined}
+    acaoTituloDireita={modalMusculoRotina.multiRotina ? linkDistribuicao : undefined}
   >
     {#if carregandoTendencia}
       <p class="tendencia-musculo muted">Verificando progressão…</p>
@@ -2904,7 +2930,7 @@
         {/if}
       {/if}
       {#if metasEditor.length}
-        {@render cabecalhoCaixas(ordemMusculosEditor, (campo) => (ordemMusculosEditor = campo))}
+        {@render cabecalhoCaixas(ordemSemanal, (campo) => (ordemSemanal = campo))}
         <div class="editor-musculos-lista">
           {#each metasEditor as item (item.musculo.id)}
             {@const metaCampo = item.meta?.tipo ?? null}
@@ -2943,7 +2969,7 @@
                 </span>
               </button>
               {@render barraFadiga(item.partes, item.partes.a + item.partes.b + item.partes.c)}
-              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemMusculosEditor, (campo) => (ordemMusculosEditor = campo), totalTexto, totalClasse, metaCampo)}
+              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemSemanal, (campo) => (ordemSemanal = campo), totalTexto, totalClasse, metaCampo)}
             </div>
           {/each}
         </div>
@@ -2958,17 +2984,12 @@
         <div class="editor-totais-acoes">
           <button
             class="rotina-grafico-btn"
-            onclick={() => {
-              // Acompanha a coluna selecionada no card do editor — sem isso a grade sempre abria
-              // em "Pond." (padrão de ordemSemanal), ignorando Total/Acum. escolhido ali.
-              ordemSemanal = ordemMusculosEditor;
-              abrirGradeSemanal(metasEditor.map((item) => item.musculo.id), modalEditorRotina!.dia_semana);
-            }}
+            onclick={() => abrirGradeSemanal(metasEditor.map((item) => item.musculo.id), modalEditorRotina!.dia_semana)}
             aria-label="Ver distribuição na semana"
           >
             {@render iconGrade()}
           </button>
-          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!, ordemMusculosEditor)} aria-label="Ver anel por dominância">
+          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!, ordemSemanal)} aria-label="Ver anel por dominância">
             {@render iconGrafico()}
           </button>
         </div>
@@ -3483,14 +3504,12 @@
     font-weight: 600;
     color: var(--surface-fg);
   }
-  .grade-dia.com-treino {
-    color: var(--color-primary);
-  }
   .grade-rotina-nome {
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 400;
     color: var(--surface-muted);
-    max-width: 80px;
+    max-width: 52px;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -3561,27 +3580,21 @@
   .grade-valor-vazio {
     opacity: 0.7;
   }
-  .grade-toolbar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: var(--space-2);
-  }
   .grade-editar-metas-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px var(--space-2);
-    border-radius: var(--radius-sm);
+    justify-content: center;
+    width: 28px;
+    height: 28px;
     border: none;
-    background: var(--surface-card);
+    border-radius: 50%;
+    background: none;
     color: var(--surface-fg);
-    font-family: inherit;
-    font-size: var(--font-size-sm);
     cursor: pointer;
   }
   .grade-editar-metas-btn :global(svg) {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
   }
   .grade-tabela tbody tr:not(:last-child) td {
     border-bottom: 1px solid var(--surface-border);

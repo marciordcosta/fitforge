@@ -22,7 +22,7 @@
   }: { titulo?: string; opcoes: AcaoSheet[]; onFechar: () => void; acaoTitulo?: Snippet } = $props();
 </script>
 
-<Sheet {titulo} {onFechar} {acaoTitulo}>
+<Sheet {titulo} {onFechar} acaoTituloDireita={acaoTitulo}>
   {#each opcoes as opcao, i (i)}
     <button
       class="sheet-opcao"
