@@ -402,6 +402,7 @@
   type CampoOrdenacaoSeries = "total" | "ponderado" | "acumulado";
 
   const LABEL_CAMPO_CURTO: Record<CampoOrdenacaoSeries, string> = { total: "Total", ponderado: "Pond.", acumulado: "Acum." };
+  const LABEL_CAMPO_LONGO: Record<CampoOrdenacaoSeries, string> = { total: "total", ponderado: "ponderado", acumulado: "acumulado" };
 
   /** Quais das 3 colunas (Total/Pond./Acum.) aparecem — configurável em Parametrização
    * (mostrarSeries*); nunca fica vazio (a tela de Parametrização já impede desmarcar a última). */
@@ -435,13 +436,18 @@
   /** Campo usado pelas células de dia/rotina E pela coluna Total da grade semanal —
    * configurável em Parametrização (campoGrade), mesmo padrão de 3 opções do graficoCampo:
    * "destacada" segue a coluna que o usuário tocou por último (ordemSemanal); "total"/"ponderado"
-   * ignoram a coluna destacada. Acumulado não é rastreado por dia/coluna na grade (só a nível do
-   * músculo/rotina inteira) — nesse contexto, "destacada" em "acumulado" cai pra "ponderado". */
-  const campoGrade = $derived.by((): "total" | "ponderado" => {
+   * ignoram a coluna destacada. */
+  const campoGrade = $derived.by((): CampoOrdenacaoSeries => {
     if (parametrosDistribuicao.campoGrade === "total") return "total";
     if (parametrosDistribuicao.campoGrade === "ponderado") return "ponderado";
-    return ordemSemanal === "total" ? "total" : "ponderado";
+    return ordemSemanal;
   });
+
+  function valorGradeDia(v: { bruto: number; ponderado: number; acumulado: number }, campo: CampoOrdenacaoSeries): number {
+    if (campo === "total") return v.bruto;
+    if (campo === "acumulado") return v.acumulado;
+    return v.ponderado;
+  }
 
   /** Campo que os gráficos (anéis) usam como tamanho de fatia — configurável em Parametrização
    * (graficoCampo): "destacada" segue a coluna que o usuário tocou por último (ordemSemanal,
@@ -657,6 +663,10 @@
         treinoNome: treino?.nome_treino ?? null,
         mapa: treino ? contarSeriesPorMusculo(treino) : new Map<string, number>(),
         mapaPonderado: treino ? contarSeriesPorMusculoPonderado(treino) : new Map<string, number>(),
+        // Partes A/B/C (posição no treino) e peso gradual desse dia — só pra classificar/mostrar
+        // "acumulado" na célula do dia (valorAcumulado usa um dos dois, conforme fadigaModo).
+        mapaPartes: treino ? contarSeriesPorFaixaDePosicao(treino) : new Map<string, Partes>(),
+        mapaPesoGradual: treino ? contarPesoGradualPorMusculo(treino) : new Map<string, number>(),
       };
     });
 
@@ -674,9 +684,22 @@
       }
     }
 
-    // Qual dos dois totais a coluna Total soma/mostra/classifica — segue campoGrade
+    // Total semanal "acumulado" por músculo — mesmo cálculo do valor Acum. da Distribuição
+    // Semanal (partesFadigaSemanal/pesoGradualSemanal + valorAcumulado), só que restrito aos
+    // treinos que entram nessa grade (treinosParaGrade, com o rascunho ao vivo se houver).
+    const partesSemanaGrade = partesFadigaSemanal(treinosParaGrade);
+    const gradualSemanaGrade = pesoGradualSemanal(treinosParaGrade);
+    const totaisAcumulado = new Map<string, number>();
+    for (const m of musculos) {
+      totaisAcumulado.set(
+        m.id,
+        valorAcumulado({ partes: partesSemanaGrade.get(m.id) ?? partesVazias(), pesoGradual: gradualSemanaGrade.get(m.id) }),
+      );
+    }
+
+    // Qual dos três totais a coluna Total soma/mostra/classifica — segue campoGrade
     // (Parametrização > Modo de Distribuição).
-    const totaisColuna = campoGrade === "ponderado" ? totaisPonderado : totais;
+    const totaisColuna = campoGrade === "ponderado" ? totaisPonderado : campoGrade === "acumulado" ? totaisAcumulado : totais;
 
     const linhas = musculos
       .filter((m) => (totais.get(m.id) ?? 0) > 0)
@@ -691,6 +714,7 @@
         valores: colunas.map((col) => ({
           bruto: col.mapa.get(m.id) ?? 0,
           ponderado: col.mapaPonderado.get(m.id) ?? 0,
+          acumulado: valorAcumulado({ partes: col.mapaPartes.get(m.id) ?? partesVazias(), pesoGradual: col.mapaPesoGradual.get(m.id) }),
         })),
       }));
 
@@ -716,9 +740,9 @@
 
   /** Peso gradual (fatorPerformanceGradual) de cada músculo, somado entre TODAS as rotinas da
    * semana — mesmo princípio de partesFadigaSemanal, só que pro modo de fadiga "gradual". */
-  function pesoGradualSemanal(): Map<string, number> {
+  function pesoGradualSemanal(treinosLista: TreinoComExercicios[] = treinos): Map<string, number> {
     const mapa = new Map<string, number>();
-    for (const t of treinos) {
+    for (const t of treinosLista) {
       for (const [musculoId, peso] of contarPesoGradualPorMusculo(t)) {
         mapa.set(musculoId, (mapa.get(musculoId) ?? 0) + peso);
       }
@@ -2085,8 +2109,10 @@
   /** Só usado no editor de rotina: a meta manual vai junto do valor da coluna em que foi
    * definida ("atual/meta" no lugar do valor sozinho, em vez de uma linha à parte embaixo do
    * nome) — metaCampo diz qual das 3 caixas recebe esse tratamento (a mesma em que a meta foi
-   * salva; nas outras 2, mostra o valor normal). */
-  totalTexto: string | null = null,
+   * salva; nas outras 2, mostra o valor normal). O peso (negrito) é sempre do número atual; o
+   * "/meta" só ganha o mesmo peso quando bate exatamente (totalClasse "valor-subindo") — por isso
+   * ficam em spans separados, não um texto só. */
+  metaValor: number | null = null,
   totalClasse: "valor-subindo" | "valor-estavel" | "valor-caindo" | null = null,
   metaCampo: CampoOrdenacaoSeries | null = null,
 )}
@@ -2100,7 +2126,10 @@
           class:valor-subindo={metaCampo === campo && totalClasse === "valor-subindo"}
           class:valor-estavel={metaCampo === campo && totalClasse === "valor-estavel"}
           class:valor-caindo={metaCampo === campo && totalClasse === "valor-caindo"}
-        >{metaCampo === campo && totalTexto != null ? totalTexto : formatValor(valoresPorCampo[campo])}</span>
+        >{formatValor(valoresPorCampo[campo])}</span>
+        {#if metaCampo === campo && metaValor != null}
+          <span class="caixa-serie-meta" class:valor-subindo={totalClasse === "valor-subindo"}>/{formatValor(metaValor)}</span>
+        {/if}
       </button>
     {/each}
   </div>
@@ -2475,7 +2504,7 @@
             {/each}
             <th class="grade-col-total">
               <div class="grade-dia">Total</div>
-              <div class="grade-rotina-nome">{campoGrade === "ponderado" ? "ponderado" : "total"}</div>
+              <div class="grade-rotina-nome">{LABEL_CAMPO_LONGO[campoGrade]}</div>
             </th>
           </tr>
         </thead>
@@ -2488,14 +2517,14 @@
             {@const totalMetaLinha = linha.valores.reduce((acc, v, i) => {
               const treinoId = gradeSemanal.colunas[i].treinoId;
               const metaDia = treinoId ? metaParaCampo(treinoId, linha.musculo.id, campoGrade) : undefined;
-              return acc + (metaDia ?? (campoGrade === "ponderado" ? v.ponderado : v.bruto));
+              return acc + (metaDia ?? valorGradeDia(v, campoGrade));
             }, 0)}
             <tr>
               <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
               {#each linha.valores as valor, i (i)}
                 {@const treinoId = gradeSemanal.colunas[i].treinoId}
                 {@const meta = treinoId ? metaParaCampo(treinoId, linha.musculo.id, campoGrade) : undefined}
-                {@const mostrado = campoGrade === "total" ? valor.bruto : valor.ponderado}
+                {@const mostrado = valorGradeDia(valor, campoGrade)}
                 {@const texto = formatValor(mostrado)}
                 <td class="grade-valor">
                   {#if modoEdicaoMetas && treinoId}
@@ -2992,7 +3021,6 @@
           {#each metasEditor as item (item.musculo.id)}
             {@const metaCampo = item.meta?.tipo ?? null}
             {@const valorNaMetaCampo = metaCampo === "total" ? item.atual : metaCampo === "ponderado" ? item.ponderado : metaCampo === "acumulado" ? item.acumulado : null}
-            {@const totalTexto = item.meta && valorNaMetaCampo != null ? `${formatValor(valorNaMetaCampo)}/${formatValor(item.meta.valor)}` : null}
             {@const totalClasse =
               item.meta == null || valorNaMetaCampo == null
                 ? null
@@ -3031,7 +3059,7 @@
                 </span>
               </button>
               {@render barraFadiga(item.partes, item.partes.a + item.partes.b + item.partes.c)}
-              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemSemanal, (campo) => (ordemSemanal = campo), totalTexto, totalClasse, metaCampo)}
+              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemSemanal, (campo) => (ordemSemanal = campo), item.meta?.valor ?? null, totalClasse, metaCampo)}
             </div>
           {/each}
         </div>
@@ -3353,8 +3381,9 @@
   }
   /* Precisa da classe extra (.caixa-serie-valor.valor-*) pra ganhar de .caixa-serie-valor, que
      vem depois no arquivo e tem a mesma especificidade -- sem isso, o destaque de meta perdia
-     sempre pro cinza padrão, independente do estado. Meta batida em branco (igual as caixas sem
-     meta, caixa-serie-ativa) -- longe da meta (acima ou abaixo) em cor neutra, sem negrito. */
+     sempre pro cinza padrão, independente do estado. Negrito sempre (mesmo peso de
+     caixa-serie-ativa, já que essas caixas com meta só aparecem na coluna destacada) -- só a cor
+     muda: branco quando bate a meta, neutra quando ainda não bateu (acima ou abaixo). */
   .caixa-serie-valor.valor-subindo {
     color: var(--surface-fg);
     font-weight: 700;
@@ -3362,6 +3391,7 @@
   .caixa-serie-valor.valor-estavel,
   .caixa-serie-valor.valor-caindo {
     color: var(--color-neutral);
+    font-weight: 700;
   }
   .barra-wrap {
     height: 10px;
@@ -3466,6 +3496,18 @@
     white-space: nowrap;
   }
   .caixa-serie-valor.caixa-serie-ativa {
+    color: var(--surface-fg);
+    font-weight: 700;
+  }
+  /* "/meta" ao lado do valor atual — sem peso próprio (o negrito é sempre do valor atual), só
+     ganha o mesmo peso quando a meta é batida exatamente (valor-subindo). */
+  .caixa-serie-meta {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--surface-muted);
+    white-space: nowrap;
+  }
+  .caixa-serie-meta.valor-subindo {
     color: var(--surface-fg);
     font-weight: 700;
   }
