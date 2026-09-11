@@ -227,8 +227,8 @@
     if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_FORMATO_DESCANSO, formatoDescanso);
   });
 
-  const ANEL_DIAMETRO = 60;
-  const ANEL_RAIO = 26;
+  const ANEL_DIAMETRO = 70;
+  const ANEL_RAIO = 30;
   const ANEL_CIRCUNFERENCIA = 2 * Math.PI * ANEL_RAIO;
 
   /** Posição do anel na tela, arrastável pelo usuário — nasce no canto superior direito,
@@ -855,11 +855,11 @@
       onpointerdown={iniciarArrasteAnel}
       aria-label="Cronômetro de descanso"
     >
-      <svg viewBox="0 0 60 60" class="anel-svg">
-        <circle cx="30" cy="30" r={ANEL_RAIO} class="anel-fundo" />
+      <svg viewBox="0 0 70 70" class="anel-svg">
+        <circle cx="35" cy="35" r={ANEL_RAIO} class="anel-fundo" />
         <circle
-          cx="30"
-          cy="30"
+          cx="35"
+          cy="35"
           r={ANEL_RAIO}
           class="anel-progresso"
           style={`stroke-dasharray:${ANEL_CIRCUNFERENCIA}; stroke-dashoffset:${ANEL_CIRCUNFERENCIA * (1 - progressoDescanso)};`}
@@ -1757,8 +1757,8 @@
   .descanso-anel {
     position: fixed;
     z-index: 60;
-    width: 60px;
-    height: 60px;
+    width: 70px;
+    height: 70px;
     padding: 0;
     border: none;
     border-radius: 50%;
