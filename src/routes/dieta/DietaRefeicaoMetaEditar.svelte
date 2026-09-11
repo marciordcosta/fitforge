@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate, voltar } from "../../lib/router.svelte";
+  import { navigate } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -273,7 +273,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/dieta/refeicoes/gerenciar?aba=refeicoes")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={() => navigate("/dieta/refeicoes/gerenciar?aba=refeicoes")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>{nome}</h1>
     <span class="header-spacer"></span>
   </div>
