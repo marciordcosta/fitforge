@@ -426,6 +426,7 @@
     onSelecionar={confirmarMacros}
     onFechar={() => (mostrarMacros = false)}
     formatarRodape={formatarRodapeCalorias}
+    mostrarPct={false}
   />
 {/if}
 

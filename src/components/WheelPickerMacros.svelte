@@ -23,6 +23,7 @@
     onSelecionar,
     onFechar,
     formatarRodape,
+    mostrarPct = true,
   }: {
     titulo: string;
     colunas: ColunaMacro[];
@@ -30,6 +31,8 @@
     onFechar: () => void;
     /** Substitui o texto padrão "≈ X kcal" do rodapé, recebendo as calorias totais da seleção atual. */
     formatarRodape?: (caloriasTotais: number) => string;
+    /** Mostra o % de calorias que cada macro representa da seleção atual, ao lado do título da coluna. */
+    mostrarPct?: boolean;
   } = $props();
 
   const ALTURA_ITEM = 40;
@@ -91,7 +94,8 @@
     {#each colunas as coluna, idx (coluna.chave)}
       <div class="coluna">
         <p class="coluna-titulo" style={`color:${coluna.cor}`}>
-          {coluna.titulo} <span class="coluna-pct">{pctColuna(idx).toFixed(0)}%</span>
+          {coluna.titulo}
+          {#if mostrarPct}<span class="coluna-pct">{pctColuna(idx).toFixed(0)}%</span>{/if}
         </p>
         <p class="coluna-secundario">{coluna.secundario(coluna.opcoes[indices[idx]].valor)}</p>
         <div class="roda-wrap" style={`height: ${ALTURA_ITEM * ITENS_VISIVEIS}px;`}>
