@@ -18,6 +18,8 @@
     salvarExerciciosRotina,
     trocarExercicioTreinoExercicio,
     trocarExercicioEntreRotinas,
+    adicionarTreinoExercicio,
+    removerTreinoExercicio,
     renameTreino,
     listMetasMusculo,
     salvarMetaMusculo,
@@ -480,6 +482,24 @@
     return item.valor;
   }
 
+  const ORDEM_CAMPOS_DESEMPATE: CampoOrdenacaoSeries[] = ["total", "ponderado", "acumulado"];
+
+  /** Compara pela coluna escolhida; empatada nela, desempata pela próxima coluna na ordem fixa
+   * (Total → Pond. → Acum., ciclando), e assim por diante até achar diferença. */
+  function compararPorCampo(
+    a: { valor: number; bruto: number; partes: Partes; pesoGradual?: number },
+    b: { valor: number; bruto: number; partes: Partes; pesoGradual?: number },
+    campo: CampoOrdenacaoSeries,
+  ): number {
+    const idxInicial = ORDEM_CAMPOS_DESEMPATE.indexOf(campo);
+    for (let i = 0; i < ORDEM_CAMPOS_DESEMPATE.length; i++) {
+      const c = ORDEM_CAMPOS_DESEMPATE[(idxInicial + i) % ORDEM_CAMPOS_DESEMPATE.length];
+      const diferenca = valorPorCampoOrdenacao(b, c) - valorPorCampoOrdenacao(a, c);
+      if (diferenca !== 0) return diferenca;
+    }
+    return 0;
+  }
+
   /** Ordena pela coluna escolhida (total bruto, ponderado ou acumulado/fadiga) — usado tanto na
    * Distribuição Semanal quanto nos cards de cada rotina, pra manter os 2 lugares consistentes. */
   function ordenarPorCampo<
@@ -496,13 +516,11 @@
         item.subItens
           ? {
               ...item,
-              subItens: item.subItens
-                .slice()
-                .sort((a, b) => valorPorCampoOrdenacao(b, campo) - valorPorCampoOrdenacao(a, campo)),
+              subItens: item.subItens.slice().sort((a, b) => compararPorCampo(a, b, campo)),
             }
           : item,
       )
-      .sort((a, b) => valorPorCampoOrdenacao(b, campo) - valorPorCampoOrdenacao(a, campo));
+      .sort((a, b) => compararPorCampo(a, b, campo));
   }
 
   /** Dados pro anel de dominância/volume (Distribuição Semanal e por rotina) na coluna escolhida —
@@ -1535,6 +1553,43 @@
     }
   }
 
+  let movendoSemTroca = $state(false);
+
+  /** Move o exercício pra rotina de destino como um item novo, sem trocar de lugar com nenhum
+   * exercício de lá — junto com o que já existe, em vez de substituir um deles. */
+  async function moverSemTroca(): Promise<void> {
+    if (!movendoItem || !rotinaMoverEscolhida) return;
+    const origem = movendoItem;
+    const destino = rotinaMoverEscolhida;
+    movendoSemTroca = true;
+    try {
+      await adicionarTreinoExercicio(destino.id, origem.exercicioId, origem.series, []);
+      await removerTreinoExercicio(origem.treinoExercicioId);
+      await refrescarTreinoMusculo(origem.treinoId);
+      await refrescarTreinoMusculo(destino.id);
+      // Mesmo motivo do trocarComExercicioDaRotina: se a rotina de origem está aberta no
+      // editor completo (rascunho local), remove a linha de lá também — aqui a linha some de
+      // verdade (não é troca, o exercício saiu dessa rotina).
+      if (modalEditorRotina?.id === origem.treinoId) {
+        modalEditorRotina = {
+          ...modalEditorRotina,
+          exercicios: modalEditorRotina.exercicios.filter((te) => te.id !== origem.treinoExercicioId),
+        };
+      }
+      if (modalMusculoRotina) {
+        statusAjusteMusculo = {
+          tipo: "ok",
+          texto: `"${origem.exercicioNome}" foi movido pra "${destino.nome_treino}".`,
+        };
+      }
+      fecharMover();
+    } catch (e) {
+      alert("Erro ao mover exercício: " + (e as Error).message);
+    } finally {
+      movendoSemTroca = false;
+    }
+  }
+
   // ---------------- Modal: edição visual da rotina inteira (add/remover/reordenar exercícios) ----------------
 
   let modalEditorRotina = $state<TreinoComExercicios | null>(null);
@@ -1759,10 +1814,12 @@
     // reflete o volume real (leva em conta o peso_contribuicao de cada músculo secundário),
     // diferente do bruto que infla exercícios multi-músculo.
     const campo = ordemSemanal;
-    return resultado.sort(
-      (a, b) =>
-        valorPorCampoOrdenacao({ valor: b.ponderado, bruto: b.atual, partes: b.partes, pesoGradual: b.pesoGradual }, campo) -
-        valorPorCampoOrdenacao({ valor: a.ponderado, bruto: a.atual, partes: a.partes, pesoGradual: a.pesoGradual }, campo),
+    return resultado.sort((a, b) =>
+      compararPorCampo(
+        { valor: a.ponderado, bruto: a.atual, partes: a.partes, pesoGradual: a.pesoGradual },
+        { valor: b.ponderado, bruto: b.atual, partes: b.partes, pesoGradual: b.pesoGradual },
+        campo,
+      ),
     );
   });
 
@@ -2485,6 +2542,12 @@
     <path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" />
   </svg>
 {/snippet}
+{#snippet iconMaisMover()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+{/snippet}
 {#snippet iconGrade()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -3012,7 +3075,12 @@
         <div class="header">
           <button class="back" onclick={() => (rotinaMoverEscolhida = null)} aria-label="Voltar">{@render iconVoltar()}</button>
           <h1>{rotina.nome_treino}</h1>
-          <span class="spacer"></span>
+          <button
+            class="mover-adicionar-btn"
+            onclick={moverSemTroca}
+            disabled={movendoSemTroca}
+            aria-label={`Adicionar "${movendoItem!.exercicioNome}" sem trocar`}
+          >{@render iconMaisMover()}</button>
         </div>
         {#if !exerciciosDisponiveis.length}
           <p class="muted">Nenhum exercício disponível — todos já existem na rotina de origem também.</p>
@@ -3287,6 +3355,28 @@
   }
   .spacer {
     width: 36px;
+  }
+  .mover-adicionar-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    border: none;
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .mover-adicionar-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  .mover-adicionar-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .editor-dia-btn {
     flex-shrink: 0;
