@@ -9,8 +9,6 @@
     listRefeicoesModelo,
     listMetasDiaModelo,
     getReceita,
-    getRefeicoesDoDia,
-    getDiarioDoDia,
     salvarMetaNumericaRefeicao,
     salvarMetaNumericaRefeicaoDias,
     garantirReceitaPrivadaRefeicao,
@@ -45,10 +43,6 @@
     carboidratoG: number;
   }
 
-  /** Consumo de hoje dessa refeição (pelo nome, igual ao Diário) — pra comparar com a meta aqui
-   * mesmo, sem precisar ir na Home. Zero se hoje ainda não tem essa refeição ou nada lançado nela. */
-  let consumoHoje = $state<Totais>({ calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 });
-
   function somarItens(itens: ReceitaItem[]): Totais {
     return itens.reduce(
       (acc, i) => ({
@@ -69,28 +63,11 @@
     loading = true;
     erro = null;
     try {
-      const [modelos, metasDia, refeicoesHoje, itensHoje] = await Promise.all([
-        listRefeicoesModelo(),
-        listMetasDiaModelo(),
-        getRefeicoesDoDia(hojeISO()),
-        getDiarioDoDia(hojeISO()),
-      ]);
+      const [modelos, metasDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo()]);
       modelo = modelos.find((m) => m.id === modeloId) ?? null;
       overrideDia = diasSemana?.length ? (metasDia.find((m) => m.modeloId === modeloId && m.diaSemana === diasSemana![0]) ?? null) : null;
       const receitaId = overrideDia?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
       receita = receitaId ? await getReceita(receitaId) : null;
-
-      const refeicaoHoje = refeicoesHoje.find((r) => r.nome === nome);
-      const itensDaRefeicao = refeicaoHoje ? itensHoje.filter((i) => i.refeicaoId === refeicaoHoje.id) : [];
-      consumoHoje = itensDaRefeicao.reduce(
-        (acc, i) => ({
-          calorias: acc.calorias + i.calorias,
-          proteinaG: acc.proteinaG + i.proteinaG,
-          gorduraG: acc.gorduraG + i.gorduraG,
-          carboidratoG: acc.carboidratoG + i.carboidratoG,
-        }),
-        { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
-      );
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -109,8 +86,9 @@
     return Math.min(100, pct);
   }
 
-  function labelAbsoluto(valor: number, meta: number, unidade: string): string {
-    return `${valor.toFixed(0)}/${meta.toFixed(0)}${unidade}`;
+  function abrirDetalheItem(item: ReceitaItem): void {
+    if (!receita) return;
+    navigate(`/dieta/alimento/${item.alimentoId}/${hojeISO()}/receita/${receita.id}`);
   }
 
   const proteinaG = $derived(overrideDia?.metaProteinaG ?? modelo?.metaProteinaG ?? null);
@@ -359,38 +337,6 @@
         </div>
       {/if}
 
-      <p class="pct-titulo">Consumo de Hoje</p>
-      <div class="pct-grid">
-        <div class="pct-col">
-          <p class="pct-nome">Calorias</p>
-          <div class="pct-barra-wrap">
-            <div class="pct-barra" style={`width:${larguraBarra(pctMeta(consumoHoje.calorias, caloriasCalc))}%; background:var(--color-secondary);`}></div>
-          </div>
-          <p class="pct-valor">{labelAbsoluto(consumoHoje.calorias, caloriasCalc, "")}</p>
-        </div>
-        <div class="pct-col">
-          <p class="pct-nome">Carb</p>
-          <div class="pct-barra-wrap">
-            <div class="pct-barra" style={`width:${larguraBarra(pctMeta(consumoHoje.carboidratoG, carboidratoG ?? 0))}%; background:${COR_CARBO};`}></div>
-          </div>
-          <p class="pct-valor">{labelAbsoluto(consumoHoje.carboidratoG, carboidratoG ?? 0, "g")}</p>
-        </div>
-        <div class="pct-col">
-          <p class="pct-nome">Gorduras</p>
-          <div class="pct-barra-wrap">
-            <div class="pct-barra" style={`width:${larguraBarra(pctMeta(consumoHoje.gorduraG, gorduraG ?? 0))}%; background:${COR_GORDURA};`}></div>
-          </div>
-          <p class="pct-valor">{labelAbsoluto(consumoHoje.gorduraG, gorduraG ?? 0, "g")}</p>
-        </div>
-        <div class="pct-col">
-          <p class="pct-nome">Proteínas</p>
-          <div class="pct-barra-wrap">
-            <div class="pct-barra" style={`width:${larguraBarra(pctMeta(consumoHoje.proteinaG, proteinaG ?? 0))}%; background:${COR_PROTEINA};`}></div>
-          </div>
-          <p class="pct-valor">{labelAbsoluto(consumoHoje.proteinaG, proteinaG ?? 0, "g")}</p>
-        </div>
-      </div>
-
       <p class="itens-titulo">Itens</p>
       <p class="itens-ajuda">Opcional — só serve pra lançar essa refeição sozinha no diário do dia. A barra de cada um mostra quanto ele representa da meta de calorias.</p>
       {#if !receita?.itens.length}
@@ -411,7 +357,16 @@
                 <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
               </div>
             </div>
-            <span class="item-detalhe" aria-hidden="true">{@render iconInfo()}</span>
+            <span
+              class="item-detalhe"
+              role="button"
+              tabindex="0"
+              onclick={(e) => { e.stopPropagation(); abrirDetalheItem(item); }}
+              onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); abrirDetalheItem(item); } }}
+              aria-label="Detalhes do alimento"
+            >
+              {@render iconInfo()}
+            </span>
           </button>
         {/each}
       {/if}
@@ -650,6 +605,7 @@
     color: var(--surface-muted);
   }
   .item-barra-wrap {
+    width: 85%;
     height: 4px;
     margin-top: var(--space-2);
     background: var(--surface-border);
