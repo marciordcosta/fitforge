@@ -6,7 +6,12 @@
   import TreinoMinimizado from "./components/TreinoMinimizado.svelte";
   import Login from "./routes/login/Login.svelte";
   import Home from "./routes/Home.svelte";
+  import HomeParametrizacao from "./routes/home/HomeParametrizacao.svelte";
   import Placeholder from "./routes/Placeholder.svelte";
+  import Treino from "./routes/treino/Treino.svelte";
+  import Peso from "./routes/peso/Peso.svelte";
+  import Dieta from "./routes/dieta/Dieta.svelte";
+  import Fotos from "./routes/fotos/Fotos.svelte";
 
   const sectionTitles: Record<string, string> = {
     "/treino": "Treino",
@@ -43,35 +48,15 @@
   {#if router.path === "/"}
     <Home />
   {:else if router.path === "/inicio/configurar"}
-    {#await import("./routes/home/HomeParametrizacao.svelte")}
-      <div class="loading">Carregando…</div>
-    {:then { default: HomeParametrizacao }}
-      <HomeParametrizacao />
-    {/await}
+    <HomeParametrizacao />
   {:else if router.path.startsWith("/treino")}
-    {#await import("./routes/treino/Treino.svelte")}
-      <div class="loading">Carregando…</div>
-    {:then { default: Treino }}
-      <Treino />
-    {/await}
+    <Treino />
   {:else if router.path.startsWith("/peso")}
-    {#await import("./routes/peso/Peso.svelte")}
-      <div class="loading">Carregando…</div>
-    {:then { default: Peso }}
-      <Peso />
-    {/await}
+    <Peso />
   {:else if router.path.startsWith("/dieta")}
-    {#await import("./routes/dieta/Dieta.svelte")}
-      <div class="loading">Carregando…</div>
-    {:then { default: Dieta }}
-      <Dieta />
-    {/await}
+    <Dieta />
   {:else if router.path.startsWith("/fotos")}
-    {#await import("./routes/fotos/Fotos.svelte")}
-      <div class="loading">Carregando…</div>
-    {:then { default: Fotos }}
-      <Fotos />
-    {/await}
+    <Fotos />
   {:else if sectionTitles[router.path]}
     <Placeholder titulo={sectionTitles[router.path]} />
   {:else}
