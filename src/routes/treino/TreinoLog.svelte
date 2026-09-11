@@ -831,7 +831,7 @@
                 onclick={() => toggleConcluida(exIdx, setIdx)}
                 aria-label="Marcar série concluída"
               >
-                ✓
+                {@render iconCheck()}
               </button>
             </div>
           {/each}
@@ -1340,7 +1340,7 @@
     text-align: center;
   }
   .linha.concluida {
-    background: #1e4a2f;
+    background: color-mix(in srgb, var(--color-primary) 18%, transparent);
     margin: 0 calc(var(--space-4) * -1);
     padding: var(--space-1) var(--space-4);
   }
@@ -1436,13 +1436,20 @@
     text-align: center;
   }
   .check {
-    width: 40px;
+    width: 36px;
     height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 8px;
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
     color: var(--surface-muted);
     cursor: pointer;
+  }
+  .check svg {
+    width: 18px;
+    height: 18px;
   }
   .check.ativo {
     background: var(--color-primary);
