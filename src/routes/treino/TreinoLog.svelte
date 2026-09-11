@@ -1792,7 +1792,7 @@
   }
   .anel-progresso {
     fill: none;
-    stroke: var(--color-secondary);
+    stroke: #3b82f6;
     stroke-width: 5;
     stroke-linecap: round;
     transition: stroke-dashoffset 1s linear, stroke 0.2s;
@@ -1805,7 +1805,7 @@
   }
   .anel-tempo {
     position: relative;
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--surface-fg);
     font-variant-numeric: tabular-nums;
