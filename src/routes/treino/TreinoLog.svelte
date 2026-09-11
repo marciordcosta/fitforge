@@ -201,6 +201,71 @@
     ex.descansoInicioEm = null;
   }
 
+  // ---------------- Cronômetro de descanso: anel flutuante arrastável ou barra fixa ----------------
+
+  const CHAVE_FORMATO_DESCANSO = "fitforge_formato_descanso";
+  let formatoDescanso = $state<"anel" | "barra">(
+    typeof localStorage !== "undefined" && localStorage.getItem(CHAVE_FORMATO_DESCANSO) === "barra"
+      ? "barra"
+      : "anel",
+  );
+  $effect(() => {
+    if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_FORMATO_DESCANSO, formatoDescanso);
+  });
+
+  const ANEL_DIAMETRO = 60;
+  const ANEL_RAIO = 26;
+  const ANEL_CIRCUNFERENCIA = 2 * Math.PI * ANEL_RAIO;
+
+  /** Posição do anel na tela, arrastável pelo usuário — nasce no canto superior direito,
+   * acima de onde o teclado costuma cobrir, ao contrário da barra fixa embaixo. */
+  let anelPos = $state<{ x: number; y: number }>(
+    typeof window !== "undefined" ? { x: window.innerWidth - ANEL_DIAMETRO - 16, y: 84 } : { x: 260, y: 84 },
+  );
+  let anelExpandido = $state(false);
+
+  $effect(() => {
+    if (!exercicioDescansando) anelExpandido = false;
+  });
+
+  function iniciarArrasteAnel(e: PointerEvent): void {
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const offsetX = startX - anelPos.x;
+    const offsetY = startY - anelPos.y;
+    const rect = el.getBoundingClientRect();
+    let moveu = false;
+
+    function mover(ev: PointerEvent): void {
+      if (Math.abs(ev.clientX - startX) > 4 || Math.abs(ev.clientY - startY) > 4) moveu = true;
+      anelPos = {
+        x: Math.min(Math.max(ev.clientX - offsetX, 4), window.innerWidth - rect.width - 4),
+        y: Math.min(Math.max(ev.clientY - offsetY, 4), window.innerHeight - rect.height - 4),
+      };
+    }
+    function soltar(): void {
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", soltar);
+      if (!moveu) anelExpandido = !anelExpandido;
+    }
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", soltar);
+  }
+
+  function estiloPopoverAnel(): string {
+    const LARGURA = 210;
+    const ALTURA = 100;
+    const abaixo = anelPos.y + ANEL_DIAMETRO + 6 + ALTURA <= window.innerHeight;
+    const top = abaixo ? anelPos.y + ANEL_DIAMETRO + 6 : anelPos.y - ALTURA - 6;
+    const left = Math.min(
+      Math.max(anelPos.x + ANEL_DIAMETRO / 2 - LARGURA / 2, 4),
+      window.innerWidth - LARGURA - 4,
+    );
+    return `left:${left}px; top:${top}px; width:${LARGURA}px;`;
+  }
+
   function adicionarSerie(exIdx: number) {
     const ex = sessao[exIdx];
     const proxSerie = ex.sets.length + 1;
@@ -304,12 +369,10 @@
       : String(serieItem.repMin ?? serieItem.repMax);
   }
 
+  /** Sempre mostra o total configurado, mesmo com o descanso rodando — o tempo que está
+   * correndo de fato aparece no cronômetro flutuante (anel ou barra), não aqui. */
   function descansoLabel(ex: ExercicioSessao): string {
-    if (ex.descansoAte) {
-      const restante = Math.ceil((ex.descansoAte - agora) / 1000);
-      if (restante > 0) return `Descanso: ${formatMMSS(restante)}`;
-    }
-    if (ex.descanso_seg) return `Descanso padrão: ${formatMMSS(ex.descanso_seg)}`;
+    if (ex.descanso_seg) return `Descanso: ${formatMMSS(ex.descanso_seg)}`;
     return "Descanso: Desativado";
   }
 
@@ -347,6 +410,17 @@
     const ex = sessao[exIdx];
     ex.descanso_seg = novoSeg;
     descansoEditandoIdx = null;
+    /** Se o descanso desse exercício já está rodando, o ajuste do total reflete na hora
+     * no cronômetro corrente, contado a partir do mesmo início. */
+    if (ex.descansoAte != null && ex.descansoInicioEm != null) {
+      if (novoSeg == null) {
+        ex.descansoAte = null;
+        ex.descansoInicioEm = null;
+      } else {
+        ex.descansoAte = ex.descansoInicioEm + novoSeg * 1000;
+        ex.descansoNotificado = false;
+      }
+    }
     try {
       await updateDescansoTreinoExercicio(ex.treino_exercicio_id, novoSeg);
     } catch (e) {
@@ -759,17 +833,51 @@
 </div>
 
 {#if exercicioDescansando}
-  <div class="descanso-bar">
-    <div class="descanso-progresso" style={`width: ${progressoDescanso * 100}%`}></div>
-    <div class="descanso-bar-conteudo">
-      <div class="descanso-central">
-        <button class="descanso-ajuste" onclick={() => ajustarDescanso(-15)}>-15</button>
-        <span class="descanso-tempo">{formatMMSS(restanteDescansoSeg)}</span>
-        <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
+  {#if formatoDescanso === "anel"}
+    <button
+      class="descanso-anel"
+      style={`left:${anelPos.x}px; top:${anelPos.y}px;`}
+      onpointerdown={iniciarArrasteAnel}
+      aria-label="Cronômetro de descanso"
+    >
+      <svg viewBox="0 0 60 60" class="anel-svg">
+        <circle cx="30" cy="30" r={ANEL_RAIO} class="anel-fundo" />
+        <circle
+          cx="30"
+          cy="30"
+          r={ANEL_RAIO}
+          class="anel-progresso"
+          style={`stroke-dasharray:${ANEL_CIRCUNFERENCIA}; stroke-dashoffset:${ANEL_CIRCUNFERENCIA * (1 - progressoDescanso)};`}
+        />
+      </svg>
+      <span class="anel-tempo">{formatMMSS(restanteDescansoSeg)}</span>
+    </button>
+    {#if anelExpandido}
+      <div class="anel-popover" style={estiloPopoverAnel()}>
+        <div class="anel-popover-linha">
+          <button class="descanso-ajuste" onclick={() => ajustarDescanso(-15)}>-15</button>
+          <button class="descanso-pular" onclick={() => { pularDescanso(); anelExpandido = false; }}>Pular</button>
+          <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
+        </div>
+        <button class="formato-descanso-btn" onclick={() => (formatoDescanso = "barra")}>Ver como barra</button>
       </div>
-      <button class="descanso-pular" onclick={pularDescanso}>Pular</button>
+    {/if}
+  {:else}
+    <div class="descanso-bar">
+      <div class="descanso-progresso" style={`width: ${progressoDescanso * 100}%`}></div>
+      <div class="descanso-bar-conteudo">
+        <button class="formato-descanso-btn-icon" onclick={() => (formatoDescanso = "anel")} aria-label="Ver como anel">
+          ◯
+        </button>
+        <div class="descanso-central">
+          <button class="descanso-ajuste" onclick={() => ajustarDescanso(-15)}>-15</button>
+          <span class="descanso-tempo">{formatMMSS(restanteDescansoSeg)}</span>
+          <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
+        </div>
+        <button class="descanso-pular" onclick={pularDescanso}>Pular</button>
+      </div>
     </div>
-  </div>
+  {/if}
 {/if}
 
 {#snippet iconCheck()}
@@ -1613,5 +1721,87 @@
     font-size: var(--font-size-base);
     font-weight: 600;
     cursor: pointer;
+  }
+  .formato-descanso-btn-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+  }
+  .formato-descanso-btn {
+    border: none;
+    background: none;
+    color: var(--color-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    padding: var(--space-1);
+  }
+  .descanso-anel {
+    position: fixed;
+    z-index: 60;
+    width: 60px;
+    height: 60px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--surface-card);
+    box-shadow: var(--shadow-float);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    touch-action: none;
+  }
+  .anel-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+    pointer-events: none;
+  }
+  .anel-fundo {
+    fill: none;
+    stroke: var(--surface-border);
+    stroke-width: 5;
+  }
+  .anel-progresso {
+    fill: none;
+    stroke: var(--color-primary);
+    stroke-width: 5;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear;
+  }
+  .anel-tempo {
+    position: relative;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--surface-fg);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .anel-popover {
+    position: fixed;
+    z-index: 61;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    box-shadow: var(--shadow-float);
+  }
+  .anel-popover-linha {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
   }
 </style>
