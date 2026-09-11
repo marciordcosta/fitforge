@@ -129,16 +129,18 @@
 
   let mostrarMacros = $state(false);
 
-  /** Cada opção da roda mostra quanto restaria pra bater a meta do dia (disponível pra essa
-   * refeição menos o que essa opção usaria) em vez do grama bruto — só o texto secundário
-   * embaixo do título continua mostrando o grama escolhido de verdade. */
-  function opcoesGramas(max: number, disponivelG: number | null): { valor: number; label: string }[] {
+  /** A roda em si continua em ordem crescente normal (menor em cima, maior embaixo, igual todo
+   * seletor de rolar) — só o texto secundário embaixo do título mostra quanto restaria pra bater
+   * a meta do dia com o valor selecionado no momento. */
+  function opcoesGramas(max: number): { valor: number; label: string }[] {
     const opcoes: { valor: number; label: string }[] = [];
-    for (let v = 0; v <= max; v++) {
-      const label = disponivelG != null ? `${Math.max(0, Math.round(disponivelG - v))} g` : `${v} g`;
-      opcoes.push({ valor: v, label });
-    }
+    for (let v = 0; v <= max; v++) opcoes.push({ valor: v, label: `${v} g` });
     return opcoes;
+  }
+
+  function secundarioRestante(v: number, disponivelG: number | null): string {
+    if (disponivelG == null) return `${v} g`;
+    return `${Math.max(0, Math.round(disponivelG - v))} g restante`;
   }
 
   /** Teto de cada macro pra essa refeição: não editar acima do que sobraria pra última (automática)
@@ -148,9 +150,9 @@
     const tetoGordura = contexto ? Math.max(Math.round(gorduraG ?? 0), Math.min(150, Math.round(contexto.disponivel.gorduraG))) : 150;
     const tetoProteina = contexto ? Math.max(Math.round(proteinaG ?? 0), Math.min(300, Math.round(contexto.disponivel.proteinaG))) : 300;
     return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(tetoCarbo, contexto?.disponivel.carboidratoG ?? null), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(tetoGordura, contexto?.disponivel.gorduraG ?? null), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => `${v} g` },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(tetoProteina, contexto?.disponivel.proteinaG ?? null), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(tetoCarbo), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => secundarioRestante(v, contexto?.disponivel.carboidratoG ?? null) },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(tetoGordura), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => secundarioRestante(v, contexto?.disponivel.gorduraG ?? null) },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(tetoProteina), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => secundarioRestante(v, contexto?.disponivel.proteinaG ?? null) },
     ];
   }
 
