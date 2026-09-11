@@ -2200,33 +2200,33 @@
   }
   .nome-macros {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: var(--space-2) var(--space-2);
-    font-size: 12px;
+    gap: var(--space-1);
+    font-size: 10px;
     color: var(--surface-muted);
   }
   .nome-macros.invisivel {
     visibility: hidden;
   }
   .mini-macro-col {
-    flex: 1 1 28%;
-    min-width: 64px;
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
   }
   .mini-macro-nome {
-    font-size: 10px;
+    font-size: 9px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .mini-macro-barra-wrap {
     display: block;
-    height: 4px;
-    border-radius: 3px;
+    height: 3px;
+    border-radius: 2px;
     overflow: hidden;
     background: var(--surface-border);
   }
@@ -2235,7 +2235,7 @@
     height: 100%;
   }
   .mini-macro-valor {
-    font-size: 10px;
+    font-size: 9px;
     color: var(--surface-muted);
     white-space: nowrap;
     overflow: hidden;
