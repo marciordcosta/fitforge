@@ -43,12 +43,28 @@
     mostrarConfirmDescartar = false;
     treinoLogSessao.limpar();
   }
+
+  /** Só a posição da barra minimizada — tocar no nome sempre abre a rotina ao vivo; o "^" apenas
+   * manda a barra pro topo (ou de volta pro rodapé), sem sair da tela atual. */
+  let posicao = $state<"baixo" | "cima">("baixo");
 </script>
 
 {#if treinoLogSessao.atual && info}
-  <div class="barra">
-    <button class="icone-btn" onclick={() => navigate(`/treino/log/${treinoLogSessao.atual!.treinoId}`)} aria-label="Abrir treino">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <div class="barra" class:cima={posicao === "cima"}>
+    <button
+      class="icone-btn"
+      onclick={() => (posicao = posicao === "baixo" ? "cima" : "baixo")}
+      aria-label={posicao === "baixo" ? "Mover barra para o topo" : "Mover barra para baixo"}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        style={posicao === "cima" ? "transform: rotate(180deg);" : ""}
+      >
         <path d="M18 15l-6-6-6 6" />
       </svg>
     </button>
@@ -95,6 +111,10 @@
     box-shadow: var(--shadow-float);
     z-index: 60;
   }
+  .barra.cima {
+    bottom: auto;
+    top: calc(env(safe-area-inset-top, 0px) + var(--space-3));
+  }
   .icone-btn {
     flex-shrink: 0;
     width: 40px;
@@ -111,6 +131,7 @@
   .icone-btn svg {
     width: 22px;
     height: 22px;
+    transition: transform 0.2s;
   }
   .icone-btn.lixeira {
     color: var(--color-danger);

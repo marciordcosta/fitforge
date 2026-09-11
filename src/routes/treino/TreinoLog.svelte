@@ -51,6 +51,11 @@
     return `${m}:${String(s).padStart(2, "0")}`;
   }
 
+  /** Igual a formatMMSS, mas mostra o sinal de negativo quando o descanso já passou do tempo. */
+  function formatMMSSAssinado(segundos: number): string {
+    return segundos < 0 ? `-${formatMMSS(-segundos)}` : formatMMSS(segundos);
+  }
+
   function formatDuracao(segundosTotais: number): string {
     const h = Math.floor(segundosTotais / 3600);
     const m = Math.floor((segundosTotais % 3600) / 60);
@@ -173,12 +178,21 @@
   }, 1000);
   $effect(() => () => clearInterval(timerId));
 
-  const exercicioDescansando = $derived.by(() => sessao.find((ex) => ex.descansoAte && ex.descansoAte > agora) ?? null);
+  /** No formato anel, o cronômetro continua visível depois de zerar (contando o atraso em negativo)
+   * até o usuário pular ou uma nova série iniciar outro descanso — na barra, some ao zerar como antes. */
+  const exercicioDescansando = $derived.by(() => {
+    const ativo = sessao.find((ex) => ex.descansoAte && ex.descansoAte > agora);
+    if (ativo) return ativo;
+    if (formatoDescanso === "anel") return sessao.find((ex) => ex.descansoAte != null) ?? null;
+    return null;
+  });
 
   const restanteDescansoSeg = $derived.by(() => {
     if (!exercicioDescansando?.descansoAte) return 0;
-    return Math.max(Math.ceil((exercicioDescansando.descansoAte - agora) / 1000), 0);
+    return Math.ceil((exercicioDescansando.descansoAte - agora) / 1000);
   });
+
+  const descansoAtrasado = $derived(restanteDescansoSeg < 0);
 
   const progressoDescanso = $derived.by(() => {
     const ex = exercicioDescansando;
@@ -728,7 +742,7 @@
     </div>
     <div class="stat-inline">
       <span class="stat-label">Duração</span>
-      <span class="stat-valor destaque duracao">{duracaoLabel}</span>
+      <span class="stat-valor duracao">{duracaoLabel}</span>
     </div>
     <div class="stat-inline">
       <span class="stat-label">Séries</span>
@@ -836,6 +850,7 @@
   {#if formatoDescanso === "anel"}
     <button
       class="descanso-anel"
+      class:anel-atrasado={descansoAtrasado}
       style={`left:${anelPos.x}px; top:${anelPos.y}px;`}
       onpointerdown={iniciarArrasteAnel}
       aria-label="Cronômetro de descanso"
@@ -850,7 +865,7 @@
           style={`stroke-dasharray:${ANEL_CIRCUNFERENCIA}; stroke-dashoffset:${ANEL_CIRCUNFERENCIA * (1 - progressoDescanso)};`}
         />
       </svg>
-      <span class="anel-tempo">{formatMMSS(restanteDescansoSeg)}</span>
+      <span class="anel-tempo">{formatMMSSAssinado(restanteDescansoSeg)}</span>
     </button>
     {#if anelExpandido}
       <div class="anel-popover" style={estiloPopoverAnel()}>
@@ -1232,9 +1247,6 @@
     opacity: 0.6;
     cursor: not-allowed;
   }
-  .stat-valor.destaque {
-    color: var(--color-primary);
-  }
   .exercicio-card {
     padding: var(--space-3) 0;
     margin-bottom: var(--space-5);
@@ -1433,9 +1445,9 @@
     cursor: pointer;
   }
   .check.ativo {
-    background: var(--color-success);
-    color: #fff;
-    border-color: var(--color-success);
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    border-color: var(--color-primary);
   }
   .sub {
     text-align: center;
@@ -1773,10 +1785,16 @@
   }
   .anel-progresso {
     fill: none;
-    stroke: var(--color-primary);
+    stroke: var(--color-secondary);
     stroke-width: 5;
     stroke-linecap: round;
-    transition: stroke-dashoffset 1s linear;
+    transition: stroke-dashoffset 1s linear, stroke 0.2s;
+  }
+  .descanso-anel.anel-atrasado .anel-progresso {
+    stroke: var(--color-danger);
+  }
+  .descanso-anel.anel-atrasado .anel-tempo {
+    color: var(--color-danger);
   }
   .anel-tempo {
     position: relative;
@@ -1803,5 +1821,8 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
+  }
+  .anel-popover-linha .descanso-pular {
+    padding: var(--space-2) var(--space-3);
   }
 </style>
