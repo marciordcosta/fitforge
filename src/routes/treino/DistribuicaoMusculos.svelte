@@ -578,6 +578,33 @@
     return metaObj && metaObj.tipo === campo ? metaObj.valor : undefined;
   }
 
+  /** Soma quanto falta pra bater cada meta manual definida pra essa rotina (qualquer músculo,
+   * qualquer coluna) — só conta o que ainda falta (meta acima do atual), não o que já passou.
+   * Usado pro balãozinho de notificação no card da rotina (fechada), avisando que tem ajuste
+   * pendente sem precisar abrir pra conferir músculo a músculo. */
+  function totalAjustePendente(treino: TreinoComExercicios): number {
+    const prefixo = `${treino.id}:`;
+    const chaves = [...metasMusculo.keys()].filter((k) => k.startsWith(prefixo));
+    if (!chaves.length) return 0;
+    const mapaBruto = contarSeriesPorMusculo(treino);
+    const mapaPonderado = contarSeriesPorMusculoPonderado(treino);
+    const mapaPartes = contarSeriesPorFaixaDePosicao(treino);
+    const mapaGradual = contarPesoGradualPorMusculo(treino);
+    let total = 0;
+    for (const chave of chaves) {
+      const musculoId = chave.slice(prefixo.length);
+      const meta = metasMusculo.get(chave)!;
+      const atual =
+        meta.tipo === "total"
+          ? (mapaBruto.get(musculoId) ?? 0)
+          : meta.tipo === "acumulado"
+            ? valorAcumulado({ partes: mapaPartes.get(musculoId) ?? partesVazias(), pesoGradual: mapaGradual.get(musculoId) })
+            : (mapaPonderado.get(musculoId) ?? 0);
+      total += Math.max(0, meta.valor - atual);
+    }
+    return total;
+  }
+
   /** `valorAtualSeries` é o valor JÁ MOSTRADO naquela célula (não a meta), na mesma coluna que
    * está sendo editada — guardado à parte pra, ao salvar, detectar quando a meta escolhida bate
    * com o que já foi feito. Uma meta salva antes numa coluna DIFERENTE de `campo` não é reusada
@@ -1598,16 +1625,25 @@
     };
   }
 
-  /** Snapshot de séries por exercício e total bruto por músculo, capturado quando o editor é
-   * aberto — base FIXA (não ao vivo) pro badge "4-1", pro número congelado até o ajuste, e pro %
-   * de impacto do balãozinho nos cards de meta. Sem isso, baixar as séries e depois voltar ao
-   * número original mostraria um "aumento" (relativo ao valor intermediário) em vez de sumir. */
+  /** Snapshot de séries por exercício (dessa rotina) e total bruto por músculo NA SEMANA INTEIRA
+   * (todas as rotinas, não só essa), capturado quando o editor é aberto — base FIXA (não ao vivo)
+   * pro badge "4-1", pro número congelado até o ajuste, e pro % de impacto do balãozinho nos
+   * cards de meta. O % é sobre o total semanal do músculo de propósito: editar essa rotina também
+   * muda o volume semanal dele, que é o que interessa acompanhar, não só a fatia dessa rotina.
+   * Sem isso, baixar as séries e depois voltar ao número original mostraria um "aumento"
+   * (relativo ao valor intermediário) em vez de sumir. */
   let baselineEditor = $state<{ seriesPorExercicio: Map<string, number>; totalPorMusculo: Map<string, number> } | null>(null);
 
   function capturarBaselineEditor(treino: TreinoComExercicios): void {
     const seriesPorExercicio = new Map<string, number>();
     for (const te of treino.exercicios) seriesPorExercicio.set(te.id, te.series.length);
-    baselineEditor = { seriesPorExercicio, totalPorMusculo: contarSeriesPorMusculo(treino) };
+    const totalSemanaPorMusculo = new Map<string, number>();
+    for (const t of treinos) {
+      for (const [musculoId, v] of contarSeriesPorMusculo(t)) {
+        totalSemanaPorMusculo.set(musculoId, (totalSemanaPorMusculo.get(musculoId) ?? 0) + v);
+      }
+    }
+    baselineEditor = { seriesPorExercicio, totalPorMusculo: totalSemanaPorMusculo };
   }
 
   /** Delta de séries de um exercício comparado à baseline (0 se ele não existia nela, ou seja,
@@ -1620,9 +1656,9 @@
 
   /** % de impacto de TODO o rascunho num músculo, comparando as séries ATUAIS com a baseline
    * fixa: soma o delta de séries (ponderado por peso_contribuicao) de TODOS os exercícios que
-   * trabalham esse músculo, sobre o total bruto ORIGINAL dele na rotina. Mostrado como o
-   * balãozinho no canto do card de meta (mesmo estilo do "x" nos cards de dia da Dieta). 0 se não
-   * há baseline ou se as mudanças voltaram a se cancelar. */
+   * trabalham esse músculo, sobre o total bruto ORIGINAL dele NA SEMANA (todas as rotinas, não só
+   * essa). Mostrado como o balãozinho no canto do card de meta (mesmo estilo do "x" nos cards de
+   * dia da Dieta). 0 se não há baseline ou se as mudanças voltaram a se cancelar. */
   function impactoTotalMusculo(musculoId: string): number {
     if (!baselineEditor || !modalEditorRotina) return 0;
     const totalBase = baselineEditor.totalPorMusculo.get(musculoId) ?? 0;
@@ -2244,6 +2280,7 @@
 
         {#each distribuicaoPorTreino as { treino, lista } (treino.id)}
           {@const ordemTreino = ordemSemanal}
+          {@const ajustePendente = totalAjustePendente(treino)}
           {@const listaExibida = ordenarPorCampo(lista, ordemTreino)}
           {@const expandido = treinosExpandidos.has(treino.id)}
           <div class="rotina-card">
@@ -2260,7 +2297,13 @@
                 }
               }}
             >
-              <h2 class="rotina-nome">{treino.nome_treino}</h2>
+              <span class="rotina-nome-linha">
+                <h2 class="rotina-nome">{treino.nome_treino}</h2>
+                {#if ajustePendente > 0}
+                  <span class="rotina-ajuste-badge" aria-label={`${formatValor(ajustePendente)} séries por ajustar`}
+                  >{formatValor(ajustePendente)}</span>
+                {/if}
+              </span>
               {#if treino.dia_semana != null}
                 <span class="dia-tag">{DIAS_SEMANA_ABREV[treino.dia_semana]}</span>
               {/if}
@@ -3069,11 +3112,13 @@
                 onclick={() => (editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id)}
               >
                 <span class="editor-musculo-nome-col">
-                  <span class="editor-musculo-nome">{abreviarMusculo(item.musculo.nome)}</span>
-                  {#if item.impactoPct !== 0}
-                    <span class="editor-meta-badge" class:badge-mais={item.impactoPct > 0} class:badge-menos={item.impactoPct < 0}
-                    >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
-                  {/if}
+                  <span class="editor-musculo-nome-linha">
+                    <span class="editor-musculo-nome">{abreviarMusculo(item.musculo.nome)}</span>
+                    {#if item.impactoPct !== 0}
+                      <span class="editor-meta-badge" class:badge-mais={item.impactoPct > 0} class:badge-menos={item.impactoPct < 0}
+                      >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
+                    {/if}
+                  </span>
                   {#if textoTendencia(tendMusculo)}
                     <span
                       class="editor-tendencia-texto"
@@ -3283,12 +3328,33 @@
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     cursor: pointer;
   }
-  .rotina-cabecalho-clicavel .rotina-nome {
+  .rotina-nome-linha {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     flex: 1;
+    min-width: 0;
+  }
+  .rotina-cabecalho-clicavel .rotina-nome {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .rotina-ajuste-badge {
+    flex-shrink: 0;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--color-secondary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
   }
   .chevron-rotina {
     flex-shrink: 0;
@@ -4193,28 +4259,35 @@
     padding-right: var(--space-2);
   }
   .editor-musculo-nome-col {
-    position: relative;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
     min-width: 0;
   }
+  /* Nome + balãozinho lado a lado, em fluxo normal (não posicionamento absoluto) -- com
+     absoluto, o balão ficava ancorado à largura da coluna, que na maioria das vezes é bem maior
+     que o texto do nome (que ocupa só o espaço que precisa), então o balão flutuava por cima do
+     próprio nome em vez de ao lado dele. */
+  .editor-musculo-nome-linha {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+  }
   .editor-musculo-nome {
     font-size: var(--font-size-sm);
-    max-width: 100%;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Balãozinho no canto, mesmo estilo do "x" nos cards de dia da tela de Dieta
+  /* Balãozinho, mesmo estilo do "x" nos cards de dia da tela de Dieta
      (DietaRefeicoesGerenciar.svelte .dia-card-x) — só que em pílula (o texto "+17%" não cabe
      num círculo de 20px) em vez de círculo. */
   .editor-meta-badge {
-    position: absolute;
-    top: -8px;
-    right: -4px;
-    z-index: 2;
+    flex-shrink: 0;
     min-width: 20px;
     height: 16px;
     padding: 0 4px;
@@ -4226,6 +4299,7 @@
     font-size: 9px;
     font-weight: 700;
     line-height: 1;
+    white-space: nowrap;
   }
   .editor-meta-badge.badge-mais {
     background: var(--color-success);
