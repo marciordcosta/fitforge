@@ -409,6 +409,16 @@
     ponderado: "Distribuição Ponderada",
     acumulado: "Distribuição Acumulada",
   };
+  const LABEL_CAMPO_ADJETIVO: Record<CampoOrdenacaoSeries, string> = { total: "Total", ponderado: "Ponderada", acumulado: "Acumulada" };
+
+  /** Título do gráfico de dominância com a coluna atual embutida (igual ao título da grade
+   * semanal virar o próprio alternador) — só acrescenta o campo quando há mais de uma coluna pra
+   * escolher, senão o título fica igual ao nome sozinho (rotina ou "Distribuição Semanal"). */
+  const tituloDetalheComCampo = $derived.by((): string => {
+    const base = modalDetalheRotina?.titulo ?? "";
+    if (colunasAtivas.length <= 1) return base;
+    return `${base} · ${LABEL_CAMPO_ADJETIVO[campoGrafico]}`;
+  });
 
   /** Quais das 3 colunas (Total/Pond./Acum.) aparecem — configurável em Parametrização
    * (mostrarSeries*); nunca fica vazio (a tela de Parametrização já impede desmarcar a última). */
@@ -2542,12 +2552,6 @@
   >{modoDetalhe === "volume" ? "Volume" : "Fadiga"}</button>
 {/snippet}
 
-{#snippet acaoEsquerdaDetalhe()}
-  <button class="rotina-coluna-btn" onclick={alternarColunaDetalhe} aria-label="Alternar coluna destacada">
-    {LABEL_CAMPO_CURTO[ordemSemanal]}
-  </button>
-{/snippet}
-
 {#if modalAberto}
   <ActionSheet titulo={modalAberto.titulo} opcoes={modalAberto.opcoes} onFechar={() => (modalAberto = null)} />
 {/if}
@@ -2735,9 +2739,9 @@
        precisa ficar por cima dele, não só do resto da página. -->
   <div class="acima-editor">
     <Sheet
-      titulo={modalDetalheRotina.titulo}
+      titulo={tituloDetalheComCampo}
       onFechar={() => (modalDetalheRotina = null)}
-      acaoTituloEsquerda={colunasAtivas.length > 1 && parametrosDistribuicao.graficoCampo === "destacada" ? acaoEsquerdaDetalhe : undefined}
+      aoClicarTitulo={colunasAtivas.length > 1 && parametrosDistribuicao.graficoCampo === "destacada" ? alternarColunaDetalhe : undefined}
       acaoTituloDireita={modalDetalheRotina.itens.length ? alternarModoDetalhe : undefined}
     >
       <div class="pizza-wrap">
@@ -4397,19 +4401,6 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    cursor: pointer;
-  }
-  .rotina-coluna-btn {
-    flex-shrink: 0;
-    height: 28px;
-    padding: 0 var(--space-2);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: none;
-    color: var(--surface-muted);
-    font-family: inherit;
-    font-size: 11px;
-    font-weight: 600;
     cursor: pointer;
   }
   .rotina-grafico-btn svg {
