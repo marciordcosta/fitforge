@@ -76,12 +76,25 @@
     return Number.isInteger(arred) ? String(arred) : arred.toFixed(1);
   }
 
-  /** Quebra o nome em linhas curtas pra nunca ultrapassar a largura reservada pro rótulo. */
+  /** Quebra o nome em linhas curtas pra nunca ultrapassar a largura reservada pro rótulo. Uma
+   * palavra sozinha maior que o limite (ex: "Panturrilhas", sem espaço pra quebrar) também é
+   * fatiada por caractere — sem isso ela ficava numa linha só, mais larga que a coluna reservada,
+   * e o lado esquerdo (ancorado à direita) estourava pra fora do modal. */
   function quebrarLinhas(texto: string): string[] {
     const palavras = texto.split(" ");
     const linhas: string[] = [];
     let atual = "";
     for (const p of palavras) {
+      if (p.length > MAX_CHARS_LINHA) {
+        if (atual) {
+          linhas.push(atual);
+          atual = "";
+        }
+        for (let i = 0; i < p.length; i += MAX_CHARS_LINHA) {
+          linhas.push(p.slice(i, i + MAX_CHARS_LINHA));
+        }
+        continue;
+      }
       const tentativa = atual ? `${atual} ${p}` : p;
       if (tentativa.length > MAX_CHARS_LINHA && atual) {
         linhas.push(atual);
