@@ -22,11 +22,14 @@
     colunas,
     onSelecionar,
     onFechar,
+    formatarRodape,
   }: {
     titulo: string;
     colunas: ColunaMacro[];
     onSelecionar: (valores: Record<string, number>) => void;
     onFechar: () => void;
+    /** Substitui o texto padrão "≈ X kcal" do rodapé, recebendo as calorias totais da seleção atual. */
+    formatarRodape?: (caloriasTotais: number) => string;
   } = $props();
 
   const ALTURA_ITEM = 40;
@@ -116,7 +119,13 @@
     {/each}
   </div>
   <div class="rodape">
-    <p class="total-cal">≈ <strong>{caloriasTotais}</strong> kcal</p>
+    <p class="total-cal">
+      {#if formatarRodape}
+        {formatarRodape(caloriasTotais)}
+      {:else}
+        ≈ <strong>{caloriasTotais}</strong> kcal
+      {/if}
+    </p>
     <button class="feito" onclick={confirmar}>Feito</button>
   </div>
 </Sheet>

@@ -43,7 +43,6 @@
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
-  let itemParaRemover = $state<ItemDiario | null>(null);
   let confirmandoExclusaoRefeicao = $state(false);
   let processando = $state(false);
   let itemEditando = $state<ItemDiario | null>(null);
@@ -232,12 +231,10 @@
     }
   }
 
-  async function remover() {
-    if (!itemParaRemover) return;
+  async function remover(item: ItemDiario) {
     processando = true;
     try {
-      await removerItemDiario(itemParaRemover.id);
-      itemParaRemover = null;
+      await removerItemDiario(item.id);
       await carregar();
     } finally {
       processando = false;
@@ -428,15 +425,6 @@
   {/if}
 </div>
 
-{#if itemParaRemover !== null}
-  <ConfirmDialog
-    titulo="Tem certeza de que quer remover este alimento?"
-    textoConfirmar="Remover"
-    onConfirmar={remover}
-    onCancelar={() => (itemParaRemover = null)}
-  />
-{/if}
-
 {#if confirmandoExclusaoRefeicao}
   <ConfirmDialog
     titulo="Tem certeza de que quer descartar esta refeição? Todos os alimentos dela serão apagados."
@@ -463,7 +451,7 @@
     onFechar={() => (menuItemAberto = null)}
     opcoes={[
       { label: "Mover", icon: iconMover, onSelect: () => void abrirMoverItem(itemMenu) },
-      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => (itemParaRemover = itemMenu) },
+      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => { menuItemAberto = null; void remover(itemMenu); } },
     ]}
   />
 {/if}

@@ -129,9 +129,15 @@
 
   let mostrarMacros = $state(false);
 
-  function opcoesGramas(max: number): { valor: number; label: string }[] {
-    const opcoes: { valor: number; label: string }[] = [{ valor: 0, label: "0 g" }];
-    for (let v = 1; v <= max; v++) opcoes.push({ valor: v, label: `${v} g` });
+  /** Cada opção da roda mostra quanto restaria pra bater a meta do dia (disponível pra essa
+   * refeição menos o que essa opção usaria) em vez do grama bruto — só o texto secundário
+   * embaixo do título continua mostrando o grama escolhido de verdade. */
+  function opcoesGramas(max: number, disponivelG: number | null): { valor: number; label: string }[] {
+    const opcoes: { valor: number; label: string }[] = [];
+    for (let v = 0; v <= max; v++) {
+      const label = disponivelG != null ? `${Math.max(0, Math.round(disponivelG - v))} g` : `${v} g`;
+      opcoes.push({ valor: v, label });
+    }
     return opcoes;
   }
 
@@ -142,10 +148,18 @@
     const tetoGordura = contexto ? Math.max(Math.round(gorduraG ?? 0), Math.min(150, Math.round(contexto.disponivel.gorduraG))) : 150;
     const tetoProteina = contexto ? Math.max(Math.round(proteinaG ?? 0), Math.min(300, Math.round(contexto.disponivel.proteinaG))) : 300;
     return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(tetoCarbo), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(tetoGordura), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => `${v} g` },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(tetoProteina), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(tetoCarbo, contexto?.disponivel.carboidratoG ?? null), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(tetoGordura, contexto?.disponivel.gorduraG ?? null), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => `${v} g` },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(tetoProteina, contexto?.disponivel.proteinaG ?? null), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
     ];
+  }
+
+  /** Rodapé do modal: calorias que essa refeição vai "consumir" da meta do dia com a escolha
+   * atual, e quanto restaria pra bater a meta (a última refeição automática absorve isso). */
+  function formatarRodapeCalorias(caloriasEscolhidas: number): string {
+    if (!contexto) return `≈ ${caloriasEscolhidas} kcal`;
+    const restante = Math.max(0, Math.round(contexto.disponivel.calorias - caloriasEscolhidas));
+    return `${caloriasEscolhidas} consumido / ${restante} restante`;
   }
 
   async function confirmarMacros(valores: Record<string, number>): Promise<void> {
@@ -404,7 +418,13 @@
 </div>
 
 {#if mostrarMacros}
-  <WheelPickerMacros titulo="Ajustar Macros (g)" colunas={colunasMacros()} onSelecionar={confirmarMacros} onFechar={() => (mostrarMacros = false)} />
+  <WheelPickerMacros
+    titulo="Ajustar Macros (g)"
+    colunas={colunasMacros()}
+    onSelecionar={confirmarMacros}
+    onFechar={() => (mostrarMacros = false)}
+    formatarRodape={formatarRodapeCalorias}
+  />
 {/if}
 
 {#if itemEditando}
