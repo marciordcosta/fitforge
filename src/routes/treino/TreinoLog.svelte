@@ -1227,8 +1227,8 @@
   }
   .concluir {
     flex-shrink: 0;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1240,8 +1240,8 @@
     cursor: pointer;
   }
   .concluir svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
   }
   .concluir:disabled {
     opacity: 0.6;
