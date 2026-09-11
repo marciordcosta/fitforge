@@ -582,32 +582,21 @@ export async function garantirRefeicoesPadraoDoDia(data: string): Promise<Refeic
   return getRefeicoesDoDia(data);
 }
 
-/** Pra cada refeição do catálogo com uma lista de alimentos própria (efetiva pro dia da semana
- * informado — override do dia se houver, senão a global) que ainda não tem nenhum item lançado
- * nesse dia, lança todos os itens dela de uma vez (mesmo `adicionarReceitaAoDiario` do "Adicionar
- * à refeição" manual). Só age na primeira vez: se o usuário apagar os itens lançados, não volta
- * sozinho — mesma idempotência de garantirRefeicoesPadraoDoDia (só olha se a refeição já tem
- * QUALQUER item, não se são os mesmos que seriam lançados). */
-export async function garantirRefeicoesPadraoLancadas(data: string, diaSemana: number): Promise<void> {
-  const [catalogo, metasDia, refeicoesDia, itensHoje] = await Promise.all([
-    listRefeicoesModelo(),
-    listMetasDiaModelo(),
-    getRefeicoesDoDia(data),
-    getDiarioDoDia(data),
-  ]);
-  const overridePorModelo = new Map(metasDia.filter((m) => m.diaSemana === diaSemana).map((m) => [m.modeloId, m]));
-  const refeicaoIdPorNome = new Map(refeicoesDia.map((r) => [r.nome, r.id]));
-  const refeicoesComItem = new Set(itensHoje.map((i) => i.refeicaoId));
-
-  for (const modelo of catalogo) {
-    const receitaId = overridePorModelo.get(modelo.id)?.metaReceitaId ?? modelo.metaReceitaId;
-    if (!receitaId) continue;
-    const refeicaoId = refeicaoIdPorNome.get(modelo.nome);
-    if (!refeicaoId || refeicoesComItem.has(refeicaoId)) continue;
-    const receita = await getReceita(receitaId);
-    if (!receita?.itens.length) continue;
-    await adicionarReceitaAoDiario(receitaId, data, refeicaoId);
-  }
+/** Lança de uma vez só, no diário do dia informado, os itens da lista de alimentos "padrão"
+ * dessa refeição (efetiva pro dia da semana — override do dia se houver, senão a global). Ação
+ * manual (botão "Refeição Padrão" no Diário): ao contrário do que fazia antes automaticamente,
+ * lança mesmo que a refeição já tenha itens hoje — quem decide é o usuário. Retorna `false` sem
+ * fazer nada se essa refeição não tiver uma lista de alimentos padrão configurada. */
+export async function lancarReceitaPadrao(modeloId: string, diaSemana: number, refeicaoId: string, data: string): Promise<boolean> {
+  const [modelos, metasDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo()]);
+  const modelo = modelos.find((m) => m.id === modeloId);
+  const override = metasDia.find((m) => m.modeloId === modeloId && m.diaSemana === diaSemana);
+  const receitaId = override?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
+  if (!receitaId) return false;
+  const receita = await getReceita(receitaId);
+  if (!receita?.itens.length) return false;
+  await adicionarReceitaAoDiario(receitaId, data, refeicaoId);
+  return true;
 }
 
 export async function getRefeicaoDia(id: string): Promise<RefeicaoDia | null> {

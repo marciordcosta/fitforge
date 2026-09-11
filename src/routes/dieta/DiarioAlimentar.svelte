@@ -7,7 +7,7 @@
   import DietaResumoModal from "./DietaResumoModal.svelte";
   import {
     garantirRefeicoesPadraoDoDia,
-    garantirRefeicoesPadraoLancadas,
+    lancarReceitaPadrao,
     getDiarioDoDia,
     getMetasDoDia,
     listRefeicoesModelo,
@@ -108,9 +108,6 @@
     erro = null;
     try {
       refeicoes = await garantirRefeicoesPadraoDoDia(dataAtual);
-      // Lança sozinho no diário os alimentos das refeições "padrão" configuradas pra esse dia da
-      // semana, antes de buscar os itens de verdade — só age na primeira vez (refeição ainda vazia).
-      await garantirRefeicoesPadraoLancadas(dataAtual, parseISODate(dataAtual).getDay());
       [itens, metas] = await Promise.all([getDiarioDoDia(dataAtual), getMetasDoDia(dataAtual)]);
     } catch (err) {
       erro = (err as Error).message;
@@ -215,6 +212,25 @@
   function aoCriarRefeicao(id: string) {
     mostrarCriarRefeicao = false;
     navigate(`/dieta/refeicao/${id}`);
+  }
+
+  let lancandoPadraoId = $state<string | null>(null);
+
+  async function aoClicarRefeicaoPadrao(e: MouseEvent, refeicao: RefeicaoDia, meta: RefeicaoModelo) {
+    e.stopPropagation();
+    lancandoPadraoId = refeicao.id;
+    try {
+      const lancou = await lancarReceitaPadrao(meta.id, parseISODate(dataAtual).getDay(), refeicao.id, dataAtual);
+      if (!lancou) {
+        alert("Essa refeição não tem alimentos configurados na Refeição Padrão.");
+        return;
+      }
+      await carregar();
+    } catch (err) {
+      alert("Erro ao lançar refeição padrão: " + (err as Error).message);
+    } finally {
+      lancandoPadraoId = null;
+    }
   }
 
   const totalCalorias = $derived(itens.reduce((acc, i) => acc + i.calorias, 0));
@@ -613,16 +629,28 @@
           {:else}
             <p class="preview">{preview(refeicao.id)}</p>
           {/if}
-          <button
-            type="button"
-            class="acao-adicionar"
-            onclick={(e) => {
-              e.stopPropagation();
-              navigate(`/dieta/alimentos/refeicao/${refeicao.id}`);
-            }}
-          >
-            Adicionar Alimento
-          </button>
+          <div class="acoes-refeicao">
+            {#if metaRef?.metaReceitaId}
+              <button
+                type="button"
+                class="acao-padrao"
+                disabled={lancandoPadraoId === refeicao.id}
+                onclick={(e) => aoClicarRefeicaoPadrao(e, refeicao, metaRef)}
+              >
+                Refeição Padrão
+              </button>
+            {/if}
+            <button
+              type="button"
+              class="acao-adicionar"
+              onclick={(e) => {
+                e.stopPropagation();
+                navigate(`/dieta/alimentos/refeicao/${refeicao.id}`);
+              }}
+            >
+              Adicionar Alimento
+            </button>
+          </div>
         </div>
       {/each}
     {/if}
@@ -962,6 +990,15 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
   }
+  .acoes-refeicao {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .acoes-refeicao .acao-adicionar,
+  .acoes-refeicao .acao-padrao {
+    flex: 1;
+    min-width: 0;
+  }
   .acao-adicionar {
     width: 100%;
     padding: var(--space-3);
@@ -973,6 +1010,22 @@
     font-size: var(--font-size-base);
     font-family: inherit;
     cursor: pointer;
+  }
+  .acao-padrao {
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--surface-border);
+    background: none;
+    color: var(--surface-muted);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .acao-padrao:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .pct-titulo {
     margin: 0 0 var(--space-2);

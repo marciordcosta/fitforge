@@ -1123,24 +1123,14 @@
   carboidratoDiaG: number,
   gorduraDiaG: number,
   proteinaDiaG: number,
-  invisivel: boolean,
 )}
   {@const pctCarboDia = carboidratoDiaG > 0 ? Math.round((carboidratoG / carboidratoDiaG) * 100) : 0}
   {@const pctGorduraDia = gorduraDiaG > 0 ? Math.round((gorduraG / gorduraDiaG) * 100) : 0}
   {@const pctProteinaDia = proteinaDiaG > 0 ? Math.round((proteinaG / proteinaDiaG) * 100) : 0}
-  <span class="nome-macros" class:invisivel>
-    <span class="mini-macro-col">
-      <span class="mini-macro-nome">Carb</span>
-      <span class="mini-macro-valor">{carboidratoG.toFixed(0)} g · {pctCarboDia}%</span>
-    </span>
-    <span class="mini-macro-col">
-      <span class="mini-macro-nome">Gorduras</span>
-      <span class="mini-macro-valor">{gorduraG.toFixed(0)} g · {pctGorduraDia}%</span>
-    </span>
-    <span class="mini-macro-col">
-      <span class="mini-macro-nome">Proteínas</span>
-      <span class="mini-macro-valor">{proteinaG.toFixed(0)} g · {pctProteinaDia}%</span>
-    </span>
+  <span class="nome-macros-inline">
+    <span class="macro-dot" style={`background:${COR_CARBO};`}></span><span class="macro-pct">{pctCarboDia}%</span>
+    <span class="macro-dot" style={`background:${COR_GORDURA};`}></span><span class="macro-pct">{pctGorduraDia}%</span>
+    <span class="macro-dot" style={`background:${COR_PROTEINA};`}></span><span class="macro-pct">{pctProteinaDia}%</span>
   </span>
 {/snippet}
 
@@ -1457,17 +1447,18 @@
               >
                 <span class="nome-linha">
                   <span class="nome">{m.nome}</span>
-                  {#if meta.calorias != null}<span class="nome-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
+                  {#if meta.calorias != null}
+                    {@render barrasMacrosLinha(
+                      meta.carboidratoG ?? 0,
+                      meta.gorduraG ?? 0,
+                      meta.proteinaG ?? 0,
+                      metaGrupo.carboidratoG,
+                      metaGrupo.gorduraG,
+                      metaGrupo.proteinaG,
+                    )}
+                    <span class="nome-cal">{arredondarDezena(meta.calorias)} cal</span>
+                  {/if}
                 </span>
-                {@render barrasMacrosLinha(
-                  meta.carboidratoG ?? 0,
-                  meta.gorduraG ?? 0,
-                  meta.proteinaG ?? 0,
-                  metaGrupo.carboidratoG,
-                  metaGrupo.gorduraG,
-                  metaGrupo.proteinaG,
-                  meta.calorias == null,
-                )}
               </button>
             </li>
           {/each}
@@ -1578,17 +1569,18 @@
             >
               <span class="nome-linha">
                 <span class="nome">{m.nome}</span>
-                {#if m.metaCalorias != null}<span class="nome-cal">{arredondarDezena(m.metaCalorias)} cal</span>{/if}
+                {#if m.metaCalorias != null}
+                  {@render barrasMacrosLinha(
+                    m.metaCarboidratoG ?? 0,
+                    m.metaGorduraG ?? 0,
+                    m.metaProteinaG ?? 0,
+                    metaGlobal.carboidratoG,
+                    metaGlobal.gorduraG,
+                    metaGlobal.proteinaG,
+                  )}
+                  <span class="nome-cal">{arredondarDezena(m.metaCalorias)} cal</span>
+                {/if}
               </span>
-              {@render barrasMacrosLinha(
-                m.metaCarboidratoG ?? 0,
-                m.metaGorduraG ?? 0,
-                m.metaProteinaG ?? 0,
-                metaGlobal.carboidratoG,
-                metaGlobal.gorduraG,
-                metaGlobal.proteinaG,
-                m.metaCalorias == null,
-              )}
             </button>
           </li>
         {/each}
@@ -2021,9 +2013,11 @@
   }
   .nome-linha {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    justify-content: space-between;
+    justify-content: center;
     gap: var(--space-2);
+    text-align: center;
   }
   .nome {
     min-width: 0;
@@ -2038,37 +2032,22 @@
     font-size: 12px;
     color: var(--surface-muted);
   }
-  .nome-macros {
+  .nome-macros-inline {
     display: flex;
     flex-wrap: nowrap;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-1);
-    font-size: 10px;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
     color: var(--surface-muted);
   }
-  .nome-macros.invisivel {
-    visibility: hidden;
+  .macro-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
   }
-  .mini-macro-col {
-    flex: 1 1 0;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .mini-macro-nome {
-    font-size: 9px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .mini-macro-valor {
-    font-size: 9px;
-    color: var(--surface-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .macro-pct {
+    margin-right: 2px;
   }
   .conteudo {
     transition: opacity 0.15s;

@@ -340,7 +340,6 @@
       {/if}
 
       <p class="itens-titulo">Itens</p>
-      <p class="itens-ajuda">Opcional — só serve pra lançar essa refeição sozinha no diário do dia. A barra de cada um mostra quanto ele representa da meta de calorias.</p>
       {#if !receita?.itens.length}
         <p class="muted">Nenhum alimento adicionado ainda.</p>
       {:else}
@@ -567,12 +566,7 @@
   }
   .itens-titulo {
     font-weight: 600;
-    margin: var(--space-2) 0 0;
-  }
-  .itens-ajuda {
-    margin: 2px 0 var(--space-3);
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
+    margin: var(--space-2) 0 var(--space-3);
   }
   .item-card {
     width: 100%;

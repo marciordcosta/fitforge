@@ -387,6 +387,7 @@
       <p class="muted">Nenhum alimento nessa refeição.</p>
     {:else}
       {#each itensLocais as item (item.id)}
+        {@const pctItem = metas ? pctMeta(item.calorias, metas.calorias) : 0}
         <button
           class="item-card"
           onpointerdown={(e) => aoPointerDownItem(e, item)}
@@ -395,7 +396,14 @@
         >
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
-            <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal</p>
+            <p class="item-qtd">
+              {item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal{#if metas} · {pctItem.toFixed(0)}% da meta{/if}
+            </p>
+            {#if metas}
+              <div class="item-barra-wrap">
+                <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
+              </div>
+            {/if}
           </div>
           <span
             class="item-detalhe"
@@ -681,6 +689,19 @@
     margin: 2px 0 0;
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .item-barra-wrap {
+    width: 85%;
+    height: 4px;
+    margin-top: var(--space-2);
+    background: var(--surface-border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .item-barra {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--color-primary);
   }
   .item-detalhe {
     flex-shrink: 0;
