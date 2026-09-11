@@ -341,18 +341,6 @@
     mostrarCaloriasBlocos = true;
   }
 
-  /** Card "Calorias" da aba Refeições (bloco ondulatório): abre o mesmo editor de blocos da aba
-   * Calorias já direto na edição desse bloco — mesma redistribuição entre os outros dias
-   * (tetoRedistribuicao/redistribuirEntreBlocos), mesmos limites parametrizados. Só funciona pra
-   * um bloco já nomeado (grupo.manual) com todos os 7 dias nomeados — mesma condição que já
-   * habilita "Definir calorias" na aba Calorias. */
-  function abrirEdicaoCaloriasGrupo(grupo: GrupoDias) {
-    if (!grupo.manual || !todosOsDiasNomeados) return;
-    abrirCaloriasBlocos();
-    const idx = blocosEdicao.findIndex((b) => b.dias.includes(grupo.dias[0]));
-    if (idx !== -1) blocoCaloriasEditando = idx;
-  }
-
   /**
    * Generaliza resolverDistribuicao/distribuirValorPorDia pra quando TODOS os dias já têm um valor
    * próprio (nenhum "automático" sobrando): editar um bloco desloca todos os OUTROS igualmente por
@@ -805,38 +793,6 @@
     };
   }
 
-  /** Soma dos macros já configurados nas refeições desse dia — pra comparar com a meta do dia. */
-  function somaMacrosInformados(dia: number) {
-    return modelosDoDia(dia).reduce(
-      (acc, m) => {
-        const meta = metaEfetivaDoDia(m, dia);
-        return {
-          calorias: acc.calorias + (meta.calorias ?? 0),
-          proteinaG: acc.proteinaG + (meta.proteinaG ?? 0),
-          gorduraG: acc.gorduraG + (meta.gorduraG ?? 0),
-          carboidratoG: acc.carboidratoG + (meta.carboidratoG ?? 0),
-        };
-      },
-      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
-    );
-  }
-
-  /** Mesma soma, mas sobre todo o catálogo — usada no topo da aba Refeições em Fixa (não há grupos de dias pra separar). */
-  function somaMacrosGlobal() {
-    return modelos.reduce(
-      (acc, m) => {
-        const v = macrosEfetivosGlobais(m);
-        return {
-          calorias: acc.calorias + v.calorias,
-          proteinaG: acc.proteinaG + v.proteinaG,
-          gorduraG: acc.gorduraG + v.gorduraG,
-          carboidratoG: acc.carboidratoG + v.carboidratoG,
-        };
-      },
-      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
-    );
-  }
-
   /**
    * Meta de macros do dia pra esse grupo: proteína é sempre o global atual (nunca varia por dia);
    * se é manual, gordura vem da composição salva e o carboidrato é recalculado ao vivo pra fechar
@@ -866,17 +822,6 @@
   function arredondarDezena(valor: number): number {
     return Math.round(valor / 10) * 10;
   }
-
-  function restante(valor: number, meta: number): number {
-    return Math.max(0, meta - valor);
-  }
-
-  /** Quando o consumido passa da meta, o texto vira "X acima" em vez de ficar travado em "0 restantes". */
-  function passouMeta(valor: number, meta: number): boolean {
-    return valor > meta;
-  }
-
-  let modoRestanteRefeicoes = $state(false);
 
   async function carregar() {
     loading = true;
@@ -1425,7 +1370,6 @@
       <p class="muted">Nenhuma refeição cadastrada ainda.</p>
     {:else if modoCalorias === "ondulatoria"}
       {#each gruposDias as grupo (grupo.dias[0])}
-        {@const somaGrupo = somaMacrosInformados(grupo.dias[0])}
         {@const metaGrupo = metaMacrosDoGrupo(grupo)}
         {#if gruposDias.length > 1}
           <div class="secao-dias-header">
@@ -1442,93 +1386,6 @@
             </div>
           </div>
         {/if}
-
-        <button
-          type="button"
-          class="card-calorias"
-          class:card-calorias-editavel={grupo.manual && todosOsDiasNomeados}
-          disabled={!grupo.manual || !todosOsDiasNomeados}
-          onclick={() => abrirEdicaoCaloriasGrupo(grupo)}
-        >
-          <p class="card-titulo">Calorias</p>
-          <div class="calorias-linha">
-            <span class="calorias-valor"><strong>{somaGrupo.calorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metaGrupo.calorias.toFixed(0)}</span></span>
-            <span class="calorias-restantes">
-              {#if passouMeta(somaGrupo.calorias, metaGrupo.calorias)}
-                <strong>{(somaGrupo.calorias - metaGrupo.calorias).toFixed(0)}</strong> acima
-              {:else}
-                <strong>{restante(somaGrupo.calorias, metaGrupo.calorias).toFixed(0)}</strong> restantes
-              {/if}
-            </span>
-          </div>
-          <div class="barra-wrap-grande">
-            <div class="barra-grande" style={`width:${larguraBarra(pctMeta(somaGrupo.calorias, metaGrupo.calorias))}%; background:var(--color-secondary);`}></div>
-          </div>
-        </button>
-
-        <div class="card-macros">
-          <button
-            type="button"
-            class="toggle-btn"
-            onclick={() => (modoRestanteRefeicoes = !modoRestanteRefeicoes)}
-            aria-label="Alternar exibição"
-          >
-            {@render iconToggle()}
-          </button>
-          <div class="macros-grid">
-            <div class="macro-col">
-              <p class="macro-nome">Carb</p>
-              <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG))}% 100%);`}>
-                <div class="macro-anel-centro">
-                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG)}
-                    <strong>{(somaGrupo.carboidratoG - metaGrupo.carboidratoG).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">acima</span>
-                  {:else if modoRestanteRefeicoes}
-                    <strong>{restante(somaGrupo.carboidratoG, metaGrupo.carboidratoG).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">restantes</span>
-                  {:else}
-                    <strong>{somaGrupo.carboidratoG.toFixed(0)} g</strong>
-                    <span class="macro-meta">/ {metaGrupo.carboidratoG.toFixed(0)}</span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-            <div class="macro-col">
-              <p class="macro-nome">Gorduras</p>
-              <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(somaGrupo.gorduraG, metaGrupo.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.gorduraG, metaGrupo.gorduraG))}% 100%);`}>
-                <div class="macro-anel-centro">
-                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.gorduraG, metaGrupo.gorduraG)}
-                    <strong>{(somaGrupo.gorduraG - metaGrupo.gorduraG).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">acima</span>
-                  {:else if modoRestanteRefeicoes}
-                    <strong>{restante(somaGrupo.gorduraG, metaGrupo.gorduraG).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">restantes</span>
-                  {:else}
-                    <strong>{somaGrupo.gorduraG.toFixed(0)} g</strong>
-                    <span class="macro-meta">/ {metaGrupo.gorduraG.toFixed(0)}</span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-            <div class="macro-col">
-              <p class="macro-nome">Proteínas</p>
-              <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG))}% 100%);`}>
-                <div class="macro-anel-centro">
-                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.proteinaG, metaGrupo.proteinaG)}
-                    <strong>{(somaGrupo.proteinaG - metaGrupo.proteinaG).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">acima</span>
-                  {:else if modoRestanteRefeicoes}
-                    <strong>{restante(somaGrupo.proteinaG, metaGrupo.proteinaG).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">restantes</span>
-                  {:else}
-                    <strong>{somaGrupo.proteinaG.toFixed(0)} g</strong>
-                    <span class="macro-meta">/ {metaGrupo.proteinaG.toFixed(0)}</span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <ul class="lista lista-dia">
           {#each (arrastandoDia === grupo.dias[0] ? arrastoListaDia : grupo.modelos) as m, i (m.id)}
@@ -1570,89 +1427,7 @@
         <button type="button" class="add-refeicao-btn" onclick={() => abrirAdicionarRefeicao(grupo)}>+ Adicionar refeição</button>
       {/each}
     {:else}
-      {@const somaGlobal = somaMacrosGlobal()}
       {@const metaGlobal = { calorias: caloriasCalc, proteinaG: proteinaGInput ?? 0, gorduraG: gorduraGInput ?? 0, carboidratoG: carboidratoGInput ?? 0 }}
-
-      <div class="card-calorias">
-        <p class="card-titulo">Calorias</p>
-        <div class="calorias-linha">
-          <span class="calorias-valor"><strong>{somaGlobal.calorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metaGlobal.calorias.toFixed(0)}</span></span>
-          <span class="calorias-restantes">
-            {#if passouMeta(somaGlobal.calorias, metaGlobal.calorias)}
-              <strong>{(somaGlobal.calorias - metaGlobal.calorias).toFixed(0)}</strong> acima
-            {:else}
-              <strong>{restante(somaGlobal.calorias, metaGlobal.calorias).toFixed(0)}</strong> restantes
-            {/if}
-          </span>
-        </div>
-        <div class="barra-wrap-grande">
-          <div class="barra-grande" style={`width:${larguraBarra(pctMeta(somaGlobal.calorias, metaGlobal.calorias))}%; background:var(--color-secondary);`}></div>
-        </div>
-      </div>
-
-      <div class="card-macros">
-        <button
-          type="button"
-          class="toggle-btn"
-          onclick={() => (modoRestanteRefeicoes = !modoRestanteRefeicoes)}
-          aria-label="Alternar exibição"
-        >
-          {@render iconToggle()}
-        </button>
-        <div class="macros-grid">
-          <div class="macro-col">
-            <p class="macro-nome">Carb</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG))}% 100%);`}>
-              <div class="macro-anel-centro">
-                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG)}
-                  <strong>{(somaGlobal.carboidratoG - metaGlobal.carboidratoG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGlobal.carboidratoG, metaGlobal.carboidratoG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGlobal.carboidratoG.toFixed(0)} g</strong>
-                  <span class="macro-meta">/ {metaGlobal.carboidratoG.toFixed(0)}</span>
-                {/if}
-              </div>
-            </div>
-          </div>
-          <div class="macro-col">
-            <p class="macro-nome">Gorduras</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(somaGlobal.gorduraG, metaGlobal.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.gorduraG, metaGlobal.gorduraG))}% 100%);`}>
-              <div class="macro-anel-centro">
-                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.gorduraG, metaGlobal.gorduraG)}
-                  <strong>{(somaGlobal.gorduraG - metaGlobal.gorduraG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGlobal.gorduraG, metaGlobal.gorduraG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGlobal.gorduraG.toFixed(0)} g</strong>
-                  <span class="macro-meta">/ {metaGlobal.gorduraG.toFixed(0)}</span>
-                {/if}
-              </div>
-            </div>
-          </div>
-          <div class="macro-col">
-            <p class="macro-nome">Proteínas</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(somaGlobal.proteinaG, metaGlobal.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.proteinaG, metaGlobal.proteinaG))}% 100%);`}>
-              <div class="macro-anel-centro">
-                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.proteinaG, metaGlobal.proteinaG)}
-                  <strong>{(somaGlobal.proteinaG - metaGlobal.proteinaG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGlobal.proteinaG, metaGlobal.proteinaG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGlobal.proteinaG.toFixed(0)} g</strong>
-                  <span class="macro-meta">/ {metaGlobal.proteinaG.toFixed(0)}</span>
-                {/if}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <ul class="lista">
         {#each modelos as m, i (m.id)}
@@ -2259,134 +2034,6 @@
   .toggle-modo-btn svg {
     width: 20px;
     height: 20px;
-  }
-  .card-calorias,
-  .card-macros {
-    position: relative;
-    display: block;
-    width: 100%;
-    background: var(--surface-card);
-    border: none;
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
-    box-shadow: var(--shadow-card);
-    margin-bottom: var(--space-4);
-    text-align: left;
-    font-family: inherit;
-    color: inherit;
-  }
-  .card-calorias-editavel {
-    cursor: pointer;
-  }
-  .card-calorias:disabled {
-    cursor: default;
-  }
-  .card-titulo {
-    margin: 0 0 var(--space-2);
-    font-size: var(--font-size-base);
-    color: var(--surface-muted);
-  }
-  .calorias-linha {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: var(--space-3);
-  }
-  .calorias-valor {
-    font-size: var(--font-size-lg);
-  }
-  .calorias-valor strong {
-    font-size: 22px;
-  }
-  .calorias-meta {
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
-  }
-  .calorias-restantes {
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
-  }
-  .barra-wrap-grande {
-    height: 10px;
-    background: var(--surface-border);
-    border-radius: 6px;
-    overflow: hidden;
-  }
-  .barra-grande {
-    height: 100%;
-    border-radius: 6px;
-  }
-  .toggle-btn {
-    position: absolute;
-    top: var(--space-4);
-    right: var(--space-4);
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    border: none;
-    background: var(--surface-bg);
-    color: var(--surface-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-  .toggle-btn svg {
-    width: 16px;
-    height: 16px;
-  }
-  .macros-grid {
-    display: flex;
-    gap: var(--space-3);
-    width: calc(100% - 48px);
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-  }
-  .macros-grid::-webkit-scrollbar {
-    display: none;
-  }
-  .macros-grid .macro-col {
-    flex: 0 0 calc((100% - 2 * var(--space-3)) / 3);
-    min-width: 0;
-    scroll-snap-align: start;
-  }
-  .macro-nome {
-    margin: 0 0 var(--space-1);
-    font-size: var(--font-size-sm);
-    color: var(--surface-fg);
-    white-space: nowrap;
-  }
-  .macro-meta {
-    color: var(--surface-muted);
-  }
-  .macro-meta-restantes {
-    display: block;
-  }
-  .macro-anel {
-    position: relative;
-    width: 68px;
-    height: 68px;
-    margin: 0 auto;
-    border-radius: 50%;
-  }
-  .macro-anel-centro {
-    position: absolute;
-    inset: 6px;
-    border-radius: 50%;
-    background: var(--surface-card);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    line-height: 1.2;
-  }
-  .macro-anel-centro strong {
-    font-size: 14px;
-    color: var(--surface-fg);
-  }
-  .macro-anel-centro .macro-meta {
-    font-size: 10px;
   }
   .dias-lista {
     display: flex;
