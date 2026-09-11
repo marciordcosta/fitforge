@@ -228,7 +228,7 @@
   });
 
   const ANEL_DIAMETRO = 70;
-  const ANEL_RAIO = 30;
+  const ANEL_RAIO = 31;
   const ANEL_CIRCUNFERENCIA = 2 * Math.PI * ANEL_RAIO;
 
   /** Posição do anel na tela, arrastável pelo usuário — nasce no canto superior direito,
@@ -865,7 +865,9 @@
           style={`stroke-dasharray:${ANEL_CIRCUNFERENCIA}; stroke-dashoffset:${ANEL_CIRCUNFERENCIA * (1 - progressoDescanso)};`}
         />
       </svg>
-      <span class="anel-tempo">{formatMMSSAssinado(restanteDescansoSeg)}</span>
+      <span class="anel-centro">
+        <span class="anel-tempo">{formatMMSSAssinado(restanteDescansoSeg)}</span>
+      </span>
     </button>
     {#if anelExpandido}
       <div class="anel-popover" style={estiloPopoverAnel()}>
@@ -1768,9 +1770,7 @@
     height: 70px;
     padding: 0;
     border: none;
-    border-radius: 50%;
-    background: var(--surface-card);
-    box-shadow: var(--shadow-float);
+    background: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1788,14 +1788,25 @@
   .anel-fundo {
     fill: none;
     stroke: var(--surface-border);
-    stroke-width: 5;
+    stroke-width: 6;
   }
   .anel-progresso {
     fill: none;
     stroke: #3b82f6;
-    stroke-width: 5;
+    stroke-width: 6;
     stroke-linecap: round;
     transition: stroke-dashoffset 1s linear, stroke 0.2s;
+  }
+  .anel-centro {
+    position: relative;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    box-shadow: var(--shadow-float);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .descanso-anel.anel-atrasado .anel-progresso {
     stroke: var(--color-danger);
