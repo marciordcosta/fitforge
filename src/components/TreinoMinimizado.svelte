@@ -3,6 +3,16 @@
   import { treinoLogSessao } from "../lib/treinoLogSessao.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
 
+  /** onAbrir: usado quando essa barra aparece por cima de uma subtela da própria rotina ao vivo
+   * (ex: o picker de exercícios), que cobre a lista mas não navega de verdade pra fora da rota —
+   * nesse caso "abrir a rotina" é só fechar essa subtela, não um navigate (já se está na rota). */
+  let { onAbrir }: { onAbrir?: () => void } = $props();
+
+  function abrirRotina(): void {
+    if (onAbrir) onAbrir();
+    else navigate(`/treino/log/${treinoLogSessao.atual!.treinoId}`);
+  }
+
   let agora = $state(Date.now());
   const timerId = setInterval(() => (agora = Date.now()), 1000);
   $effect(() => () => clearInterval(timerId));
@@ -80,7 +90,7 @@
         <path d="M18 15l-6-6-6 6" />
       </svg>
     </button>
-    <button class="conteudo" onclick={() => navigate(`/treino/log/${treinoLogSessao.atual!.treinoId}`)}>
+    <button class="conteudo" onclick={abrirRotina}>
       <span class="titulo">
         <span class="ponto"></span>
         {info.titulo}
@@ -121,7 +131,9 @@
     border-radius: var(--radius-lg);
     padding: var(--space-2);
     box-shadow: var(--shadow-float);
-    z-index: 60;
+    /* Acima de telas cheias como o picker de exercícios e as telas de avulso/reordenar (120-150) —
+       a barra minimizada precisa continuar visível por cima delas. */
+    z-index: 155;
   }
   .barra.cima {
     bottom: auto;

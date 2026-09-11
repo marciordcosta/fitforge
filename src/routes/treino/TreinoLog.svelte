@@ -26,6 +26,7 @@
   import Sheet from "../../components/Sheet.svelte";
   import Exercicios from "./Exercicios.svelte";
   import ExercicioCampos from "./ExercicioCampos.svelte";
+  import TreinoMinimizado from "../../components/TreinoMinimizado.svelte";
   import { treinoLogSessao, type SetSessao, type ExercicioSessao } from "../../lib/treinoLogSessao.svelte";
 
   let { treinoId }: { treinoId: string } = $props();
@@ -735,6 +736,14 @@
     treinoLogSessao.limpar();
     navigate("/treino");
   }
+
+  /** Essas telas cobrem a lista de exercícios com um overlay cheio, sem navegar de verdade pra
+   * fora de /treino/log/:id — então o TreinoMinimizado do App.svelte (que só aparece fora dessa
+   * rota) fica escondido. Mostra a mesma barra aqui, por cima, enquanto qualquer uma delas está
+   * aberta, exatamente como já acontece ao sair pra outras telas do app. */
+  const subtelaAberta = $derived(
+    mostrarEscolhaAdicionar || mostrarPicker || mostrarCriarAvulso || substituindoExIdx !== null || reordenando,
+  );
 </script>
 
 <div class="header-fixo">
@@ -1175,6 +1184,18 @@
       {/if}
     </div>
   </Sheet>
+{/if}
+
+{#if subtelaAberta}
+  <TreinoMinimizado
+    onAbrir={() => {
+      mostrarEscolhaAdicionar = false;
+      mostrarPicker = false;
+      mostrarCriarAvulso = false;
+      substituindoExIdx = null;
+      reordenando = false;
+    }}
+  />
 {/if}
 
 <style>
@@ -1700,9 +1721,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    /* Acima do picker de exercícios (120/130) e das telas cheias de avulso/reordenar (150) desta
-       tela — o cronômetro não pode ficar escondido enquanto o usuário navega por elas. */
-    z-index: 160;
+    z-index: 40;
     background: var(--surface-card);
     border-top: 1px solid var(--surface-border);
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -1790,7 +1809,7 @@
   }
   .descanso-anel {
     position: fixed;
-    z-index: 160;
+    z-index: 60;
     width: 70px;
     height: 70px;
     padding: 0;
@@ -1849,7 +1868,7 @@
   }
   .anel-popover {
     position: fixed;
-    z-index: 161;
+    z-index: 61;
     display: flex;
     flex-direction: column;
     align-items: center;
