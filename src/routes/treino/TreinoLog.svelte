@@ -872,7 +872,7 @@
     {#if anelExpandido}
       <div class="anel-popover" style={estiloPopoverAnel()}>
         <div class="anel-popover-linha">
-          <button class="descanso-ajuste" onclick={() => ajustarDescanso(-15)}>-15</button>
+          <button class="descanso-ajuste" disabled={restanteDescansoSeg < 15} onclick={() => ajustarDescanso(-15)}>-15</button>
           <button class="descanso-pular" onclick={() => { pularDescanso(); anelExpandido = false; }}>Pular</button>
           <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
         </div>
@@ -887,7 +887,7 @@
           ◯
         </button>
         <div class="descanso-central">
-          <button class="descanso-ajuste" onclick={() => ajustarDescanso(-15)}>-15</button>
+          <button class="descanso-ajuste" disabled={restanteDescansoSeg < 15} onclick={() => ajustarDescanso(-15)}>-15</button>
           <span class="descanso-tempo">{formatMMSS(restanteDescansoSeg)}</span>
           <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
         </div>
@@ -1723,6 +1723,10 @@
     font-size: var(--font-size-base);
     font-weight: 600;
     cursor: pointer;
+  }
+  .descanso-ajuste:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
   .descanso-tempo {
     flex-shrink: 0;
