@@ -7,6 +7,7 @@
   import PieChart from "../../components/PieChart.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
   import Exercicios from "./Exercicios.svelte";
+  import { treinoEditorRascunho } from "../../lib/treinoEditorRascunho.svelte";
   import {
     listMusculos,
     listTreinos,
@@ -1699,14 +1700,33 @@
     );
   });
 
+  /** Se já existe um rascunho pendente desse mesmo treino (ex: navegou pra ver detalhes de um
+   * exercício e voltou), reabre a partir dele em vez do que está salvo no banco — sem isso, sair
+   * da rota /treino/distribuicao e voltar recriava o componente do zero e descartava
+   * silenciosamente qualquer edição ainda não salva. */
   function definirModalEditor(treino: TreinoComExercicios): void {
-    modalEditorRotina = treino;
-    capturarBaselineEditor(treino);
-    editorSujo = false;
+    const rascunho = treinoEditorRascunho.atual;
+    if (rascunho && rascunho.treinoId === treino.id) {
+      modalEditorRotina = rascunho.treino;
+      baselineEditor = rascunho.baseline;
+      editorSujo = rascunho.sujo;
+    } else {
+      modalEditorRotina = treino;
+      capturarBaselineEditor(treino);
+      editorSujo = false;
+    }
     editorFiltroMusculoId = editorFiltroInicialId;
     editorFiltroInicialId = null;
     modoReordenarEditor = false;
   }
+
+  /** Espelha o rascunho aberto no store fora do componente, sempre que muda — é o que permite
+   * definirModalEditor recuperá-lo depois de o componente ser desmontado e remontado. */
+  $effect(() => {
+    if (modalEditorRotina && baselineEditor) {
+      treinoEditorRascunho.definir({ treinoId: modalEditorRotina.id, treino: modalEditorRotina, baseline: baselineEditor, sujo: editorSujo });
+    }
+  });
 
   /** Navega (em vez de só setar estado) pra sair e voltar do detalhe de um exercício reabrir o
    * editor. `destaqueMusculoId` (opcional) marca qual músculo destacar nos exercícios do editor —
@@ -1724,6 +1744,7 @@
   function fecharEditorSemSalvar(): void {
     modalEditorRotina = null;
     editorSujo = false;
+    treinoEditorRascunho.limpar();
     if (editorUrlTreino) window.history.back();
   }
 
@@ -1769,6 +1790,7 @@
       void carregarRegistrosPorTreino(treinos);
       editorSujo = false;
       modalEditorRotina = null;
+      treinoEditorRascunho.limpar();
       if (editorUrlTreino) window.history.back();
     } catch (e) {
       alert("Erro ao salvar rotina: " + (e as Error).message);
