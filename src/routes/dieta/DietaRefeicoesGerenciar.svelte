@@ -5,7 +5,6 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
   import WheelPickerMacros from "../../components/WheelPickerMacros.svelte";
-  import ActionSheet from "../../components/ActionSheet.svelte";
   import {
     listRefeicoesModelo,
     criarRefeicaoModelo,
@@ -1106,29 +1105,33 @@
 
   let mostrarAdicionarRefeicaoGrupo = $state(false);
   let grupoParaAdicionar = $state<GrupoDias | null>(null);
+  let nomeNovaRefeicaoGrupo = $state("");
+  let salvandoNovaRefeicaoGrupo = $state(false);
 
   function abrirAdicionarRefeicao(grupo: GrupoDias) {
     grupoParaAdicionar = grupo;
+    nomeNovaRefeicaoGrupo = "";
     mostrarAdicionarRefeicaoGrupo = true;
   }
 
-  const refeicoesDisponiveisParaGrupo = $derived(
-    grupoParaAdicionar ? modelos.filter((m) => !grupoParaAdicionar!.modelos.some((x) => x.id === m.id)) : [],
-  );
-
-  async function adicionarAoGrupo(m: RefeicaoModelo) {
-    if (!grupoParaAdicionar) return;
+  /** Cria uma refeição nova no catálogo e já a inclui só nesse grupo de dias — entra ANTES da
+   * última (automática/sobra do dia), que continua sempre por último. */
+  async function criarEAdicionarAoGrupo() {
+    if (!grupoParaAdicionar || !nomeNovaRefeicaoGrupo.trim()) return;
     const grupo = grupoParaAdicionar;
-    // Entra ANTES da última (automática/sobra do dia) — ela continua sempre por último.
-    const ids = grupo.modelos.length
-      ? [...grupo.modelos.slice(0, -1).map((x) => x.id), m.id, grupo.modelos[grupo.modelos.length - 1].id]
-      : [m.id];
-    mostrarAdicionarRefeicaoGrupo = false;
+    salvandoNovaRefeicaoGrupo = true;
     try {
+      const novoId = await criarRefeicaoModelo(nomeNovaRefeicaoGrupo.trim());
+      const ids = grupo.modelos.length
+        ? [...grupo.modelos.slice(0, -1).map((x) => x.id), novoId, grupo.modelos[grupo.modelos.length - 1].id]
+        : [novoId];
       await Promise.all(grupo.dias.map((dia) => definirRefeicoesDoDia(dia, ids)));
-      aplicarModelosPorDiaLocal(grupo.dias, ids);
+      mostrarAdicionarRefeicaoGrupo = false;
+      await carregar();
     } catch (err) {
-      alert("Erro ao adicionar refeição: " + (err as Error).message);
+      alert("Erro ao criar refeição: " + (err as Error).message);
+    } finally {
+      salvandoNovaRefeicaoGrupo = false;
     }
   }
 </script>
@@ -1577,13 +1580,10 @@
 {/if}
 
 {#if mostrarAdicionarRefeicaoGrupo}
-  <ActionSheet
-    titulo="Adicionar refeição"
-    onFechar={() => (mostrarAdicionarRefeicaoGrupo = false)}
-    opcoes={refeicoesDisponiveisParaGrupo.length
-      ? refeicoesDisponiveisParaGrupo.map((m) => ({ label: m.nome, onSelect: () => adicionarAoGrupo(m) }))
-      : [{ label: "Todas as refeições do catálogo já estão nesse bloco", disabled: true, onSelect: () => {} }]}
-  />
+  <Sheet titulo="Adicionar refeição" onFechar={() => (mostrarAdicionarRefeicaoGrupo = false)}>
+    <input class="nome-input" type="text" placeholder="Nome da refeição" bind:value={nomeNovaRefeicaoGrupo} />
+    <Button onclick={criarEAdicionarAoGrupo} disabled={salvandoNovaRefeicaoGrupo || !nomeNovaRefeicaoGrupo.trim()}>Salvar</Button>
+  </Sheet>
 {/if}
 
 <style>
