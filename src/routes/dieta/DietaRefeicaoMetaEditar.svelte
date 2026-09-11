@@ -332,11 +332,12 @@
       </div>
 
       <p class="itens-titulo">Itens</p>
-      <p class="itens-ajuda">Opcional — só serve pra lançar essa refeição sozinha no diário do dia.</p>
+      <p class="itens-ajuda">Opcional — só serve pra lançar essa refeição sozinha no diário do dia. A barra de cada um mostra quanto ele representa da meta de calorias.</p>
       {#if !receita?.itens.length}
         <p class="muted">Nenhum alimento adicionado ainda.</p>
       {:else}
         {#each receita.itens as item (item.id)}
+          {@const pctItem = pctMeta(item.calorias, caloriasCalc)}
           <button
             class="item-card"
             onpointerdown={(e) => aoPointerDownItem(e, item)}
@@ -345,7 +346,10 @@
           >
             <div class="item-info">
               <p class="item-nome">{item.nome}</p>
-              <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal</p>
+              <p class="item-qtd">{item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal · {pctItem.toFixed(0)}% da meta</p>
+              <div class="item-barra-wrap">
+                <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
+              </div>
             </div>
             <span class="item-detalhe" aria-hidden="true">{@render iconInfo()}</span>
           </button>
@@ -584,6 +588,18 @@
     margin: 2px 0 0;
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .item-barra-wrap {
+    height: 4px;
+    margin-top: var(--space-2);
+    background: var(--surface-border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .item-barra {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--color-primary);
   }
   .item-detalhe {
     flex-shrink: 0;
