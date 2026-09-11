@@ -50,12 +50,14 @@
   let carregandoRealizado = $state(false);
   let carregouRealizadoAlgumaVez = $state(false);
 
-  /** Rotinas com dia informado sobem pro topo, ordenadas pelo dia mais próximo; sem dia, mantém a ordenação manual (mesma lógica da tela inicial de Treino). */
+  /** Rotinas com dia informado sobem pro topo, na ordem FIXA da semana (Seg..Dom) -- diferente da
+   * tela inicial de Treino, que ordena pelo dia mais próximo de hoje (muda de posição conforme os
+   * dias passam). Aqui o cartão de cada rotina fica sempre no mesmo lugar, dia a dia. Sem dia,
+   * mantém a ordenação manual. */
   function ordenarPorDia(lista: TreinoComExercicios[]): TreinoComExercicios[] {
-    const hoje = new Date().getDay();
     const comDia = lista
       .filter((t) => t.dia_semana != null)
-      .sort((a, b) => ((a.dia_semana! - hoje + 7) % 7) - ((b.dia_semana! - hoje + 7) % 7));
+      .sort((a, b) => ORDEM_DIAS.indexOf(a.dia_semana!) - ORDEM_DIAS.indexOf(b.dia_semana!));
     const semDia = lista.filter((t) => t.dia_semana == null);
     return [...comDia, ...semDia];
   }

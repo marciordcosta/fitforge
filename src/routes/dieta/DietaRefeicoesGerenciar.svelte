@@ -1413,77 +1413,87 @@
           <div class="macros-grid">
             <div class="macro-col">
               <p class="macro-nome">Carb</p>
-              <p class="macro-valor">
-                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG)}
-                  <strong>{(somaGrupo.carboidratoG - metaGrupo.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGrupo.carboidratoG, metaGrupo.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGrupo.carboidratoG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGrupo.carboidratoG.toFixed(0)}</span>
-                {/if}
-              </p>
-              <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG))}%; background:${COR_CARBO};`}></div>
+              <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG))}% 100%);`}>
+                <div class="macro-anel-centro">
+                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.carboidratoG, metaGrupo.carboidratoG)}
+                    <strong>{(somaGrupo.carboidratoG - metaGrupo.carboidratoG).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">acima</span>
+                  {:else if modoRestanteRefeicoes}
+                    <strong>{restante(somaGrupo.carboidratoG, metaGrupo.carboidratoG).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">restantes</span>
+                  {:else}
+                    <strong>{somaGrupo.carboidratoG.toFixed(0)} g</strong>
+                    <span class="macro-meta">/ {metaGrupo.carboidratoG.toFixed(0)}</span>
+                  {/if}
+                </div>
               </div>
             </div>
             <div class="macro-col">
               <p class="macro-nome">Gorduras</p>
-              <p class="macro-valor">
-                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.gorduraG, metaGrupo.gorduraG)}
-                  <strong>{(somaGrupo.gorduraG - metaGrupo.gorduraG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGrupo.gorduraG, metaGrupo.gorduraG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGrupo.gorduraG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGrupo.gorduraG.toFixed(0)}</span>
-                {/if}
-              </p>
-              <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.gorduraG, metaGrupo.gorduraG))}%; background:${COR_GORDURA};`}></div>
+              <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(somaGrupo.gorduraG, metaGrupo.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.gorduraG, metaGrupo.gorduraG))}% 100%);`}>
+                <div class="macro-anel-centro">
+                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.gorduraG, metaGrupo.gorduraG)}
+                    <strong>{(somaGrupo.gorduraG - metaGrupo.gorduraG).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">acima</span>
+                  {:else if modoRestanteRefeicoes}
+                    <strong>{restante(somaGrupo.gorduraG, metaGrupo.gorduraG).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">restantes</span>
+                  {:else}
+                    <strong>{somaGrupo.gorduraG.toFixed(0)} g</strong>
+                    <span class="macro-meta">/ {metaGrupo.gorduraG.toFixed(0)}</span>
+                  {/if}
+                </div>
               </div>
             </div>
             <div class="macro-col">
               <p class="macro-nome">Proteínas</p>
-              <p class="macro-valor">
-                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.proteinaG, metaGrupo.proteinaG)}
-                  <strong>{(somaGrupo.proteinaG - metaGrupo.proteinaG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGrupo.proteinaG, metaGrupo.proteinaG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGrupo.proteinaG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGrupo.proteinaG.toFixed(0)}</span>
-                {/if}
-              </p>
-              <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG))}%; background:${COR_PROTEINA};`}></div>
+              <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.proteinaG, metaGrupo.proteinaG))}% 100%);`}>
+                <div class="macro-anel-centro">
+                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.proteinaG, metaGrupo.proteinaG)}
+                    <strong>{(somaGrupo.proteinaG - metaGrupo.proteinaG).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">acima</span>
+                  {:else if modoRestanteRefeicoes}
+                    <strong>{restante(somaGrupo.proteinaG, metaGrupo.proteinaG).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">restantes</span>
+                  {:else}
+                    <strong>{somaGrupo.proteinaG.toFixed(0)} g</strong>
+                    <span class="macro-meta">/ {metaGrupo.proteinaG.toFixed(0)}</span>
+                  {/if}
+                </div>
               </div>
             </div>
             <div class="macro-col">
               <p class="macro-nome">G. satur</p>
-              <p class="macro-valor">
-                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo)}
-                  <strong>{(somaGrupo.gorduraSaturadaG - gorduraSaturadaMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGrupo.gorduraSaturadaG.toFixed(0)} g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxGrupo.toFixed(0)}</span>
-                {/if}
-              </p>
-              <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo))}%; background:${COR_GORDURA};`}></div>
+              <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo))}% 100%);`}>
+                <div class="macro-anel-centro">
+                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo)}
+                    <strong>{(somaGrupo.gorduraSaturadaG - gorduraSaturadaMaxGrupo).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">acima</span>
+                  {:else if modoRestanteRefeicoes}
+                    <strong>{restante(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">restantes</span>
+                  {:else}
+                    <strong>{somaGrupo.gorduraSaturadaG.toFixed(0)} g</strong>
+                    <span class="macro-meta">/ {gorduraSaturadaMaxGrupo.toFixed(0)}</span>
+                  {/if}
+                </div>
               </div>
             </div>
             <div class="macro-col">
               <p class="macro-nome">Fibras</p>
-              <p class="macro-valor">
-                {#if modoRestanteRefeicoes && passouMeta(somaGrupo.fibraG, fibrasMaxGrupo)}
-                  <strong>{(somaGrupo.fibraG - fibrasMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGrupo.fibraG, fibrasMaxGrupo).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGrupo.fibraG.toFixed(0)} g</strong> <span class="macro-meta">/ {fibrasMaxGrupo.toFixed(0)}</span>
-                {/if}
-              </p>
-              <div class="barra-wrap">
-                <div class="barra" style={`width:${larguraBarra(pctMeta(somaGrupo.fibraG, fibrasMaxGrupo))}%; background:${COR_CARBO};`}></div>
+              <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(somaGrupo.fibraG, fibrasMaxGrupo))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.fibraG, fibrasMaxGrupo))}% 100%);`}>
+                <div class="macro-anel-centro">
+                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.fibraG, fibrasMaxGrupo)}
+                    <strong>{(somaGrupo.fibraG - fibrasMaxGrupo).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">acima</span>
+                  {:else if modoRestanteRefeicoes}
+                    <strong>{restante(somaGrupo.fibraG, fibrasMaxGrupo).toFixed(0)} g</strong>
+                    <span class="macro-meta macro-meta-restantes">restantes</span>
+                  {:else}
+                    <strong>{somaGrupo.fibraG.toFixed(0)} g</strong>
+                    <span class="macro-meta">/ {fibrasMaxGrupo.toFixed(0)}</span>
+                  {/if}
+                </div>
               </div>
             </div>
           </div>
@@ -1559,77 +1569,87 @@
         <div class="macros-grid">
           <div class="macro-col">
             <p class="macro-nome">Carb</p>
-            <p class="macro-valor">
-              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG)}
-                <strong>{(somaGlobal.carboidratoG - metaGlobal.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-              {:else if modoRestanteRefeicoes}
-                <strong>{restante(somaGlobal.carboidratoG, metaGlobal.carboidratoG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-              {:else}
-                <strong>{somaGlobal.carboidratoG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGlobal.carboidratoG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG))}%; background:${COR_CARBO};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.carboidratoG, metaGlobal.carboidratoG)}
+                  <strong>{(somaGlobal.carboidratoG - metaGlobal.carboidratoG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
+                  <strong>{restante(somaGlobal.carboidratoG, metaGlobal.carboidratoG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">restantes</span>
+                {:else}
+                  <strong>{somaGlobal.carboidratoG.toFixed(0)} g</strong>
+                  <span class="macro-meta">/ {metaGlobal.carboidratoG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Gorduras</p>
-            <p class="macro-valor">
-              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.gorduraG, metaGlobal.gorduraG)}
-                <strong>{(somaGlobal.gorduraG - metaGlobal.gorduraG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-              {:else if modoRestanteRefeicoes}
-                <strong>{restante(somaGlobal.gorduraG, metaGlobal.gorduraG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-              {:else}
-                <strong>{somaGlobal.gorduraG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGlobal.gorduraG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.gorduraG, metaGlobal.gorduraG))}%; background:${COR_GORDURA};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(somaGlobal.gorduraG, metaGlobal.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.gorduraG, metaGlobal.gorduraG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.gorduraG, metaGlobal.gorduraG)}
+                  <strong>{(somaGlobal.gorduraG - metaGlobal.gorduraG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
+                  <strong>{restante(somaGlobal.gorduraG, metaGlobal.gorduraG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">restantes</span>
+                {:else}
+                  <strong>{somaGlobal.gorduraG.toFixed(0)} g</strong>
+                  <span class="macro-meta">/ {metaGlobal.gorduraG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Proteínas</p>
-            <p class="macro-valor">
-              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.proteinaG, metaGlobal.proteinaG)}
-                <strong>{(somaGlobal.proteinaG - metaGlobal.proteinaG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-              {:else if modoRestanteRefeicoes}
-                <strong>{restante(somaGlobal.proteinaG, metaGlobal.proteinaG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-              {:else}
-                <strong>{somaGlobal.proteinaG.toFixed(0)} g</strong> <span class="macro-meta">/ {metaGlobal.proteinaG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.proteinaG, metaGlobal.proteinaG))}%; background:${COR_PROTEINA};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(somaGlobal.proteinaG, metaGlobal.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.proteinaG, metaGlobal.proteinaG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.proteinaG, metaGlobal.proteinaG)}
+                  <strong>{(somaGlobal.proteinaG - metaGlobal.proteinaG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
+                  <strong>{restante(somaGlobal.proteinaG, metaGlobal.proteinaG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">restantes</span>
+                {:else}
+                  <strong>{somaGlobal.proteinaG.toFixed(0)} g</strong>
+                  <span class="macro-meta">/ {metaGlobal.proteinaG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">G. satur</p>
-            <p class="macro-valor">
-              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG)}
-                <strong>{(somaGlobal.gorduraSaturadaG - gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-              {:else if modoRestanteRefeicoes}
-                <strong>{restante(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-              {:else}
-                <strong>{somaGlobal.gorduraSaturadaG.toFixed(0)} g</strong> <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG))}%; background:${COR_GORDURA};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG)}
+                  <strong>{(somaGlobal.gorduraSaturadaG - gorduraSaturadaMaxG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
+                  <strong>{restante(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">restantes</span>
+                {:else}
+                  <strong>{somaGlobal.gorduraSaturadaG.toFixed(0)} g</strong>
+                  <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Fibras</p>
-            <p class="macro-valor">
-              {#if modoRestanteRefeicoes && passouMeta(somaGlobal.fibraG, fibrasMaxG)}
-                <strong>{(somaGlobal.fibraG - fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">acima</span>
-              {:else if modoRestanteRefeicoes}
-                <strong>{restante(somaGlobal.fibraG, fibrasMaxG).toFixed(0)} g</strong> <span class="macro-meta macro-meta-restantes">restantes</span>
-              {:else}
-                <strong>{somaGlobal.fibraG.toFixed(0)} g</strong> <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
-              {/if}
-            </p>
-            <div class="barra-wrap">
-              <div class="barra" style={`width:${larguraBarra(pctMeta(somaGlobal.fibraG, fibrasMaxG))}%; background:${COR_CARBO};`}></div>
+            <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(somaGlobal.fibraG, fibrasMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.fibraG, fibrasMaxG))}% 100%);`}>
+              <div class="macro-anel-centro">
+                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.fibraG, fibrasMaxG)}
+                  <strong>{(somaGlobal.fibraG - fibrasMaxG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">acima</span>
+                {:else if modoRestanteRefeicoes}
+                  <strong>{restante(somaGlobal.fibraG, fibrasMaxG).toFixed(0)} g</strong>
+                  <span class="macro-meta macro-meta-restantes">restantes</span>
+                {:else}
+                  <strong>{somaGlobal.fibraG.toFixed(0)} g</strong>
+                  <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
         </div>
@@ -2352,26 +2372,36 @@
     color: var(--surface-fg);
     white-space: nowrap;
   }
-  .macro-valor {
-    margin: 0 0 var(--space-2);
-    font-size: 12px;
-    color: var(--surface-fg);
-  }
   .macro-meta {
     color: var(--surface-muted);
   }
   .macro-meta-restantes {
     display: block;
   }
-  .barra-wrap {
-    height: 8px;
-    background: var(--surface-border);
-    border-radius: 5px;
-    overflow: hidden;
+  .macro-anel {
+    position: relative;
+    width: 68px;
+    height: 68px;
+    margin: 0 auto;
+    border-radius: 50%;
   }
-  .barra {
-    height: 100%;
-    border-radius: 5px;
+  .macro-anel-centro {
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--surface-card);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.2;
+  }
+  .macro-anel-centro strong {
+    font-size: 14px;
+    color: var(--surface-fg);
+  }
+  .macro-anel-centro .macro-meta {
+    font-size: 10px;
   }
   .dias-lista {
     display: flex;
