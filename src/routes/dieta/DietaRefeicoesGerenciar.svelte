@@ -1131,23 +1131,14 @@
   <span class="nome-macros" class:invisivel>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Carb</span>
-      <span class="mini-macro-barra-wrap">
-        <span class="mini-macro-barra" style={`width:${Math.min(100, pctCarboDia)}%; background:${COR_CARBO};`}></span>
-      </span>
       <span class="mini-macro-valor">{carboidratoG.toFixed(0)} g · {pctCarboDia}%</span>
     </span>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Gorduras</span>
-      <span class="mini-macro-barra-wrap">
-        <span class="mini-macro-barra" style={`width:${Math.min(100, pctGorduraDia)}%; background:${COR_GORDURA};`}></span>
-      </span>
       <span class="mini-macro-valor">{gorduraG.toFixed(0)} g · {pctGorduraDia}%</span>
     </span>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Proteínas</span>
-      <span class="mini-macro-barra-wrap">
-        <span class="mini-macro-barra" style={`width:${Math.min(100, pctProteinaDia)}%; background:${COR_PROTEINA};`}></span>
-      </span>
       <span class="mini-macro-valor">{proteinaG.toFixed(0)} g · {pctProteinaDia}%</span>
     </span>
   </span>
@@ -2071,17 +2062,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .mini-macro-barra-wrap {
-    display: block;
-    height: 3px;
-    border-radius: 2px;
-    overflow: hidden;
-    background: var(--surface-border);
-  }
-  .mini-macro-barra {
-    display: block;
-    height: 100%;
   }
   .mini-macro-valor {
     font-size: 9px;
