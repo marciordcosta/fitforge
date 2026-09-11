@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import WheelPickerMacros from "../../components/WheelPickerMacros.svelte";
@@ -8,6 +9,8 @@
     listRefeicoesModelo,
     listMetasDiaModelo,
     getReceita,
+    getRefeicoesDoDia,
+    getDiarioDoDia,
     salvarMetaNumericaRefeicao,
     salvarMetaNumericaRefeicaoDias,
     garantirReceitaPrivadaRefeicao,
@@ -35,15 +38,43 @@
   let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
 
+  interface Totais {
+    calorias: number;
+    proteinaG: number;
+    gorduraG: number;
+    carboidratoG: number;
+  }
+
+  /** Consumo de hoje dessa refeição (pelo nome, igual ao Diário) — pra comparar com a meta aqui
+   * mesmo, sem precisar ir na Home. Zero se hoje ainda não tem essa refeição ou nada lançado nela. */
+  let consumoHoje = $state<Totais>({ calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 });
+
   async function carregar(): Promise<void> {
     loading = true;
     erro = null;
     try {
-      const [modelos, metasDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo()]);
+      const [modelos, metasDia, refeicoesHoje, itensHoje] = await Promise.all([
+        listRefeicoesModelo(),
+        listMetasDiaModelo(),
+        getRefeicoesDoDia(hojeISO()),
+        getDiarioDoDia(hojeISO()),
+      ]);
       modelo = modelos.find((m) => m.id === modeloId) ?? null;
       overrideDia = diasSemana?.length ? (metasDia.find((m) => m.modeloId === modeloId && m.diaSemana === diasSemana![0]) ?? null) : null;
       const receitaId = overrideDia?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
       receita = receitaId ? await getReceita(receitaId) : null;
+
+      const refeicaoHoje = refeicoesHoje.find((r) => r.nome === nome);
+      const itensDaRefeicao = refeicaoHoje ? itensHoje.filter((i) => i.refeicaoId === refeicaoHoje.id) : [];
+      consumoHoje = itensDaRefeicao.reduce(
+        (acc, i) => ({
+          calorias: acc.calorias + i.calorias,
+          proteinaG: acc.proteinaG + i.proteinaG,
+          gorduraG: acc.gorduraG + i.gorduraG,
+          carboidratoG: acc.carboidratoG + i.carboidratoG,
+        }),
+        { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+      );
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -53,6 +84,18 @@
   }
 
   void carregar();
+
+  function pctMeta(valor: number, meta: number): number {
+    return meta > 0 ? (valor / meta) * 100 : 0;
+  }
+
+  function larguraBarra(pct: number): number {
+    return Math.min(100, pct);
+  }
+
+  function labelAbsoluto(valor: number, meta: number, unidade: string): string {
+    return `${valor.toFixed(0)}/${meta.toFixed(0)}${unidade}`;
+  }
 
   const proteinaG = $derived(overrideDia?.metaProteinaG ?? modelo?.metaProteinaG ?? null);
   const gorduraG = $derived(overrideDia?.metaGorduraG ?? modelo?.metaGorduraG ?? null);
@@ -239,19 +282,54 @@
     <p class="erro">Erro ao carregar: {erro}</p>
   {:else}
     <div class="conteudo" class:carregando={loading}>
-      <button type="button" class="resumo" onclick={() => (mostrarMacros = true)}>
-        <span class="donut" style={donutStyle}>
-          <span class="donut-centro">
-            <strong>{caloriasCalc.toFixed(0)}</strong>
-            <span>Cal</span>
+      <div class="card-meta">
+        <p class="card-meta-titulo">Meta da Refeição</p>
+        <button type="button" class="resumo" onclick={() => (mostrarMacros = true)}>
+          <span class="donut" style={donutStyle}>
+            <span class="donut-centro">
+              <strong>{caloriasCalc.toFixed(0)}</strong>
+              <span>Cal</span>
+            </span>
           </span>
-        </span>
-        <span class="resumo-macros">
-          <span><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br /><span class="valor-g">{(carboidratoG ?? 0).toFixed(0)} g</span><br />Carb</span>
-          <span><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br /><span class="valor-g">{(gorduraG ?? 0).toFixed(0)} g</span><br />Gorduras</span>
-          <span><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{(proteinaG ?? 0).toFixed(0)} g</span><br />Proteínas</span>
-        </span>
-      </button>
+          <span class="resumo-macros">
+            <span><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br /><span class="valor-g">{(carboidratoG ?? 0).toFixed(0)} g</span><br />Carb</span>
+            <span><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br /><span class="valor-g">{(gorduraG ?? 0).toFixed(0)} g</span><br />Gorduras</span>
+            <span><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{(proteinaG ?? 0).toFixed(0)} g</span><br />Proteínas</span>
+          </span>
+        </button>
+      </div>
+
+      <p class="pct-titulo">Consumo de Hoje</p>
+      <div class="pct-grid">
+        <div class="pct-col">
+          <p class="pct-nome">Calorias</p>
+          <div class="pct-barra-wrap">
+            <div class="pct-barra" style={`width:${larguraBarra(pctMeta(consumoHoje.calorias, caloriasCalc))}%; background:var(--color-secondary);`}></div>
+          </div>
+          <p class="pct-valor">{labelAbsoluto(consumoHoje.calorias, caloriasCalc, "")}</p>
+        </div>
+        <div class="pct-col">
+          <p class="pct-nome">Carb</p>
+          <div class="pct-barra-wrap">
+            <div class="pct-barra" style={`width:${larguraBarra(pctMeta(consumoHoje.carboidratoG, carboidratoG ?? 0))}%; background:${COR_CARBO};`}></div>
+          </div>
+          <p class="pct-valor">{labelAbsoluto(consumoHoje.carboidratoG, carboidratoG ?? 0, "g")}</p>
+        </div>
+        <div class="pct-col">
+          <p class="pct-nome">Gorduras</p>
+          <div class="pct-barra-wrap">
+            <div class="pct-barra" style={`width:${larguraBarra(pctMeta(consumoHoje.gorduraG, gorduraG ?? 0))}%; background:${COR_GORDURA};`}></div>
+          </div>
+          <p class="pct-valor">{labelAbsoluto(consumoHoje.gorduraG, gorduraG ?? 0, "g")}</p>
+        </div>
+        <div class="pct-col">
+          <p class="pct-nome">Proteínas</p>
+          <div class="pct-barra-wrap">
+            <div class="pct-barra" style={`width:${larguraBarra(pctMeta(consumoHoje.proteinaG, proteinaG ?? 0))}%; background:${COR_PROTEINA};`}></div>
+          </div>
+          <p class="pct-valor">{labelAbsoluto(consumoHoje.proteinaG, proteinaG ?? 0, "g")}</p>
+        </div>
+      </div>
 
       <p class="itens-titulo">Itens</p>
       <p class="itens-ajuda">Opcional — só serve pra lançar essa refeição sozinha no diário do dia.</p>
@@ -361,12 +439,24 @@
     width: 36px;
     flex-shrink: 0;
   }
+  .card-meta {
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    padding: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+  .card-meta-titulo {
+    margin: 0;
+    font-weight: 600;
+    color: var(--surface-fg);
+  }
   .resumo {
     width: 100%;
     display: flex;
     align-items: center;
     gap: var(--space-5);
-    padding: var(--space-5) 0;
+    padding: var(--space-3) 0 0;
     background: none;
     border: none;
     cursor: pointer;
@@ -417,6 +507,42 @@
   }
   .resumo-macros .valor-g {
     font-size: 17px;
+  }
+  .pct-titulo {
+    margin: 0 0 var(--space-2);
+    font-size: 12px;
+    color: var(--surface-muted);
+  }
+  .pct-grid {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+  .pct-col {
+    flex: 1;
+    min-width: 0;
+  }
+  .pct-nome {
+    margin: 0 0 var(--space-1);
+    font-size: 12px;
+    color: var(--surface-fg);
+  }
+  .pct-barra-wrap {
+    height: 6px;
+    background: var(--surface-border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: var(--space-1);
+  }
+  .pct-barra {
+    height: 100%;
+    border-radius: 4px;
+  }
+  .pct-valor {
+    margin: 0;
+    font-size: 11px;
+    color: var(--surface-muted);
   }
   .itens-titulo {
     font-weight: 600;
