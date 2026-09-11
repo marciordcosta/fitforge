@@ -9,6 +9,7 @@
     listRefeicoesModelo,
     listMetasDiaModelo,
     getReceita,
+    getContextoMetaCatalogo,
     salvarMetaNumericaRefeicao,
     salvarMetaNumericaRefeicaoDias,
     garantirReceitaPrivadaRefeicao,
@@ -21,6 +22,7 @@
     type MetaDiaModelo,
     type Receita,
     type ReceitaItem,
+    type ContextoMetaCatalogo,
   } from "../../lib/dietaApi";
 
   let { modeloId, nome, diasSemana }: { modeloId: string; nome: string; diasSemana?: number[] } = $props();
@@ -32,6 +34,7 @@
   let modelo = $state<RefeicaoModelo | null>(null);
   let overrideDia = $state<MetaDiaModelo | null>(null);
   let receita = $state<Receita | null>(null);
+  let contexto = $state<ContextoMetaCatalogo | null>(null);
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
@@ -63,9 +66,14 @@
     loading = true;
     erro = null;
     try {
-      const [modelos, metasDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo()]);
+      const [modelos, metasDia, contextoRes] = await Promise.all([
+        listRefeicoesModelo(),
+        listMetasDiaModelo(),
+        getContextoMetaCatalogo(modeloId, diasSemana),
+      ]);
       modelo = modelos.find((m) => m.id === modeloId) ?? null;
       overrideDia = diasSemana?.length ? (metasDia.find((m) => m.modeloId === modeloId && m.diaSemana === diasSemana![0]) ?? null) : null;
+      contexto = contextoRes;
       const receitaId = overrideDia?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
       receita = receitaId ? await getReceita(receitaId) : null;
     } catch (err) {
@@ -91,9 +99,11 @@
     navigate(`/dieta/alimento/${item.alimentoId}/${hojeISO()}/receita/${receita.id}`);
   }
 
-  const proteinaG = $derived(overrideDia?.metaProteinaG ?? modelo?.metaProteinaG ?? null);
-  const gorduraG = $derived(overrideDia?.metaGorduraG ?? modelo?.metaGorduraG ?? null);
-  const carboidratoG = $derived(overrideDia?.metaCarboidratoG ?? modelo?.metaCarboidratoG ?? null);
+  const ehUltima = $derived(contexto?.ehUltima ?? false);
+
+  const proteinaG = $derived(ehUltima ? Math.max(0, contexto!.disponivel.proteinaG) : (overrideDia?.metaProteinaG ?? modelo?.metaProteinaG ?? null));
+  const gorduraG = $derived(ehUltima ? Math.max(0, contexto!.disponivel.gorduraG) : (overrideDia?.metaGorduraG ?? modelo?.metaGorduraG ?? null));
+  const carboidratoG = $derived(ehUltima ? Math.max(0, contexto!.disponivel.carboidratoG) : (overrideDia?.metaCarboidratoG ?? modelo?.metaCarboidratoG ?? null));
   const receitaIdAtual = $derived(overrideDia?.metaReceitaId ?? modelo?.metaReceitaId ?? null);
 
   const caloriasCarbo = $derived((carboidratoG ?? 0) * 4);
@@ -125,11 +135,16 @@
     return opcoes;
   }
 
+  /** Teto de cada macro pra essa refeição: não editar acima do que sobraria pra última (automática)
+   * — nunca menor que o valor já salvo, pra não escondê-lo da roda ao abrir. */
   function colunasMacros() {
+    const tetoCarbo = contexto ? Math.max(Math.round(carboidratoG ?? 0), Math.min(300, Math.round(contexto.disponivel.carboidratoG))) : 300;
+    const tetoGordura = contexto ? Math.max(Math.round(gorduraG ?? 0), Math.min(150, Math.round(contexto.disponivel.gorduraG))) : 150;
+    const tetoProteina = contexto ? Math.max(Math.round(proteinaG ?? 0), Math.min(300, Math.round(contexto.disponivel.proteinaG))) : 300;
     return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(300), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(150), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => `${v} g` },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(300), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(tetoCarbo), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(tetoGordura), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => `${v} g` },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(tetoProteina), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
     ];
   }
 
@@ -285,10 +300,15 @@
   {:else}
     <div class="conteudo" class:carregando={loading}>
       <div class="card-meta">
-        <p class="card-meta-titulo">Meta da Refeição</p>
+        <p class="card-meta-titulo">
+          Meta da Refeição
+          {#if ehUltima}<span class="card-meta-auto">Automática — sobra do dia</span>{/if}
+        </p>
         <button
           type="button"
           class="resumo"
+          class:resumo-auto={ehUltima}
+          disabled={ehUltima}
           onclick={() => (mostrarMacros = true)}
         >
           <span class="donut" style={donutStyle}>
@@ -374,9 +394,11 @@
 
       <button class="acao-adicionar" onclick={abrirAdicionarAlimento} disabled={preparandoAlimento}>+ Adicionar Alimento</button>
 
-      <div class="acao-excluir">
-        <Button variant="danger" onclick={() => (confirmandoRemoverMeta = true)} disabled={removendoMeta}>Remover Meta</Button>
-      </div>
+      {#if !ehUltima}
+        <div class="acao-excluir">
+          <Button variant="danger" onclick={() => (confirmandoRemoverMeta = true)} disabled={removendoMeta}>Remover Meta</Button>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
@@ -470,6 +492,14 @@
     margin: 0;
     font-weight: 600;
     color: var(--surface-fg);
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+  .card-meta-auto {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--surface-muted);
   }
   .resumo {
     width: 100%;
@@ -482,6 +512,9 @@
     cursor: pointer;
     text-align: left;
     font-family: inherit;
+  }
+  .resumo-auto {
+    cursor: default;
   }
   .donut {
     position: relative;

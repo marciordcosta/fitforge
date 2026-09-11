@@ -702,26 +702,106 @@
     carboidratoG: number | null;
   }
 
-  /** Meta de uma refeição do catálogo num dia específico — usa o override daquele dia se houver, senão cai pra meta global (m). */
+  /** Meta de macros do dia (sem grupo) — mesma fórmula de metaMacrosDoGrupo, mas por dia da semana
+   * direto, usada pra achar a sobra da última refeição desse dia. */
+  function metaMacrosDoDia(dia: number) {
+    const proteinaG = proteinaGInput ?? 0;
+    const manual = manuaisEfetivos.get(dia);
+    if (manual) return manual;
+    const calorias = diasResolvidos.find((d) => d.diaSemana === dia)?.calorias ?? caloriasCalc;
+    const gorduraG = gorduraResolvidaSemana.find((d) => d.diaSemana === dia)?.valor ?? gorduraGInput ?? 0;
+    return { calorias, proteinaG, gorduraG, carboidratoG: carboidratoGDoDia(calorias, proteinaG, gorduraG) };
+  }
+
+  /** Meta de uma refeição do catálogo num dia específico — usa o override daquele dia se houver,
+   * senão cai pra meta global (m). Exceto se `m` for a ÚLTIMA refeição da lista desse dia: aí a
+   * meta não é a armazenada, é a sobra (meta do dia menos a soma de todas as outras) — a última
+   * é sempre automática, pra fechar exatamente com a meta do dia. */
   function metaEfetivaDoDia(m: RefeicaoModelo, dia: number): MetaEfetiva {
     const override = metaDiaMap.get(`${m.id}:${dia}`);
-    if (override) {
-      return {
-        receitaId: override.metaReceitaId,
-        receitaOculta: override.metaReceitaOculta,
-        calorias: override.metaCalorias,
-        proteinaG: override.metaProteinaG,
-        gorduraG: override.metaGorduraG,
-        carboidratoG: override.metaCarboidratoG,
-      };
-    }
+    const bruta: MetaEfetiva = override
+      ? {
+          receitaId: override.metaReceitaId,
+          receitaOculta: override.metaReceitaOculta,
+          calorias: override.metaCalorias,
+          proteinaG: override.metaProteinaG,
+          gorduraG: override.metaGorduraG,
+          carboidratoG: override.metaCarboidratoG,
+        }
+      : {
+          receitaId: m.metaReceitaId,
+          receitaOculta: m.metaReceitaOculta,
+          calorias: m.metaCalorias,
+          proteinaG: m.metaProteinaG,
+          gorduraG: m.metaGorduraG,
+          carboidratoG: m.metaCarboidratoG,
+        };
+
+    const lista = modelosDoDia(dia);
+    if (!lista.length || lista[lista.length - 1].id !== m.id) return bruta;
+
+    const metaTotal = metaMacrosDoDia(dia);
+    const soma = lista.slice(0, -1).reduce(
+      (acc, x) => {
+        const v = metaEfetivaDoDia(x, dia);
+        return {
+          calorias: acc.calorias + (v.calorias ?? 0),
+          proteinaG: acc.proteinaG + (v.proteinaG ?? 0),
+          gorduraG: acc.gorduraG + (v.gorduraG ?? 0),
+          carboidratoG: acc.carboidratoG + (v.carboidratoG ?? 0),
+        };
+      },
+      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+    );
     return {
-      receitaId: m.metaReceitaId,
-      receitaOculta: m.metaReceitaOculta,
-      calorias: m.metaCalorias,
-      proteinaG: m.metaProteinaG,
-      gorduraG: m.metaGorduraG,
-      carboidratoG: m.metaCarboidratoG,
+      ...bruta,
+      calorias: Math.max(0, metaTotal.calorias - soma.calorias),
+      proteinaG: Math.max(0, metaTotal.proteinaG - soma.proteinaG),
+      gorduraG: Math.max(0, metaTotal.gorduraG - soma.gorduraG),
+      carboidratoG: Math.max(0, metaTotal.carboidratoG - soma.carboidratoG),
+    };
+  }
+
+  /** Verdadeiro se `m` é a última refeição da lista (catálogo global em Fixa, ou desse grupo de
+   * dias em Ondulatória) — a automática, com meta sempre travada na sobra do dia. */
+  function ehUltimaDaLista(m: RefeicaoModelo, grupo?: GrupoDias): boolean {
+    const lista = grupo ? grupo.modelos : modelos;
+    return lista.length > 0 && lista[lista.length - 1].id === m.id;
+  }
+
+  interface MacrosSimples {
+    calorias: number;
+    proteinaG: number;
+    gorduraG: number;
+    carboidratoG: number;
+  }
+
+  /** Mesma ideia de metaEfetivaDoDia, mas pro catálogo global (Fixa, sem dia/grupo). */
+  function macrosEfetivosGlobais(m: RefeicaoModelo): MacrosSimples {
+    const bruta = {
+      calorias: m.metaCalorias ?? 0,
+      proteinaG: m.metaProteinaG ?? 0,
+      gorduraG: m.metaGorduraG ?? 0,
+      carboidratoG: m.metaCarboidratoG ?? 0,
+    };
+    if (!ehUltimaDaLista(m)) return bruta;
+    const soma = modelos.slice(0, -1).reduce(
+      (acc, x) => {
+        const v = macrosEfetivosGlobais(x);
+        return {
+          calorias: acc.calorias + v.calorias,
+          proteinaG: acc.proteinaG + v.proteinaG,
+          gorduraG: acc.gorduraG + v.gorduraG,
+          carboidratoG: acc.carboidratoG + v.carboidratoG,
+        };
+      },
+      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+    );
+    return {
+      calorias: Math.max(0, caloriasCalc - soma.calorias),
+      proteinaG: Math.max(0, (proteinaGInput ?? 0) - soma.proteinaG),
+      gorduraG: Math.max(0, (gorduraGInput ?? 0) - soma.gorduraG),
+      carboidratoG: Math.max(0, (carboidratoGInput ?? 0) - soma.carboidratoG),
     };
   }
 
@@ -744,12 +824,15 @@
   /** Mesma soma, mas sobre todo o catálogo — usada no topo da aba Refeições em Fixa (não há grupos de dias pra separar). */
   function somaMacrosGlobal() {
     return modelos.reduce(
-      (acc, m) => ({
-        calorias: acc.calorias + (m.metaCalorias ?? 0),
-        proteinaG: acc.proteinaG + (m.metaProteinaG ?? 0),
-        gorduraG: acc.gorduraG + (m.metaGorduraG ?? 0),
-        carboidratoG: acc.carboidratoG + (m.metaCarboidratoG ?? 0),
-      }),
+      (acc, m) => {
+        const v = macrosEfetivosGlobais(m);
+        return {
+          calorias: acc.calorias + v.calorias,
+          proteinaG: acc.proteinaG + v.proteinaG,
+          gorduraG: acc.gorduraG + v.gorduraG,
+          carboidratoG: acc.carboidratoG + v.carboidratoG,
+        };
+      },
       { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
     );
   }
@@ -855,11 +938,20 @@
       // (modelosDoDia) -- criar uma refeição nova faria ela aparecer só nesses dias "automáticos"
       // e não nos que já têm lista própria, quebrando um bloco que antes era só um em dois. Grava
       // a lista de cada grupo + a nova refeição explicitamente pra TODOS os dias, pra continuarem
-      // idênticos entre si.
+      // idênticos entre si. A nova sempre entra ANTES da última (que é a automática/sobra) — nunca
+      // depois dela, senão a automática deixaria de ser a última da lista.
       const gruposAntes = modoCalorias === "ondulatoria" ? gruposDias : [];
+      const modelosAntes = modelos;
       const novoId = await criarRefeicaoModelo(nome.trim());
+      if (modelosAntes.length) {
+        const semUltima = modelosAntes.slice(0, -1).map((m) => m.id);
+        const ultima = modelosAntes[modelosAntes.length - 1].id;
+        await reordenarRefeicoesModelo([...semUltima, novoId, ultima]);
+      }
       for (const g of gruposAntes) {
-        const ids = [...g.modelos.map((m) => m.id), novoId];
+        const ids = g.modelos.length
+          ? [...g.modelos.slice(0, -1).map((m) => m.id), novoId, g.modelos[g.modelos.length - 1].id]
+          : [novoId];
         await Promise.all(g.dias.map((dia) => definirRefeicoesDoDia(dia, ids)));
       }
       mostrarForm = false;
@@ -903,6 +995,10 @@
     timeoutPressionarNome = setTimeout(() => {
       pressionouLongoNome = true;
       cancelarPressionarNome();
+      if (ehUltimaDaLista(m, grupo)) {
+        alert("Essa é a última refeição — automática, com a meta sempre igual à sobra do dia. Não pode ser removida.");
+        return;
+      }
       if (navigator.vibrate) navigator.vibrate(10);
       if (grupo) paraRemoverDoGrupo = { grupo, modelo: m };
       else paraExcluir = m;
@@ -913,6 +1009,10 @@
     e.preventDefault();
     cancelarPressionarNome();
     pressionouLongoNome = false;
+    if (ehUltimaDaLista(m, grupo)) {
+      alert("Essa é a última refeição — automática, com a meta sempre igual à sobra do dia. Não pode ser removida.");
+      return;
+    }
     if (grupo) paraRemoverDoGrupo = { grupo, modelo: m };
     else paraExcluir = m;
   }
@@ -1074,7 +1174,10 @@
   async function adicionarAoGrupo(m: RefeicaoModelo) {
     if (!grupoParaAdicionar) return;
     const grupo = grupoParaAdicionar;
-    const ids = [...grupo.modelos.map((x) => x.id), m.id];
+    // Entra ANTES da última (automática/sobra do dia) — ela continua sempre por último.
+    const ids = grupo.modelos.length
+      ? [...grupo.modelos.slice(0, -1).map((x) => x.id), m.id, grupo.modelos[grupo.modelos.length - 1].id]
+      : [m.id];
     mostrarAdicionarRefeicaoGrupo = false;
     try {
       await Promise.all(grupo.dias.map((dia) => definirRefeicoesDoDia(dia, ids)));
@@ -1430,6 +1533,7 @@
         <ul class="lista lista-dia">
           {#each (arrastandoDia === grupo.dias[0] ? arrastoListaDia : grupo.modelos) as m, i (m.id)}
             {@const meta = metaEfetivaDoDia(m, grupo.dias[0])}
+            {@const ultima = ehUltimaDaLista(m, grupo)}
             <li
               class="linha"
               class:arrastando={arrastandoDia === grupo.dias[0] && arrastandoIndex === i}
@@ -1446,7 +1550,7 @@
                 oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
               >
                 <span class="nome-linha">
-                  <span class="nome">{m.nome}</span>
+                  <span class="nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
                   {#if meta.calorias != null}
                     {@render barrasMacrosLinha(
                       meta.carboidratoG ?? 0,
@@ -1552,6 +1656,8 @@
 
       <ul class="lista">
         {#each modelos as m, i (m.id)}
+          {@const efetivo = macrosEfetivosGlobais(m)}
+          {@const ultima = ehUltimaDaLista(m)}
           <li
             class="linha"
             class:arrastando={arrastandoDia === null && arrastandoIndex === i}
@@ -1568,17 +1674,17 @@
               oncontextmenu={(e) => aoContextMenuNome(e, m)}
             >
               <span class="nome-linha">
-                <span class="nome">{m.nome}</span>
-                {#if m.metaCalorias != null}
+                <span class="nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
+                {#if ultima || m.metaCalorias != null}
                   {@render barrasMacrosLinha(
-                    m.metaCarboidratoG ?? 0,
-                    m.metaGorduraG ?? 0,
-                    m.metaProteinaG ?? 0,
+                    efetivo.carboidratoG,
+                    efetivo.gorduraG,
+                    efetivo.proteinaG,
                     metaGlobal.carboidratoG,
                     metaGlobal.gorduraG,
                     metaGlobal.proteinaG,
                   )}
-                  <span class="nome-cal">{arredondarDezena(m.metaCalorias)} cal</span>
+                  <span class="nome-cal">{arredondarDezena(efetivo.calorias)} cal</span>
                 {/if}
               </span>
             </button>
@@ -2014,10 +2120,11 @@
   .nome-linha {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: center;
+    align-items: center;
+    justify-content: flex-start;
     gap: var(--space-2);
-    text-align: center;
+    text-align: left;
+    min-height: 24px;
   }
   .nome {
     min-width: 0;
@@ -2030,6 +2137,11 @@
   .nome-cal {
     flex-shrink: 0;
     font-size: 12px;
+    color: var(--surface-muted);
+  }
+  .nome-auto {
+    font-size: 11px;
+    font-weight: 400;
     color: var(--surface-muted);
   }
   .nome-macros-inline {

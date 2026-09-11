@@ -464,6 +464,97 @@ export async function salvarMetaNumericaRefeicaoDias(
   if (error) throw error;
 }
 
+export interface ContextoMetaCatalogo {
+  /** Essa é a última refeição do catálogo (Fixa) ou do grupo de dias (Ondulatória) — sua meta é
+   * sempre a sobra do dia (metaDiaria - disponivel de todas as outras), não editável na roda
+   * tripla; só a lista de alimentos e o nome continuam editáveis. */
+  ehUltima: boolean;
+  /** Meta diária efetiva (Fixa: global; Ondulatória: a desse dia da semana). */
+  metaDiaria: MetasDiarias;
+  /** O que sobra pra essa refeição depois de descontar todas as OUTRAS (exceto a última/automática
+   * e exceto ela mesma): se `ehUltima`, é a meta automática dela; senão, é o teto que ela pode
+   * usar sem deixar a última com sobra negativa. */
+  disponivel: { calorias: number; proteinaG: number; gorduraG: number; carboidratoG: number };
+}
+
+/** Resolve o contexto de "última refeição automática" pra roda tripla de uma refeição do
+ * catálogo — usado por DietaRefeicaoMetaEditar pra saber se deve travar a edição manual (é a
+ * última) e, em qualquer caso, até quanto essa refeição pode usar da meta diária sem faltar pra
+ * última. `diasSemana` presente = grupo da Ondulatória (usa a ordem/meta desse dia); ausente =
+ * catálogo Fixa (ordem/meta globais). */
+export async function getContextoMetaCatalogo(modeloId: string, diasSemana?: number[]): Promise<ContextoMetaCatalogo> {
+  const [modelos, metasDiaModelo, modelosPorDia] = await Promise.all([
+    listRefeicoesModelo(),
+    listMetasDiaModelo(),
+    listRefeicoesModeloDia(),
+  ]);
+
+  type Macros = { calorias: number; proteinaG: number; gorduraG: number; carboidratoG: number };
+  let siblings: RefeicaoModelo[];
+  let metaDiaria: MetasDiarias;
+  let macrosDe: (m: RefeicaoModelo) => Macros;
+
+  if (diasSemana?.length) {
+    const dia = diasSemana[0];
+    const linhas = modelosPorDia.filter((r) => r.diaSemana === dia);
+    const porId = new Map(modelos.map((m) => [m.id, m]));
+    siblings = linhas.length
+      ? linhas
+          .slice()
+          .sort((a, b) => a.ordem - b.ordem)
+          .map((r) => porId.get(r.modeloId))
+          .filter((m): m is RefeicaoModelo => m != null)
+      : modelos;
+    metaDiaria = await getMetasDoDiaSemana(dia);
+    const overridePorModelo = new Map(metasDiaModelo.filter((m) => m.diaSemana === dia).map((m) => [m.modeloId, m]));
+    macrosDe = (m) => {
+      const o = overridePorModelo.get(m.id);
+      return {
+        calorias: o?.metaCalorias ?? m.metaCalorias ?? 0,
+        proteinaG: o?.metaProteinaG ?? m.metaProteinaG ?? 0,
+        gorduraG: o?.metaGorduraG ?? m.metaGorduraG ?? 0,
+        carboidratoG: o?.metaCarboidratoG ?? m.metaCarboidratoG ?? 0,
+      };
+    };
+  } else {
+    siblings = modelos;
+    metaDiaria = await getMetasDiarias();
+    macrosDe = (m) => ({
+      calorias: m.metaCalorias ?? 0,
+      proteinaG: m.metaProteinaG ?? 0,
+      gorduraG: m.metaGorduraG ?? 0,
+      carboidratoG: m.metaCarboidratoG ?? 0,
+    });
+  }
+
+  const ultima = siblings[siblings.length - 1] ?? null;
+  const ehUltima = ultima?.id === modeloId;
+  const outras = siblings.filter((m) => m.id !== modeloId && m.id !== ultima?.id);
+  const somaOutras = outras.reduce(
+    (acc, m) => {
+      const v = macrosDe(m);
+      return {
+        calorias: acc.calorias + v.calorias,
+        proteinaG: acc.proteinaG + v.proteinaG,
+        gorduraG: acc.gorduraG + v.gorduraG,
+        carboidratoG: acc.carboidratoG + v.carboidratoG,
+      };
+    },
+    { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+  );
+
+  return {
+    ehUltima,
+    metaDiaria,
+    disponivel: {
+      calorias: metaDiaria.calorias - somaOutras.calorias,
+      proteinaG: metaDiaria.proteinaG - somaOutras.proteinaG,
+      gorduraG: metaDiaria.gorduraG - somaOutras.gorduraG,
+      carboidratoG: metaDiaria.carboidratoG - somaOutras.carboidratoG,
+    },
+  };
+}
+
 /** Nome duplicado no catálogo quebra buscas por nome (getMetaRefeicaoPorNome e afins, usadas
  * pra achar a meta de uma refeição do dia) — sem esse checagem, criar/renomear pra um nome já
  * existente gera duas refeições indistinguíveis por nome no catálogo. */
@@ -1238,6 +1329,13 @@ export function carboidratoGDoDia(caloriasDoDia: number, proteinaG: number, gord
  * nada. Mesma lógica usada em Gerenciar > Refeições.
  */
 export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
+  return getMetasDoDiaSemana(parseISODate(data).getDay());
+}
+
+/** Mesma resolução de getMetasDoDia, mas recebendo o dia da semana (0-6) diretamente em vez de
+ * uma data — útil pra quem só precisa resolver "a meta desse dia da semana" sem ter (ou precisar
+ * inventar) uma data concreta, como o editor de meta de uma refeição do catálogo. */
+export async function getMetasDoDiaSemana(diaSemana: number): Promise<MetasDiarias> {
   const modo = await getModoCalorias();
   if (modo === "fixa") return getMetasDiarias();
 
@@ -1255,7 +1353,6 @@ export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
   const minimo = (parametros.get("calorias")?.min ?? PARAMETROS_PADRAO.calorias.min) * pesoAtual;
   const manuaisCalorias = new Map([...manuais].map(([dia, v]) => [dia, v.calorias]));
 
-  const diaSemana = parseISODate(data).getDay();
   let diaResolvido: CaloriasPorDia;
   try {
     const dias = resolverDistribuicao(caloriasMedia, manuaisCalorias, minimo);
