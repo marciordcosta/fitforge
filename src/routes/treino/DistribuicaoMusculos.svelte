@@ -3635,6 +3635,11 @@
   }
   /* Soma dos dias — separada com uma borda mais forte pra não confundir com mais um dia da semana;
      mais larga que os dias porque o texto "atual/meta" (ex: "9/11.5") não cabe em 56px. */
+  /* Separa o cabeçalho da primeira linha com a mesma borda forte da coluna Total, em vez da
+     linha discreta usada entre as linhas do corpo. */
+  .grade-tabela thead th {
+    border-bottom: 1px solid var(--surface-fg);
+  }
   .grade-tabela th.grade-col-total {
     width: 72px;
     /* Os dias têm 2 linhas (abreviação + nome da rotina/💤), o que deixa o cabeçalho da tabela
