@@ -351,6 +351,22 @@ export async function vincularMetaReceita(modeloId: string, receitaId: string): 
   if (error) throw error;
 }
 
+/** Remove a meta global (Fixa) dessa refeição do catálogo — a receita em si não é tocada, só o vínculo. */
+export async function desvincularMetaReceita(modeloId: string): Promise<void> {
+  const { error } = await supabase.from("dieta_refeicoes_modelo").update({ meta_receita_id: null }).eq("id", modeloId);
+  if (error) throw error;
+}
+
+/** Remove a meta por dia (Ondulatória) desses dias — a receita em si não é tocada, só o vínculo; os dias voltam a usar o meta_receita_id global como fallback. */
+export async function removerMetaReceitaDias(modeloId: string, diasSemana: number[]): Promise<void> {
+  const { error } = await supabase
+    .from("dieta_refeicoes_modelo_meta_dia")
+    .delete()
+    .eq("modelo_id", modeloId)
+    .in("dia_semana", diasSemana);
+  if (error) throw error;
+}
+
 /** Se essa receita é o prato padrão de alguma refeição do catálogo (global ou por dia) — usado pra esconder "Adicionar à refeição" ao visualizá-la nesse papel. */
 export async function receitaEhMetaDeRefeicao(receitaId: string): Promise<boolean> {
   const [global, porDia] = await Promise.all([
@@ -1286,6 +1302,9 @@ export interface ReceitaItem {
 
 export interface Receita extends ReceitaResumo {
   itens: ReceitaItem[];
+  /** Cópia privada gerada pra ajustar a meta de um dia/grupo específico (ver clonarReceitaOculta) —
+   * não aparece na lista de Receitas nem nas buscas. */
+  oculta: boolean;
 }
 
 function mapReceitaItem(l: Record<string, unknown>): ReceitaItem {
@@ -1335,7 +1354,7 @@ export async function listReceitas(limite = 50): Promise<ReceitaResumo[]> {
 
 export async function getReceita(id: string): Promise<Receita | null> {
   const [receitaRes, itensRes] = await Promise.all([
-    supabase.from("dieta_receitas").select("id, nome").eq("id", id).maybeSingle(),
+    supabase.from("dieta_receitas").select("id, nome, oculta").eq("id", id).maybeSingle(),
     supabase
       .from("dieta_receita_itens")
       .select(
@@ -1351,6 +1370,7 @@ export async function getReceita(id: string): Promise<Receita | null> {
   return {
     id: receitaRes.data.id,
     nome: receitaRes.data.nome,
+    oculta: (receitaRes.data as { oculta?: boolean }).oculta ?? false,
     calorias: round1(itens.reduce((acc, it) => acc + it.calorias, 0)),
     itens,
   };

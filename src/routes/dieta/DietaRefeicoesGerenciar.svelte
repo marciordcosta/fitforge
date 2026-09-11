@@ -873,7 +873,7 @@
     if (diasGrupo?.length) {
       const efetiva = metaEfetivaDoDia(m, diasGrupo[0]);
       if (efetiva.receitaId && efetiva.receitaOculta) {
-        navigate(`/dieta/receitas/ver/${efetiva.receitaId}`);
+        navigate(`/dieta/receitas/ver/${efetiva.receitaId}/meta/${m.id}/${diasGrupo.join(",")}`);
         return;
       }
       if (efetiva.receitaId) {
@@ -881,7 +881,7 @@
         try {
           const forkId = await clonarReceitaOculta(efetiva.receitaId);
           await vincularMetaReceitaDias(m.id, diasGrupo, forkId);
-          navigate(`/dieta/receitas/ver/${forkId}`);
+          navigate(`/dieta/receitas/ver/${forkId}/meta/${m.id}/${diasGrupo.join(",")}`);
         } catch (err) {
           alert("Erro ao preparar o ajuste desse dia: " + (err as Error).message);
         } finally {
@@ -893,7 +893,7 @@
       return;
     }
     if (m.metaReceitaId) {
-      navigate(`/dieta/receitas/ver/${m.metaReceitaId}`);
+      navigate(`/dieta/receitas/ver/${m.metaReceitaId}/meta/${m.id}`);
       return;
     }
     navigate(`/dieta/receitas/buscar/meta/${m.id}/${encodeURIComponent(m.nome)}`);
@@ -1172,14 +1172,20 @@
   carboidratoG: number,
   gorduraG: number,
   proteinaG: number,
+  fibraG: number,
+  gorduraSaturadaG: number,
   carboidratoDiaG: number,
   gorduraDiaG: number,
   proteinaDiaG: number,
+  fibraDiaG: number,
+  gorduraSaturadaDiaG: number,
   invisivel: boolean,
 )}
   {@const pctCarboDia = carboidratoDiaG > 0 ? Math.round((carboidratoG / carboidratoDiaG) * 100) : 0}
   {@const pctGorduraDia = gorduraDiaG > 0 ? Math.round((gorduraG / gorduraDiaG) * 100) : 0}
   {@const pctProteinaDia = proteinaDiaG > 0 ? Math.round((proteinaG / proteinaDiaG) * 100) : 0}
+  {@const pctFibraDia = fibraDiaG > 0 ? Math.round((fibraG / fibraDiaG) * 100) : 0}
+  {@const pctGorduraSaturadaDia = gorduraSaturadaDiaG > 0 ? Math.round((gorduraSaturadaG / gorduraSaturadaDiaG) * 100) : 0}
   <span class="nome-macros" class:invisivel>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Carb</span>
@@ -1201,6 +1207,20 @@
         <span class="mini-macro-barra" style={`width:${Math.min(100, pctProteinaDia)}%; background:${COR_PROTEINA};`}></span>
       </span>
       <span class="mini-macro-valor">{proteinaG.toFixed(0)} g · {pctProteinaDia}%</span>
+    </span>
+    <span class="mini-macro-col">
+      <span class="mini-macro-nome">Fibras</span>
+      <span class="mini-macro-barra-wrap">
+        <span class="mini-macro-barra" style={`width:${Math.min(100, pctFibraDia)}%; background:${COR_CARBO};`}></span>
+      </span>
+      <span class="mini-macro-valor">{fibraG.toFixed(0)} g · {pctFibraDia}%</span>
+    </span>
+    <span class="mini-macro-col">
+      <span class="mini-macro-nome">G. satur</span>
+      <span class="mini-macro-barra-wrap">
+        <span class="mini-macro-barra" style={`width:${Math.min(100, pctGorduraSaturadaDia)}%; background:${COR_GORDURA};`}></span>
+      </span>
+      <span class="mini-macro-valor">{gorduraSaturadaG.toFixed(0)} g · {pctGorduraSaturadaDia}%</span>
     </span>
   </span>
 {/snippet}
@@ -1561,9 +1581,13 @@
                   meta.carboidratoG ?? 0,
                   meta.gorduraG ?? 0,
                   meta.proteinaG ?? 0,
+                  meta.fibraG ?? 0,
+                  meta.gorduraSaturadaG ?? 0,
                   metaGrupo.carboidratoG,
                   metaGrupo.gorduraG,
                   metaGrupo.proteinaG,
+                  fibrasMaxGrupo,
+                  gorduraSaturadaMaxGrupo,
                   meta.calorias == null,
                 )}
               </button>
@@ -1716,9 +1740,13 @@
                 m.metaCarboidratoG ?? 0,
                 m.metaGorduraG ?? 0,
                 m.metaProteinaG ?? 0,
+                m.metaFibraG ?? 0,
+                m.metaGorduraSaturadaG ?? 0,
                 metaGlobal.carboidratoG,
                 metaGlobal.gorduraG,
                 metaGlobal.proteinaG,
+                fibrasMaxG,
+                gorduraSaturadaMaxG,
                 m.metaCalorias == null,
               )}
             </button>
@@ -2172,9 +2200,10 @@
   }
   .nome-macros {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: var(--space-2);
+    gap: var(--space-2) var(--space-2);
     font-size: 12px;
     color: var(--surface-muted);
   }
@@ -2182,8 +2211,8 @@
     visibility: hidden;
   }
   .mini-macro-col {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 28%;
+    min-width: 64px;
     display: flex;
     flex-direction: column;
     gap: 3px;
