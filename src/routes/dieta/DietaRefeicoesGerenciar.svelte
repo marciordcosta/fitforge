@@ -1380,6 +1380,7 @@
                   <p class="dia-card-treino-topo">{treino ?? ""}</p>
                   <div class="dia-card" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
                     <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
+                    <span class="dia-card-cal">{Math.round(metaGrupo.calorias)}</span>
                   </div>
                 </div>
               {/each}
