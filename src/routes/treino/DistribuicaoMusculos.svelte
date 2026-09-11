@@ -2161,11 +2161,6 @@
               <button class="rotina-totais-texto" onclick={() => abrirGradeSemanal(null)}>
                 {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
               </button>
-              {#if colunasAtivas.length > 1}
-                <button class="rotina-coluna-btn" onclick={alternarColunaDestacada} aria-label="Alternar coluna destacada">
-                  {LABEL_CAMPO_CURTO[ordemSemanal]}
-                </button>
-              {/if}
               <button class="rotina-grafico-btn" onclick={() => abrirGraficoSemanal()} aria-label="Ver anel por dominância">
                 {@render iconGrafico()}
               </button>
@@ -2405,13 +2400,20 @@
 {/snippet}
 
 {#snippet acaoDireitaGrade()}
-  <button
-    class="grade-editar-metas-btn"
-    onclick={() => (modoEdicaoMetas = !modoEdicaoMetas)}
-    aria-label={modoEdicaoMetas ? "Concluir edição de metas" : "Editar metas"}
-  >
-    {#if modoEdicaoMetas}{@render iconConcluir()}{:else}{@render iconEditarMeta()}{/if}
-  </button>
+  <div class="grade-acoes-titulo">
+    {#if colunasAtivas.length > 1 && parametrosDistribuicao.campoGrade === "destacada"}
+      <button class="rotina-coluna-btn" onclick={alternarColunaDestacada} aria-label="Alternar coluna destacada">
+        {LABEL_CAMPO_CURTO[ordemSemanal]}
+      </button>
+    {/if}
+    <button
+      class="grade-editar-metas-btn"
+      onclick={() => (modoEdicaoMetas = !modoEdicaoMetas)}
+      aria-label={modoEdicaoMetas ? "Concluir edição de metas" : "Editar metas"}
+    >
+      {#if modoEdicaoMetas}{@render iconConcluir()}{:else}{@render iconEditarMeta()}{/if}
+    </button>
+  </div>
 {/snippet}
 
 {#snippet alternarModoDetalhe()}
@@ -3677,6 +3679,11 @@
   }
   .grade-valor-vazio {
     opacity: 0.7;
+  }
+  .grade-acoes-titulo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
   .grade-editar-metas-btn {
     display: flex;
