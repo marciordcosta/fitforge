@@ -1453,9 +1453,9 @@
     height: 18px;
   }
   .check.ativo {
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    border-color: var(--color-primary);
+    background: transparent;
+    color: #fff;
+    border-color: transparent;
   }
   .sub {
     text-align: center;
