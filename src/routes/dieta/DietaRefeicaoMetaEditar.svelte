@@ -80,18 +80,6 @@
       const receitaId = overrideDia?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
       receita = receitaId ? await getReceita(receitaId) : null;
 
-      // Com alimentos na lista, a meta numérica (usada na Home, no Gerenciar e na redistribuição)
-      // sempre acompanha a soma deles — sem isso a meta ficaria "presa" no último valor manual
-      // enquanto essa tela mostra a soma dos itens, divergindo do resto do app.
-      if (receita?.itens.length) {
-        const soma = somarItens(receita.itens);
-        if (diasSemana?.length) {
-          await salvarMetaNumericaRefeicaoDias(modeloId, diasSemana, soma.proteinaG, soma.gorduraG, soma.carboidratoG);
-        } else {
-          await salvarMetaNumericaRefeicao(modeloId, soma.proteinaG, soma.gorduraG, soma.carboidratoG);
-        }
-      }
-
       const refeicaoHoje = refeicoesHoje.find((r) => r.nome === nome);
       const itensDaRefeicao = refeicaoHoje ? itensHoje.filter((i) => i.refeicaoId === refeicaoHoje.id) : [];
       consumoHoje = itensDaRefeicao.reduce(
@@ -125,30 +113,28 @@
     return `${valor.toFixed(0)}/${meta.toFixed(0)}${unidade}`;
   }
 
-  /** Valor guardado no banco — só usado como ponto de partida da roda tripla quando ainda não há
-   * nenhum alimento na lista (com alimentos, a meta É a soma deles, ver totaisItens). */
-  const proteinaArmazenada = $derived(overrideDia?.metaProteinaG ?? modelo?.metaProteinaG ?? null);
-  const gorduraArmazenada = $derived(overrideDia?.metaGorduraG ?? modelo?.metaGorduraG ?? null);
-  const carboidratoArmazenado = $derived(overrideDia?.metaCarboidratoG ?? modelo?.metaCarboidratoG ?? null);
+  const proteinaG = $derived(overrideDia?.metaProteinaG ?? modelo?.metaProteinaG ?? null);
+  const gorduraG = $derived(overrideDia?.metaGorduraG ?? modelo?.metaGorduraG ?? null);
+  const carboidratoG = $derived(overrideDia?.metaCarboidratoG ?? modelo?.metaCarboidratoG ?? null);
   const receitaIdAtual = $derived(overrideDia?.metaReceitaId ?? modelo?.metaReceitaId ?? null);
-
-  /** Valores efetivos da meta mostrados na tela inteira — soma dos alimentos quando há algum
-   * (igual funciona nas outras telas de receita), senão o valor guardado manualmente. */
-  const proteinaG = $derived(totaisItens ? totaisItens.proteinaG : proteinaArmazenada);
-  const gorduraG = $derived(totaisItens ? totaisItens.gorduraG : gorduraArmazenada);
-  const carboidratoG = $derived(totaisItens ? totaisItens.carboidratoG : carboidratoArmazenado);
-  const caloriasCalc = $derived(totaisItens ? totaisItens.calorias : 4 * (proteinaG ?? 0) + 9 * (gorduraG ?? 0) + 4 * (carboidratoG ?? 0));
 
   const caloriasCarbo = $derived((carboidratoG ?? 0) * 4);
   const caloriasGordura = $derived((gorduraG ?? 0) * 9);
   const caloriasProteina = $derived((proteinaG ?? 0) * 4);
-  /** Denominador dos 3 percentuais — sempre a soma pela fórmula dos macros (não a calorias real
-   * dos itens, que pode diferir um pouco), pra garantir que os 3 percentuais somem 100%. */
-  const caloriasMacros = $derived(caloriasCarbo + caloriasGordura + caloriasProteina);
+  const caloriasCalc = $derived(caloriasCarbo + caloriasGordura + caloriasProteina);
 
-  const pctCarbo = $derived(caloriasMacros > 0 ? (caloriasCarbo / caloriasMacros) * 100 : 0);
-  const pctGordura = $derived(caloriasMacros > 0 ? (caloriasGordura / caloriasMacros) * 100 : 0);
-  const pctProteina = $derived(caloriasMacros > 0 ? (caloriasProteina / caloriasMacros) * 100 : 0);
+  const pctCarbo = $derived(caloriasCalc > 0 ? (caloriasCarbo / caloriasCalc) * 100 : 0);
+  const pctGordura = $derived(caloriasCalc > 0 ? (caloriasGordura / caloriasCalc) * 100 : 0);
+  const pctProteina = $derived(caloriasCalc > 0 ? (caloriasProteina / caloriasCalc) * 100 : 0);
+
+  /** Total dos alimentos da lista abaixo — só informativo, comparado à meta (independente,
+   * definida na roda tripla acima); não altera nem é alterado por ela. */
+  const pctCarboItens = $derived(totaisItens && totaisItens.calorias > 0 ? ((totaisItens.carboidratoG * 4) / totaisItens.calorias) * 100 : 0);
+  const pctGorduraItens = $derived(totaisItens && totaisItens.calorias > 0 ? ((totaisItens.gorduraG * 9) / totaisItens.calorias) * 100 : 0);
+  const pctProteinaItens = $derived(totaisItens && totaisItens.calorias > 0 ? ((totaisItens.proteinaG * 4) / totaisItens.calorias) * 100 : 0);
+  const donutItensStyle = $derived(
+    `background: conic-gradient(${COR_CARBO} 0% ${pctCarboItens}%, ${COR_GORDURA} ${pctCarboItens}% ${pctCarboItens + pctGorduraItens}%, ${COR_PROTEINA} ${pctCarboItens + pctGorduraItens}% 100%);`,
+  );
 
   const donutStyle = $derived(
     `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
@@ -164,9 +150,9 @@
 
   function colunasMacros() {
     return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(300), valorAtual: Math.round(carboidratoArmazenado ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(150), valorAtual: Math.round(gorduraArmazenada ?? 0), kcalPorGrama: 9, secundario: (v: number) => `${v} g` },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(300), valorAtual: Math.round(proteinaArmazenada ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(300), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(150), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => `${v} g` },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(300), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => `${v} g` },
     ];
   }
 
@@ -326,7 +312,6 @@
         <button
           type="button"
           class="resumo"
-          disabled={totaisItens != null}
           onclick={() => (mostrarMacros = true)}
         >
           <span class="donut" style={donutStyle}>
@@ -341,10 +326,26 @@
             <span><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{(proteinaG ?? 0).toFixed(0)} g</span><br />Proteínas</span>
           </span>
         </button>
-        {#if totaisItens}
-          <p class="card-meta-ajuda">Somada dos alimentos da lista — pra editar na mão, remova os alimentos.</p>
-        {/if}
       </div>
+
+      {#if totaisItens}
+        <div class="card-meta">
+          <p class="card-meta-titulo">Total dos Alimentos</p>
+          <div class="resumo resumo-info">
+            <span class="donut" style={donutItensStyle}>
+              <span class="donut-centro">
+                <strong>{totaisItens.calorias.toFixed(0)}</strong>
+                <span>Cal</span>
+              </span>
+            </span>
+            <span class="resumo-macros">
+              <span><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarboItens.toFixed(0)}%</strong><br /><span class="valor-g">{totaisItens.carboidratoG.toFixed(0)} g</span><br />Carb</span>
+              <span><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGorduraItens.toFixed(0)}%</strong><br /><span class="valor-g">{totaisItens.gorduraG.toFixed(0)} g</span><br />Gorduras</span>
+              <span><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteinaItens.toFixed(0)}%</strong><br /><span class="valor-g">{totaisItens.proteinaG.toFixed(0)} g</span><br />Proteínas</span>
+            </span>
+          </div>
+        </div>
+      {/if}
 
       <p class="pct-titulo">Consumo de Hoje</p>
       <div class="pct-grid">
@@ -502,11 +503,6 @@
     font-weight: 600;
     color: var(--surface-fg);
   }
-  .card-meta-ajuda {
-    margin: var(--space-1) 0 0;
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
-  }
   .resumo {
     width: 100%;
     display: flex;
@@ -519,7 +515,7 @@
     text-align: left;
     font-family: inherit;
   }
-  .resumo:disabled {
+  .resumo-info {
     cursor: default;
   }
   .donut {
