@@ -15,10 +15,13 @@
     atualizarItemDiario,
     getRefeicoesDoDia,
     moverItemDiario,
+    listRefeicoesModelo,
+    lancarReceitaPadrao,
     type RefeicaoDia,
     type ItemDiario,
     type MetasDiarias,
     type Alimento,
+    type RefeicaoModelo,
   } from "../../lib/dietaApi";
 
   let { refeicaoId }: { refeicaoId: string } = $props();
@@ -36,6 +39,7 @@
   let itens = $state<ItemDiario[]>([]);
   let metas = $state<MetasDiarias | null>(null);
   let metaRefeicao = $state<MetasDiarias | null>(null);
+  let modeloRefeicao = $state<RefeicaoModelo | null>(null);
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
@@ -54,7 +58,16 @@
     loading = true;
     erro = null;
     try {
-      [refeicao, itens, metas] = await Promise.all([getRefeicaoDia(refeicaoId), getItensDaRefeicao(refeicaoId), getMetasDiarias()]);
+      const [refeicaoRes, itensRes, metasRes, modelos] = await Promise.all([
+        getRefeicaoDia(refeicaoId),
+        getItensDaRefeicao(refeicaoId),
+        getMetasDiarias(),
+        listRefeicoesModelo(),
+      ]);
+      refeicao = refeicaoRes;
+      itens = itensRes;
+      metas = metasRes;
+      modeloRefeicao = refeicao ? (modelos.find((m) => m.nome === refeicao!.nome) ?? null) : null;
       metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome) : null;
     } catch (err) {
       erro = (err as Error).message;
@@ -231,6 +244,25 @@
     }
   }
 
+  let lancandoPadrao = $state(false);
+
+  async function aoClicarRefeicaoPadrao() {
+    if (!refeicao || !modeloRefeicao) return;
+    lancandoPadrao = true;
+    try {
+      const lancou = await lancarReceitaPadrao(modeloRefeicao.id, parseISODate(refeicao.data).getDay(), refeicaoId, refeicao.data);
+      if (!lancou) {
+        alert("Essa refeição não tem alimentos configurados na Refeição Padrão.");
+        return;
+      }
+      await carregar();
+    } catch (err) {
+      alert("Erro ao lançar refeição padrão: " + (err as Error).message);
+    } finally {
+      lancandoPadrao = false;
+    }
+  }
+
   async function descartarRefeicao() {
     processando = true;
     try {
@@ -385,7 +417,12 @@
       {/each}
     {/if}
 
-    <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/refeicao/${refeicaoId}`)}>+ Adicionar Alimento</button>
+    <div class="acoes-refeicao">
+      {#if modeloRefeicao?.metaReceitaId}
+        <button type="button" class="acao-padrao" disabled={lancandoPadrao} onclick={aoClicarRefeicaoPadrao}>Refeição Padrão</button>
+      {/if}
+      <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/refeicao/${refeicaoId}`)}>+ Adicionar Alimento</button>
+    </div>
     <button class="descartar" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>Descartar refeição</button>
     </div>
   {/if}
@@ -664,6 +701,17 @@
     width: 18px;
     height: 18px;
   }
+  .acoes-refeicao {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+  .acoes-refeicao .acao-adicionar,
+  .acoes-refeicao .acao-padrao {
+    flex: 1;
+    min-width: 0;
+    margin-top: 0;
+  }
   .acao-adicionar {
     width: 100%;
     padding: var(--space-3);
@@ -675,6 +723,22 @@
     font-weight: 600;
     font-size: var(--font-size-base);
     cursor: pointer;
+  }
+  .acao-padrao {
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--surface-border);
+    background: none;
+    color: var(--surface-muted);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .acao-padrao:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .descartar {
     width: 100%;
