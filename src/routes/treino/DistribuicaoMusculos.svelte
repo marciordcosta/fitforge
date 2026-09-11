@@ -1958,6 +1958,7 @@
     // Anel geral: mesma regra da coluna Total da grade semanal — classifica por volume sempre
     // pelo ponderado.
     abrirDetalheRotina("Distribuição Semanal", itens, formatValor(total), "séries", coresAbcAcumulado(itens), "ponderado");
+    modalDetalheOrigem = { tipo: "semanal" };
   }
 
 
@@ -1989,6 +1990,19 @@
     cores?: string[];
     campoVolume: CampoVolume;
   } | null>(null);
+
+  /** De onde os dados do anel aberto vieram — pra recalcular quando o botão de alternar coluna
+   * (mesma ideia da grade semanal) é tocado dentro do próprio modal. */
+  let modalDetalheOrigem = $state<{ tipo: "semanal" } | { tipo: "treino"; treino: TreinoComExercicios } | null>(null);
+
+  /** Botão de alternar coluna dentro do anel — cicla ordemSemanal (mesma variável global da
+   * grade) e reabre o anel com os dados recalculados pra coluna nova. */
+  function alternarColunaDetalhe(): void {
+    alternarColunaDestacada();
+    if (!modalDetalheOrigem) return;
+    if (modalDetalheOrigem.tipo === "semanal") abrirGraficoSemanal();
+    else abrirGraficoTreinoDominancia(modalDetalheOrigem.treino, campoGrafico);
+  }
 
   /** Alterna entre o anel por músculo individual com cores de classificação de volume semanal
    * (Parametrização — padrão) e por dominância (ABC). Reseta pro padrão sempre que um anel novo
@@ -2056,6 +2070,7 @@
     // Anel por rotina: mesma regra das colunas de rotina/dia da grade semanal — classifica por
     // volume sempre pelo total bruto.
     abrirDetalheRotina(treino.nome_treino, itens, formatValor(total), "séries", coresAbcAcumulado(itens), "bruto");
+    modalDetalheOrigem = { tipo: "treino", treino };
   }
 </script>
 
@@ -2447,6 +2462,12 @@
   >{modoDetalhe === "volume" ? "Volume" : "Fadiga"}</button>
 {/snippet}
 
+{#snippet acaoEsquerdaDetalhe()}
+  <button class="rotina-coluna-btn" onclick={alternarColunaDetalhe} aria-label="Alternar coluna destacada">
+    {LABEL_CAMPO_CURTO[ordemSemanal]}
+  </button>
+{/snippet}
+
 {#if modalAberto}
   <ActionSheet titulo={modalAberto.titulo} opcoes={modalAberto.opcoes} onFechar={() => (modalAberto = null)} />
 {/if}
@@ -2633,6 +2654,7 @@
     <Sheet
       titulo={modalDetalheRotina.titulo}
       onFechar={() => (modalDetalheRotina = null)}
+      acaoTituloEsquerda={colunasAtivas.length > 1 && parametrosDistribuicao.graficoCampo === "destacada" ? acaoEsquerdaDetalhe : undefined}
       acaoTituloDireita={modalDetalheRotina.itens.length ? alternarModoDetalhe : undefined}
     >
       <div class="pizza-wrap">
