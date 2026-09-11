@@ -13,17 +13,28 @@
     return `${m}:${String(s).padStart(2, "0")}`;
   }
 
+  /** Igual a formatMMSS, mas mostra o sinal de negativo quando o descanso já passou do tempo. */
+  function formatMMSSAssinado(segundos: number): string {
+    return segundos < 0 ? `-${formatMMSS(-segundos)}` : formatMMSS(segundos);
+  }
+
   const info = $derived.by(() => {
     const atual = treinoLogSessao.atual;
     if (!atual) return null;
 
-    const descansando = atual.sessao.find((ex) => ex.descansoAte && ex.descansoAte > agora);
+    /** Mesma regra do cronômetro na tela ao vivo: continua marcando "Descanso" mesmo depois de
+     * zerar (contando o atraso em negativo) até pular ou iniciar outro descanso — sem isso, aqui
+     * fora da tela o card voltava a mostrar a duração total assim que o descanso zerava. */
+    const descansando =
+      atual.sessao.find((ex) => ex.descansoAte && ex.descansoAte > agora) ??
+      atual.sessao.find((ex) => ex.descansoAte != null);
     if (descansando) {
       const restante = Math.ceil((descansando.descansoAte! - agora) / 1000);
       return {
         titulo: "Descanso",
-        tempo: formatMMSS(Math.max(restante, 0)),
+        tempo: formatMMSSAssinado(restante),
         subtitulo: descansando.nome,
+        atrasado: restante < 0,
       };
     }
 
@@ -34,6 +45,7 @@
       titulo: atual.nomeTreino,
       tempo: duracao,
       subtitulo: emAndamento?.nome ?? atual.sessao[atual.sessao.length - 1]?.nome ?? "",
+      atrasado: false,
     };
   });
 
@@ -72,7 +84,7 @@
       <span class="titulo">
         <span class="ponto"></span>
         {info.titulo}
-        <span class="tempo">{info.tempo}</span>
+        <span class="tempo" class:atrasado={info.atrasado}>{info.tempo}</span>
       </span>
       <span class="subtitulo">{info.subtitulo}</span>
     </button>
@@ -180,6 +192,9 @@
   .tempo {
     color: var(--color-primary);
     font-weight: 700;
+  }
+  .tempo.atrasado {
+    color: var(--color-danger);
   }
   .subtitulo {
     font-size: var(--font-size-base);
