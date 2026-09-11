@@ -5,8 +5,10 @@
 
   /** onAbrir: usado quando essa barra aparece por cima de uma subtela da própria rotina ao vivo
    * (ex: o picker de exercícios), que cobre a lista mas não navega de verdade pra fora da rota —
-   * nesse caso "abrir a rotina" é só fechar essa subtela, não um navigate (já se está na rota). */
-  let { onAbrir }: { onAbrir?: () => void } = $props();
+   * nesse caso "abrir a rotina" é só fechar essa subtela, não um navigate (já se está na rota).
+   * zIndex: sobrescreve o z-index padrão (60, calibrado pra ficar abaixo de Sheet/ActionSheet em
+   * uso normal) só quando precisa ficar por cima de telas cheias específicas mais altas. */
+  let { onAbrir, zIndex }: { onAbrir?: () => void; zIndex?: number } = $props();
 
   function abrirRotina(): void {
     if (onAbrir) onAbrir();
@@ -72,7 +74,7 @@
 </script>
 
 {#if treinoLogSessao.atual && info}
-  <div class="barra" class:cima={posicao === "cima"}>
+  <div class="barra" class:cima={posicao === "cima"} style={zIndex != null ? `z-index:${zIndex};` : ""}>
     <button
       class="icone-btn"
       onclick={() => (posicao = posicao === "baixo" ? "cima" : "baixo")}
@@ -131,9 +133,7 @@
     border-radius: var(--radius-lg);
     padding: var(--space-2);
     box-shadow: var(--shadow-float);
-    /* Acima de telas cheias como o picker de exercícios e as telas de avulso/reordenar (120-150) —
-       a barra minimizada precisa continuar visível por cima delas. */
-    z-index: 155;
+    z-index: 60;
   }
   .barra.cima {
     bottom: auto;

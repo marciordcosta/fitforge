@@ -740,9 +740,11 @@
   /** Essas telas cobrem a lista de exercícios com um overlay cheio, sem navegar de verdade pra
    * fora de /treino/log/:id — então o TreinoMinimizado do App.svelte (que só aparece fora dessa
    * rota) fica escondido. Mostra a mesma barra aqui, por cima, enquanto qualquer uma delas está
-   * aberta, exatamente como já acontece ao sair pra outras telas do app. */
+   * aberta, exatamente como já acontece ao sair pra outras telas do app. Não inclui
+   * mostrarEscolhaAdicionar (o ActionSheet rápido de Lista/Avulso) — é pequeno e fica perto do
+   * rodapé, então a barra tampava as opções em vez de ficar por cima sem atrapalhar. */
   const subtelaAberta = $derived(
-    mostrarEscolhaAdicionar || mostrarPicker || mostrarCriarAvulso || substituindoExIdx !== null || reordenando,
+    mostrarPicker || mostrarCriarAvulso || substituindoExIdx !== null || reordenando,
   );
 </script>
 
@@ -1188,8 +1190,8 @@
 
 {#if subtelaAberta}
   <TreinoMinimizado
+    zIndex={155}
     onAbrir={() => {
-      mostrarEscolhaAdicionar = false;
       mostrarPicker = false;
       mostrarCriarAvulso = false;
       substituindoExIdx = null;
