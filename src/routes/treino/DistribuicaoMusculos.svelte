@@ -3352,19 +3352,16 @@
     color: var(--color-negative);
   }
   /* Precisa da classe extra (.caixa-serie-valor.valor-*) pra ganhar de .caixa-serie-valor, que
-     vem depois no arquivo e tem a mesma especificidade -- sem isso, o destaque de meta batida
-     (verde) ficava sempre perdendo pro cinza padrão, independente do estado. */
+     vem depois no arquivo e tem a mesma especificidade -- sem isso, o destaque de meta perdia
+     sempre pro cinza padrão, independente do estado. Meta batida em branco (igual as caixas sem
+     meta, caixa-serie-ativa) -- longe da meta (acima ou abaixo) em cor neutra, sem negrito. */
   .caixa-serie-valor.valor-subindo {
-    color: var(--color-success);
+    color: var(--surface-fg);
     font-weight: 700;
   }
-  .caixa-serie-valor.valor-estavel {
-    color: var(--color-neutral);
-    font-weight: 700;
-  }
+  .caixa-serie-valor.valor-estavel,
   .caixa-serie-valor.valor-caindo {
-    color: var(--color-negative);
-    font-weight: 700;
+    color: var(--color-neutral);
   }
   .barra-wrap {
     height: 10px;
