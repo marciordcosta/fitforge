@@ -2109,26 +2109,20 @@
   /** Só usado no editor de rotina: a meta manual vai junto do valor da coluna em que foi
    * definida ("atual/meta" no lugar do valor sozinho, em vez de uma linha à parte embaixo do
    * nome) — metaCampo diz qual das 3 caixas recebe esse tratamento (a mesma em que a meta foi
-   * salva; nas outras 2, mostra o valor normal). O peso (negrito) é sempre do número atual; o
-   * "/meta" só ganha o mesmo peso quando bate exatamente (totalClasse "valor-subindo") — por isso
-   * ficam em spans separados, não um texto só. */
+   * salva; nas outras 2, mostra o valor normal). O número atual sempre em branco/negrito (igual
+   * caixa-serie-ativa); o "/meta" sempre em cor neutra sem negrito — por isso ficam em spans
+   * separados, não um texto só. */
   metaValor: number | null = null,
-  totalClasse: "valor-subindo" | "valor-estavel" | "valor-caindo" | null = null,
   metaCampo: CampoOrdenacaoSeries | null = null,
 )}
   {@const valoresPorCampo: Record<CampoOrdenacaoSeries, number> = { total: bruto, ponderado, acumulado }}
   <div class="caixas-series">
     {#each colunasAtivas as campo (campo)}
       <button type="button" class="caixa-serie" onclick={(e) => { e.stopPropagation(); aoTocar(campo); }}>
-        <span
-          class="caixa-serie-valor"
-          class:caixa-serie-ativa={ordenandoPor === campo && !(metaCampo === campo && totalClasse != null)}
-          class:valor-subindo={metaCampo === campo && totalClasse === "valor-subindo"}
-          class:valor-estavel={metaCampo === campo && totalClasse === "valor-estavel"}
-          class:valor-caindo={metaCampo === campo && totalClasse === "valor-caindo"}
+        <span class="caixa-serie-valor" class:caixa-serie-ativa={ordenandoPor === campo}
         >{formatValor(valoresPorCampo[campo])}</span>
         {#if metaCampo === campo && metaValor != null}
-          <span class="caixa-serie-meta" class:valor-subindo={totalClasse === "valor-subindo"}>/{formatValor(metaValor)}</span>
+          <span class="caixa-serie-meta">/{formatValor(metaValor)}</span>
         {/if}
       </button>
     {/each}
@@ -2449,8 +2443,8 @@
   <button
     class="abc-toggle-btn"
     onclick={alternarModoDetalheCiclo}
-    aria-label={modoDetalhe === "volume" ? "Ver por dominância (ABC)" : "Ver por classificação de volume"}
-  >{modoDetalhe === "volume" ? "Volume" : "ABC"}</button>
+    aria-label={modoDetalhe === "volume" ? "Ver por dominância (Fadiga)" : "Ver por classificação de volume"}
+  >{modoDetalhe === "volume" ? "Volume" : "Fadiga"}</button>
 {/snippet}
 
 {#if modalAberto}
@@ -3020,15 +3014,6 @@
         <div class="editor-musculos-lista">
           {#each metasEditor as item (item.musculo.id)}
             {@const metaCampo = item.meta?.tipo ?? null}
-            {@const valorNaMetaCampo = metaCampo === "total" ? item.atual : metaCampo === "ponderado" ? item.ponderado : metaCampo === "acumulado" ? item.acumulado : null}
-            {@const totalClasse =
-              item.meta == null || valorNaMetaCampo == null
-                ? null
-                : valorNaMetaCampo > item.meta.valor
-                  ? "valor-caindo"
-                  : valorNaMetaCampo === item.meta.valor
-                    ? "valor-subindo"
-                    : "valor-estavel"}
             {@const tendMusculo = tendenciaMusculoEditor(item.musculo.id)}
             {@const classeVolumeItem = classificarVolumeSemanal(arredondarValor(item.atual), parametrosParaMusculo(item.musculo))}
             {@const alertaItem = alertaVolumeTendencia(classeVolumeItem, tendMusculo)}
@@ -3059,7 +3044,7 @@
                 </span>
               </button>
               {@render barraFadiga(item.partes, item.partes.a + item.partes.b + item.partes.c)}
-              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemSemanal, (campo) => (ordemSemanal = campo), item.meta?.valor ?? null, totalClasse, metaCampo)}
+              {@render caixasSeries(item.atual, item.ponderado, item.acumulado, ordemSemanal, (campo) => (ordemSemanal = campo), item.meta?.valor ?? null, metaCampo)}
             </div>
           {/each}
         </div>
@@ -3379,20 +3364,6 @@
   .valor-caindo {
     color: var(--color-negative);
   }
-  /* Precisa da classe extra (.caixa-serie-valor.valor-*) pra ganhar de .caixa-serie-valor, que
-     vem depois no arquivo e tem a mesma especificidade -- sem isso, o destaque de meta perdia
-     sempre pro cinza padrão, independente do estado. Negrito sempre (mesmo peso de
-     caixa-serie-ativa, já que essas caixas com meta só aparecem na coluna destacada) -- só a cor
-     muda: branco quando bate a meta, neutra quando ainda não bateu (acima ou abaixo). */
-  .caixa-serie-valor.valor-subindo {
-    color: var(--surface-fg);
-    font-weight: 700;
-  }
-  .caixa-serie-valor.valor-estavel,
-  .caixa-serie-valor.valor-caindo {
-    color: var(--color-neutral);
-    font-weight: 700;
-  }
   .barra-wrap {
     height: 10px;
     background: var(--surface-border);
@@ -3579,6 +3550,7 @@
 
   .grade-scroll {
     overflow-x: auto;
+    padding-top: var(--space-3);
     padding-bottom: var(--space-3);
   }
   .grade-tabela {
