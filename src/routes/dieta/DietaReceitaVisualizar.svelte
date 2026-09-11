@@ -18,8 +18,6 @@
     removerItemReceita,
     adicionarItemReceita,
     excluirReceita,
-    desvincularMetaReceita,
-    removerMetaReceitaDias,
     type Receita,
     type ReceitaItem,
     type RefeicaoDia,
@@ -27,15 +25,7 @@
   } from "../../lib/dietaApi";
   import { receitaRascunho, limparRascunho } from "../../lib/receitaRascunho.svelte";
 
-  /** metaModeloId presente = essa receita foi aberta como a meta de uma refeição do catálogo (vindo
-   * de Gerenciar), não como um prato solto da lista de Receitas — "Excluir" nesse caso só remove o
-   * vínculo (esse dia/grupo, ou a meta global se metaDiasSemana ausente), nunca a receita em si,
-   * já que outra refeição/dia pode ter essa mesma receita como base. */
-  let {
-    receitaId,
-    metaModeloId,
-    metaDiasSemana,
-  }: { receitaId: string; metaModeloId?: string; metaDiasSemana?: number[] } = $props();
+  let { receitaId }: { receitaId: string } = $props();
 
   const PREFIXO_NOVO = "novo-";
 
@@ -283,22 +273,10 @@
     if (!receita) return;
     excluindo = true;
     try {
-      if (metaModeloId) {
-        if (metaDiasSemana?.length) {
-          await removerMetaReceitaDias(metaModeloId, metaDiasSemana);
-        } else {
-          await desvincularMetaReceita(metaModeloId);
-        }
-        // Cópia oculta exclusiva desse dia/grupo — sem mais nenhum vínculo apontando pra ela, não
-        // serve pra mais nada; a receita original (não oculta) nunca é tocada aqui.
-        if (receita.oculta) await excluirReceita(receita.id);
-        navigate("/dieta/refeicoes/gerenciar?aba=refeicoes");
-      } else {
-        await excluirReceita(receita.id);
-        navigate("/dieta/receitas");
-      }
+      await excluirReceita(receita.id);
+      navigate("/dieta/receitas");
     } catch (err) {
-      alert("Erro ao remover refeição: " + (err as Error).message);
+      alert("Erro ao excluir refeição: " + (err as Error).message);
       excluindo = false;
     }
   }
@@ -325,11 +303,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button
-      class="back"
-      onclick={() => voltar(metaModeloId ? "/dieta/refeicoes/gerenciar?aba=refeicoes" : "/dieta/receitas")}
-      aria-label="Voltar"
-    >{@render iconVoltar()}</button>
+    <button class="back" onclick={() => voltar("/dieta/receitas")} aria-label="Voltar">{@render iconVoltar()}</button>
     {#if nomeEditando}
       <input
         class="nome-input"
@@ -440,9 +414,7 @@
     <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/receita/${receitaId}`)}>+ Adicionar Alimento</button>
 
     <div class="acao-excluir">
-      <Button variant="danger" onclick={() => (confirmandoExclusao = true)} disabled={excluindo}>
-        {metaModeloId ? "Remover Refeição" : "Excluir Refeição"}
-      </Button>
+      <Button variant="danger" onclick={() => (confirmandoExclusao = true)} disabled={excluindo}>Excluir Refeição</Button>
     </div>
     </div>
   {/if}
@@ -450,10 +422,8 @@
 
 {#if confirmandoExclusao}
   <ConfirmDialog
-    titulo={metaModeloId
-      ? `Remover essa refeição d${metaDiasSemana?.length ? "esse dia" : "a distribuição"}? A receita continua na sua lista de Receitas.`
-      : "Tem certeza de que quer excluir esta refeição salva?"}
-    textoConfirmar={metaModeloId ? "Remover" : "Excluir Refeição"}
+    titulo="Tem certeza de que quer excluir esta refeição salva?"
+    textoConfirmar="Excluir Refeição"
     onConfirmar={excluir}
     onCancelar={() => (confirmandoExclusao = false)}
   />

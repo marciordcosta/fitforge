@@ -8,6 +8,7 @@
   import DietaReceitas from "./DietaReceitas.svelte";
   import DietaReceitaVisualizar from "./DietaReceitaVisualizar.svelte";
   import DietaRefeicoesGerenciar from "./DietaRefeicoesGerenciar.svelte";
+  import DietaRefeicaoMetaEditar from "./DietaRefeicaoMetaEditar.svelte";
   import DietaParametrizacao from "./DietaParametrizacao.svelte";
   import Placeholder from "../Placeholder.svelte";
   import { hojeISO } from "../../lib/dates";
@@ -35,26 +36,18 @@
   <DietaAlimentos modoReceita={true} receitaIdExistente={segmentos[2]} />
 {:else if segmentos[0] === "alimentos"}
   <DietaAlimentos />
-{:else if segmentos[0] === "receitas" && segmentos[1] === "nova" && segmentos[2] === "meta" && segmentos[3] && segmentos[4]}
-  <DietaReceitaForm metaParaModeloId={segmentos[3]} metaParaDiasSemana={segmentos[4].split(",").map(Number)} />
-{:else if segmentos[0] === "receitas" && segmentos[1] === "nova" && segmentos[2] === "meta" && segmentos[3]}
-  <DietaReceitaForm metaParaModeloId={segmentos[3]} />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "nova"}
   <DietaReceitaForm />
-{:else if segmentos[0] === "receitas" && segmentos[1] === "ver" && segmentos[2] && segmentos[3] === "meta" && segmentos[4] && segmentos[5]}
-  <DietaReceitaVisualizar receitaId={segmentos[2]} metaModeloId={segmentos[4]} metaDiasSemana={segmentos[5].split(",").map(Number)} />
-{:else if segmentos[0] === "receitas" && segmentos[1] === "ver" && segmentos[2] && segmentos[3] === "meta" && segmentos[4]}
-  <DietaReceitaVisualizar receitaId={segmentos[2]} metaModeloId={segmentos[4]} />
 {:else if segmentos[0] === "receitas" && segmentos[1] === "ver" && segmentos[2]}
   <DietaReceitaVisualizar receitaId={segmentos[2]} />
-{:else if segmentos[0] === "receitas" && segmentos[1] === "buscar" && segmentos[2] === "meta" && segmentos[3] && segmentos[5]}
-  <DietaReceitas metaParaModeloId={segmentos[3]} nomeInicial={decodeURIComponent(segmentos[4] ?? "")} metaParaDiasSemana={segmentos[5].split(",").map(Number)} />
-{:else if segmentos[0] === "receitas" && segmentos[1] === "buscar" && segmentos[2] === "meta" && segmentos[3]}
-  <DietaReceitas metaParaModeloId={segmentos[3]} nomeInicial={decodeURIComponent(segmentos[4] ?? "")} />
 {:else if segmentos[0] === "receitas"}
   <DietaReceitas />
 {:else if segmentos[0] === "refeicoes" && segmentos[1] === "gerenciar"}
   <DietaRefeicoesGerenciar />
+{:else if segmentos[0] === "refeicoes" && segmentos[1] === "meta" && segmentos[2] && segmentos[3] && segmentos[4]}
+  <DietaRefeicaoMetaEditar modeloId={segmentos[2]} nome={decodeURIComponent(segmentos[3])} diasSemana={segmentos[4].split(",").map(Number)} />
+{:else if segmentos[0] === "refeicoes" && segmentos[1] === "meta" && segmentos[2] && segmentos[3]}
+  <DietaRefeicaoMetaEditar modeloId={segmentos[2]} nome={decodeURIComponent(segmentos[3])} />
 {:else if segmentos[0] === "scanear" && segmentos[1] === "receita"}
   {#await import("./DietaScanear.svelte") then { default: DietaScanear }}
     <DietaScanear modoReceita={true} receitaIdExistente={segmentos[2]} />

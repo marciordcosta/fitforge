@@ -29,8 +29,6 @@
     carboidratoGDoDia,
     listRefeicoesModeloDia,
     definirRefeicoesDoDia,
-    vincularMetaReceitaDias,
-    clonarReceitaOculta,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
@@ -108,13 +106,6 @@
   const fibrasMaxG = $derived(Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, caloriasCalc)));
   const gorduraSaturadaMaxG = $derived(Math.round(gramasDoParametro(defParametro.get("gordura_saturada")!, parametro("gordura_saturada").max, pesoAtual, caloriasCalc)));
 
-  /** Mesmas faixas de cima, mas pra calorias de um bloco de dias específico (Ondulatória) — o bloco pode ter uma meta diferente da média semanal. */
-  function fibrasMaxDoGrupo(calorias: number): number {
-    return Math.round(gramasDoParametro(defParametro.get("fibras")!, parametro("fibras").max, pesoAtual, calorias));
-  }
-  function gorduraSaturadaMaxDoGrupo(calorias: number): number {
-    return Math.round(gramasDoParametro(defParametro.get("gordura_saturada")!, parametro("gordura_saturada").max, pesoAtual, calorias));
-  }
   const aguaMinL = $derived(Math.round(parametro("agua").min * pesoAtual * 10) / 10);
   const aguaMaxL = $derived(Math.round(parametro("agua").max * pesoAtual * 10) / 10);
 
@@ -703,15 +694,12 @@
 
   interface MetaEfetiva {
     receitaId: string | null;
-    /** Se o prato dessa meta já é uma cópia oculta exclusiva desse dia/grupo — editar os itens
-     * dela direto é seguro, não vaza pra outro dia nem pra receita original. */
+    /** Se a lista de alimentos dessa meta já é uma receita oculta exclusiva desse dia/grupo. */
     receitaOculta: boolean;
     calorias: number | null;
     proteinaG: number | null;
     gorduraG: number | null;
     carboidratoG: number | null;
-    fibraG: number | null;
-    gorduraSaturadaG: number | null;
   }
 
   /** Meta de uma refeição do catálogo num dia específico — usa o override daquele dia se houver, senão cai pra meta global (m). */
@@ -725,8 +713,6 @@
         proteinaG: override.metaProteinaG,
         gorduraG: override.metaGorduraG,
         carboidratoG: override.metaCarboidratoG,
-        fibraG: override.metaFibraG,
-        gorduraSaturadaG: override.metaGorduraSaturadaG,
       };
     }
     return {
@@ -736,8 +722,6 @@
       proteinaG: m.metaProteinaG,
       gorduraG: m.metaGorduraG,
       carboidratoG: m.metaCarboidratoG,
-      fibraG: m.metaFibraG,
-      gorduraSaturadaG: m.metaGorduraSaturadaG,
     };
   }
 
@@ -751,11 +735,9 @@
           proteinaG: acc.proteinaG + (meta.proteinaG ?? 0),
           gorduraG: acc.gorduraG + (meta.gorduraG ?? 0),
           carboidratoG: acc.carboidratoG + (meta.carboidratoG ?? 0),
-          fibraG: acc.fibraG + (meta.fibraG ?? 0),
-          gorduraSaturadaG: acc.gorduraSaturadaG + (meta.gorduraSaturadaG ?? 0),
         };
       },
-      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0, fibraG: 0, gorduraSaturadaG: 0 },
+      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
     );
   }
 
@@ -767,10 +749,8 @@
         proteinaG: acc.proteinaG + (m.metaProteinaG ?? 0),
         gorduraG: acc.gorduraG + (m.metaGorduraG ?? 0),
         carboidratoG: acc.carboidratoG + (m.metaCarboidratoG ?? 0),
-        fibraG: acc.fibraG + (m.metaFibraG ?? 0),
-        gorduraSaturadaG: acc.gorduraSaturadaG + (m.metaGorduraSaturadaG ?? 0),
       }),
-      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0, fibraG: 0, gorduraSaturadaG: 0 },
+      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
     );
   }
 
@@ -860,43 +840,11 @@
     mostrarForm = true;
   }
 
-  let preparandoAjusteDia = $state(false);
-
-  /**
-   * diasGrupo: todos os dias que compartilham essa meta de calorias — vincular um prato aqui vale
-   * pro grupo inteiro de uma vez. Ao abrir pra edição vinda de um dia/grupo, se o prato ainda é o
-   * compartilhado (não é uma cópia oculta exclusiva desse grupo), clona ele antes — ajustar as
-   * quantidades a partir daqui nunca deve mudar a receita original (visível na lista de Receitas)
-   * nem vazar pra outro dia/grupo que aponte pra ela.
-   */
-  async function abrirMeta(m: RefeicaoModelo, diasGrupo?: number[]) {
-    if (diasGrupo?.length) {
-      const efetiva = metaEfetivaDoDia(m, diasGrupo[0]);
-      if (efetiva.receitaId && efetiva.receitaOculta) {
-        navigate(`/dieta/receitas/ver/${efetiva.receitaId}/meta/${m.id}/${diasGrupo.join(",")}`);
-        return;
-      }
-      if (efetiva.receitaId) {
-        preparandoAjusteDia = true;
-        try {
-          const forkId = await clonarReceitaOculta(efetiva.receitaId);
-          await vincularMetaReceitaDias(m.id, diasGrupo, forkId);
-          navigate(`/dieta/receitas/ver/${forkId}/meta/${m.id}/${diasGrupo.join(",")}`);
-        } catch (err) {
-          alert("Erro ao preparar o ajuste desse dia: " + (err as Error).message);
-        } finally {
-          preparandoAjusteDia = false;
-        }
-        return;
-      }
-      navigate(`/dieta/receitas/buscar/meta/${m.id}/${encodeURIComponent(m.nome)}/${diasGrupo.join(",")}`);
-      return;
-    }
-    if (m.metaReceitaId) {
-      navigate(`/dieta/receitas/ver/${m.metaReceitaId}/meta/${m.id}`);
-      return;
-    }
-    navigate(`/dieta/receitas/buscar/meta/${m.id}/${encodeURIComponent(m.nome)}`);
+  /** diasGrupo: todos os dias que compartilham essa meta de calorias — a tela de meta edita o
+   * grupo inteiro de uma vez. */
+  function abrirMeta(m: RefeicaoModelo, diasGrupo?: number[]): void {
+    const diasSeg = diasGrupo?.length ? `/${diasGrupo.join(",")}` : "";
+    navigate(`/dieta/refeicoes/meta/${m.id}/${encodeURIComponent(m.nome)}${diasSeg}`);
   }
 
   async function salvar() {
@@ -991,7 +939,7 @@
       pressionouLongoNome = false;
       return;
     }
-    void abrirMeta(m, diasGrupo);
+    abrirMeta(m, diasGrupo);
   }
 
   /** Tempo segurando o handle parado antes do arrasto realmente começar — evita que um toque de rolagem vire reordenação sem querer. */
@@ -1172,20 +1120,14 @@
   carboidratoG: number,
   gorduraG: number,
   proteinaG: number,
-  fibraG: number,
-  gorduraSaturadaG: number,
   carboidratoDiaG: number,
   gorduraDiaG: number,
   proteinaDiaG: number,
-  fibraDiaG: number,
-  gorduraSaturadaDiaG: number,
   invisivel: boolean,
 )}
   {@const pctCarboDia = carboidratoDiaG > 0 ? Math.round((carboidratoG / carboidratoDiaG) * 100) : 0}
   {@const pctGorduraDia = gorduraDiaG > 0 ? Math.round((gorduraG / gorduraDiaG) * 100) : 0}
   {@const pctProteinaDia = proteinaDiaG > 0 ? Math.round((proteinaG / proteinaDiaG) * 100) : 0}
-  {@const pctFibraDia = fibraDiaG > 0 ? Math.round((fibraG / fibraDiaG) * 100) : 0}
-  {@const pctGorduraSaturadaDia = gorduraSaturadaDiaG > 0 ? Math.round((gorduraSaturadaG / gorduraSaturadaDiaG) * 100) : 0}
   <span class="nome-macros" class:invisivel>
     <span class="mini-macro-col">
       <span class="mini-macro-nome">Carb</span>
@@ -1207,20 +1149,6 @@
         <span class="mini-macro-barra" style={`width:${Math.min(100, pctProteinaDia)}%; background:${COR_PROTEINA};`}></span>
       </span>
       <span class="mini-macro-valor">{proteinaG.toFixed(0)} g · {pctProteinaDia}%</span>
-    </span>
-    <span class="mini-macro-col">
-      <span class="mini-macro-nome">Fibras</span>
-      <span class="mini-macro-barra-wrap">
-        <span class="mini-macro-barra" style={`width:${Math.min(100, pctFibraDia)}%; background:${COR_CARBO};`}></span>
-      </span>
-      <span class="mini-macro-valor">{fibraG.toFixed(0)} g · {pctFibraDia}%</span>
-    </span>
-    <span class="mini-macro-col">
-      <span class="mini-macro-nome">G. satur</span>
-      <span class="mini-macro-barra-wrap">
-        <span class="mini-macro-barra" style={`width:${Math.min(100, pctGorduraSaturadaDia)}%; background:${COR_GORDURA};`}></span>
-      </span>
-      <span class="mini-macro-valor">{gorduraSaturadaG.toFixed(0)} g · {pctGorduraSaturadaDia}%</span>
     </span>
   </span>
 {/snippet}
@@ -1415,8 +1343,6 @@
       {#each gruposDias as grupo (grupo.dias[0])}
         {@const somaGrupo = somaMacrosInformados(grupo.dias[0])}
         {@const metaGrupo = metaMacrosDoGrupo(grupo)}
-        {@const fibrasMaxGrupo = fibrasMaxDoGrupo(metaGrupo.calorias)}
-        {@const gorduraSaturadaMaxGrupo = gorduraSaturadaMaxDoGrupo(metaGrupo.calorias)}
         {#if gruposDias.length > 1}
           <div class="secao-dias-header">
             <div class="dias-lista secao-dias-lista">
@@ -1517,40 +1443,6 @@
                 </div>
               </div>
             </div>
-            <div class="macro-col">
-              <p class="macro-nome">G. satur</p>
-              <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo))}% 100%);`}>
-                <div class="macro-anel-centro">
-                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo)}
-                    <strong>{(somaGrupo.gorduraSaturadaG - gorduraSaturadaMaxGrupo).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">acima</span>
-                  {:else if modoRestanteRefeicoes}
-                    <strong>{restante(somaGrupo.gorduraSaturadaG, gorduraSaturadaMaxGrupo).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">restantes</span>
-                  {:else}
-                    <strong>{somaGrupo.gorduraSaturadaG.toFixed(0)} g</strong>
-                    <span class="macro-meta">/ {gorduraSaturadaMaxGrupo.toFixed(0)}</span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-            <div class="macro-col">
-              <p class="macro-nome">Fibras</p>
-              <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(somaGrupo.fibraG, fibrasMaxGrupo))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGrupo.fibraG, fibrasMaxGrupo))}% 100%);`}>
-                <div class="macro-anel-centro">
-                  {#if modoRestanteRefeicoes && passouMeta(somaGrupo.fibraG, fibrasMaxGrupo)}
-                    <strong>{(somaGrupo.fibraG - fibrasMaxGrupo).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">acima</span>
-                  {:else if modoRestanteRefeicoes}
-                    <strong>{restante(somaGrupo.fibraG, fibrasMaxGrupo).toFixed(0)} g</strong>
-                    <span class="macro-meta macro-meta-restantes">restantes</span>
-                  {:else}
-                    <strong>{somaGrupo.fibraG.toFixed(0)} g</strong>
-                    <span class="macro-meta">/ {fibrasMaxGrupo.toFixed(0)}</span>
-                  {/if}
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1568,7 +1460,6 @@
               </button>
               <button
                 class="nome-btn"
-                disabled={preparandoAjusteDia}
                 onpointerdown={(e) => aoPointerDownNome(e, m, grupo)}
                 onclick={() => aoClickNome(m, grupo.dias)}
                 oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
@@ -1581,13 +1472,9 @@
                   meta.carboidratoG ?? 0,
                   meta.gorduraG ?? 0,
                   meta.proteinaG ?? 0,
-                  meta.fibraG ?? 0,
-                  meta.gorduraSaturadaG ?? 0,
                   metaGrupo.carboidratoG,
                   metaGrupo.gorduraG,
                   metaGrupo.proteinaG,
-                  fibrasMaxGrupo,
-                  gorduraSaturadaMaxGrupo,
                   meta.calorias == null,
                 )}
               </button>
@@ -1678,40 +1565,6 @@
               </div>
             </div>
           </div>
-          <div class="macro-col">
-            <p class="macro-nome">G. satur</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG))}% 100%);`}>
-              <div class="macro-anel-centro">
-                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG)}
-                  <strong>{(somaGlobal.gorduraSaturadaG - gorduraSaturadaMaxG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGlobal.gorduraSaturadaG, gorduraSaturadaMaxG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGlobal.gorduraSaturadaG.toFixed(0)} g</strong>
-                  <span class="macro-meta">/ {gorduraSaturadaMaxG.toFixed(0)}</span>
-                {/if}
-              </div>
-            </div>
-          </div>
-          <div class="macro-col">
-            <p class="macro-nome">Fibras</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(somaGlobal.fibraG, fibrasMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(somaGlobal.fibraG, fibrasMaxG))}% 100%);`}>
-              <div class="macro-anel-centro">
-                {#if modoRestanteRefeicoes && passouMeta(somaGlobal.fibraG, fibrasMaxG)}
-                  <strong>{(somaGlobal.fibraG - fibrasMaxG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">acima</span>
-                {:else if modoRestanteRefeicoes}
-                  <strong>{restante(somaGlobal.fibraG, fibrasMaxG).toFixed(0)} g</strong>
-                  <span class="macro-meta macro-meta-restantes">restantes</span>
-                {:else}
-                  <strong>{somaGlobal.fibraG.toFixed(0)} g</strong>
-                  <span class="macro-meta">/ {fibrasMaxG.toFixed(0)}</span>
-                {/if}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1740,13 +1593,9 @@
                 m.metaCarboidratoG ?? 0,
                 m.metaGorduraG ?? 0,
                 m.metaProteinaG ?? 0,
-                m.metaFibraG ?? 0,
-                m.metaGorduraSaturadaG ?? 0,
                 metaGlobal.carboidratoG,
                 metaGlobal.gorduraG,
                 metaGlobal.proteinaG,
-                fibrasMaxG,
-                gorduraSaturadaMaxG,
                 m.metaCalorias == null,
               )}
             </button>

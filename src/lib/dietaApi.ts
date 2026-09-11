@@ -235,21 +235,21 @@ export async function criarAlimentoOpenFoodFacts(input: AlimentoOpenFoodFactsInp
 export interface RefeicaoModelo {
   id: string;
   nome: string;
-  /** Prato vinculado (dieta_receitas) que serve como meta de macros/calorias dessa refeição, se houver. */
+  /** Receita privada (oculta) com os alimentos dessa refeição, se o usuário tiver adicionado algum
+   * — só serve pra lançar automaticamente no diário do dia (garantirRefeicoesPadraoLancadas), não
+   * tem mais relação com o número da meta abaixo. */
   metaReceitaId: string | null;
-  /** Se o prato vinculado é uma cópia oculta (fork), já exclusiva desse contexto — editar os itens
-   * dela não vaza pra outro dia/grupo nem pra receita original visível na lista de Receitas. */
   metaReceitaOculta: boolean;
+  /** Meta de calorias/macros dessa refeição — número direto (editado pela roda tripla), não mais
+   * somado de uma receita. Calorias é sempre derivada dos 3 macros (4p + 9g + 4c). */
   metaCalorias: number | null;
   metaProteinaG: number | null;
   metaGorduraG: number | null;
   metaCarboidratoG: number | null;
-  metaFibraG: number | null;
-  metaGorduraSaturadaG: number | null;
 }
 
 const REFEICAO_MODELO_SELECT =
-  "id, nome, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(oculta, itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g)))";
+  "id, nome, meta_receita_id, meta_proteina_g, meta_gordura_g, meta_carboidrato_g, meta_receita:dieta_receitas!meta_receita_id(oculta)";
 
 interface ItemReceitaBruto {
   quantidade: number;
@@ -282,26 +282,27 @@ function somarTotaisItensReceita(itens: ItemReceitaBruto[]) {
   );
 }
 
+/** Calorias sempre derivadas dos 3 macros — mesma fórmula usada na meta diária (caloriasCalc). Null
+ * quando os 3 macros estão null (nenhuma meta configurada pra essa refeição). */
+function calcularMetaCalorias(proteinaG: number | null, gorduraG: number | null, carboidratoG: number | null): number | null {
+  if (proteinaG == null && gorduraG == null && carboidratoG == null) return null;
+  return round1(4 * (proteinaG ?? 0) + 9 * (gorduraG ?? 0) + 4 * (carboidratoG ?? 0));
+}
+
 function mapRefeicaoModelo(l: Record<string, unknown>): RefeicaoModelo {
-  const metaReceita = l.meta_receita as { oculta: boolean; itens: ItemReceitaBruto[] } | null;
-  const base = {
+  const metaReceita = l.meta_receita as { oculta: boolean } | null;
+  const proteinaG = l.meta_proteina_g as number | null;
+  const gorduraG = l.meta_gordura_g as number | null;
+  const carboidratoG = l.meta_carboidrato_g as number | null;
+  return {
     id: l.id as string,
     nome: l.nome as string,
     metaReceitaId: l.meta_receita_id as string | null,
     metaReceitaOculta: metaReceita?.oculta ?? false,
-  };
-  if (!metaReceita) {
-    return { ...base, metaCalorias: null, metaProteinaG: null, metaGorduraG: null, metaCarboidratoG: null, metaFibraG: null, metaGorduraSaturadaG: null };
-  }
-  const totais = somarTotaisItensReceita(metaReceita.itens ?? []);
-  return {
-    ...base,
-    metaCalorias: round1(totais.calorias),
-    metaProteinaG: round1(totais.proteinaG),
-    metaGorduraG: round1(totais.gorduraG),
-    metaCarboidratoG: round1(totais.carboidratoG),
-    metaFibraG: round1(totais.fibraG),
-    metaGorduraSaturadaG: round1(totais.gorduraSaturadaG),
+    metaCalorias: calcularMetaCalorias(proteinaG, gorduraG, carboidratoG),
+    metaProteinaG: proteinaG,
+    metaGorduraG: gorduraG,
+    metaCarboidratoG: carboidratoG,
   };
 }
 
@@ -337,13 +338,6 @@ export async function getMetaRefeicaoPorNome(nome: string): Promise<MetasDiarias
     gorduraG: modelo.metaGorduraG!,
     carboidratoG: modelo.metaCarboidratoG!,
   };
-}
-
-/** Id do prato vinculado como meta da refeição do catálogo com esse nome, ou null — select enxuto, sem os totais. */
-export async function getMetaReceitaIdPorNome(nome: string): Promise<string | null> {
-  const { data, error } = await supabase.from("dieta_refeicoes_modelo").select("meta_receita_id").eq("nome", nome).limit(1);
-  if (error) throw error;
-  return data?.[0]?.meta_receita_id ?? null;
 }
 
 export async function vincularMetaReceita(modeloId: string, receitaId: string): Promise<void> {
@@ -382,38 +376,36 @@ export async function receitaEhMetaDeRefeicao(receitaId: string): Promise<boolea
 export interface MetaDiaModelo {
   modeloId: string;
   diaSemana: number;
-  metaReceitaId: string;
+  metaReceitaId: string | null;
   metaReceitaOculta: boolean;
-  metaCalorias: number;
-  metaProteinaG: number;
-  metaGorduraG: number;
-  metaCarboidratoG: number;
-  metaFibraG: number;
-  metaGorduraSaturadaG: number;
+  metaCalorias: number | null;
+  metaProteinaG: number | null;
+  metaGorduraG: number | null;
+  metaCarboidratoG: number | null;
 }
 
 const META_DIA_MODELO_SELECT =
-  "modelo_id, dia_semana, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(oculta, itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g)))";
+  "modelo_id, dia_semana, meta_receita_id, meta_proteina_g, meta_gordura_g, meta_carboidrato_g, meta_receita:dieta_receitas!meta_receita_id(oculta)";
 
-/** Todas as metas por dia já configuradas (qualquer refeição, qualquer dia) — ausência de linha pra um (modelo, dia) usa o meta_receita_id global como fallback. */
+/** Todas as metas por dia já configuradas (qualquer refeição, qualquer dia) — ausência de linha pra um (modelo, dia) usa o meta_receita_id/meta numérica global como fallback. */
 export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
   const { data, error } = await supabase.from("dieta_refeicoes_modelo_meta_dia").select(META_DIA_MODELO_SELECT);
   if (error) throw error;
   return (data ?? []).map((l) => {
     const linha = l as Record<string, unknown>;
-    const metaReceita = linha.meta_receita as { oculta: boolean; itens: ItemReceitaBruto[] } | null;
-    const totais = somarTotaisItensReceita(metaReceita?.itens ?? []);
+    const metaReceita = linha.meta_receita as { oculta: boolean } | null;
+    const proteinaG = linha.meta_proteina_g as number | null;
+    const gorduraG = linha.meta_gordura_g as number | null;
+    const carboidratoG = linha.meta_carboidrato_g as number | null;
     return {
       modeloId: linha.modelo_id as string,
       diaSemana: linha.dia_semana as number,
-      metaReceitaId: linha.meta_receita_id as string,
+      metaReceitaId: linha.meta_receita_id as string | null,
       metaReceitaOculta: metaReceita?.oculta ?? false,
-      metaCalorias: round1(totais.calorias),
-      metaProteinaG: round1(totais.proteinaG),
-      metaGorduraG: round1(totais.gorduraG),
-      metaCarboidratoG: round1(totais.carboidratoG),
-      metaFibraG: round1(totais.fibraG),
-      metaGorduraSaturadaG: round1(totais.gorduraSaturadaG),
+      metaCalorias: calcularMetaCalorias(proteinaG, gorduraG, carboidratoG),
+      metaProteinaG: proteinaG,
+      metaGorduraG: gorduraG,
+      metaCarboidratoG: carboidratoG,
     };
   });
 }
@@ -426,6 +418,45 @@ export async function vincularMetaReceitaDias(modeloId: string, diasSemana: numb
       modelo_id: modeloId,
       dia_semana: diaSemana,
       meta_receita_id: receitaId,
+      updated_at: new Date().toISOString(),
+    })),
+    { onConflict: "user_id,modelo_id,dia_semana" },
+  );
+  if (error) throw error;
+}
+
+/** Meta numérica global (Fixa) de uma refeição — proteína/gordura/carboidrato em gramas; calorias é
+ * sempre derivada (calcularMetaCalorias). Passar null nos 3 campos limpa a meta. */
+export async function salvarMetaNumericaRefeicao(
+  modeloId: string,
+  proteinaG: number | null,
+  gorduraG: number | null,
+  carboidratoG: number | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from("dieta_refeicoes_modelo")
+    .update({ meta_proteina_g: proteinaG, meta_gordura_g: gorduraG, meta_carboidrato_g: carboidratoG })
+    .eq("id", modeloId);
+  if (error) throw error;
+}
+
+/** Mesma coisa, mas só pros dias informados (Ondulatória) — não mexe no meta_receita_id (lista de
+ * alimentos) que já estiver salvo pra esses dias, upsert só grava as colunas passadas aqui. */
+export async function salvarMetaNumericaRefeicaoDias(
+  modeloId: string,
+  diasSemana: number[],
+  proteinaG: number | null,
+  gorduraG: number | null,
+  carboidratoG: number | null,
+): Promise<void> {
+  const { error } = await supabase.from("dieta_refeicoes_modelo_meta_dia").upsert(
+    diasSemana.map((diaSemana) => ({
+      user_id: uid(),
+      modelo_id: modeloId,
+      dia_semana: diaSemana,
+      meta_proteina_g: proteinaG,
+      meta_gordura_g: gorduraG,
+      meta_carboidrato_g: carboidratoG,
       updated_at: new Date().toISOString(),
     })),
     { onConflict: "user_id,modelo_id,dia_semana" },
@@ -549,6 +580,34 @@ export async function garantirRefeicoesPadraoDoDia(data: string): Promise<Refeic
   if (!catalogo.length) return existentes;
   await Promise.all(catalogo.map((m) => criarRefeicaoDia(data, m.nome)));
   return getRefeicoesDoDia(data);
+}
+
+/** Pra cada refeição do catálogo com uma lista de alimentos própria (efetiva pro dia da semana
+ * informado — override do dia se houver, senão a global) que ainda não tem nenhum item lançado
+ * nesse dia, lança todos os itens dela de uma vez (mesmo `adicionarReceitaAoDiario` do "Adicionar
+ * à refeição" manual). Só age na primeira vez: se o usuário apagar os itens lançados, não volta
+ * sozinho — mesma idempotência de garantirRefeicoesPadraoDoDia (só olha se a refeição já tem
+ * QUALQUER item, não se são os mesmos que seriam lançados). */
+export async function garantirRefeicoesPadraoLancadas(data: string, diaSemana: number): Promise<void> {
+  const [catalogo, metasDia, refeicoesDia, itensHoje] = await Promise.all([
+    listRefeicoesModelo(),
+    listMetasDiaModelo(),
+    getRefeicoesDoDia(data),
+    getDiarioDoDia(data),
+  ]);
+  const overridePorModelo = new Map(metasDia.filter((m) => m.diaSemana === diaSemana).map((m) => [m.modeloId, m]));
+  const refeicaoIdPorNome = new Map(refeicoesDia.map((r) => [r.nome, r.id]));
+  const refeicoesComItem = new Set(itensHoje.map((i) => i.refeicaoId));
+
+  for (const modelo of catalogo) {
+    const receitaId = overridePorModelo.get(modelo.id)?.metaReceitaId ?? modelo.metaReceitaId;
+    if (!receitaId) continue;
+    const refeicaoId = refeicaoIdPorNome.get(modelo.nome);
+    if (!refeicaoId || refeicoesComItem.has(refeicaoId)) continue;
+    const receita = await getReceita(receitaId);
+    if (!receita?.itens.length) continue;
+    await adicionarReceitaAoDiario(receitaId, data, refeicaoId);
+  }
 }
 
 export async function getRefeicaoDia(id: string): Promise<RefeicaoDia | null> {
@@ -1302,7 +1361,7 @@ export interface ReceitaItem {
 
 export interface Receita extends ReceitaResumo {
   itens: ReceitaItem[];
-  /** Cópia privada gerada pra ajustar a meta de um dia/grupo específico (ver clonarReceitaOculta) —
+  /** Lista de alimentos privada de uma refeição do catálogo (ver garantirReceitaPrivadaRefeicao) —
    * não aparece na lista de Receitas nem nas buscas. */
   oculta: boolean;
 }
@@ -1376,29 +1435,23 @@ export async function getReceita(id: string): Promise<Receita | null> {
   };
 }
 
-/** Clona uma receita (com os itens) numa cópia oculta — usada pra ajustar as quantidades de uma
- * refeição exclusivamente num dia/grupo de dias específico sem alterar a receita original visível
- * na lista de Receitas, nem qualquer outro dia/grupo que ainda aponte pra ela. */
-export async function clonarReceitaOculta(receitaId: string): Promise<string> {
-  const original = await getReceita(receitaId);
-  if (!original) throw new Error("Refeição de origem não encontrada.");
-  const { data: nova, error } = await supabase
-    .from("dieta_receitas")
-    .insert({ user_id: uid(), nome: original.nome, oculta: true })
-    .select("id")
-    .single();
+/** Garante que uma refeição do catálogo (opcionalmente restrita a um grupo de dias, em
+ * Ondulatória) tem uma lista de alimentos própria — uma receita oculta, que nunca aparece na
+ * lista de Receitas nem em buscas. Se `receitaIdExistente` já vem preenchido (a refeição já tinha
+ * uma), só devolve ele; senão cria uma vazia e vincula. */
+export async function garantirReceitaPrivadaRefeicao(
+  modeloId: string,
+  nome: string,
+  receitaIdExistente: string | null,
+  diasSemana?: number[],
+): Promise<string> {
+  if (receitaIdExistente) return receitaIdExistente;
+  const { data: nova, error } = await supabase.from("dieta_receitas").insert({ user_id: uid(), nome, oculta: true }).select("id").single();
   if (error) throw error;
-  if (original.itens.length) {
-    const linhas = original.itens.map((it, i) => ({
-      receita_id: nova.id as string,
-      alimento_id: it.alimentoId,
-      quantidade: it.quantidade,
-      ordem: i,
-    }));
-    const { error: errorItens } = await supabase.from("dieta_receita_itens").insert(linhas);
-    if (errorItens) throw errorItens;
-  }
-  return nova.id as string;
+  const novoId = nova.id as string;
+  if (diasSemana?.length) await vincularMetaReceitaDias(modeloId, diasSemana, novoId);
+  else await vincularMetaReceita(modeloId, novoId);
+  return novoId;
 }
 
 export async function atualizarItemReceita(id: string, quantidade: number): Promise<void> {

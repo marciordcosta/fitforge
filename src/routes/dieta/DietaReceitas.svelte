@@ -1,50 +1,24 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { buscarReceitas, listReceitas, vincularMetaReceita, vincularMetaReceitaDias, type ReceitaResumo } from "../../lib/dietaApi";
-  import { receitaRascunho, limparRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
-
-  let {
-    metaParaModeloId,
-    nomeInicial,
-    metaParaDiasSemana,
-  }: { metaParaModeloId?: string; nomeInicial?: string; metaParaDiasSemana?: number[] } = $props();
+  import { buscarReceitas, listReceitas, type ReceitaResumo } from "../../lib/dietaApi";
+  import { limparRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
 
   let receitas = $state<ReceitaResumo[]>([]);
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
   let busca = $state("");
-  let vinculando = $state<string | null>(null);
 
   let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
 
   function criarNova() {
     limparRascunho();
     definirContexto("nova");
-    if (metaParaModeloId && nomeInicial) {
-      receitaRascunho.nome = nomeInicial;
-    }
-    const diaSeg = metaParaDiasSemana?.length ? `/${metaParaDiasSemana.join(",")}` : "";
-    navigate(metaParaModeloId ? `/dieta/receitas/nova/meta/${metaParaModeloId}${diaSeg}` : "/dieta/receitas/nova");
+    navigate("/dieta/receitas/nova");
   }
 
-  async function selecionar(r: ReceitaResumo) {
-    if (!metaParaModeloId) {
-      navigate(`/dieta/receitas/ver/${r.id}`);
-      return;
-    }
-    vinculando = r.id;
-    try {
-      if (metaParaDiasSemana?.length) {
-        await vincularMetaReceitaDias(metaParaModeloId, metaParaDiasSemana, r.id);
-      } else {
-        await vincularMetaReceita(metaParaModeloId, r.id);
-      }
-      navigate("/dieta/refeicoes/gerenciar");
-    } catch (err) {
-      alert("Erro ao vincular refeição: " + (err as Error).message);
-      vinculando = null;
-    }
+  function selecionar(r: ReceitaResumo) {
+    navigate(`/dieta/receitas/ver/${r.id}`);
   }
 
   async function carregarInicial() {
@@ -92,7 +66,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar(metaParaModeloId ? "/dieta/refeicoes/gerenciar" : "/dieta")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={() => voltar("/dieta")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Refeições</h1>
     <button class="criar" onclick={criarNova}>Criar</button>
   </div>
@@ -111,14 +85,14 @@
       <ul class="lista">
         {#each receitas as r (r.id)}
           <li class="linha">
-            <button class="info-btn" onclick={() => selecionar(r)} disabled={vinculando === r.id}>
+            <button class="info-btn" onclick={() => selecionar(r)}>
               <span class="avatar">{iniciais(r.nome)}</span>
               <span class="info">
                 <span class="nome">{r.nome}</span>
                 <span class="sub">{r.calorias.toFixed(0)} kcal</span>
               </span>
             </button>
-            <span class="chevron">{vinculando === r.id ? "…" : "›"}</span>
+            <span class="chevron">›</span>
           </li>
         {/each}
       </ul>

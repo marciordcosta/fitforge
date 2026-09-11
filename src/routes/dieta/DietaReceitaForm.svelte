@@ -1,16 +1,8 @@
 <script lang="ts">
-  import { untrack } from "svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { criarReceita, vincularMetaReceita, vincularMetaReceitaDias, getMetasDiarias, type MetasDiarias } from "../../lib/dietaApi";
+  import { criarReceita, getMetasDiarias, type MetasDiarias } from "../../lib/dietaApi";
   import { receitaRascunho, removerDoRascunho, limparRascunho, type ItemRascunho } from "../../lib/receitaRascunho.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
-
-  let { metaParaModeloId, metaParaDiasSemana }: { metaParaModeloId?: string; metaParaDiasSemana?: number[] } = $props();
-
-  untrack(() => {
-    receitaRascunho.metaParaModeloId = metaParaModeloId ?? null;
-    receitaRascunho.metaParaDiasSemana = metaParaDiasSemana ?? null;
-  });
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -76,19 +68,12 @@
     if (!valido) return;
     salvando = true;
     try {
-      const novoId = await criarReceita(
+      await criarReceita(
         receitaRascunho.nome.trim(),
         receitaRascunho.itens.map((i) => ({ alimentoId: i.alimento.id, quantidade: i.quantidade })),
       );
-      if (metaParaModeloId) {
-        if (metaParaDiasSemana?.length) {
-          await vincularMetaReceitaDias(metaParaModeloId, metaParaDiasSemana, novoId);
-        } else {
-          await vincularMetaReceita(metaParaModeloId, novoId);
-        }
-      }
       limparRascunho();
-      navigate(metaParaModeloId ? "/dieta/refeicoes/gerenciar" : "/dieta/receitas");
+      navigate("/dieta/receitas");
     } catch (err) {
       alert("Erro ao criar refeição: " + (err as Error).message);
       salvando = false;
@@ -134,7 +119,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar(metaParaModeloId ? "/dieta/refeicoes/gerenciar" : "/dieta/receitas")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={() => voltar("/dieta/receitas")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Nova Refeição</h1>
     <button class="salvar" onclick={salvar} disabled={salvando || !valido} aria-label="Salvar">
       {@render iconCheck()}
