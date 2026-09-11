@@ -308,16 +308,20 @@ export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
   return (data ?? []).map((l) => mapRefeicaoModelo(l as Record<string, unknown>));
 }
 
-/** Meta de macros/calorias da refeição do catálogo com esse nome (via prato vinculado), ou null se não achar/sem prato. */
+/** Meta de macros/calorias da refeição do catálogo com esse nome (via prato vinculado), ou null se não achar/sem prato.
+ * `.limit(1)` em vez de `.maybeSingle()` — nomes deveriam ser únicos no catálogo, mas isso não é
+ * garantido no banco; se algum dia existir duplicata, usa a primeira em vez de quebrar a tela
+ * inteira com "multiple rows returned". */
 export async function getMetaRefeicaoPorNome(nome: string): Promise<MetasDiarias | null> {
   const { data, error } = await supabase
     .from("dieta_refeicoes_modelo")
     .select(REFEICAO_MODELO_SELECT)
     .eq("nome", nome)
-    .maybeSingle();
+    .limit(1);
   if (error) throw error;
-  if (!data) return null;
-  const modelo = mapRefeicaoModelo(data as Record<string, unknown>);
+  const linha = data?.[0];
+  if (!linha) return null;
+  const modelo = mapRefeicaoModelo(linha as Record<string, unknown>);
   if (modelo.metaCalorias == null) return null;
   return {
     calorias: modelo.metaCalorias,
@@ -329,9 +333,9 @@ export async function getMetaRefeicaoPorNome(nome: string): Promise<MetasDiarias
 
 /** Id do prato vinculado como meta da refeição do catálogo com esse nome, ou null — select enxuto, sem os totais. */
 export async function getMetaReceitaIdPorNome(nome: string): Promise<string | null> {
-  const { data, error } = await supabase.from("dieta_refeicoes_modelo").select("meta_receita_id").eq("nome", nome).maybeSingle();
+  const { data, error } = await supabase.from("dieta_refeicoes_modelo").select("meta_receita_id").eq("nome", nome).limit(1);
   if (error) throw error;
-  return data?.meta_receita_id ?? null;
+  return data?.[0]?.meta_receita_id ?? null;
 }
 
 export async function vincularMetaReceita(modeloId: string, receitaId: string): Promise<void> {
@@ -403,14 +407,27 @@ export async function vincularMetaReceitaDias(modeloId: string, diasSemana: numb
   if (error) throw error;
 }
 
+/** Nome duplicado no catálogo quebra buscas por nome (getMetaRefeicaoPorNome e afins, usadas
+ * pra achar a meta de uma refeição do dia) — sem esse checagem, criar/renomear pra um nome já
+ * existente gera duas refeições indistinguíveis por nome no catálogo. */
+async function existeNomeRefeicaoModelo(nome: string, idParaIgnorar?: string): Promise<boolean> {
+  let query = supabase.from("dieta_refeicoes_modelo").select("id").eq("user_id", uid()).ilike("nome", nome).limit(1);
+  if (idParaIgnorar) query = query.neq("id", idParaIgnorar);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
+}
+
 export async function criarRefeicaoModelo(nome: string): Promise<string> {
+  const nomeTrim = nome.trim();
+  if (await existeNomeRefeicaoModelo(nomeTrim)) throw new Error(`Já existe uma refeição chamada "${nomeTrim}".`);
   const { count, error: erroCount } = await supabase
     .from("dieta_refeicoes_modelo")
     .select("id", { count: "exact", head: true });
   if (erroCount) throw erroCount;
   const { data, error } = await supabase
     .from("dieta_refeicoes_modelo")
-    .insert({ user_id: uid(), nome, ordem: count ?? 0 })
+    .insert({ user_id: uid(), nome: nomeTrim, ordem: count ?? 0 })
     .select("id")
     .single();
   if (error) throw error;
@@ -418,7 +435,9 @@ export async function criarRefeicaoModelo(nome: string): Promise<string> {
 }
 
 export async function atualizarRefeicaoModelo(id: string, nome: string): Promise<void> {
-  const { error } = await supabase.from("dieta_refeicoes_modelo").update({ nome }).eq("id", id);
+  const nomeTrim = nome.trim();
+  if (await existeNomeRefeicaoModelo(nomeTrim, id)) throw new Error(`Já existe uma refeição chamada "${nomeTrim}".`);
+  const { error } = await supabase.from("dieta_refeicoes_modelo").update({ nome: nomeTrim }).eq("id", id);
   if (error) throw error;
 }
 
