@@ -2497,7 +2497,7 @@
                 {@const meta = treinoId ? metaParaCampo(treinoId, linha.musculo.id, campoGrade) : undefined}
                 {@const mostrado = campoGrade === "total" ? valor.bruto : valor.ponderado}
                 {@const texto = formatValor(mostrado)}
-                <td class="grade-valor" class:grade-col-destacada={gradeSemanal.colunas[i].dia === diaDestacadoGrade}>
+                <td class="grade-valor">
                   {#if modoEdicaoMetas && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-meta-edit"
@@ -3603,18 +3603,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* Dia da rotina sendo editada (grade aberta a partir do editor completo) — os outros dias
-     continuam com os valores deles, só essa coluna inteira (cabeçalho + células) ganha destaque
-     pra achar rápido em qual coluna olhar. */
+  /* Dia da rotina sendo editada (grade aberta a partir do editor completo) — só o cabeçalho ganha
+     destaque pra achar rápido em qual coluna olhar (destacar a coluna inteira, célula por célula,
+     ficava poluído). */
   .grade-tabela th.grade-col-destacada {
     background: color-mix(in srgb, var(--color-primary) 18%, transparent);
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  }
-  .grade-tabela td.grade-col-destacada {
-    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-  }
-  .grade-tabela tbody tr:last-child td.grade-col-destacada {
-    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    border-radius: var(--radius-sm);
   }
   .grade-tabela .grade-col-musculo {
     text-align: left;
