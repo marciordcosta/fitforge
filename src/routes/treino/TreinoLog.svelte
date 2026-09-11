@@ -1686,7 +1686,9 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 40;
+    /* Acima do picker de exercícios (120/130) e das telas cheias de avulso/reordenar (150) desta
+       tela — o cronômetro não pode ficar escondido enquanto o usuário navega por elas. */
+    z-index: 160;
     background: var(--surface-card);
     border-top: 1px solid var(--surface-border);
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -1774,7 +1776,7 @@
   }
   .descanso-anel {
     position: fixed;
-    z-index: 60;
+    z-index: 160;
     width: 70px;
     height: 70px;
     padding: 0;
@@ -1833,7 +1835,7 @@
   }
   .anel-popover {
     position: fixed;
-    z-index: 61;
+    z-index: 161;
     display: flex;
     flex-direction: column;
     align-items: center;
