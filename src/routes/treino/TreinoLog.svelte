@@ -178,13 +178,12 @@
   }, 1000);
   $effect(() => () => clearInterval(timerId));
 
-  /** No formato anel, o cronômetro continua visível depois de zerar (contando o atraso em negativo)
-   * até o usuário pular ou uma nova série iniciar outro descanso — na barra, some ao zerar como antes. */
+  /** O cronômetro (anel ou barra) continua visível depois de zerar, contando o atraso em negativo,
+   * até o usuário pular ou uma nova série iniciar outro descanso. */
   const exercicioDescansando = $derived.by(() => {
     const ativo = sessao.find((ex) => ex.descansoAte && ex.descansoAte > agora);
     if (ativo) return ativo;
-    if (formatoDescanso === "anel") return sessao.find((ex) => ex.descansoAte != null) ?? null;
-    return null;
+    return sessao.find((ex) => ex.descansoAte != null) ?? null;
   });
 
   const restanteDescansoSeg = $derived.by(() => {
@@ -880,7 +879,7 @@
       </div>
     {/if}
   {:else}
-    <div class="descanso-bar">
+    <div class="descanso-bar" class:descanso-atrasado={descansoAtrasado}>
       <div class="descanso-progresso" style={`width: ${progressoDescanso * 100}%`}></div>
       <div class="descanso-bar-conteudo">
         <button class="formato-descanso-btn-icon" onclick={() => (formatoDescanso = "anel")} aria-label="Ver como anel">
@@ -888,7 +887,7 @@
         </button>
         <div class="descanso-central">
           <button class="descanso-ajuste" disabled={restanteDescansoSeg < 15} onclick={() => ajustarDescanso(-15)}>-15</button>
-          <span class="descanso-tempo">{formatMMSS(restanteDescansoSeg)}</span>
+          <span class="descanso-tempo">{formatMMSSAssinado(restanteDescansoSeg)}</span>
           <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
         </div>
         <button class="descanso-pular" onclick={pularDescanso}>Pular</button>
@@ -1695,7 +1694,13 @@
   .descanso-progresso {
     height: 3px;
     background: var(--color-primary);
-    transition: width 1s linear;
+    transition: width 1s linear, background 0.2s;
+  }
+  .descanso-bar.descanso-atrasado .descanso-progresso {
+    background: var(--color-danger);
+  }
+  .descanso-bar.descanso-atrasado .descanso-tempo {
+    color: var(--color-danger);
   }
   .descanso-bar-conteudo {
     max-width: 520px;
