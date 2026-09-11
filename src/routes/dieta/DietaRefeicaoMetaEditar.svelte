@@ -127,14 +127,11 @@
   const pctGordura = $derived(caloriasCalc > 0 ? (caloriasGordura / caloriasCalc) * 100 : 0);
   const pctProteina = $derived(caloriasCalc > 0 ? (caloriasProteina / caloriasCalc) * 100 : 0);
 
-  /** Total dos alimentos da lista abaixo — só informativo, comparado à meta (independente,
-   * definida na roda tripla acima); não altera nem é alterado por ela. */
+  /** Total dos alimentos da lista abaixo — só informativo (barras, não anel), independente da
+   * meta definida na roda tripla acima; não altera nem é alterado por ela. */
   const pctCarboItens = $derived(totaisItens && totaisItens.calorias > 0 ? ((totaisItens.carboidratoG * 4) / totaisItens.calorias) * 100 : 0);
   const pctGorduraItens = $derived(totaisItens && totaisItens.calorias > 0 ? ((totaisItens.gorduraG * 9) / totaisItens.calorias) * 100 : 0);
   const pctProteinaItens = $derived(totaisItens && totaisItens.calorias > 0 ? ((totaisItens.proteinaG * 4) / totaisItens.calorias) * 100 : 0);
-  const donutItensStyle = $derived(
-    `background: conic-gradient(${COR_CARBO} 0% ${pctCarboItens}%, ${COR_GORDURA} ${pctCarboItens}% ${pctCarboItens + pctGorduraItens}%, ${COR_PROTEINA} ${pctCarboItens + pctGorduraItens}% 100%);`,
-  );
 
   const donutStyle = $derived(
     `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
@@ -329,20 +326,35 @@
       </div>
 
       {#if totaisItens}
-        <div class="card-meta">
-          <p class="card-meta-titulo">Total dos Alimentos</p>
-          <div class="resumo resumo-info">
-            <span class="donut" style={donutItensStyle}>
-              <span class="donut-centro">
-                <strong>{totaisItens.calorias.toFixed(0)}</strong>
-                <span>Cal</span>
-              </span>
-            </span>
-            <span class="resumo-macros">
-              <span><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarboItens.toFixed(0)}%</strong><br /><span class="valor-g">{totaisItens.carboidratoG.toFixed(0)} g</span><br />Carb</span>
-              <span><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGorduraItens.toFixed(0)}%</strong><br /><span class="valor-g">{totaisItens.gorduraG.toFixed(0)} g</span><br />Gorduras</span>
-              <span><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteinaItens.toFixed(0)}%</strong><br /><span class="valor-g">{totaisItens.proteinaG.toFixed(0)} g</span><br />Proteínas</span>
-            </span>
+        <p class="pct-titulo">Total dos Alimentos</p>
+        <div class="pct-grid">
+          <div class="pct-col">
+            <p class="pct-nome">Calorias</p>
+            <div class="pct-barra-wrap">
+              <div class="pct-barra" style="width:100%; background:var(--color-secondary);"></div>
+            </div>
+            <p class="pct-valor">{totaisItens.calorias.toFixed(0)} kcal</p>
+          </div>
+          <div class="pct-col">
+            <p class="pct-nome">Carb</p>
+            <div class="pct-barra-wrap">
+              <div class="pct-barra" style={`width:${larguraBarra(pctCarboItens)}%; background:${COR_CARBO};`}></div>
+            </div>
+            <p class="pct-valor">{totaisItens.carboidratoG.toFixed(0)}g · {pctCarboItens.toFixed(0)}%</p>
+          </div>
+          <div class="pct-col">
+            <p class="pct-nome">Gorduras</p>
+            <div class="pct-barra-wrap">
+              <div class="pct-barra" style={`width:${larguraBarra(pctGorduraItens)}%; background:${COR_GORDURA};`}></div>
+            </div>
+            <p class="pct-valor">{totaisItens.gorduraG.toFixed(0)}g · {pctGorduraItens.toFixed(0)}%</p>
+          </div>
+          <div class="pct-col">
+            <p class="pct-nome">Proteínas</p>
+            <div class="pct-barra-wrap">
+              <div class="pct-barra" style={`width:${larguraBarra(pctProteinaItens)}%; background:${COR_PROTEINA};`}></div>
+            </div>
+            <p class="pct-valor">{totaisItens.proteinaG.toFixed(0)}g · {pctProteinaItens.toFixed(0)}%</p>
           </div>
         </div>
       {/if}
@@ -514,9 +526,6 @@
     cursor: pointer;
     text-align: left;
     font-family: inherit;
-  }
-  .resumo-info {
-    cursor: default;
   }
   .donut {
     position: relative;
