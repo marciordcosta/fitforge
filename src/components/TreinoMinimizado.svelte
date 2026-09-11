@@ -7,8 +7,12 @@
    * (ex: o picker de exercícios), que cobre a lista mas não navega de verdade pra fora da rota —
    * nesse caso "abrir a rotina" é só fechar essa subtela, não um navigate (já se está na rota).
    * zIndex: sobrescreve o z-index padrão (60, calibrado pra ficar abaixo de Sheet/ActionSheet em
-   * uso normal) só quando precisa ficar por cima de telas cheias específicas mais altas. */
-  let { onAbrir, zIndex }: { onAbrir?: () => void; zIndex?: number } = $props();
+   * uso normal) só quando precisa ficar por cima de telas cheias específicas mais altas.
+   * comBottomNav: false quando a tela por trás é cheia e não tem o <BottomNav> do app (essas
+   * mesmas subtelas) — sem isso a barra ficava flutuando acima do rodapé de verdade, deixando um
+   * vão vazio embaixo dela onde não existe navegação nenhuma pra reservar espaço. */
+  let { onAbrir, zIndex, comBottomNav = true }: { onAbrir?: () => void; zIndex?: number; comBottomNav?: boolean } =
+    $props();
 
   function abrirRotina(): void {
     if (onAbrir) onAbrir();
@@ -74,7 +78,11 @@
 </script>
 
 {#if treinoLogSessao.atual && info}
-  <div class="barra" class:cima={posicao === "cima"} style={zIndex != null ? `z-index:${zIndex};` : ""}>
+  <div
+    class="barra"
+    class:cima={posicao === "cima"}
+    style={`${zIndex != null ? `z-index:${zIndex};` : ""}${!comBottomNav && posicao !== "cima" ? "bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-2));" : ""}`}
+  >
     <button
       class="icone-btn"
       onclick={() => (posicao = posicao === "baixo" ? "cima" : "baixo")}

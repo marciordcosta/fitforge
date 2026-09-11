@@ -1191,6 +1191,7 @@
 {#if subtelaAberta}
   <TreinoMinimizado
     zIndex={155}
+    comBottomNav={false}
     onAbrir={() => {
       mostrarPicker = false;
       mostrarCriarAvulso = false;
