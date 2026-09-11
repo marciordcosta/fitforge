@@ -316,6 +316,27 @@
   let descansoEditandoIdx = $state<number | null>(null);
   let recordeAberto = $state<{ exIdx: number; setIdx: number } | null>(null);
 
+  let editandoMetaSerie = $state<{ exIdx: number; setIdx: number } | null>(null);
+  let metaRepMinTemp = $state<number | null>(null);
+  let metaRepMaxTemp = $state<number | null>(null);
+
+  /** Ajusta a meta de repetições só nessa sessão ao vivo, sem navegar pra rotina salva —
+   * a rotina em si só é alterada se o usuário escolher "Rotina ajustada" ao concluir o treino. */
+  function abrirEditarMetaSerie(exIdx: number, setIdx: number): void {
+    const s = sessao[exIdx].sets[setIdx];
+    metaRepMinTemp = s.repMin;
+    metaRepMaxTemp = s.repMax;
+    editandoMetaSerie = { exIdx, setIdx };
+  }
+
+  function salvarMetaSerie(): void {
+    if (!editandoMetaSerie) return;
+    const s = sessao[editandoMetaSerie.exIdx].sets[editandoMetaSerie.setIdx];
+    s.repMin = metaRepMinTemp;
+    s.repMax = metaRepMaxTemp;
+    editandoMetaSerie = null;
+  }
+
   function formatDelta(delta: number | null): string {
     if (delta == null) return "";
     const arredondado = Math.round(delta * 100) / 100;
@@ -557,27 +578,27 @@
   let mostrarConfirmConcluir = $state(false);
 
   function concluirTreino() {
-    mostrarConfirmConcluir = true;
+    if (houveAlteracaoEstrutura) {
+      mostrarEscolhaEstrutura = true;
+    } else {
+      mostrarConfirmConcluir = true;
+    }
+  }
+
+  function registrosDoDiaAtual(): Map<string, { serie: number; peso: number | null; repeticoes: number | null }[]> {
+    return new Map(
+      sessao.map((ex) => [
+        ex.exercicio_id,
+        ex.sets.map((s) => ({ serie: s.serie, peso: s.peso, repeticoes: s.repeticoes })),
+      ]),
+    );
   }
 
   async function confirmarConcluirTreino() {
     mostrarConfirmConcluir = false;
     salvando = true;
     try {
-      const porExercicio = new Map(
-        sessao.map((ex) => [
-          ex.exercicio_id,
-          ex.sets.map((s) => ({ serie: s.serie, peso: s.peso, repeticoes: s.repeticoes })),
-        ]),
-      );
-      await salvarRegistrosDoDia(treinoId, hojeISO(), porExercicio);
-
-      if (houveAlteracaoEstrutura) {
-        salvando = false;
-        mostrarEscolhaEstrutura = true;
-        return;
-      }
-
+      await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
       treinoLogSessao.limpar();
       navigate("/treino");
     } catch (e) {
@@ -590,6 +611,7 @@
     mostrarEscolhaEstrutura = false;
     salvando = true;
     try {
+      await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
       if (salvarNaRotina) {
         await salvarExerciciosRotina(
           treinoId,
@@ -694,11 +716,14 @@
                 </button>
               {/if}
               {#if serieItem.repMin != null || serieItem.repMax != null}
-                <button class="meta-cel" onclick={() => navigate(`/treino/rotina/${treinoId}`)}>
+                <button class="meta-cel" onclick={() => abrirEditarMetaSerie(exIdx, setIdx)}>
                   {faixaMeta(serieItem)}
                 </button>
               {:else}
-                <span class="meta-cel meta-cel-vazia">—</span>
+                <button
+                  class="meta-cel meta-cel-vazia"
+                  onclick={() => abrirEditarMetaSerie(exIdx, setIdx)}
+                >—</button>
               {/if}
               <input
                 type="number"
@@ -873,13 +898,22 @@
 {/if}
 
 {#if mostrarEscolhaEstrutura}
-  <ConfirmDialog
-    titulo="Você alterou os exercícios desta sessão"
-    textoConfirmar="Salvar Nova Rotina"
-    textoCancelar="Manter Rotina"
-    destrutivo={false}
-    onConfirmar={() => finalizarComEscolha(true)}
-    onCancelar={() => finalizarComEscolha(false)}
+  <ActionSheet
+    titulo="Concluir como"
+    onFechar={() => (mostrarEscolhaEstrutura = false)}
+    opcoes={[
+      {
+        label: "Rotina padrão",
+        subtitulo: "Salva o treino de hoje sem alterar a rotina",
+        onSelect: () => finalizarComEscolha(false),
+      },
+      {
+        label: "Rotina ajustada",
+        subtitulo: "Salva o treino de hoje e também as mudanças na rotina",
+        onSelect: () => finalizarComEscolha(true),
+      },
+      { label: "Cancelar", onSelect: () => (mostrarEscolhaEstrutura = false) },
+    ]}
   />
 {/if}
 
@@ -946,6 +980,23 @@
     onSelecionar={(seg) => salvarDescanso(idxDescanso, seg)}
     onFechar={() => (descansoEditandoIdx = null)}
   />
+{/if}
+
+{#if editandoMetaSerie !== null}
+  <Sheet titulo="Meta de Repetições" onFechar={() => (editandoMetaSerie = null)}>
+    <div class="meta-editor-campos">
+      <label class="meta-editor-campo">
+        <span>Mínimo</span>
+        <input type="number" inputmode="numeric" placeholder="-" bind:value={metaRepMinTemp} />
+      </label>
+      <span class="meta-editor-a">a</span>
+      <label class="meta-editor-campo">
+        <span>Máximo</span>
+        <input type="number" inputmode="numeric" placeholder="-" bind:value={metaRepMaxTemp} />
+      </label>
+    </div>
+    <button class="meta-editor-salvar" onclick={salvarMetaSerie}>Salvar</button>
+  </Sheet>
 {/if}
 
 {#if recordeAberto !== null}
@@ -1053,8 +1104,8 @@
   }
   .concluir {
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1066,8 +1117,8 @@
     cursor: pointer;
   }
   .concluir svg {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
   }
   .concluir:disabled {
     opacity: 0.6;
@@ -1211,7 +1262,46 @@
   }
   .meta-cel-vazia {
     color: var(--surface-muted);
-    cursor: default;
+  }
+  .meta-editor-campos {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: var(--space-3);
+    margin: var(--space-2) 0 var(--space-4);
+  }
+  .meta-editor-campo {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .meta-editor-campo input {
+    width: 88px;
+    height: 44px;
+    box-sizing: border-box;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    font-size: var(--font-size-lg);
+    text-align: center;
+  }
+  .meta-editor-a {
+    padding-bottom: var(--space-3);
+    color: var(--surface-muted);
+  }
+  .meta-editor-salvar {
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
   }
   .linha input {
     box-sizing: border-box;

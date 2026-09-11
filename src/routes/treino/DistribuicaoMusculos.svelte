@@ -3350,7 +3350,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 999px;
-    background: var(--color-secondary);
+    background: var(--color-danger);
     color: #fff;
     font-size: 11px;
     font-weight: 700;
