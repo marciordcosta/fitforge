@@ -411,16 +411,6 @@
     ponderado: "Distribuição Ponderada",
     acumulado: "Distribuição Acumulada",
   };
-  const LABEL_CAMPO_ADJETIVO: Record<CampoOrdenacaoSeries, string> = { total: "Total", ponderado: "Ponderada", acumulado: "Acumulada" };
-
-  /** Título do gráfico de dominância com a coluna atual embutida (igual ao título da grade
-   * semanal virar o próprio alternador) — só acrescenta o campo quando há mais de uma coluna pra
-   * escolher, senão o título fica igual ao nome sozinho (rotina ou "Distribuição Semanal"). */
-  const tituloDetalheComCampo = $derived.by((): string => {
-    const base = modalDetalheRotina?.titulo ?? "";
-    if (colunasAtivas.length <= 1) return base;
-    return `${base} · ${LABEL_CAMPO_ADJETIVO[campoGrafico]}`;
-  });
 
   /** Quais das 3 colunas (Total/Pond./Acum.) aparecem — configurável em Parametrização
    * (mostrarSeries*); nunca fica vazio (a tela de Parametrização já impede desmarcar a última). */
@@ -2802,7 +2792,7 @@
        precisa ficar por cima dele, não só do resto da página. -->
   <div class="acima-editor">
     <Sheet
-      titulo={tituloDetalheComCampo}
+      titulo={LABEL_TITULO_GRADE[campoGrafico]}
       onFechar={() => (modalDetalheRotina = null)}
       aoClicarTitulo={colunasAtivas.length > 1 && parametrosDistribuicao.graficoCampo === "destacada" ? alternarColunaDetalhe : undefined}
       acaoTituloDireita={modalDetalheRotina.itens.length ? alternarModoDetalhe : undefined}
