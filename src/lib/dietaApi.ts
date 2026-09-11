@@ -321,7 +321,10 @@ export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
  * `.limit(1)` em vez de `.maybeSingle()` — nomes deveriam ser únicos no catálogo, mas isso não é
  * garantido no banco; se algum dia existir duplicata, usa a primeira em vez de quebrar a tela
  * inteira com "multiple rows returned". */
-export async function getMetaRefeicaoPorNome(nome: string): Promise<MetasDiarias | null> {
+/** Meta de uma refeição do catálogo pelo nome — respeita o override do dia da semana (Ondulatória)
+ * quando `diaSemana` é informado, e usa a meta automática (sobra do dia) se essa refeição for a
+ * última da lista efetiva desse dia. Sem `diaSemana`, ignora overrides por dia e a automática. */
+export async function getMetaRefeicaoPorNome(nome: string, diaSemana?: number): Promise<MetasDiarias | null> {
   const { data, error } = await supabase
     .from("dieta_refeicoes_modelo")
     .select(REFEICAO_MODELO_SELECT)
@@ -331,6 +334,29 @@ export async function getMetaRefeicaoPorNome(nome: string): Promise<MetasDiarias
   const linha = data?.[0];
   if (!linha) return null;
   const modelo = mapRefeicaoModelo(linha as Record<string, unknown>);
+
+  if (diaSemana != null) {
+    const contexto = await getContextoMetaCatalogo(modelo.id, [diaSemana]);
+    if (contexto.ehUltima) {
+      return {
+        calorias: Math.max(0, contexto.disponivel.calorias),
+        proteinaG: Math.max(0, contexto.disponivel.proteinaG),
+        gorduraG: Math.max(0, contexto.disponivel.gorduraG),
+        carboidratoG: Math.max(0, contexto.disponivel.carboidratoG),
+      };
+    }
+    const metasDia = await listMetasDiaModelo();
+    const override = metasDia.find((m) => m.modeloId === modelo.id && m.diaSemana === diaSemana);
+    const calorias = override?.metaCalorias ?? modelo.metaCalorias;
+    if (calorias == null) return null;
+    return {
+      calorias,
+      proteinaG: override?.metaProteinaG ?? modelo.metaProteinaG ?? 0,
+      gorduraG: override?.metaGorduraG ?? modelo.metaGorduraG ?? 0,
+      carboidratoG: override?.metaCarboidratoG ?? modelo.metaCarboidratoG ?? 0,
+    };
+  }
+
   if (modelo.metaCalorias == null) return null;
   return {
     calorias: modelo.metaCalorias,

@@ -68,7 +68,7 @@
       itens = itensRes;
       metas = metasRes;
       modeloRefeicao = refeicao ? (modelos.find((m) => m.nome === refeicao!.nome) ?? null) : null;
-      metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome) : null;
+      metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome, parseISODate(refeicao.data).getDay()) : null;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
