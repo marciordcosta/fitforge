@@ -6,12 +6,15 @@
     onFechar,
     acaoTituloEsquerda,
     acaoTituloDireita,
+    aoClicarTitulo,
     children,
   }: {
     titulo?: string;
     onFechar: () => void;
     acaoTituloEsquerda?: Snippet;
     acaoTituloDireita?: Snippet;
+    /** Quando informado, o título vira um botão (ex: pra alternar entre variantes da mesma tela). */
+    aoClicarTitulo?: () => void;
     children: Snippet;
   } = $props();
 
@@ -61,7 +64,11 @@
     <div class="sheet-conteudo" bind:this={conteudoEl}>
       {#if titulo}
         <div class="sheet-header">
-          <h3>{titulo}</h3>
+          {#if aoClicarTitulo}
+            <button type="button" class="sheet-titulo-btn" onclick={aoClicarTitulo}><h3>{titulo}</h3></button>
+          {:else}
+            <h3>{titulo}</h3>
+          {/if}
           {#if acaoTituloEsquerda}
             <div class="sheet-header-acao esquerda">{@render acaoTituloEsquerda()}</div>
           {/if}
@@ -122,6 +129,16 @@
   }
   .sheet-header {
     position: relative;
+  }
+  .sheet-titulo-btn {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: inherit;
+    color: inherit;
+    cursor: pointer;
   }
   .sheet-header-acao {
     position: absolute;

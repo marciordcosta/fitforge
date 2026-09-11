@@ -404,6 +404,11 @@
 
   const LABEL_CAMPO_CURTO: Record<CampoOrdenacaoSeries, string> = { total: "Total", ponderado: "Pond.", acumulado: "Acum." };
   const LABEL_CAMPO_LONGO: Record<CampoOrdenacaoSeries, string> = { total: "total", ponderado: "ponderado", acumulado: "acumulado" };
+  const LABEL_TITULO_GRADE: Record<CampoOrdenacaoSeries, string> = {
+    total: "Distribuição Total",
+    ponderado: "Distribuição Ponderada",
+    acumulado: "Distribuição Acumulada",
+  };
 
   /** Quais das 3 colunas (Total/Pond./Acum.) aparecem — configurável em Parametrização
    * (mostrarSeries*); nunca fica vazio (a tela de Parametrização já impede desmarcar a última). */
@@ -1686,6 +1691,21 @@
     return modalEditorRotina.exercicios.filter((te) => te.exercicio?.musculos.some((m) => m.musculo_id === editorFiltroMusculoId)).length;
   });
 
+  /** Filtro em cascata: com um músculo filtrado, os exercícios visíveis (que trabalham esse
+   * músculo) também trabalham outros músculos — a lista de músculos abaixo filtra pra mostrar só
+   * esses, deixando claro onde mudar os exercícios filtrados também vai impactar. */
+  const musculosImpactadosFiltro = $derived.by((): Set<string> | null => {
+    if (!editorFiltroMusculoId || !modalEditorRotina) return null;
+    const visiveis = modalEditorRotina.exercicios.filter((te) =>
+      te.exercicio?.musculos.some((m) => m.musculo_id === editorFiltroMusculoId),
+    );
+    const impactados = new Set<string>();
+    for (const te of visiveis) {
+      for (const m of te.exercicio?.musculos ?? []) impactados.add(m.musculo_id);
+    }
+    return impactados;
+  });
+
   /** Um card por músculo trabalhado na rotina (com série > 0) OU com meta configurada (mesmo em
    * 0, pra continuar mostrando o alvo vazio) — `meta: null` quando não há meta pra esse músculo,
    * aí o card só mostra o número de séries em vez de "atual/meta". Continua clicável (filtro) pros
@@ -2321,6 +2341,7 @@
                   {#each listaExibida as linha (linha.chave)}
                     {@const grupoChave = `${treino.id}:${linha.chave}`}
                     {@const aberto = linha.subItens != null && gruposExpandidos.has(grupoChave)}
+                    {@const metaLinha = linha.musculo ? (metasMusculo.get(chaveMeta(treino.id, linha.musculo.id)) ?? null) : null}
                     <div class="item">
                       {#if linha.subItens}
                         <button class="nome-btn nome-grupo" onclick={() => alternarGrupo(grupoChave)}>
@@ -2331,14 +2352,15 @@
                         <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
                       {/if}
                       {@render barraFadiga(linha.partes, linha.valor)}
-                      {@render caixasSeries(linha.bruto, linha.valor, valorAcumulado(linha), ordemTreino, (campo) => (ordemSemanal = campo))}
+                      {@render caixasSeries(linha.bruto, linha.valor, valorAcumulado(linha), ordemTreino, (campo) => (ordemSemanal = campo), metaLinha?.valor ?? null, metaLinha?.tipo ?? null)}
                     </div>
                     {#if aberto && linha.subItens}
                       {#each linha.subItens as sub (sub.musculo.id)}
+                        {@const metaSub = metasMusculo.get(chaveMeta(treino.id, sub.musculo.id)) ?? null}
                         <div class="item item-sub">
                           <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
                           {@render barraFadiga(sub.partes, sub.valor)}
-                          {@render caixasSeries(sub.bruto, sub.valor, valorAcumulado(sub), ordemTreino, (campo) => (ordemSemanal = campo))}
+                          {@render caixasSeries(sub.bruto, sub.valor, valorAcumulado(sub), ordemTreino, (campo) => (ordemSemanal = campo), metaSub?.valor ?? null, metaSub?.tipo ?? null)}
                         </div>
                       {/each}
                     {/if}
@@ -2503,20 +2525,13 @@
 {/snippet}
 
 {#snippet acaoDireitaGrade()}
-  <div class="grade-acoes-titulo">
-    {#if colunasAtivas.length > 1 && parametrosDistribuicao.campoGrade === "destacada"}
-      <button class="rotina-coluna-btn" onclick={alternarColunaDestacada} aria-label="Alternar coluna destacada">
-        {LABEL_CAMPO_CURTO[ordemSemanal]}
-      </button>
-    {/if}
-    <button
-      class="grade-editar-metas-btn"
-      onclick={() => (modoEdicaoMetas = !modoEdicaoMetas)}
-      aria-label={modoEdicaoMetas ? "Concluir edição de metas" : "Editar metas"}
-    >
-      {#if modoEdicaoMetas}{@render iconConcluir()}{:else}{@render iconEditarMeta()}{/if}
-    </button>
-  </div>
+  <button
+    class="grade-editar-metas-btn"
+    onclick={() => (modoEdicaoMetas = !modoEdicaoMetas)}
+    aria-label={modoEdicaoMetas ? "Concluir edição de metas" : "Editar metas"}
+  >
+    {#if modoEdicaoMetas}{@render iconConcluir()}{:else}{@render iconEditarMeta()}{/if}
+  </button>
 {/snippet}
 
 {#snippet alternarModoDetalhe()}
@@ -2542,13 +2557,16 @@
        por baixo quando essa grade abre a partir do ícone de calendário dele. -->
   <div class="acima-editor">
   <Sheet
-    titulo="Distribuição na Semana"
+    titulo={LABEL_TITULO_GRADE[campoGrade]}
     onFechar={() => {
       mostrarGradeSemanal = false;
       if (modalMusculoRotina?.multiRotina) modalMusculoRotina = null;
     }}
     acaoTituloEsquerda={modalMusculoRotina?.multiRotina ? voltarGradeSemanal : undefined}
     acaoTituloDireita={acaoDireitaGrade}
+    aoClicarTitulo={colunasAtivas.length > 1 && parametrosDistribuicao.campoGrade === "destacada"
+      ? alternarColunaDestacada
+      : undefined}
   >
     <div class="grade-scroll">
       <table class="grade-tabela">
@@ -3104,13 +3122,26 @@
             {@const tendMusculo = tendenciaMusculoEditor(item.musculo.id)}
             {@const classeVolumeItem = classificarVolumeSemanal(arredondarValor(item.atual), parametrosParaMusculo(item.musculo))}
             {@const alertaItem = alertaVolumeTendencia(classeVolumeItem, tendMusculo)}
-            <div class="item editor-musculo-linha" class:editor-musculo-ativo={editorFiltroMusculoId === item.musculo.id}>
-              <button
-                type="button"
-                class="nome-btn"
-                disabled={modoReordenarEditor}
-                onclick={() => (editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id)}
-              >
+            {@const foraDoFiltroMusculo = musculosImpactadosFiltro != null && !musculosImpactadosFiltro.has(item.musculo.id)}
+            <div
+              class="item editor-musculo-linha"
+              class:editor-musculo-ativo={editorFiltroMusculoId === item.musculo.id}
+              class:editor-item-oculto={foraDoFiltroMusculo}
+              role="button"
+              tabindex="0"
+              onclick={() => {
+                if (modoReordenarEditor) return;
+                editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id;
+              }}
+              onkeydown={(e) => {
+                if (modoReordenarEditor) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  editorFiltroMusculoId = editorFiltroMusculoId === item.musculo.id ? null : item.musculo.id;
+                }
+              }}
+            >
+              <button type="button" class="nome-btn" disabled={modoReordenarEditor} tabindex="-1">
                 <span class="editor-musculo-nome-col">
                   <span class="editor-musculo-nome-linha">
                     <span class="editor-musculo-nome">{abreviarMusculo(item.musculo.nome)}</span>
@@ -3800,11 +3831,6 @@
   .grade-valor-vazio {
     opacity: 0.7;
   }
-  .grade-acoes-titulo {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
   .grade-editar-metas-btn {
     display: flex;
     align-items: center;
@@ -4244,15 +4270,19 @@
     width: 100%;
     padding: var(--space-2) 0;
     border-bottom: 1px solid var(--surface-border);
+    cursor: pointer;
   }
   .editor-musculo-linha:has(.nome-btn:disabled) {
     opacity: 0.5;
+  }
+  .editor-musculo-linha.editor-item-oculto {
+    display: none;
   }
   .editor-musculo-linha:last-child {
     border-bottom: none;
   }
   .editor-musculo-ativo {
-    background: var(--surface-card);
+    background: #232a3b;
     border-radius: var(--radius-md);
     border-bottom-color: transparent;
     padding-left: var(--space-2);
