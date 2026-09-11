@@ -193,6 +193,10 @@
 
   const descansoAtrasado = $derived(restanteDescansoSeg < 0);
 
+  /** Cronômetro (anel/barra) fica visível o tempo todo, em descanso ou não — fora do descanso mostra
+   * o tempo total decorrido do treino, no mesmo formato mm:ss. */
+  const duracaoTotalSeg = $derived(Math.floor((agora - inicio) / 1000));
+
   const progressoDescanso = $derived.by(() => {
     const ex = exercicioDescansando;
     if (!ex?.descansoAte || !ex.descansoInicioEm) return 0;
@@ -845,14 +849,14 @@
   {/if}
 </div>
 
-{#if exercicioDescansando}
+{#if !loading && !naoEncontrada}
   {#if formatoDescanso === "anel"}
     <button
       class="descanso-anel"
       class:anel-atrasado={descansoAtrasado}
       style={`left:${anelPos.x}px; top:${anelPos.y}px;`}
       onpointerdown={iniciarArrasteAnel}
-      aria-label="Cronômetro de descanso"
+      aria-label="Cronômetro"
     >
       <svg viewBox="0 0 70 70" class="anel-svg">
         <circle cx="35" cy="35" r={ANEL_RAIO} class="anel-fundo" />
@@ -865,16 +869,20 @@
         />
       </svg>
       <span class="anel-centro">
-        <span class="anel-tempo">{formatMMSSAssinado(restanteDescansoSeg)}</span>
+        <span class="anel-tempo">
+          {exercicioDescansando ? formatMMSSAssinado(restanteDescansoSeg) : formatMMSS(duracaoTotalSeg)}
+        </span>
       </span>
     </button>
     {#if anelExpandido}
       <div class="anel-popover" style={estiloPopoverAnel()}>
-        <div class="anel-popover-linha">
-          <button class="descanso-ajuste" disabled={restanteDescansoSeg < 15} onclick={() => ajustarDescanso(-15)}>-15</button>
-          <button class="descanso-pular" onclick={() => { pularDescanso(); anelExpandido = false; }}>Pular</button>
-          <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
-        </div>
+        {#if exercicioDescansando}
+          <div class="anel-popover-linha">
+            <button class="descanso-ajuste" disabled={restanteDescansoSeg < 15} onclick={() => ajustarDescanso(-15)}>-15</button>
+            <button class="descanso-pular" onclick={() => { pularDescanso(); anelExpandido = false; }}>Pular</button>
+            <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
+          </div>
+        {/if}
         <button class="formato-descanso-btn" onclick={() => (formatoDescanso = "barra")}>Ver como barra</button>
       </div>
     {/if}
@@ -886,11 +894,17 @@
           ◯
         </button>
         <div class="descanso-central">
-          <button class="descanso-ajuste" disabled={restanteDescansoSeg < 15} onclick={() => ajustarDescanso(-15)}>-15</button>
-          <span class="descanso-tempo">{formatMMSSAssinado(restanteDescansoSeg)}</span>
-          <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
+          {#if exercicioDescansando}
+            <button class="descanso-ajuste" disabled={restanteDescansoSeg < 15} onclick={() => ajustarDescanso(-15)}>-15</button>
+            <span class="descanso-tempo">{formatMMSSAssinado(restanteDescansoSeg)}</span>
+            <button class="descanso-ajuste" onclick={() => ajustarDescanso(15)}>+15</button>
+          {:else}
+            <span class="descanso-tempo">{formatMMSS(duracaoTotalSeg)}</span>
+          {/if}
         </div>
-        <button class="descanso-pular" onclick={pularDescanso}>Pular</button>
+        {#if exercicioDescansando}
+          <button class="descanso-pular" onclick={pularDescanso}>Pular</button>
+        {/if}
       </div>
     </div>
   {/if}
