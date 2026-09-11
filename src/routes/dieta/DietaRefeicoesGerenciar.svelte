@@ -29,6 +29,8 @@
     carboidratoGDoDia,
     listRefeicoesModeloDia,
     definirRefeicoesDoDia,
+    vincularMetaReceitaDias,
+    clonarReceitaOculta,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
@@ -701,6 +703,9 @@
 
   interface MetaEfetiva {
     receitaId: string | null;
+    /** Se o prato dessa meta já é uma cópia oculta exclusiva desse dia/grupo — editar os itens
+     * dela direto é seguro, não vaza pra outro dia nem pra receita original. */
+    receitaOculta: boolean;
     calorias: number | null;
     proteinaG: number | null;
     gorduraG: number | null;
@@ -715,6 +720,7 @@
     if (override) {
       return {
         receitaId: override.metaReceitaId,
+        receitaOculta: override.metaReceitaOculta,
         calorias: override.metaCalorias,
         proteinaG: override.metaProteinaG,
         gorduraG: override.metaGorduraG,
@@ -725,6 +731,7 @@
     }
     return {
       receitaId: m.metaReceitaId,
+      receitaOculta: m.metaReceitaOculta,
       calorias: m.metaCalorias,
       proteinaG: m.metaProteinaG,
       gorduraG: m.metaGorduraG,
@@ -853,15 +860,43 @@
     mostrarForm = true;
   }
 
-  /** diasGrupo: todos os dias que compartilham essa meta de calorias — vincular um prato aqui vale pro grupo inteiro de uma vez. */
-  function abrirMeta(m: RefeicaoModelo, diasGrupo?: number[]) {
-    const receitaId = diasGrupo?.length ? metaEfetivaDoDia(m, diasGrupo[0]).receitaId : m.metaReceitaId;
-    if (receitaId) {
-      navigate(`/dieta/receitas/ver/${receitaId}`);
+  let preparandoAjusteDia = $state(false);
+
+  /**
+   * diasGrupo: todos os dias que compartilham essa meta de calorias — vincular um prato aqui vale
+   * pro grupo inteiro de uma vez. Ao abrir pra edição vinda de um dia/grupo, se o prato ainda é o
+   * compartilhado (não é uma cópia oculta exclusiva desse grupo), clona ele antes — ajustar as
+   * quantidades a partir daqui nunca deve mudar a receita original (visível na lista de Receitas)
+   * nem vazar pra outro dia/grupo que aponte pra ela.
+   */
+  async function abrirMeta(m: RefeicaoModelo, diasGrupo?: number[]) {
+    if (diasGrupo?.length) {
+      const efetiva = metaEfetivaDoDia(m, diasGrupo[0]);
+      if (efetiva.receitaId && efetiva.receitaOculta) {
+        navigate(`/dieta/receitas/ver/${efetiva.receitaId}`);
+        return;
+      }
+      if (efetiva.receitaId) {
+        preparandoAjusteDia = true;
+        try {
+          const forkId = await clonarReceitaOculta(efetiva.receitaId);
+          await vincularMetaReceitaDias(m.id, diasGrupo, forkId);
+          navigate(`/dieta/receitas/ver/${forkId}`);
+        } catch (err) {
+          alert("Erro ao preparar o ajuste desse dia: " + (err as Error).message);
+        } finally {
+          preparandoAjusteDia = false;
+        }
+        return;
+      }
+      navigate(`/dieta/receitas/buscar/meta/${m.id}/${encodeURIComponent(m.nome)}/${diasGrupo.join(",")}`);
       return;
     }
-    const diaSeg = diasGrupo?.length ? `/${diasGrupo.join(",")}` : "";
-    navigate(`/dieta/receitas/buscar/meta/${m.id}/${encodeURIComponent(m.nome)}${diaSeg}`);
+    if (m.metaReceitaId) {
+      navigate(`/dieta/receitas/ver/${m.metaReceitaId}`);
+      return;
+    }
+    navigate(`/dieta/receitas/buscar/meta/${m.id}/${encodeURIComponent(m.nome)}`);
   }
 
   async function salvar() {
@@ -956,7 +991,7 @@
       pressionouLongoNome = false;
       return;
     }
-    abrirMeta(m, diasGrupo);
+    void abrirMeta(m, diasGrupo);
   }
 
   /** Tempo segurando o handle parado antes do arrasto realmente começar — evita que um toque de rolagem vire reordenação sem querer. */
@@ -1513,6 +1548,7 @@
               </button>
               <button
                 class="nome-btn"
+                disabled={preparandoAjusteDia}
                 onpointerdown={(e) => aoPointerDownNome(e, m, grupo)}
                 onclick={() => aoClickNome(m, grupo.dias)}
                 oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}

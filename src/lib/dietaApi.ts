@@ -237,6 +237,9 @@ export interface RefeicaoModelo {
   nome: string;
   /** Prato vinculado (dieta_receitas) que serve como meta de macros/calorias dessa refeição, se houver. */
   metaReceitaId: string | null;
+  /** Se o prato vinculado é uma cópia oculta (fork), já exclusiva desse contexto — editar os itens
+   * dela não vaza pra outro dia/grupo nem pra receita original visível na lista de Receitas. */
+  metaReceitaOculta: boolean;
   metaCalorias: number | null;
   metaProteinaG: number | null;
   metaGorduraG: number | null;
@@ -246,7 +249,7 @@ export interface RefeicaoModelo {
 }
 
 const REFEICAO_MODELO_SELECT =
-  "id, nome, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g)))";
+  "id, nome, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(oculta, itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g)))";
 
 interface ItemReceitaBruto {
   quantidade: number;
@@ -280,8 +283,13 @@ function somarTotaisItensReceita(itens: ItemReceitaBruto[]) {
 }
 
 function mapRefeicaoModelo(l: Record<string, unknown>): RefeicaoModelo {
-  const metaReceita = l.meta_receita as { itens: ItemReceitaBruto[] } | null;
-  const base = { id: l.id as string, nome: l.nome as string, metaReceitaId: l.meta_receita_id as string | null };
+  const metaReceita = l.meta_receita as { oculta: boolean; itens: ItemReceitaBruto[] } | null;
+  const base = {
+    id: l.id as string,
+    nome: l.nome as string,
+    metaReceitaId: l.meta_receita_id as string | null,
+    metaReceitaOculta: metaReceita?.oculta ?? false,
+  };
   if (!metaReceita) {
     return { ...base, metaCalorias: null, metaProteinaG: null, metaGorduraG: null, metaCarboidratoG: null, metaFibraG: null, metaGorduraSaturadaG: null };
   }
@@ -359,6 +367,7 @@ export interface MetaDiaModelo {
   modeloId: string;
   diaSemana: number;
   metaReceitaId: string;
+  metaReceitaOculta: boolean;
   metaCalorias: number;
   metaProteinaG: number;
   metaGorduraG: number;
@@ -368,7 +377,7 @@ export interface MetaDiaModelo {
 }
 
 const META_DIA_MODELO_SELECT =
-  "modelo_id, dia_semana, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g)))";
+  "modelo_id, dia_semana, meta_receita_id, meta_receita:dieta_receitas!meta_receita_id(oculta, itens:dieta_receita_itens(quantidade, alimento:alimentos(porcao_padrao_qtd, calorias_por_porcao, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g)))";
 
 /** Todas as metas por dia já configuradas (qualquer refeição, qualquer dia) — ausência de linha pra um (modelo, dia) usa o meta_receita_id global como fallback. */
 export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
@@ -376,12 +385,13 @@ export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
   if (error) throw error;
   return (data ?? []).map((l) => {
     const linha = l as Record<string, unknown>;
-    const metaReceita = linha.meta_receita as { itens: ItemReceitaBruto[] } | null;
+    const metaReceita = linha.meta_receita as { oculta: boolean; itens: ItemReceitaBruto[] } | null;
     const totais = somarTotaisItensReceita(metaReceita?.itens ?? []);
     return {
       modeloId: linha.modelo_id as string,
       diaSemana: linha.dia_semana as number,
       metaReceitaId: linha.meta_receita_id as string,
+      metaReceitaOculta: metaReceita?.oculta ?? false,
       metaCalorias: round1(totais.calorias),
       metaProteinaG: round1(totais.proteinaG),
       metaGorduraG: round1(totais.gorduraG),
@@ -1301,7 +1311,11 @@ function mapReceitaItem(l: Record<string, unknown>): ReceitaItem {
 export async function buscarReceitas(query: string): Promise<ReceitaResumo[]> {
   const termo = query.trim();
   if (!termo) return [];
-  const { data, error } = await porPalavras(supabase.from("dieta_receitas").select(RECEITA_RESUMO_SELECT), "nome", termo)
+  const { data, error } = await porPalavras(
+    supabase.from("dieta_receitas").select(RECEITA_RESUMO_SELECT).eq("oculta", false),
+    "nome",
+    termo,
+  )
     .order("nome", { ascending: true })
     .limit(20);
   if (error) throw error;
@@ -1312,6 +1326,7 @@ export async function listReceitas(limite = 50): Promise<ReceitaResumo[]> {
   const { data, error } = await supabase
     .from("dieta_receitas")
     .select(RECEITA_RESUMO_SELECT)
+    .eq("oculta", false)
     .order("nome", { ascending: true })
     .limit(limite);
   if (error) throw error;
@@ -1339,6 +1354,31 @@ export async function getReceita(id: string): Promise<Receita | null> {
     calorias: round1(itens.reduce((acc, it) => acc + it.calorias, 0)),
     itens,
   };
+}
+
+/** Clona uma receita (com os itens) numa cópia oculta — usada pra ajustar as quantidades de uma
+ * refeição exclusivamente num dia/grupo de dias específico sem alterar a receita original visível
+ * na lista de Receitas, nem qualquer outro dia/grupo que ainda aponte pra ela. */
+export async function clonarReceitaOculta(receitaId: string): Promise<string> {
+  const original = await getReceita(receitaId);
+  if (!original) throw new Error("Refeição de origem não encontrada.");
+  const { data: nova, error } = await supabase
+    .from("dieta_receitas")
+    .insert({ user_id: uid(), nome: original.nome, oculta: true })
+    .select("id")
+    .single();
+  if (error) throw error;
+  if (original.itens.length) {
+    const linhas = original.itens.map((it, i) => ({
+      receita_id: nova.id as string,
+      alimento_id: it.alimentoId,
+      quantidade: it.quantidade,
+      ordem: i,
+    }));
+    const { error: errorItens } = await supabase.from("dieta_receita_itens").insert(linhas);
+    if (errorItens) throw errorItens;
+  }
+  return nova.id as string;
 }
 
 export async function atualizarItemReceita(id: string, quantidade: number): Promise<void> {
