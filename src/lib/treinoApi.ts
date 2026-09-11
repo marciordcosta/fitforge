@@ -1250,12 +1250,10 @@ export interface ParametrosDistribuicao {
   mostrarSeriesTotais: boolean;
   mostrarSeriesPonderadas: boolean;
   mostrarSeriesAcumuladas: boolean;
-  /** Campo que classifica/colore as células de dia e rotina na grade semanal — true = total
-   * (bruto), false = ponderado. Comportamento fixo anterior: sempre total. */
-  usarTotalNaGrade: boolean;
-  /** Campo que soma e classifica/colore a coluna Total da grade semanal — true = ponderado,
-   * false = total (bruto). Comportamento fixo anterior: sempre ponderado. */
-  usarPonderadoNoTotal: boolean;
+  /** Campo que classifica/colore as células de dia/rotina E a coluna Total da grade semanal —
+   * mesmo padrão de 3 opções do graficoCampo: "destacada" segue a coluna Total/Pond./Acum. que o
+   * usuário tocou por último na grade; "total"/"ponderado" ignoram a coluna destacada. */
+  campoGrade: GraficoCampo;
   graficoCampo: GraficoCampo;
   homeModoGrupos: HomeModoGrupos;
 }
@@ -1273,8 +1271,7 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   mostrarSeriesTotais: true,
   mostrarSeriesPonderadas: true,
   mostrarSeriesAcumuladas: true,
-  usarTotalNaGrade: true,
-  usarPonderadoNoTotal: true,
+  campoGrade: "destacada",
   graficoCampo: "destacada",
   homeModoGrupos: "todos",
 };
@@ -1299,7 +1296,7 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
   const { data, error } = await supabase
     .from("treino_parametros")
     .select(
-      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, usar_total_na_grade, usar_ponderado_no_total, grafico_campo, home_modo_grupos",
+      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, campo_grade, grafico_campo, home_modo_grupos",
     )
     .maybeSingle();
   if (error) throw error;
@@ -1317,8 +1314,7 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
     mostrarSeriesTotais: data.mostrar_series_totais,
     mostrarSeriesPonderadas: data.mostrar_series_ponderadas,
     mostrarSeriesAcumuladas: data.mostrar_series_acumuladas,
-    usarTotalNaGrade: data.usar_total_na_grade,
-    usarPonderadoNoTotal: data.usar_ponderado_no_total,
+    campoGrade: data.campo_grade === "total" || data.campo_grade === "ponderado" ? data.campo_grade : "destacada",
     graficoCampo: data.grafico_campo === "total" || data.grafico_campo === "ponderado" ? data.grafico_campo : "destacada",
     homeModoGrupos: data.home_modo_grupos === "proximo" ? "proximo" : "todos",
   };
@@ -1339,8 +1335,7 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     mostrar_series_totais: p.mostrarSeriesTotais,
     mostrar_series_ponderadas: p.mostrarSeriesPonderadas,
     mostrar_series_acumuladas: p.mostrarSeriesAcumuladas,
-    usar_total_na_grade: p.usarTotalNaGrade,
-    usar_ponderado_no_total: p.usarPonderadoNoTotal,
+    campo_grade: p.campoGrade,
     grafico_campo: p.graficoCampo,
     home_modo_grupos: p.homeModoGrupos,
     updated_at: new Date().toISOString(),

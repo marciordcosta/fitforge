@@ -28,8 +28,7 @@
   let mostrarSeriesTotais = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesTotais);
   let mostrarSeriesPonderadas = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesPonderadas);
   let mostrarSeriesAcumuladas = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesAcumuladas);
-  let usarTotalNaGrade = $state(PARAMETROS_DISTRIBUICAO_PADRAO.usarTotalNaGrade);
-  let usarPonderadoNoTotal = $state(PARAMETROS_DISTRIBUICAO_PADRAO.usarPonderadoNoTotal);
+  let campoGrade = $state<GraficoCampo>(PARAMETROS_DISTRIBUICAO_PADRAO.campoGrade);
   let graficoCampo = $state<GraficoCampo>(PARAMETROS_DISTRIBUICAO_PADRAO.graficoCampo);
   let homeModoGrupos = $state<HomeModoGrupos>(PARAMETROS_DISTRIBUICAO_PADRAO.homeModoGrupos);
 
@@ -93,8 +92,7 @@
       mostrarSeriesTotais = p.mostrarSeriesTotais;
       mostrarSeriesPonderadas = p.mostrarSeriesPonderadas;
       mostrarSeriesAcumuladas = p.mostrarSeriesAcumuladas;
-      usarTotalNaGrade = p.usarTotalNaGrade;
-      usarPonderadoNoTotal = p.usarPonderadoNoTotal;
+      campoGrade = p.campoGrade;
       graficoCampo = p.graficoCampo;
       homeModoGrupos = p.homeModoGrupos;
     } catch (err) {
@@ -122,8 +120,7 @@
         mostrarSeriesTotais,
         mostrarSeriesPonderadas,
         mostrarSeriesAcumuladas,
-        usarTotalNaGrade,
-        usarPonderadoNoTotal,
+        campoGrade,
         graficoCampo,
         homeModoGrupos,
       };
@@ -271,14 +268,12 @@
         <span>Séries Acumuladas</span>
       </label>
 
-      <label class="checkbox-linha checkbox-linha-desc">
-        <input type="checkbox" bind:checked={usarTotalNaGrade} />
-        <span>Usar séries totais na distribuição semanal <em>(desmarcado mostra ponderada)</em></span>
-      </label>
-      <label class="checkbox-linha checkbox-linha-desc">
-        <input type="checkbox" bind:checked={usarPonderadoNoTotal} />
-        <span>Usar séries ponderadas no Total <em>(desmarcado mostra séries totais)</em></span>
-      </label>
+      <p class="param-subtitulo">Distribuição semanal</p>
+      <div class="opcoes-toggle">
+        {#each OPCOES_GRAFICO as opcao (opcao.valor)}
+          <button type="button" class:ativo={campoGrade === opcao.valor} onclick={() => (campoGrade = opcao.valor)}>{opcao.label}</button>
+        {/each}
+      </div>
 
       <p class="param-subtitulo">Gráficos</p>
       <div class="opcoes-toggle">
@@ -490,15 +485,6 @@
   .checkbox-linha span {
     font-size: var(--font-size-base);
     color: var(--surface-fg);
-  }
-  .checkbox-linha-desc span {
-    font-size: var(--font-size-sm);
-  }
-  .checkbox-linha-desc em {
-    display: block;
-    font-style: normal;
-    color: var(--surface-muted);
-    font-size: 12px;
   }
   .opcoes-toggle {
     display: flex;

@@ -425,13 +425,23 @@
     if (!colunasAtivas.includes(ordemSemanal)) ordemSemanal = colunasAtivas[0];
   });
 
-  /** Campo usado pelas células de dia/rotina da grade semanal — configurável em Parametrização
-   * (usarTotalNaGrade); comportamento fixo anterior: sempre "total". */
-  const campoGradeDia = $derived<CampoOrdenacaoSeries>(parametrosDistribuicao.usarTotalNaGrade ? "total" : "ponderado");
+  /** Botão do rodapé da Distribuição Semanal — alterna a coluna destacada (ordemSemanal) entre as
+   * ativas, mesmo efeito de tocar num cabeçalho/valor da coluna, só que sem precisar mirar neles. */
+  function alternarColunaDestacada(): void {
+    const idx = colunasAtivas.indexOf(ordemSemanal);
+    ordemSemanal = colunasAtivas[(idx + 1) % colunasAtivas.length];
+  }
 
-  /** Campo usado pela coluna Total da grade semanal — configurável em Parametrização
-   * (usarPonderadoNoTotal); comportamento fixo anterior: sempre "ponderado". */
-  const campoTotalColuna = $derived<CampoOrdenacaoSeries>(parametrosDistribuicao.usarPonderadoNoTotal ? "ponderado" : "total");
+  /** Campo usado pelas células de dia/rotina E pela coluna Total da grade semanal —
+   * configurável em Parametrização (campoGrade), mesmo padrão de 3 opções do graficoCampo:
+   * "destacada" segue a coluna que o usuário tocou por último (ordemSemanal); "total"/"ponderado"
+   * ignoram a coluna destacada. Acumulado não é rastreado por dia/coluna na grade (só a nível do
+   * músculo/rotina inteira) — nesse contexto, "destacada" em "acumulado" cai pra "ponderado". */
+  const campoGrade = $derived.by((): "total" | "ponderado" => {
+    if (parametrosDistribuicao.campoGrade === "total") return "total";
+    if (parametrosDistribuicao.campoGrade === "ponderado") return "ponderado";
+    return ordemSemanal === "total" ? "total" : "ponderado";
+  });
 
   /** Campo que os gráficos (anéis) usam como tamanho de fatia — configurável em Parametrização
    * (graficoCampo): "destacada" segue a coluna que o usuário tocou por último (ordemSemanal,
@@ -664,9 +674,9 @@
       }
     }
 
-    // Qual dos dois totais a coluna Total soma/mostra/classifica — configurável em Parametrização
-    // (campoTotalColuna, "usarPonderadoNoTotal"); comportamento fixo anterior: sempre ponderado.
-    const totaisColuna = campoTotalColuna === "ponderado" ? totaisPonderado : totais;
+    // Qual dos dois totais a coluna Total soma/mostra/classifica — segue campoGrade
+    // (Parametrização > Modo de Distribuição).
+    const totaisColuna = campoGrade === "ponderado" ? totaisPonderado : totais;
 
     const linhas = musculos
       .filter((m) => (totais.get(m.id) ?? 0) > 0)
@@ -2151,6 +2161,11 @@
               <button class="rotina-totais-texto" onclick={() => abrirGradeSemanal(null)}>
                 {totaisSemanais.exercicios} {totaisSemanais.exercicios === 1 ? "exercício" : "exercícios"} · {totaisSemanais.series} séries
               </button>
+              {#if colunasAtivas.length > 1}
+                <button class="rotina-coluna-btn" onclick={alternarColunaDestacada} aria-label="Alternar coluna destacada">
+                  {LABEL_CAMPO_CURTO[ordemSemanal]}
+                </button>
+              {/if}
               <button class="rotina-grafico-btn" onclick={() => abrirGraficoSemanal()} aria-label="Ver anel por dominância">
                 {@render iconGrafico()}
               </button>
@@ -2458,7 +2473,7 @@
             {/each}
             <th class="grade-col-total">
               <div class="grade-dia">Total</div>
-              <div class="grade-rotina-nome">{campoTotalColuna === "ponderado" ? "ponderado" : "total"}</div>
+              <div class="grade-rotina-nome">{campoGrade === "ponderado" ? "ponderado" : "total"}</div>
             </th>
           </tr>
         </thead>
@@ -2466,26 +2481,26 @@
           {#each gradeSemanal.linhas as linha (linha.musculo.id)}
             {@const temMetaNaLinha = linha.valores.some((v, i) => {
               const treinoId = gradeSemanal.colunas[i].treinoId;
-              return treinoId != null && metaParaCampo(treinoId, linha.musculo.id, campoTotalColuna) != null;
+              return treinoId != null && metaParaCampo(treinoId, linha.musculo.id, campoGrade) != null;
             })}
             {@const totalMetaLinha = linha.valores.reduce((acc, v, i) => {
               const treinoId = gradeSemanal.colunas[i].treinoId;
-              const metaDia = treinoId ? metaParaCampo(treinoId, linha.musculo.id, campoTotalColuna) : undefined;
-              return acc + (metaDia ?? (campoTotalColuna === "ponderado" ? v.ponderado : v.bruto));
+              const metaDia = treinoId ? metaParaCampo(treinoId, linha.musculo.id, campoGrade) : undefined;
+              return acc + (metaDia ?? (campoGrade === "ponderado" ? v.ponderado : v.bruto));
             }, 0)}
             <tr>
               <td class="grade-col-musculo">{abreviarMusculo(linha.musculo.nome)}</td>
               {#each linha.valores as valor, i (i)}
                 {@const treinoId = gradeSemanal.colunas[i].treinoId}
-                {@const meta = treinoId ? metaParaCampo(treinoId, linha.musculo.id, campoGradeDia) : undefined}
-                {@const mostrado = campoGradeDia === "total" ? valor.bruto : valor.ponderado}
+                {@const meta = treinoId ? metaParaCampo(treinoId, linha.musculo.id, campoGrade) : undefined}
+                {@const mostrado = campoGrade === "total" ? valor.bruto : valor.ponderado}
                 {@const texto = formatValor(mostrado)}
                 <td class="grade-valor" class:grade-col-destacada={gradeSemanal.colunas[i].dia === diaDestacadoGrade}>
                   {#if modoEdicaoMetas && treinoId}
                     <button
                       class="grade-valor-caixa grade-valor-meta-edit"
                       style={estiloCaixaVolume(mostrado, linha.musculo)}
-                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, mostrado, campoGradeDia)}
+                      onclick={() => abrirEditarMeta(treinoId!, linha.musculo, mostrado, campoGrade)}
                     >{texto}{#if meta != null}<span class="grade-meta-sub">/{formatValor(meta)}</span>{/if}</button>
                   {:else if valor.bruto > 0 && treinoId}
                     <button
@@ -3334,6 +3349,21 @@
   .valor-caindo {
     color: var(--color-negative);
   }
+  /* Precisa da classe extra (.caixa-serie-valor.valor-*) pra ganhar de .caixa-serie-valor, que
+     vem depois no arquivo e tem a mesma especificidade -- sem isso, o destaque de meta batida
+     (verde) ficava sempre perdendo pro cinza padrão, independente do estado. */
+  .caixa-serie-valor.valor-subindo {
+    color: var(--color-success);
+    font-weight: 700;
+  }
+  .caixa-serie-valor.valor-estavel {
+    color: var(--color-neutral);
+    font-weight: 700;
+  }
+  .caixa-serie-valor.valor-caindo {
+    color: var(--color-negative);
+    font-weight: 700;
+  }
   .barra-wrap {
     height: 10px;
     background: var(--surface-border);
@@ -4123,6 +4153,7 @@
     position: absolute;
     top: -8px;
     right: -4px;
+    z-index: 2;
     min-width: 20px;
     height: 16px;
     padding: 0 4px;
@@ -4201,6 +4232,19 @@
     align-items: center;
     justify-content: center;
     padding: 0;
+    cursor: pointer;
+  }
+  .rotina-coluna-btn {
+    flex-shrink: 0;
+    height: 28px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: none;
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
     cursor: pointer;
   }
   .rotina-grafico-btn svg {
