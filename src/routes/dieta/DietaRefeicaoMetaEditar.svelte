@@ -106,10 +106,12 @@
   const pctProteina = $derived(caloriasCalc > 0 ? (caloriasProteina / caloriasCalc) * 100 : 0);
 
   /** Total dos alimentos da lista abaixo — só informativo (barras, não anel), independente da
-   * meta definida na roda tripla acima; não altera nem é alterado por ela. */
-  const pctCarboItens = $derived(totaisItens && totaisItens.calorias > 0 ? ((totaisItens.carboidratoG * 4) / totaisItens.calorias) * 100 : 0);
-  const pctGorduraItens = $derived(totaisItens && totaisItens.calorias > 0 ? ((totaisItens.gorduraG * 9) / totaisItens.calorias) * 100 : 0);
-  const pctProteinaItens = $derived(totaisItens && totaisItens.calorias > 0 ? ((totaisItens.proteinaG * 4) / totaisItens.calorias) * 100 : 0);
+   * meta definida na roda tripla acima; não altera nem é alterado por ela. A barra vai de 0 até a
+   * meta manual (100% = meta), preenchida com o quanto os alimentos inseridos já somam dela. */
+  const pctCaloriasItens = $derived(totaisItens ? pctMeta(totaisItens.calorias, caloriasCalc) : 0);
+  const pctCarboItens = $derived(totaisItens ? pctMeta(totaisItens.carboidratoG, carboidratoG ?? 0) : 0);
+  const pctGorduraItens = $derived(totaisItens ? pctMeta(totaisItens.gorduraG, gorduraG ?? 0) : 0);
+  const pctProteinaItens = $derived(totaisItens ? pctMeta(totaisItens.proteinaG, proteinaG ?? 0) : 0);
 
   const donutStyle = $derived(
     `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
@@ -309,30 +311,30 @@
           <div class="pct-col">
             <p class="pct-nome">Calorias</p>
             <div class="pct-barra-wrap">
-              <div class="pct-barra" style="width:100%; background:var(--color-secondary);"></div>
+              <div class="pct-barra" style={`width:${larguraBarra(pctCaloriasItens)}%; background:var(--color-secondary);`}></div>
             </div>
-            <p class="pct-valor">{totaisItens.calorias.toFixed(0)} kcal</p>
+            <p class="pct-valor">{totaisItens.calorias.toFixed(0)}/{caloriasCalc.toFixed(0)}</p>
           </div>
           <div class="pct-col">
             <p class="pct-nome">Carb</p>
             <div class="pct-barra-wrap">
               <div class="pct-barra" style={`width:${larguraBarra(pctCarboItens)}%; background:${COR_CARBO};`}></div>
             </div>
-            <p class="pct-valor">{totaisItens.carboidratoG.toFixed(0)}g · {pctCarboItens.toFixed(0)}%</p>
+            <p class="pct-valor">{totaisItens.carboidratoG.toFixed(0)}/{(carboidratoG ?? 0).toFixed(0)}g</p>
           </div>
           <div class="pct-col">
             <p class="pct-nome">Gorduras</p>
             <div class="pct-barra-wrap">
               <div class="pct-barra" style={`width:${larguraBarra(pctGorduraItens)}%; background:${COR_GORDURA};`}></div>
             </div>
-            <p class="pct-valor">{totaisItens.gorduraG.toFixed(0)}g · {pctGorduraItens.toFixed(0)}%</p>
+            <p class="pct-valor">{totaisItens.gorduraG.toFixed(0)}/{(gorduraG ?? 0).toFixed(0)}g</p>
           </div>
           <div class="pct-col">
             <p class="pct-nome">Proteínas</p>
             <div class="pct-barra-wrap">
               <div class="pct-barra" style={`width:${larguraBarra(pctProteinaItens)}%; background:${COR_PROTEINA};`}></div>
             </div>
-            <p class="pct-valor">{totaisItens.proteinaG.toFixed(0)}g · {pctProteinaItens.toFixed(0)}%</p>
+            <p class="pct-valor">{totaisItens.proteinaG.toFixed(0)}/{(proteinaG ?? 0).toFixed(0)}g</p>
           </div>
         </div>
       {/if}
