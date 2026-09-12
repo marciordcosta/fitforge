@@ -10,9 +10,11 @@
     construirMusculosInput,
     getHistoricoDetalhadoExercicio,
     distribuicaoMusculosExercicio,
+    listMarcadoresExercicio,
     type Exercicio,
     type SessaoHistorico,
     type LinhaMusculoInput,
+    type MarcadorExercicio,
   } from "../../lib/treinoApi";
   import ExercicioChart from "./ExercicioChart.svelte";
   import ExercicioCampos from "./ExercicioCampos.svelte";
@@ -30,8 +32,11 @@
 
   let exercicio = $state<Exercicio | null>(null);
   let historico = $state<SessaoHistorico[]>([]);
+  let marcadores = $state<MarcadorExercicio[]>([]);
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
+
+  const marcadoresPorData = $derived(new Map(marcadores.map((m) => [m.data, m.observacao])));
 
   /** Compartilhado com o gráfico (ExercicioChart) — o mesmo filtro por quantidade de
    * registros usado no gráfico também restringe a lista de sessões abaixo dele.
@@ -49,9 +54,14 @@
 
   async function carregar() {
     loading = true;
-    const [ex, hist] = await Promise.all([getExercicio(exercicioId), getHistoricoDetalhadoExercicio(exercicioId)]);
+    const [ex, hist, marc] = await Promise.all([
+      getExercicio(exercicioId),
+      getHistoricoDetalhadoExercicio(exercicioId),
+      listMarcadoresExercicio(exercicioId),
+    ]);
     exercicio = ex;
     historico = hist;
+    marcadores = marc;
     if (exercicio) {
       nome = exercicio.nome;
       padraoId = exercicio.padrao_id ?? "";
@@ -201,7 +211,7 @@
         {/each}
       </div>
     {/if}
-    <ExercicioChart {exercicio} bind:filtroQtd />
+    <ExercicioChart {exercicio} {marcadores} bind:filtroQtd />
     {#if !historico.length}
       <p class="muted">Nenhum registro ainda.</p>
     {:else}
@@ -224,6 +234,9 @@
               {@render iconLixeira()}
             </button>
           </div>
+          {#if marcadoresPorData.has(sessao.data)}
+            <p class="sessao-marcador">🚩 {marcadoresPorData.get(sessao.data)}</p>
+          {/if}
           <div class="sessao-tabela">
             <div class="sessao-linha sessao-cabecalho">
               <span>Série</span>
@@ -416,6 +429,11 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
     flex-shrink: 0;
+  }
+  .sessao-marcador {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-sm);
+    color: var(--color-warning, #fbbf24);
   }
   .sessao-excluir {
     flex-shrink: 0;

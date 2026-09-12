@@ -1,10 +1,14 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
-  import { getHistoricoExercicio, type HistoricoPonto, type Exercicio } from "../../lib/treinoApi";
+  import { getHistoricoExercicio, type HistoricoPonto, type Exercicio, type MarcadorExercicio } from "../../lib/treinoApi";
   import ExercicioChartTelaCheia from "./ExercicioChartTelaCheia.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
-  let { exercicio, filtroQtd = $bindable(6) }: { exercicio: Exercicio; filtroQtd?: number | null } = $props();
+  let {
+    exercicio,
+    marcadores = [],
+    filtroQtd = $bindable(6),
+  }: { exercicio: Exercicio; marcadores?: MarcadorExercicio[]; filtroQtd?: number | null } = $props();
 
   let historico = $state<HistoricoPonto[]>([]);
   let loading = $state(true);
@@ -53,6 +57,10 @@
   void carregar();
 
   const historicoFiltrado = $derived(filtroQtd == null ? historico : historico.slice(-filtroQtd));
+
+  /** Datas com marcador (ex: troca de equipamento) que caem dentro do período exibido no gráfico —
+   * comparações de peso/1RM/volume antes e depois dessas datas podem não refletir progresso real. */
+  const marcadoresNoFiltro = $derived(marcadores.filter((m) => historicoFiltrado.some((h) => h.data === m.data)));
 
   function formatData(iso: string): string {
     const [y, m, d] = iso.split("-");
@@ -104,7 +112,9 @@
                 borderColor: "#5eead4",
                 backgroundColor: "#5eead4",
                 tension: 0.3,
-                pointRadius: 3,
+                pointRadius: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? 6 : 3)),
+                pointBackgroundColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#fbbf24" : "#5eead4")),
+                pointBorderColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#d97706" : "#5eead4")),
               },
             ],
       },
@@ -168,6 +178,13 @@
       {@render iconExpandir()}
     </button>
   </div>
+  {#if marcadoresNoFiltro.length}
+    <div class="marcador-alerta">
+      {#each marcadoresNoFiltro as m (m.data)}
+        <p>🚩 {formatData(m.data)}: {m.observacao}</p>
+      {/each}
+    </div>
+  {/if}
   <div class="chart-wrap">
     <canvas bind:this={canvas}></canvas>
   </div>
@@ -192,7 +209,7 @@
 {/if}
 
 {#if mostrarTelaCheia}
-  <ExercicioChartTelaCheia {exercicio} metricaInicial={metrica} bind:filtroQtd onFechar={() => (mostrarTelaCheia = false)} />
+  <ExercicioChartTelaCheia {exercicio} {marcadores} metricaInicial={metrica} bind:filtroQtd onFechar={() => (mostrarTelaCheia = false)} />
 {/if}
 
 <style>
@@ -216,6 +233,21 @@
   .icone-topo svg {
     width: 15px;
     height: 15px;
+  }
+  .marcador-alerta {
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-2);
+  }
+  .marcador-alerta p {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: #fbbf24;
+  }
+  .marcador-alerta p + p {
+    margin-top: var(--space-1);
   }
   .chart-wrap {
     width: 100%;

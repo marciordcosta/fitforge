@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { Chart, type ChartDataset } from "chart.js/auto";
-  import { getHistoricoExercicio, listExercicios, type HistoricoPonto, type Exercicio } from "../../lib/treinoApi";
+  import { getHistoricoExercicio, listExercicios, type HistoricoPonto, type Exercicio, type MarcadorExercicio } from "../../lib/treinoApi";
   import { chaveSemana, parseISODate } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
@@ -9,11 +9,13 @@
   let {
     exercicio,
     metricaInicial,
+    marcadores = [],
     filtroQtd = $bindable(6),
     onFechar,
   }: {
     exercicio: Exercicio;
     metricaInicial: "peso" | "1rm" | "volume" | "todos";
+    marcadores?: MarcadorExercicio[];
     filtroQtd?: number | null;
     onFechar: () => void;
   } = $props();
@@ -224,7 +226,9 @@
         borderColor: COR_PRINCIPAL,
         backgroundColor: COR_PRINCIPAL,
         tension: 0.3,
-        pointRadius: 3,
+        pointRadius: datas.map((d) => (marcadores.some((m) => m.data === d) ? 6 : 3)),
+        pointBackgroundColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#fbbf24" : COR_PRINCIPAL)),
+        pointBorderColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#d97706" : COR_PRINCIPAL)),
         spanGaps: true,
       },
       ...comparaveisNaJanela.map((c, i) => {

@@ -15,12 +15,14 @@
     createExercicioAvulso,
     construirMusculosInput,
     getExercicio,
+    salvarMarcadorExercicio,
     type TreinoComExercicios,
     type Exercicio,
     type LinhaMusculoInput,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import AlertDialog from "../../components/AlertDialog.svelte";
+  import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DescansoPicker from "../../components/DescansoPicker.svelte";
   import Sheet from "../../components/Sheet.svelte";
@@ -459,6 +461,32 @@
   let substituindoExIdx = $state<number | null>(null);
   let reordenando = $state(false);
   let buscaSubstituir = $state("");
+
+  /** "Marcar Exercício": registra uma observação (ex: troca de equipamento) no dia de hoje pra esse
+   * exercício — aparece no histórico e no gráfico de progressão, alertando que uma mudança de peso
+   * em volta dessa data pode não ser progresso/regressão real. */
+  let marcandoExIdx = $state<number | null>(null);
+  let observacaoMarcador = $state("");
+  let salvandoMarcador = $state(false);
+
+  function abrirMarcarExercicio(exIdx: number) {
+    marcandoExIdx = exIdx;
+    observacaoMarcador = "";
+  }
+
+  async function confirmarMarcarExercicio() {
+    if (marcandoExIdx == null || !observacaoMarcador.trim()) return;
+    salvandoMarcador = true;
+    try {
+      await salvarMarcadorExercicio(sessao[marcandoExIdx].exercicio_id, hojeISO(), observacaoMarcador.trim());
+      marcandoExIdx = null;
+      observacaoMarcador = "";
+    } catch (err) {
+      alert("Erro ao marcar exercício: " + (err as Error).message);
+    } finally {
+      salvandoMarcador = false;
+    }
+  }
 
   function abrirSubstituir(exIdx: number) {
     substituindoExIdx = exIdx;
@@ -931,6 +959,11 @@
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 {/snippet}
+{#snippet iconMarcador()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 21V4a1 1 0 0 1 1-1h11l-2 4 2 4H6" />
+  </svg>
+{/snippet}
 {#snippet iconMedalha()}
   <svg viewBox="0 0 24 24" fill="none">
     <path d="M7 6H4a1 1 0 0 0-1 1v1a4 4 0 0 0 4 4" stroke="#d97706" stroke-width="1.4" stroke-linecap="round" />
@@ -964,9 +997,27 @@
     opcoes={[
       { label: "Reordenar Exercícios", icon: iconReordenar, onSelect: () => (reordenando = true) },
       { label: "Substituir Exercício", icon: iconSubstituir, onSelect: () => abrirSubstituir(exIdxMenu) },
+      { label: "Marcar Exercício", icon: iconMarcador, onSelect: () => abrirMarcarExercicio(exIdxMenu) },
       { label: "Remover Exercício", icon: iconRemover, destructive: true, onSelect: () => removerExercicio(exIdxMenu) },
     ]}
   />
+{/if}
+
+{#if marcandoExIdx !== null}
+  <Sheet titulo="Marcar Exercício" onFechar={() => (marcandoExIdx = null)}>
+    <p class="marcador-ajuda">
+      Registra uma observação no dia de hoje pra {sessao[marcandoExIdx].nome} — aparece no histórico e no
+      gráfico de progressão, pra não confundir uma troca de equipamento (ou algo assim) com progresso ou
+      regressão de verdade.
+    </p>
+    <textarea
+      class="marcador-input"
+      placeholder="Ex: Troquei pra máquina nova, peso não é comparável"
+      bind:value={observacaoMarcador}
+      rows="3"
+    ></textarea>
+    <Button onclick={confirmarMarcarExercicio} disabled={salvandoMarcador || !observacaoMarcador.trim()}>Salvar</Button>
+  </Sheet>
 {/if}
 
 {#if menuSerieAberto !== null}
@@ -1340,6 +1391,28 @@
     font-family: inherit;
   }
   .observacao-input::placeholder {
+    color: var(--surface-muted);
+  }
+  .marcador-ajuda {
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .marcador-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    resize: none;
+  }
+  .marcador-input::placeholder {
     color: var(--surface-muted);
   }
   .tabela {

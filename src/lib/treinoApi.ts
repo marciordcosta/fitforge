@@ -607,6 +607,37 @@ export async function getRecordesExercicio(exercicioId: string): Promise<Recorde
   };
 }
 
+export interface MarcadorExercicio {
+  data: string;
+  observacao: string;
+}
+
+/** Marca um dia específico de um exercício com uma observação (ex: troca de equipamento/máquina) —
+ * usado pra não confundir uma mudança de peso causada por isso com progresso ou regressão de
+ * verdade ao olhar o histórico/gráfico. Upsert: marcar de novo no mesmo dia substitui a observação. */
+export async function salvarMarcadorExercicio(exercicioId: string, data: string, observacao: string): Promise<void> {
+  const { error } = await supabase.from("treino_marcadores").upsert(
+    { user_id: uid(), exercicio_id: exercicioId, data, observacao },
+    { onConflict: "user_id,exercicio_id,data" },
+  );
+  if (error) throw error;
+}
+
+export async function listMarcadoresExercicio(exercicioId: string): Promise<MarcadorExercicio[]> {
+  const { data, error } = await supabase
+    .from("treino_marcadores")
+    .select("data, observacao")
+    .eq("exercicio_id", exercicioId)
+    .order("data", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function removerMarcadorExercicio(exercicioId: string, data: string): Promise<void> {
+  const { error } = await supabase.from("treino_marcadores").delete().eq("exercicio_id", exercicioId).eq("data", data);
+  if (error) throw error;
+}
+
 // ---------------- Rotinas (treinos) ----------------
 
 const TREINO_EXERCICIO_SELECT =
