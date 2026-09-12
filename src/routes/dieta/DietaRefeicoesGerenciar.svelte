@@ -930,6 +930,85 @@
     navigate(`/dieta/refeicoes/meta/${m.id}/${encodeURIComponent(m.nome)}${diasSeg}`);
   }
 
+  /** Toca no ícone (i) do card: sempre abre o detalhamento completo (onde dá pra configurar a
+   * lista de alimentos da Refeição Padrão) — igual abrirMeta, só que chamado a partir do ícone em
+   * vez do corpo do card. */
+  function abrirDetalheRefeicao(e: Event, m: RefeicaoModelo, diasGrupo?: number[]): void {
+    e.stopPropagation();
+    abrirMeta(m, diasGrupo);
+  }
+
+  let mostrarMacrosRefeicao = $state(false);
+  let modeloMacrosEditando = $state<{ modelo: RefeicaoModelo; grupo?: GrupoDias; contexto: ContextoMetaCatalogo } | null>(null);
+
+  /** Toca no corpo do card (fora do ícone): abre a roda tripla direto, sem navegar — só quando a
+   * refeição não é a última (automática), que não tem edição manual. */
+  async function abrirMacrosRefeicao(m: RefeicaoModelo, grupo?: GrupoDias): Promise<void> {
+    if (ehUltimaDaLista(m, grupo)) {
+      abrirMeta(m, grupo?.dias);
+      return;
+    }
+    try {
+      const contexto = await getContextoMetaCatalogo(m.id, grupo?.dias);
+      modeloMacrosEditando = { modelo: m, grupo, contexto };
+      mostrarMacrosRefeicao = true;
+    } catch (err) {
+      alert("Erro ao carregar meta: " + (err as Error).message);
+    }
+  }
+
+  function opcoesGramasRefeicao(max: number): { valor: number; label: string }[] {
+    const opcoes: { valor: number; label: string }[] = [];
+    for (let v = 0; v <= max; v++) opcoes.push({ valor: v, label: `${v} g` });
+    return opcoes;
+  }
+
+  function secundarioRestanteRefeicao(v: number, disponivelG: number): string {
+    return `${Math.max(0, Math.round(disponivelG - v))} g restante`;
+  }
+
+  function colunasMacrosRefeicao() {
+    if (!modeloMacrosEditando) return [];
+    const { modelo, grupo, contexto } = modeloMacrosEditando;
+    const bruta = grupo
+      ? metaEfetivaDoDia(modelo, grupo.dias[0])
+      : { carboidratoG: modelo.metaCarboidratoG, gorduraG: modelo.metaGorduraG, proteinaG: modelo.metaProteinaG };
+    const carboidratoG = bruta.carboidratoG ?? 0;
+    const gorduraG = bruta.gorduraG ?? 0;
+    const proteinaG = bruta.proteinaG ?? 0;
+    const tetoCarbo = Math.max(Math.round(carboidratoG), Math.min(300, Math.round(contexto.disponivel.carboidratoG)));
+    const tetoGordura = Math.max(Math.round(gorduraG), Math.min(150, Math.round(contexto.disponivel.gorduraG)));
+    const tetoProteina = Math.max(Math.round(proteinaG), Math.min(300, Math.round(contexto.disponivel.proteinaG)));
+    return [
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramasRefeicao(tetoCarbo), valorAtual: Math.round(carboidratoG), kcalPorGrama: 4, secundario: (v: number) => secundarioRestanteRefeicao(v, contexto.disponivel.carboidratoG) },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramasRefeicao(tetoGordura), valorAtual: Math.round(gorduraG), kcalPorGrama: 9, secundario: (v: number) => secundarioRestanteRefeicao(v, contexto.disponivel.gorduraG) },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramasRefeicao(tetoProteina), valorAtual: Math.round(proteinaG), kcalPorGrama: 4, secundario: (v: number) => secundarioRestanteRefeicao(v, contexto.disponivel.proteinaG) },
+    ];
+  }
+
+  function formatarRodapeMacrosRefeicao(caloriasEscolhidas: number): string {
+    if (!modeloMacrosEditando) return `≈ ${caloriasEscolhidas} kcal`;
+    const restante = Math.max(0, Math.round(modeloMacrosEditando.contexto.disponivel.calorias - caloriasEscolhidas));
+    return `${caloriasEscolhidas} consumido / ${restante} restante`;
+  }
+
+  async function confirmarMacrosRefeicao(valores: Record<string, number>): Promise<void> {
+    if (!modeloMacrosEditando) return;
+    const { modelo, grupo } = modeloMacrosEditando;
+    try {
+      if (grupo) {
+        await salvarMetaNumericaRefeicaoDias(modelo.id, grupo.dias, valores.proteinaG, valores.gorduraG, valores.carboidratoG);
+      } else {
+        await salvarMetaNumericaRefeicao(modelo.id, valores.proteinaG, valores.gorduraG, valores.carboidratoG);
+      }
+      mostrarMacrosRefeicao = false;
+      modeloMacrosEditando = null;
+      await carregar();
+    } catch (err) {
+      alert("Erro ao salvar meta: " + (err as Error).message);
+    }
+  }
+
   async function salvar() {
     if (!nome.trim()) return;
     salvando = true;
@@ -1022,12 +1101,12 @@
     cancelarPressionarNome();
   }
 
-  function aoClickNome(m: RefeicaoModelo, diasGrupo?: number[]) {
+  function aoClickCard(m: RefeicaoModelo, grupo?: GrupoDias) {
     if (pressionouLongoNome) {
       pressionouLongoNome = false;
       return;
     }
-    abrirMeta(m, diasGrupo);
+    void abrirMacrosRefeicao(m, grupo);
   }
 
   const TOLERANCIA_MOVIMENTO_PX = 8;
@@ -1117,6 +1196,13 @@
 {#snippet iconExcluir()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+{/snippet}
+{#snippet iconInfo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <line x1="12" y1="11" x2="12" y2="16" />
+    <circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none" />
   </svg>
 {/snippet}
 
@@ -1367,22 +1453,37 @@
                 </div>
               {:else}
                 <div class="refeicao-card">
-                  <button
+                  <div
                     class="nome-btn"
+                    role="button"
+                    tabindex="0"
                     onpointerdown={(e) => aoPointerDownNome(e, m, grupo)}
-                    onclick={() => aoClickNome(m, grupo.dias)}
+                    onclick={() => aoClickCard(m, grupo)}
+                    onkeydown={(e) => e.key === "Enter" && aoClickCard(m, grupo)}
                     oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
                   >
                     <div class="card-header">
                       <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
-                      {#if meta.calorias != null}<span class="card-header-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
+                      <span class="card-header-direita">
+                        {#if meta.calorias != null}<span class="card-header-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
+                        <span
+                          class="item-detalhe"
+                          role="button"
+                          tabindex="0"
+                          onclick={(e) => abrirDetalheRefeicao(e, m, grupo.dias)}
+                          onkeydown={(e) => { if (e.key === "Enter") abrirDetalheRefeicao(e, m, grupo.dias); }}
+                          aria-label="Detalhes da refeição"
+                        >
+                          {@render iconInfo()}
+                        </span>
+                      </span>
                     </div>
                     {#if meta.calorias != null}
                       {@render metaBarrasGrid(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias)}
                     {:else}
                       <p class="preview">Sem meta configurada</p>
                     {/if}
-                  </button>
+                  </div>
                 </div>
               {/if}
             </li>
@@ -1415,22 +1516,37 @@
               </div>
             {:else}
               <div class="refeicao-card">
-                <button
+                <div
                   class="nome-btn"
+                  role="button"
+                  tabindex="0"
                   onpointerdown={(e) => aoPointerDownNome(e, m)}
-                  onclick={() => aoClickNome(m)}
+                  onclick={() => aoClickCard(m)}
+                  onkeydown={(e) => e.key === "Enter" && aoClickCard(m)}
                   oncontextmenu={(e) => aoContextMenuNome(e, m)}
                 >
                   <div class="card-header">
                     <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
-                    {#if ultima || m.metaCalorias != null}<span class="card-header-cal">{arredondarDezena(efetivo.calorias)} cal</span>{/if}
+                    <span class="card-header-direita">
+                      {#if ultima || m.metaCalorias != null}<span class="card-header-cal">{arredondarDezena(efetivo.calorias)} cal</span>{/if}
+                      <span
+                        class="item-detalhe"
+                        role="button"
+                        tabindex="0"
+                        onclick={(e) => abrirDetalheRefeicao(e, m)}
+                        onkeydown={(e) => { if (e.key === "Enter") abrirDetalheRefeicao(e, m); }}
+                        aria-label="Detalhes da refeição"
+                      >
+                        {@render iconInfo()}
+                      </span>
+                    </span>
                   </div>
                   {#if ultima || m.metaCalorias != null}
                     {@render metaBarrasGrid(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias)}
                   {:else}
                     <p class="preview">Sem meta configurada</p>
                   {/if}
-                </button>
+                </div>
               </div>
             {/if}
           </li>
@@ -1556,6 +1672,17 @@
     colunas={colunasBloco(blocoMacrosEditando)}
     onSelecionar={(valores) => confirmarMacrosBloco(blocoMacrosEditando!, valores)}
     onFechar={() => (blocoMacrosEditando = null)}
+  />
+{/if}
+
+{#if mostrarMacrosRefeicao}
+  <WheelPickerMacros
+    titulo="Ajustar Macros (g)"
+    colunas={colunasMacrosRefeicao()}
+    onSelecionar={confirmarMacrosRefeicao}
+    onFechar={() => { mostrarMacrosRefeicao = false; modeloMacrosEditando = null; }}
+    formatarRodape={formatarRodapeMacrosRefeicao}
+    mostrarPct={false}
   />
 {/if}
 
@@ -1870,6 +1997,26 @@
     flex-shrink: 0;
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .card-header-direita {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .item-detalhe {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--surface-muted);
+    cursor: pointer;
+  }
+  .item-detalhe svg {
+    width: 18px;
+    height: 18px;
   }
   .nome-auto {
     font-size: 11px;
