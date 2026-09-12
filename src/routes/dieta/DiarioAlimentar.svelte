@@ -57,7 +57,6 @@
     calibrando: "Calibrando…",
   };
   let metasRefeicaoPorNome = $state<Map<string, RefeicaoModelo>>(new Map());
-  let modoDiarioPorId = $state<Set<string>>(new Set());
   let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
   let pesoAtual = $state(76);
   const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
@@ -235,13 +234,6 @@
   /** Quando o consumido passa da meta, o texto vira "X acima" em vez de ficar travado em "0 restantes". */
   function passouMeta(valor: number, meta: number): boolean {
     return valor > meta;
-  }
-
-  function alternarModoRefeicao(refeicaoId: string) {
-    const novo = new Set(modoDiarioPorId);
-    if (novo.has(refeicaoId)) novo.delete(refeicaoId);
-    else novo.add(refeicaoId);
-    modoDiarioPorId = novo;
   }
 
   function labelAbsoluto(valor: number, meta: number, unidade: string): string {
@@ -519,7 +511,6 @@
         {@const temItens = itens.some((i) => i.refeicaoId === refeicao.id)}
         {@const metaRef = metasRefeicaoPorNome.get(refeicao.nome)}
         {@const metaAtual = metaRef ? metasRedistribuidas.get(refeicao.id) : null}
-        {@const modoDiario = modoDiarioPorId.has(refeicao.id)}
         <div
           class="refeicao-item"
           role="button"
@@ -532,17 +523,8 @@
               <h2>{refeicao.nome}</h2>
               {#if metaAtual}<span class="card-header-cal">{arredondarDezena(metaAtual.calorias)} cal</span>{/if}
             </span>
-            {#if metaRef}
-              <button
-                class="toggle-btn-card"
-                onclick={(e) => { e.stopPropagation(); alternarModoRefeicao(refeicao.id); }}
-                aria-label="Alternar exibição"
-              >
-                {@render iconToggle()}
-              </button>
-            {/if}
           </div>
-          {#if metas && metaAtual && !modoDiario}
+          {#if metaAtual}
             <p class="pct-titulo">Meta de {refeicao.nome}</p>
             <div class="pct-grid">
               <div class="pct-col">
@@ -574,38 +556,8 @@
                 <p class="pct-valor">{labelAbsoluto(totais.proteinaG, metaAtual.proteinaG, "g")}</p>
               </div>
             </div>
-          {:else if metas && (temItens || metaRef)}
-            <p class="pct-titulo">Percentual das suas metas diárias</p>
-            <div class="pct-grid">
-              <div class="pct-col">
-                <p class="pct-nome">Calorias</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.calorias, metas.calorias))}%; background:var(--color-secondary);`}></div>
-                </div>
-                <p class="pct-valor">{pctMeta(totais.calorias, metas.calorias).toFixed(0)}% · {totais.calorias.toFixed(0)}</p>
-              </div>
-              <div class="pct-col">
-                <p class="pct-nome">Carb</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.carboidratoG, metas.carboidratoG))}%; background:${COR_CARBO};`}></div>
-                </div>
-                <p class="pct-valor">{pctMeta(totais.carboidratoG, metas.carboidratoG).toFixed(0)}% · {totais.carboidratoG.toFixed(0)}g</p>
-              </div>
-              <div class="pct-col">
-                <p class="pct-nome">Gorduras</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.gorduraG, metas.gorduraG))}%; background:${COR_GORDURA};`}></div>
-                </div>
-                <p class="pct-valor">{pctMeta(totais.gorduraG, metas.gorduraG).toFixed(0)}% · {totais.gorduraG.toFixed(0)}g</p>
-              </div>
-              <div class="pct-col">
-                <p class="pct-nome">Proteínas</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.proteinaG, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div>
-                </div>
-                <p class="pct-valor">{pctMeta(totais.proteinaG, metas.proteinaG).toFixed(0)}% · {totais.proteinaG.toFixed(0)}g</p>
-              </div>
-            </div>
+          {:else if temItens}
+            <p class="pct-titulo">Refeição sem meta</p>
           {:else}
             <p class="preview">{preview(refeicao.id)}</p>
           {/if}
@@ -928,24 +880,6 @@
   .diario-titulo {
     font-weight: 600;
     margin: 0 0 var(--space-3);
-  }
-  .toggle-btn-card {
-    flex-shrink: 0;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: none;
-    background: var(--surface-bg);
-    color: var(--surface-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .toggle-btn-card svg {
-    width: 14px;
-    height: 14px;
   }
   .preview {
     color: var(--surface-muted);

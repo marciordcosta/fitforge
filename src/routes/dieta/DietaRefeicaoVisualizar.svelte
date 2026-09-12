@@ -9,7 +9,6 @@
     getItensDaRefeicao,
     removerItemDiario,
     removerRefeicaoDia,
-    getMetasDiarias,
     getMetaRefeicaoPorNome,
     getAlimento,
     atualizarItemDiario,
@@ -37,7 +36,6 @@
 
   let refeicao = $state<RefeicaoDia | null>(null);
   let itens = $state<ItemDiario[]>([]);
-  let metas = $state<MetasDiarias | null>(null);
   let metaRefeicao = $state<MetasDiarias | null>(null);
   let modeloRefeicao = $state<RefeicaoModelo | null>(null);
   let loading = $state(true);
@@ -51,21 +49,18 @@
   let refeicoesParaMover = $state<RefeicaoDia[]>([]);
   let mostrarMoverItem = $state(false);
   let menuItemAberto = $state<ItemDiario | null>(null);
-  let modoDiarioMeta = $state(false);
 
   async function carregar() {
     loading = true;
     erro = null;
     try {
-      const [refeicaoRes, itensRes, metasRes, modelos] = await Promise.all([
+      const [refeicaoRes, itensRes, modelos] = await Promise.all([
         getRefeicaoDia(refeicaoId),
         getItensDaRefeicao(refeicaoId),
-        getMetasDiarias(),
         listRefeicoesModelo(),
       ]);
       refeicao = refeicaoRes;
       itens = itensRes;
-      metas = metasRes;
       modeloRefeicao = refeicao ? (modelos.find((m) => m.nome === refeicao!.nome) ?? null) : null;
       metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome, parseISODate(refeicao.data).getDay()) : null;
     } catch (err) {
@@ -77,9 +72,6 @@
   }
 
   void carregar();
-
-  const usaMetaRefeicao = $derived(metaRefeicao != null && !modoDiarioMeta);
-  const metasEfetivas = $derived(usaMetaRefeicao ? metaRefeicao : metas);
 
   const dataLabel = $derived.by(() => {
     if (!refeicao) return "";
@@ -114,8 +106,7 @@
   }
 
   function metaValorTexto(consumido: number, meta: number, unidade: string): string {
-    if (usaMetaRefeicao) return `${consumido.toFixed(0)} de ${meta.toFixed(0)}${unidade}`;
-    return `${pctMeta(consumido, meta).toFixed(0)}% · ${meta.toFixed(0)}${unidade}`;
+    return `${consumido.toFixed(0)} de ${meta.toFixed(0)}${unidade}`;
   }
 
   async function abrirItem(item: ItemDiario) {
@@ -300,14 +291,6 @@
     <path d="M12 2v20" />
   </svg>
 {/snippet}
-{#snippet iconToggle()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M17 3l4 4-4 4" />
-    <path d="M21 7H7a4 4 0 0 0-4 4v1" />
-    <path d="M7 21l-4-4 4-4" />
-    <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
-  </svg>
-{/snippet}
 
 <div class="header-fixo">
   <div class="header-fixo-inner">
@@ -344,37 +327,32 @@
         </div>
       </div>
 
-      {#if metasEfetivas}
-        <div class="metas-titulo-linha">
-          <p class="metas-titulo">{usaMetaRefeicao ? `Meta de ${refeicao?.nome}` : "Percentual das suas metas diárias"}</p>
-          {#if metaRefeicao}
-            <button class="toggle-btn-meta" onclick={() => (modoDiarioMeta = !modoDiarioMeta)} aria-label="Alternar exibição">
-              {@render iconToggle()}
-            </button>
-          {/if}
-        </div>
+      {#if metaRefeicao}
+        <p class="metas-titulo">Meta de {refeicao?.nome}</p>
         <div class="metas-grid">
           <div class="meta-col">
             <span class="meta-label">Calorias</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metasEfetivas.calorias))}%; background:var(--color-secondary);`}></div></div>
-            <span class="meta-valor">{metaValorTexto(totalCalorias, metasEfetivas.calorias, "")}</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metaRefeicao.calorias))}%; background:var(--color-secondary);`}></div></div>
+            <span class="meta-valor">{metaValorTexto(totalCalorias, metaRefeicao.calorias, "")}</span>
           </div>
           <div class="meta-col">
             <span class="meta-label">Carb</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metasEfetivas.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
-            <span class="meta-valor">{metaValorTexto(totalCarboidrato, metasEfetivas.carboidratoG, "g")}</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metaRefeicao.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
+            <span class="meta-valor">{metaValorTexto(totalCarboidrato, metaRefeicao.carboidratoG, "g")}</span>
           </div>
           <div class="meta-col">
             <span class="meta-label">Gorduras</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metasEfetivas.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
-            <span class="meta-valor">{metaValorTexto(totalGordura, metasEfetivas.gorduraG, "g")}</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metaRefeicao.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
+            <span class="meta-valor">{metaValorTexto(totalGordura, metaRefeicao.gorduraG, "g")}</span>
           </div>
           <div class="meta-col">
             <span class="meta-label">Proteínas</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metasEfetivas.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
-            <span class="meta-valor">{metaValorTexto(totalProteina, metasEfetivas.proteinaG, "g")}</span>
+            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metaRefeicao.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
+            <span class="meta-valor">{metaValorTexto(totalProteina, metaRefeicao.proteinaG, "g")}</span>
           </div>
         </div>
+      {:else}
+        <p class="metas-titulo">Refeição sem meta</p>
       {/if}
     {/if}
 
@@ -382,7 +360,7 @@
       <p class="muted">Nenhum alimento adicionado ainda.</p>
     {:else}
       {#each itens as item (item.id)}
-        {@const pctItem = metasEfetivas ? pctMeta(item.calorias, metasEfetivas.calorias) : 0}
+        {@const pctItem = metaRefeicao ? pctMeta(item.calorias, metaRefeicao.calorias) : 0}
         <button
           class="item-card"
           onpointerdown={(e) => aoPointerDownItem(e, item)}
@@ -392,9 +370,9 @@
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
             <p class="item-qtd">
-              {item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal{#if metasEfetivas} · {pctItem.toFixed(0)}% da meta{/if}
+              {item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal{#if metaRefeicao} · {pctItem.toFixed(0)}% da meta{/if}
             </p>
-            {#if metasEfetivas}
+            {#if metaRefeicao}
               <div class="item-barra-wrap">
                 <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
               </div>
@@ -574,33 +552,9 @@
   .resumo-macros .valor-g {
     font-size: 17px;
   }
-  .metas-titulo-linha {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    margin: var(--space-2) 0 var(--space-3);
-  }
   .metas-titulo {
     font-weight: 600;
-    margin: 0;
-  }
-  .toggle-btn-meta {
-    flex-shrink: 0;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: none;
-    background: var(--surface-bg);
-    color: var(--surface-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-  .toggle-btn-meta svg {
-    width: 14px;
-    height: 14px;
+    margin: var(--space-2) 0 var(--space-3);
   }
   .metas-grid {
     display: grid;

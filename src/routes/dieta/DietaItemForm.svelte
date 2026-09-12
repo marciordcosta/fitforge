@@ -139,10 +139,6 @@
     };
   });
 
-  let modoDiarioMeta = $state(false);
-  const usaMetaRefeicao = $derived(metaRefeicao != null && !modoDiarioMeta);
-  const metasEfetivas = $derived(usaMetaRefeicao ? metaRefeicao : metas);
-
   const fator = $derived(alimento && alimento.porcaoPadraoQtd > 0 ? quantidade / alimento.porcaoPadraoQtd : 0);
   const calorias = $derived(alimento ? alimento.caloriasPorPorcao * fator : 0);
   const proteinaG = $derived(alimento ? alimento.proteinaG * fator : 0);
@@ -174,8 +170,7 @@
   }
 
   function metaValorTexto(consumido: number, meta: number, unidade: string): string {
-    if (usaMetaRefeicao) return `${consumido.toFixed(0)} de ${meta.toFixed(0)}${unidade}`;
-    return `${pctMeta(consumido, meta).toFixed(0)}% · ${meta.toFixed(0)}${unidade}`;
+    return `${consumido.toFixed(0)} de ${meta.toFixed(0)}${unidade}`;
   }
 
   function sufixoRota(): string {
@@ -279,14 +274,6 @@
     <polyline points="4 12 10 18 20 6" />
   </svg>
 {/snippet}
-{#snippet iconToggle()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M17 3l4 4-4 4" />
-    <path d="M21 7H7a4 4 0 0 0-4 4v1" />
-    <path d="M7 21l-4-4 4-4" />
-    <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
-  </svg>
-{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -355,37 +342,32 @@
       </div>
     </div>
 
-    {#if metasEfetivas}
-      <div class="metas-titulo-linha">
-        <p class="metas-titulo">{usaMetaRefeicao ? `Meta de ${refeicao?.nome}` : "Percentual das suas metas diárias"}</p>
-        {#if metaRefeicao}
-          <button class="toggle-btn-meta" onclick={() => (modoDiarioMeta = !modoDiarioMeta)} aria-label="Alternar exibição">
-            {@render iconToggle()}
-          </button>
-        {/if}
-      </div>
+    {#if metaRefeicao}
+      <p class="metas-titulo">Meta de {refeicao?.nome}</p>
       <div class="metas-grid">
         <div class="meta-col">
           <span class="meta-label">Calorias</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(calorias, metasEfetivas.calorias))}%; background:var(--color-secondary);`}></div></div>
-          <span class="meta-valor">{metaValorTexto(calorias, metasEfetivas.calorias, "")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(calorias, metaRefeicao.calorias))}%; background:var(--color-secondary);`}></div></div>
+          <span class="meta-valor">{metaValorTexto(calorias, metaRefeicao.calorias, "")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Carb</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(carboidratoG, metasEfetivas.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(carboidratoG, metasEfetivas.carboidratoG, "g")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(carboidratoG, metaRefeicao.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(carboidratoG, metaRefeicao.carboidratoG, "g")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Gorduras</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(gorduraG, metasEfetivas.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(gorduraG, metasEfetivas.gorduraG, "g")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(gorduraG, metaRefeicao.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(gorduraG, metaRefeicao.gorduraG, "g")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Proteínas</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(proteinaG, metasEfetivas.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(proteinaG, metasEfetivas.proteinaG, "g")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(proteinaG, metaRefeicao.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(proteinaG, metaRefeicao.proteinaG, "g")}</span>
         </div>
       </div>
+    {:else}
+      <p class="metas-titulo">Refeição sem meta</p>
     {/if}
 
     <p class="nutrientes-titulo">Nutrientes</p>
@@ -626,33 +608,9 @@
   .resumo-macros .valor-g {
     font-size: 17px;
   }
-  .metas-titulo-linha {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    margin: var(--space-2) 0 var(--space-3);
-  }
   .metas-titulo {
     font-weight: 600;
-    margin: 0;
-  }
-  .toggle-btn-meta {
-    flex-shrink: 0;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: none;
-    background: var(--surface-bg);
-    color: var(--surface-fg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-  .toggle-btn-meta svg {
-    width: 14px;
-    height: 14px;
+    margin: var(--space-2) 0 var(--space-3);
   }
   .metas-grid {
     display: grid;
