@@ -15,6 +15,8 @@
     getRefeicoesDoDia,
     moverItemDiario,
     listRefeicoesModelo,
+    listMetasDiaModelo,
+    getReceita,
     lancarReceitaPadrao,
     type RefeicaoDia,
     type ItemDiario,
@@ -38,6 +40,10 @@
   let itens = $state<ItemDiario[]>([]);
   let metaRefeicao = $state<MetasDiarias | null>(null);
   let modeloRefeicao = $state<RefeicaoModelo | null>(null);
+  /** Só mostra o botão "Refeição Padrão" quando a lista de alimentos efetiva desse dia (override do
+   * dia se houver, senão a global) realmente tem algum item — senão o botão aparece sem ter nada
+   * pra lançar. */
+  let receitaPadraoTemItens = $state(false);
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
@@ -54,15 +60,26 @@
     loading = true;
     erro = null;
     try {
-      const [refeicaoRes, itensRes, modelos] = await Promise.all([
+      const [refeicaoRes, itensRes, modelos, metasDia] = await Promise.all([
         getRefeicaoDia(refeicaoId),
         getItensDaRefeicao(refeicaoId),
         listRefeicoesModelo(),
+        listMetasDiaModelo(),
       ]);
       refeicao = refeicaoRes;
       itens = itensRes;
       modeloRefeicao = refeicao ? (modelos.find((m) => m.nome === refeicao!.nome) ?? null) : null;
       metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome, parseISODate(refeicao.data).getDay()) : null;
+
+      if (refeicao && modeloRefeicao) {
+        const diaSemana = parseISODate(refeicao.data).getDay();
+        const override = metasDia.find((md) => md.modeloId === modeloRefeicao!.id && md.diaSemana === diaSemana);
+        const receitaIdEfetiva = override?.metaReceitaId ?? modeloRefeicao.metaReceitaId ?? null;
+        const receitaPadrao = receitaIdEfetiva ? await getReceita(receitaIdEfetiva) : null;
+        receitaPadraoTemItens = !!receitaPadrao?.itens.length;
+      } else {
+        receitaPadraoTemItens = false;
+      }
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -393,7 +410,7 @@
     {/if}
 
     <div class="acoes-refeicao">
-      {#if modeloRefeicao?.metaReceitaId}
+      {#if receitaPadraoTemItens}
         <button type="button" class="acao-padrao" disabled={lancandoPadrao} onclick={aoClicarRefeicaoPadrao}>Refeição Padrão</button>
       {/if}
       <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/refeicao/${refeicaoId}`)}>+ Adicionar Alimento</button>

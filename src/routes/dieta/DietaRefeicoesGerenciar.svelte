@@ -1461,33 +1461,37 @@
               style={arrastandoDia === grupo.dias[0] && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
             >
               {#if reordenando}
-                <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
-                {#if !ultima}
-                  <div class="reordenar-setas">
-                    <button disabled={i === 0} onclick={() => moverRefeicaoGrupo(grupo, i, -1)} aria-label="Mover pra cima">▲</button>
-                    <button disabled={i === grupo.modelos.length - 2} onclick={() => moverRefeicaoGrupo(grupo, i, 1)} aria-label="Mover pra baixo">▼</button>
-                  </div>
-                {/if}
-              {:else}
-                <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, grupo.dias[0])} aria-label="Reordenar">
-                  {@render iconArrastar()}
-                </button>
-                <button
-                  class="nome-btn refeicao-card"
-                  onpointerdown={(e) => aoPointerDownNome(e, m, grupo)}
-                  onclick={() => aoClickNome(m, grupo.dias)}
-                  oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
-                >
-                  <div class="card-header">
-                    <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
-                    {#if meta.calorias != null}<span class="card-header-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
-                  </div>
-                  {#if meta.calorias != null}
-                    {@render metaBarrasGrid(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias)}
-                  {:else}
-                    <p class="preview">Sem meta configurada</p>
+                <div class="reordenar-card">
+                  <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
+                  {#if !ultima}
+                    <div class="reordenar-setas">
+                      <button disabled={i === 0} onclick={() => moverRefeicaoGrupo(grupo, i, -1)} aria-label="Mover pra cima">▲</button>
+                      <button disabled={i === grupo.modelos.length - 2} onclick={() => moverRefeicaoGrupo(grupo, i, 1)} aria-label="Mover pra baixo">▼</button>
+                    </div>
                   {/if}
-                </button>
+                </div>
+              {:else}
+                <div class="refeicao-card">
+                  <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, grupo.dias[0])} aria-label="Reordenar">
+                    {@render iconArrastar()}
+                  </button>
+                  <button
+                    class="nome-btn"
+                    onpointerdown={(e) => aoPointerDownNome(e, m, grupo)}
+                    onclick={() => aoClickNome(m, grupo.dias)}
+                    oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
+                  >
+                    <div class="card-header">
+                      <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
+                      {#if meta.calorias != null}<span class="card-header-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
+                    </div>
+                    {#if meta.calorias != null}
+                      {@render metaBarrasGrid(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias)}
+                    {:else}
+                      <p class="preview">Sem meta configurada</p>
+                    {/if}
+                  </button>
+                </div>
               {/if}
             </li>
           {/each}
@@ -1513,33 +1517,37 @@
             style={arrastandoDia === null && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
           >
             {#if reordenandoGlobal}
-              <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
-              {#if !ultima}
-                <div class="reordenar-setas">
-                  <button disabled={i === 0} onclick={() => moverRefeicaoGlobal(i, -1)} aria-label="Mover pra cima">▲</button>
-                  <button disabled={i === modelos.length - 2} onclick={() => moverRefeicaoGlobal(i, 1)} aria-label="Mover pra baixo">▼</button>
-                </div>
-              {/if}
-            {:else}
-              <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
-                {@render iconArrastar()}
-              </button>
-              <button
-                class="nome-btn refeicao-card"
-                onpointerdown={(e) => aoPointerDownNome(e, m)}
-                onclick={() => aoClickNome(m)}
-                oncontextmenu={(e) => aoContextMenuNome(e, m)}
-              >
-                <div class="card-header">
-                  <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
-                  {#if ultima || m.metaCalorias != null}<span class="card-header-cal">{arredondarDezena(efetivo.calorias)} cal</span>{/if}
-                </div>
-                {#if ultima || m.metaCalorias != null}
-                  {@render metaBarrasGrid(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias)}
-                {:else}
-                  <p class="preview">Sem meta configurada</p>
+              <div class="reordenar-card">
+                <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
+                {#if !ultima}
+                  <div class="reordenar-setas">
+                    <button disabled={i === 0} onclick={() => moverRefeicaoGlobal(i, -1)} aria-label="Mover pra cima">▲</button>
+                    <button disabled={i === modelos.length - 2} onclick={() => moverRefeicaoGlobal(i, 1)} aria-label="Mover pra baixo">▼</button>
+                  </div>
                 {/if}
-              </button>
+              </div>
+            {:else}
+              <div class="refeicao-card">
+                <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
+                  {@render iconArrastar()}
+                </button>
+                <button
+                  class="nome-btn"
+                  onpointerdown={(e) => aoPointerDownNome(e, m)}
+                  onclick={() => aoClickNome(m)}
+                  oncontextmenu={(e) => aoContextMenuNome(e, m)}
+                >
+                  <div class="card-header">
+                    <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
+                    {#if ultima || m.metaCalorias != null}<span class="card-header-cal">{arredondarDezena(efetivo.calorias)} cal</span>{/if}
+                  </div>
+                  {#if ultima || m.metaCalorias != null}
+                    {@render metaBarrasGrid(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias)}
+                  {:else}
+                    <p class="preview">Sem meta configurada</p>
+                  {/if}
+                </button>
+              </div>
             {/if}
           </li>
         {/each}
@@ -1967,8 +1975,13 @@
     font-family: inherit;
   }
   .refeicao-card {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
     background: var(--surface-card);
-    padding: var(--space-4);
+    padding: var(--space-2) var(--space-3) var(--space-3);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     -webkit-tap-highlight-color: transparent;
@@ -2035,6 +2048,17 @@
     font-size: 11px;
     color: var(--surface-muted);
   }
+  .reordenar-card {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
   .reordenar-nome {
     flex: 1;
     min-width: 0;
@@ -2043,10 +2067,6 @@
     white-space: nowrap;
     font-size: var(--font-size-lg);
     color: var(--surface-fg);
-    padding: var(--space-4);
-    background: var(--surface-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
   }
   .reordenar-setas {
     flex-shrink: 0;
