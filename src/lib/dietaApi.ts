@@ -678,12 +678,32 @@ export interface RefeicaoDia {
 
 /** Ordena pelo mesmo critério de "Gerenciar Refeições" (por nome) — refeições avulsas, sem nome no catálogo, ficam no fim, na ordem em que foram criadas. */
 export async function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
-  const [linhasRes, catalogo] = await Promise.all([
+  const diaSemana = parseISODate(data).getDay();
+  const [linhasRes, catalogo, modelosPorDia] = await Promise.all([
     supabase.from("dieta_refeicoes_dia").select("id, nome, data").eq("data", data).order("created_at", { ascending: true }),
     listRefeicoesModelo(),
+    listRefeicoesModeloDia(),
   ]);
   if (linhasRes.error) throw linhasRes.error;
-  const ordemPorNome = new Map(catalogo.map((m, i) => [m.nome, i]));
+
+  // Ordem efetiva desse dia da semana (Ondulatória): usa a lista/ordem específica desse grupo de
+  // dias se houver; senão cai pro catálogo global inteiro, na ordem global — mesma resolução de
+  // modelosDoDia em Gerenciar > Refeições.
+  const linhasDoDia = modelosPorDia.filter((r) => r.diaSemana === diaSemana);
+  const ordemPorNome = new Map<string, number>();
+  if (linhasDoDia.length) {
+    const nomePorId = new Map(catalogo.map((m) => [m.id, m.nome]));
+    linhasDoDia
+      .slice()
+      .sort((a, b) => a.ordem - b.ordem)
+      .forEach((r, i) => {
+        const nome = nomePorId.get(r.modeloId);
+        if (nome) ordemPorNome.set(nome, i);
+      });
+  } else {
+    catalogo.forEach((m, i) => ordemPorNome.set(m.nome, i));
+  }
+
   return [...(linhasRes.data ?? [])].sort(
     (a, b) => (ordemPorNome.get(a.nome) ?? Infinity) - (ordemPorNome.get(b.nome) ?? Infinity),
   );

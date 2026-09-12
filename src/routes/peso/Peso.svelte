@@ -287,9 +287,27 @@
    * dia; se a meta era "manutenção" num trecho, o valor esperado nesse trecho é o próprio peso-alvo
    * (sem ritmo). Isso faz a linha ter "quebras" nos dias em que a meta foi alterada — reflete o
    * histórico real, não uma reta idealizada.
+   *
+   * Sem histórico real (nenhuma troca de meta registrada ainda — só a meta atual, semeada com
+   * `vigente_desde` no passado) não dá pra compor uma trajetória de verdade: nesse caso a linha
+   * fica reta, no valor da meta atual (mesmo ritmo do card "Meta semanal"), em vez de "inventar"
+   * uma composição diária que nunca foi realmente decidida assim.
    */
   const metaAlvoPorPonto = $derived.by(() => {
-    if (!metaHistorico.length || !mediaMovelGrafico.length) return null;
+    if (!meta || !mediaMovelGrafico.length) return null;
+
+    if (metaHistorico.length <= 1) {
+      if (meta.tipo === "manutencao") {
+        if (meta.pesoAlvo == null) return null;
+        const alvo = meta.pesoAlvo;
+        return mediaMovelGrafico.map(() => alvo);
+      }
+      if (meta.percentual == null) return null;
+      const mediaAtual = mediaMovelGrafico[mediaMovelGrafico.length - 1].peso;
+      const alvoAtual = mediaAtual * (1 + meta.percentual / 100);
+      return mediaMovelGrafico.map(() => alvoAtual);
+    }
+
     const primeiro = mediaMovelGrafico[0];
     const metaInicial = metaNaData(metaHistorico, primeiro.data);
     if (!metaInicial) return null;
