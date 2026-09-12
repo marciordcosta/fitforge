@@ -729,19 +729,6 @@
     await removerDoGrupo(grupo, modelo);
   }
 
-  let itemRefs: (HTMLLIElement | null)[] = [];
-  let itemRefsDia: (HTMLLIElement | null)[][] = [[], [], [], [], [], [], []];
-  /** null = arrastando na lista única (Fixa); número = arrastando dentro da seção desse dia (Ondulatória). */
-  let arrastandoDia = $state<number | null>(null);
-  let arrastandoIndex = $state<number | null>(null);
-  let arrastarOffsetY = $state(0);
-  let alturaLinha = 0;
-  let startY = 0;
-  let ordemMudou = false;
-  /** Cópia local da lista do grupo sendo arrastado (Ondulatória) — não mexe no catálogo global. */
-  let arrastoListaDia = $state<RefeicaoModelo[]>([]);
-  let arrastandoGrupoDiasCompleto: number[] = [];
-
   const metaDiaMap = $derived(new Map(metasDiaModelo.map((md) => [`${md.modeloId}:${md.diaSemana}`, md])));
 
   interface MetaEfetiva {
@@ -1039,79 +1026,7 @@
     abrirMeta(m, diasGrupo);
   }
 
-  /** Tempo segurando o handle parado antes do arrasto realmente começar — evita que um toque de rolagem vire reordenação sem querer. */
-  const ATRASO_ARRASTAR_MS = 250;
   const TOLERANCIA_MOVIMENTO_PX = 8;
-  let timeoutArrastar: ReturnType<typeof setTimeout> | undefined;
-  let pointerDownX = 0;
-  let pointerDownY = 0;
-
-  function aoPointerDownHandle(e: PointerEvent, index: number, dia: number | null = null) {
-    const el = dia == null ? itemRefs[index] : itemRefsDia[dia][index];
-    if (!el) return;
-    pointerDownX = e.clientX;
-    pointerDownY = e.clientY;
-    window.addEventListener("pointermove", aoPointerMoveEsperando);
-    window.addEventListener("pointerup", aoPointerUpEsperando);
-    timeoutArrastar = setTimeout(() => iniciarArrasto(el, index, dia), ATRASO_ARRASTAR_MS);
-  }
-
-  function cancelarEsperaArrastar() {
-    clearTimeout(timeoutArrastar);
-    timeoutArrastar = undefined;
-    window.removeEventListener("pointermove", aoPointerMoveEsperando);
-    window.removeEventListener("pointerup", aoPointerUpEsperando);
-  }
-
-  function aoPointerMoveEsperando(e: PointerEvent) {
-    if (Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY) > TOLERANCIA_MOVIMENTO_PX) {
-      cancelarEsperaArrastar();
-    }
-  }
-
-  function aoPointerUpEsperando() {
-    cancelarEsperaArrastar();
-  }
-
-  function iniciarArrasto(el: HTMLLIElement, index: number, dia: number | null) {
-    cancelarEsperaArrastar();
-    alturaLinha = el.getBoundingClientRect().height;
-    startY = pointerDownY;
-    arrastandoIndex = index;
-    arrastarOffsetY = 0;
-    ordemMudou = false;
-    if (dia != null) {
-      const grupo = gruposDias.find((g) => g.dias.includes(dia));
-      arrastandoGrupoDiasCompleto = grupo?.dias ?? [dia];
-      arrastoListaDia = grupo ? grupo.modelos.slice() : [];
-    }
-    arrastandoDia = dia;
-    if (navigator.vibrate) navigator.vibrate(10);
-    window.addEventListener("pointermove", aoPointerMove);
-    window.addEventListener("pointerup", aoPointerUp);
-  }
-
-  function aoPointerMove(e: PointerEvent) {
-    if (arrastandoIndex === null || !alturaLinha) return;
-    const delta = e.clientY - startY;
-    arrastarOffsetY = delta;
-    const passos = Math.round(delta / alturaLinha);
-    if (passos !== 0) {
-      const listaAtual = arrastandoDia == null ? modelos : arrastoListaDia;
-      const novoIndex = Math.min(listaAtual.length - 1, Math.max(0, arrastandoIndex + passos));
-      if (novoIndex !== arrastandoIndex) {
-        const copia = listaAtual.slice();
-        const [item] = copia.splice(arrastandoIndex, 1);
-        copia.splice(novoIndex, 0, item);
-        if (arrastandoDia == null) modelos = copia;
-        else arrastoListaDia = copia;
-        arrastandoIndex = novoIndex;
-        startY = e.clientY;
-        arrastarOffsetY = 0;
-        ordemMudou = true;
-      }
-    }
-  }
 
   /** Atualiza o estado local de modelosPorDia depois de gravar uma nova lista pra um grupo de dias, sem precisar recarregar tudo do banco. */
   function aplicarModelosPorDiaLocal(dias: number[], ids: string[]) {
@@ -1120,30 +1035,6 @@
       ids.forEach((modeloId, i) => novo.push({ modeloId, diaSemana: dia, ordem: i }));
     }
     modelosPorDia = novo;
-  }
-
-  async function aoPointerUp() {
-    window.removeEventListener("pointermove", aoPointerMove);
-    window.removeEventListener("pointerup", aoPointerUp);
-    const diaArrastado = arrastandoDia;
-    const diasGrupoArrastado = arrastandoGrupoDiasCompleto;
-    const listaFinal = arrastoListaDia;
-    arrastandoDia = null;
-    arrastandoIndex = null;
-    arrastarOffsetY = 0;
-    if (!ordemMudou) return;
-    try {
-      if (diaArrastado == null) {
-        await reordenarRefeicoesModelo(modelos.map((m) => m.id));
-      } else {
-        const ids = listaFinal.map((m) => m.id);
-        await Promise.all(diasGrupoArrastado.map((dia) => definirRefeicoesDoDia(dia, ids)));
-        aplicarModelosPorDiaLocal(diasGrupoArrastado, ids);
-      }
-    } catch (err) {
-      alert("Erro ao salvar a nova ordem: " + (err as Error).message);
-      await carregar();
-    }
   }
 
   async function removerDoGrupo(grupo: GrupoDias, m: RefeicaoModelo) {
@@ -1207,16 +1098,6 @@
     <path d="M21 7H7a4 4 0 0 0-4 4v1" />
     <path d="M7 21l-4-4 4-4" />
     <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
-  </svg>
-{/snippet}
-{#snippet iconArrastar()}
-  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-    <circle cx="9" cy="6" r="1.6" />
-    <circle cx="15" cy="6" r="1.6" />
-    <circle cx="9" cy="12" r="1.6" />
-    <circle cx="15" cy="12" r="1.6" />
-    <circle cx="9" cy="18" r="1.6" />
-    <circle cx="15" cy="18" r="1.6" />
   </svg>
 {/snippet}
 
@@ -1450,16 +1331,11 @@
         {/if}
 
         <ul class="lista lista-dia">
-          {#each (arrastandoDia === grupo.dias[0] ? arrastoListaDia : grupo.modelos) as m, i (m.id)}
+          {#each grupo.modelos as m, i (m.id)}
             {@const meta = metaEfetivaDoDia(m, grupo.dias[0])}
             {@const ultima = ehUltimaDaLista(m, grupo)}
             {@const reordenando = modoReordenarChave === chaveLista(grupo)}
-            <li
-              class="linha"
-              class:arrastando={arrastandoDia === grupo.dias[0] && arrastandoIndex === i}
-              bind:this={itemRefsDia[grupo.dias[0]][i]}
-              style={arrastandoDia === grupo.dias[0] && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
-            >
+            <li class="linha">
               {#if reordenando}
                 <div class="reordenar-card">
                   <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
@@ -1472,9 +1348,6 @@
                 </div>
               {:else}
                 <div class="refeicao-card">
-                  <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, grupo.dias[0])} aria-label="Reordenar">
-                    {@render iconArrastar()}
-                  </button>
                   <button
                     class="nome-btn"
                     onpointerdown={(e) => aoPointerDownNome(e, m, grupo)}
@@ -1510,12 +1383,7 @@
         {#each modelos as m, i (m.id)}
           {@const efetivo = macrosEfetivosGlobais(m)}
           {@const ultima = ehUltimaDaLista(m)}
-          <li
-            class="linha"
-            class:arrastando={arrastandoDia === null && arrastandoIndex === i}
-            bind:this={itemRefs[i]}
-            style={arrastandoDia === null && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
-          >
+          <li class="linha">
             {#if reordenandoGlobal}
               <div class="reordenar-card">
                 <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
@@ -1528,9 +1396,6 @@
               </div>
             {:else}
               <div class="refeicao-card">
-                <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
-                  {@render iconArrastar()}
-                </button>
                 <button
                   class="nome-btn"
                   onpointerdown={(e) => aoPointerDownNome(e, m)}
@@ -1946,42 +1811,21 @@
     margin-bottom: var(--space-3);
     position: relative;
   }
-  .linha.arrastando {
-    z-index: 10;
-  }
-  .handle {
-    flex-shrink: 0;
-    width: 32px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: none;
-    color: var(--surface-muted);
-    cursor: grab;
-    touch-action: none;
-  }
-  .handle svg {
-    width: 18px;
-    height: 18px;
-  }
   .nome-btn {
     flex: 1;
     min-width: 0;
     text-align: left;
     border: none;
+    background: none;
+    color: inherit;
     cursor: pointer;
     font-family: inherit;
   }
   .refeicao-card {
     flex: 1;
     min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
     background: var(--surface-card);
-    padding: var(--space-2) var(--space-3) var(--space-3);
+    padding: var(--space-4);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     -webkit-tap-highlight-color: transparent;
