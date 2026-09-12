@@ -5,6 +5,7 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
   import WheelPickerMacros from "../../components/WheelPickerMacros.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import {
     listRefeicoesModelo,
     criarRefeicaoModelo,
@@ -657,6 +658,70 @@
    * outros. Mesmo gesto de pressionar/botão direito do catálogo (Fixa), pra ficar consistente. */
   let paraRemoverDoGrupo = $state<{ grupo: GrupoDias; modelo: RefeicaoModelo } | null>(null);
 
+  /** Menu (Reordenar/Excluir) aberto ao pressionar uma refeição — substitui o antigo comportamento
+   * de excluir direto no pressionar. */
+  let menuRefeicaoAberto = $state<{ modelo: RefeicaoModelo; grupo?: GrupoDias } | null>(null);
+  /** Qual lista está em "modo reordenar" (setas ↑↓ em vez do conteúdo normal) — "global" pro
+   * catálogo Fixa, ou o primeiro dia do grupo pra Ondulatória. Só uma lista por vez. */
+  let modoReordenarChave = $state<string | null>(null);
+
+  function chaveLista(grupo?: GrupoDias): string {
+    return grupo ? `dia:${grupo.dias[0]}` : "global";
+  }
+
+  function abrirMenuRefeicao(m: RefeicaoModelo, grupo?: GrupoDias) {
+    if (ehUltimaDaLista(m, grupo)) {
+      alert("Essa é a última refeição — automática, com a meta sempre igual à sobra do dia. Não pode ser removida nem reordenada.");
+      return;
+    }
+    menuRefeicaoAberto = { modelo: m, grupo };
+  }
+
+  function selecionarReordenar() {
+    if (!menuRefeicaoAberto) return;
+    modoReordenarChave = chaveLista(menuRefeicaoAberto.grupo);
+    menuRefeicaoAberto = null;
+  }
+
+  function selecionarExcluir() {
+    if (!menuRefeicaoAberto) return;
+    const { modelo, grupo } = menuRefeicaoAberto;
+    menuRefeicaoAberto = null;
+    if (grupo) paraRemoverDoGrupo = { grupo, modelo };
+    else paraExcluir = modelo;
+  }
+
+  /** Troca de posição dois itens de uma lista, sempre preservando a última (automática) no fim —
+   * nunca deixa mover a própria última nem colocar outra na posição dela. */
+  async function moverRefeicaoGlobal(index: number, delta: number) {
+    const novoIndex = index + delta;
+    if (novoIndex < 0 || novoIndex >= modelos.length) return;
+    if (index === modelos.length - 1 || novoIndex === modelos.length - 1) return;
+    const nova = modelos.slice();
+    [nova[index], nova[novoIndex]] = [nova[novoIndex], nova[index]];
+    try {
+      await reordenarRefeicoesModelo(nova.map((m) => m.id));
+      await carregar();
+    } catch (err) {
+      alert("Erro ao reordenar: " + (err as Error).message);
+    }
+  }
+
+  async function moverRefeicaoGrupo(grupo: GrupoDias, index: number, delta: number) {
+    const novoIndex = index + delta;
+    if (novoIndex < 0 || novoIndex >= grupo.modelos.length) return;
+    if (index === grupo.modelos.length - 1 || novoIndex === grupo.modelos.length - 1) return;
+    const nova = grupo.modelos.slice();
+    [nova[index], nova[novoIndex]] = [nova[novoIndex], nova[index]];
+    const ids = nova.map((m) => m.id);
+    try {
+      await Promise.all(grupo.dias.map((dia) => definirRefeicoesDoDia(dia, ids)));
+      await carregar();
+    } catch (err) {
+      alert("Erro ao reordenar: " + (err as Error).message);
+    }
+  }
+
   async function confirmarRemoverDoGrupo() {
     if (!paraRemoverDoGrupo) return;
     const { grupo, modelo } = paraRemoverDoGrupo;
@@ -921,15 +986,13 @@
     }
   }
 
-  /** Tempo segurando o nome da refeição antes do toque virar "pressionar" (abre confirmação de excluir) — evita disparar sem querer num toque rápido. */
+  /** Tempo segurando o nome da refeição antes do toque virar "pressionar" (abre o menu de Reordenar/Excluir) — evita disparar sem querer num toque rápido. */
   const ATRASO_PRESSIONAR_MS = 500;
   let timeoutPressionarNome: ReturnType<typeof setTimeout> | undefined;
   let pressionarNomeX = 0;
   let pressionarNomeY = 0;
   let pressionouLongoNome = false;
 
-  /** grupo presente = Ondulatória (desvincula desse bloco de dias, paraRemoverDoGrupo); ausente =
-   * Fixa (exclui a refeição do catálogo inteiro, paraExcluir). */
   function aoPointerDownNome(e: PointerEvent, m: RefeicaoModelo, grupo?: GrupoDias) {
     pressionarNomeX = e.clientX;
     pressionarNomeY = e.clientY;
@@ -939,13 +1002,8 @@
     timeoutPressionarNome = setTimeout(() => {
       pressionouLongoNome = true;
       cancelarPressionarNome();
-      if (ehUltimaDaLista(m, grupo)) {
-        alert("Essa é a última refeição — automática, com a meta sempre igual à sobra do dia. Não pode ser removida.");
-        return;
-      }
       if (navigator.vibrate) navigator.vibrate(10);
-      if (grupo) paraRemoverDoGrupo = { grupo, modelo: m };
-      else paraExcluir = m;
+      abrirMenuRefeicao(m, grupo);
     }, ATRASO_PRESSIONAR_MS);
   }
 
@@ -953,12 +1011,7 @@
     e.preventDefault();
     cancelarPressionarNome();
     pressionouLongoNome = false;
-    if (ehUltimaDaLista(m, grupo)) {
-      alert("Essa é a última refeição — automática, com a meta sempre igual à sobra do dia. Não pode ser removida.");
-      return;
-    }
-    if (grupo) paraRemoverDoGrupo = { grupo, modelo: m };
-    else paraExcluir = m;
+    abrirMenuRefeicao(m, grupo);
   }
 
   function cancelarPressionarNome() {
@@ -1167,22 +1220,27 @@
   </svg>
 {/snippet}
 
-{#snippet barrasMacrosLinha(
-  carboidratoG: number,
-  gorduraG: number,
-  proteinaG: number,
-  carboidratoDiaG: number,
-  gorduraDiaG: number,
-  proteinaDiaG: number,
-)}
-  {@const pctCarboDia = carboidratoDiaG > 0 ? Math.round((carboidratoG / carboidratoDiaG) * 100) : 0}
-  {@const pctGorduraDia = gorduraDiaG > 0 ? Math.round((gorduraG / gorduraDiaG) * 100) : 0}
-  {@const pctProteinaDia = proteinaDiaG > 0 ? Math.round((proteinaG / proteinaDiaG) * 100) : 0}
-  <span class="nome-macros-inline">
-    <span class="macro-dot" style={`background:${COR_CARBO};`}></span><span class="macro-pct">{pctCarboDia}%</span>
-    <span class="macro-dot" style={`background:${COR_GORDURA};`}></span><span class="macro-pct">{pctGorduraDia}%</span>
-    <span class="macro-dot" style={`background:${COR_PROTEINA};`}></span><span class="macro-pct">{pctProteinaDia}%</span>
-  </span>
+{#snippet metaBarrasGrid(carboidratoG: number, gorduraG: number, proteinaG: number, calorias: number)}
+  {@const pctCarbo = calorias > 0 ? ((carboidratoG * 4) / calorias) * 100 : 0}
+  {@const pctGordura = calorias > 0 ? ((gorduraG * 9) / calorias) * 100 : 0}
+  {@const pctProteina = calorias > 0 ? ((proteinaG * 4) / calorias) * 100 : 0}
+  <div class="pct-grid">
+    <div class="pct-col">
+      <p class="pct-nome">Carb</p>
+      <div class="pct-barra-wrap"><div class="pct-barra" style={`width:${larguraBarra(pctCarbo)}%; background:${COR_CARBO};`}></div></div>
+      <p class="pct-valor">{carboidratoG.toFixed(0)}g · {pctCarbo.toFixed(0)}%</p>
+    </div>
+    <div class="pct-col">
+      <p class="pct-nome">Gorduras</p>
+      <div class="pct-barra-wrap"><div class="pct-barra" style={`width:${larguraBarra(pctGordura)}%; background:${COR_GORDURA};`}></div></div>
+      <p class="pct-valor">{gorduraG.toFixed(0)}g · {pctGordura.toFixed(0)}%</p>
+    </div>
+    <div class="pct-col">
+      <p class="pct-nome">Proteínas</p>
+      <div class="pct-barra-wrap"><div class="pct-barra" style={`width:${larguraBarra(pctProteina)}%; background:${COR_PROTEINA};`}></div></div>
+      <p class="pct-valor">{proteinaG.toFixed(0)}g · {pctProteina.toFixed(0)}%</p>
+    </div>
+  </div>
 {/snippet}
 
 <div class="container has-bottom-nav">
@@ -1395,43 +1453,54 @@
           {#each (arrastandoDia === grupo.dias[0] ? arrastoListaDia : grupo.modelos) as m, i (m.id)}
             {@const meta = metaEfetivaDoDia(m, grupo.dias[0])}
             {@const ultima = ehUltimaDaLista(m, grupo)}
+            {@const reordenando = modoReordenarChave === chaveLista(grupo)}
             <li
               class="linha"
               class:arrastando={arrastandoDia === grupo.dias[0] && arrastandoIndex === i}
               bind:this={itemRefsDia[grupo.dias[0]][i]}
               style={arrastandoDia === grupo.dias[0] && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
             >
-              <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, grupo.dias[0])} aria-label="Reordenar">
-                {@render iconArrastar()}
-              </button>
-              <button
-                class="nome-btn"
-                onpointerdown={(e) => aoPointerDownNome(e, m, grupo)}
-                onclick={() => aoClickNome(m, grupo.dias)}
-                oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
-              >
-                <span class="nome-linha">
-                  <span class="nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
+              {#if reordenando}
+                <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
+                {#if !ultima}
+                  <div class="reordenar-setas">
+                    <button disabled={i === 0} onclick={() => moverRefeicaoGrupo(grupo, i, -1)} aria-label="Mover pra cima">▲</button>
+                    <button disabled={i === grupo.modelos.length - 2} onclick={() => moverRefeicaoGrupo(grupo, i, 1)} aria-label="Mover pra baixo">▼</button>
+                  </div>
+                {/if}
+              {:else}
+                <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i, grupo.dias[0])} aria-label="Reordenar">
+                  {@render iconArrastar()}
+                </button>
+                <button
+                  class="nome-btn refeicao-card"
+                  onpointerdown={(e) => aoPointerDownNome(e, m, grupo)}
+                  onclick={() => aoClickNome(m, grupo.dias)}
+                  oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
+                >
+                  <div class="card-header">
+                    <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
+                    {#if meta.calorias != null}<span class="card-header-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
+                  </div>
                   {#if meta.calorias != null}
-                    {@render barrasMacrosLinha(
-                      meta.carboidratoG ?? 0,
-                      meta.gorduraG ?? 0,
-                      meta.proteinaG ?? 0,
-                      metaGrupo.carboidratoG,
-                      metaGrupo.gorduraG,
-                      metaGrupo.proteinaG,
-                    )}
-                    <span class="nome-cal">{arredondarDezena(meta.calorias)} cal</span>
+                    {@render metaBarrasGrid(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias)}
+                  {:else}
+                    <p class="preview">Sem meta configurada</p>
                   {/if}
-                </span>
-              </button>
+                </button>
+              {/if}
             </li>
           {/each}
         </ul>
-        <button type="button" class="add-refeicao-btn" onclick={() => abrirAdicionarRefeicao(grupo)}>+ Adicionar refeição</button>
+        {#if modoReordenarChave === chaveLista(grupo)}
+          <button type="button" class="concluir-reordenar-btn" onclick={() => (modoReordenarChave = null)}>Concluir reordenação</button>
+        {:else}
+          <button type="button" class="add-refeicao-btn" onclick={() => abrirAdicionarRefeicao(grupo)}>+ Adicionar refeição</button>
+        {/if}
       {/each}
     {:else}
       {@const metaGlobal = { calorias: caloriasCalc, proteinaG: proteinaGInput ?? 0, gorduraG: gorduraGInput ?? 0, carboidratoG: carboidratoGInput ?? 0 }}
+      {@const reordenandoGlobal = modoReordenarChave === "global"}
 
       <ul class="lista">
         {#each modelos as m, i (m.id)}
@@ -1443,33 +1512,41 @@
             bind:this={itemRefs[i]}
             style={arrastandoDia === null && arrastandoIndex === i ? `transform: translateY(${arrastarOffsetY}px);` : ""}
           >
-            <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
-              {@render iconArrastar()}
-            </button>
-            <button
-              class="nome-btn"
-              onpointerdown={(e) => aoPointerDownNome(e, m)}
-              onclick={() => aoClickNome(m)}
-              oncontextmenu={(e) => aoContextMenuNome(e, m)}
-            >
-              <span class="nome-linha">
-                <span class="nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
+            {#if reordenandoGlobal}
+              <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
+              {#if !ultima}
+                <div class="reordenar-setas">
+                  <button disabled={i === 0} onclick={() => moverRefeicaoGlobal(i, -1)} aria-label="Mover pra cima">▲</button>
+                  <button disabled={i === modelos.length - 2} onclick={() => moverRefeicaoGlobal(i, 1)} aria-label="Mover pra baixo">▼</button>
+                </div>
+              {/if}
+            {:else}
+              <button class="handle" onpointerdown={(e) => aoPointerDownHandle(e, i)} aria-label="Reordenar">
+                {@render iconArrastar()}
+              </button>
+              <button
+                class="nome-btn refeicao-card"
+                onpointerdown={(e) => aoPointerDownNome(e, m)}
+                onclick={() => aoClickNome(m)}
+                oncontextmenu={(e) => aoContextMenuNome(e, m)}
+              >
+                <div class="card-header">
+                  <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
+                  {#if ultima || m.metaCalorias != null}<span class="card-header-cal">{arredondarDezena(efetivo.calorias)} cal</span>{/if}
+                </div>
                 {#if ultima || m.metaCalorias != null}
-                  {@render barrasMacrosLinha(
-                    efetivo.carboidratoG,
-                    efetivo.gorduraG,
-                    efetivo.proteinaG,
-                    metaGlobal.carboidratoG,
-                    metaGlobal.gorduraG,
-                    metaGlobal.proteinaG,
-                  )}
-                  <span class="nome-cal">{arredondarDezena(efetivo.calorias)} cal</span>
+                  {@render metaBarrasGrid(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias)}
+                {:else}
+                  <p class="preview">Sem meta configurada</p>
                 {/if}
-              </span>
-            </button>
+              </button>
+            {/if}
           </li>
         {/each}
       </ul>
+      {#if reordenandoGlobal}
+        <button type="button" class="concluir-reordenar-btn" onclick={() => (modoReordenarChave = null)}>Concluir reordenação</button>
+      {/if}
     {/if}
     </div>
   {/if}
@@ -1480,6 +1557,17 @@
     <input class="nome-input" type="text" placeholder="Nome da refeição" bind:value={nome} />
     <Button onclick={salvar} disabled={salvando || !nome.trim()}>Salvar</Button>
   </Sheet>
+{/if}
+
+{#if menuRefeicaoAberto}
+  <ActionSheet
+    titulo={menuRefeicaoAberto.modelo.nome}
+    onFechar={() => (menuRefeicaoAberto = null)}
+    opcoes={[
+      { label: "Reordenar", onSelect: selecionarReordenar },
+      { label: "Excluir", destructive: true, onSelect: selecionarExcluir },
+    ]}
+  />
 {/if}
 
 {#if paraExcluir}
@@ -1847,20 +1935,11 @@
     display: flex;
     align-items: center;
     gap: var(--space-1);
-    border-bottom: 1px solid var(--surface-border);
+    margin-bottom: var(--space-3);
     position: relative;
-  }
-  .linha:last-child {
-    border-bottom: none;
   }
   .linha.arrastando {
     z-index: 10;
-    background: var(--surface-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    border-bottom-color: transparent;
-    margin: 0 calc(var(--space-3) * -1);
-    padding: 0 var(--space-3);
   }
   .handle {
     flex-shrink: 0;
@@ -1882,37 +1961,38 @@
   .nome-btn {
     flex: 1;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 2px;
     text-align: left;
     border: none;
-    background: none;
-    padding: var(--space-3) 0;
     cursor: pointer;
     font-family: inherit;
   }
-  .nome-linha {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-start;
-    gap: var(--space-2);
-    text-align: left;
-    min-height: 24px;
+  .refeicao-card {
+    background: var(--surface-card);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    -webkit-tap-highlight-color: transparent;
   }
-  .nome {
+  .card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .refeicao-nome {
+    flex-shrink: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-lg);
+    margin: 0;
     color: var(--surface-fg);
   }
-  .nome-cal {
+  .card-header-cal {
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
   .nome-auto {
@@ -1920,22 +2000,86 @@
     font-weight: 400;
     color: var(--surface-muted);
   }
-  .nome-macros-inline {
+  .preview {
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+    margin: 0;
+  }
+  .pct-grid {
     display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 4px;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .pct-col {
+    flex: 1;
+    min-width: 0;
+  }
+  .pct-nome {
+    margin: 0 0 var(--space-1);
+    font-size: 12px;
+    color: var(--surface-fg);
+  }
+  .pct-barra-wrap {
+    height: 6px;
+    background: var(--surface-border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: var(--space-1);
+  }
+  .pct-barra {
+    height: 100%;
+    border-radius: 4px;
+  }
+  .pct-valor {
+    margin: 0;
     font-size: 11px;
     color: var(--surface-muted);
   }
-  .macro-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
+  .reordenar-nome {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-lg);
+    color: var(--surface-fg);
+    padding: var(--space-4);
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
   }
-  .macro-pct {
-    margin-right: 2px;
+  .reordenar-setas {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .reordenar-setas button {
+    width: 40px;
+    height: 32px;
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+  }
+  .reordenar-setas button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  .concluir-reordenar-btn {
+    width: 100%;
+    padding: var(--space-3);
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    cursor: pointer;
   }
   .conteudo {
     transition: opacity 0.15s;
