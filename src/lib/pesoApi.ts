@@ -228,11 +228,60 @@ export async function salvarMeta(tipo: "percentual" | "manutencao", percentual: 
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
+  // Registra no histórico com a data de hoje como início de vigência — se já houver uma troca
+  // salva hoje, substitui (upsert por user_id+vigente_desde), não acumula duas mudanças no mesmo dia.
+  const { error: errHist } = await supabase.from("peso_metas_historico").upsert(
+    {
+      user_id: uid(),
+      tipo,
+      percentual: tipo === "percentual" ? percentual : null,
+      peso_alvo: pesoAlvo,
+      vigente_desde: hojeISO(),
+    },
+    { onConflict: "user_id,vigente_desde" },
+  );
+  if (errHist) throw errHist;
 }
 
 export async function excluirMeta(): Promise<void> {
   const { error } = await supabase.from("peso_metas").delete().eq("user_id", uid());
   if (error) throw error;
+}
+
+export interface PesoMetaHistorico extends PesoMeta {
+  /** Data (inclusive) a partir da qual essa configuração de meta passou a valer. */
+  vigenteDesde: string;
+}
+
+/** Todo o histórico de metas do usuário, do mais antigo pro mais recente — usado pra resolver qual
+ * meta valia em cada dia do gráfico (ver metaNaData). */
+export async function listMetaHistorico(): Promise<PesoMetaHistorico[]> {
+  const { data, error } = await supabase
+    .from("peso_metas_historico")
+    .select("tipo, percentual, peso_alvo, vigente_desde")
+    .eq("user_id", uid())
+    .order("vigente_desde", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((l) => ({
+    tipo: l.tipo as "percentual" | "manutencao",
+    percentual: l.percentual as number | null,
+    pesoAlvo: l.peso_alvo as number | null,
+    vigenteDesde: l.vigente_desde as string,
+  }));
+}
+
+/** Meta que estava valendo numa data específica — a mais recente com `vigenteDesde <= data`. Se a
+ * data for anterior ao primeiro registro do histórico, assume que essa meta mais antiga já valia
+ * desde então (não dá pra saber o que valia antes do histórico existir). `historico` precisa estar
+ * ordenado do mais antigo pro mais recente (como listMetaHistorico já retorna). */
+export function metaNaData(historico: PesoMetaHistorico[], data: string): PesoMetaHistorico | null {
+  if (!historico.length) return null;
+  let candidata = historico[0];
+  for (const h of historico) {
+    if (h.vigenteDesde <= data) candidata = h;
+    else break;
+  }
+  return candidata;
 }
 
 /** Quantos dias faltam pra bater o peso alvo, no ritmo semanal atual (só faz sentido pra meta

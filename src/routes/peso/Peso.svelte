@@ -5,12 +5,15 @@
   import {
     getPesosDoPeriodo,
     getMeta,
+    listMetaHistorico,
+    metaNaData,
     getDiasParaObjetivo,
     formatDiasObjetivo,
     type PesoRegistro,
     type PesoMeta,
+    type PesoMetaHistorico,
   } from "../../lib/pesoApi";
-  import { getDiasComTreino } from "../../lib/treinoApi";
+  import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
   import PesoGraficoTelaCheia from "./PesoGraficoTelaCheia.svelte";
@@ -55,7 +58,24 @@
   let pesos = $state<PesoRegistro[]>([]);
   /** Data -> nome da rotina executada nesse dia (treino_registros), pro nome pequeno no calendário. */
   let diasComTreino = $state<Map<string, string>>(new Map());
+  /** Dia da semana -> nome da rotina agendada (independente de ter sido feita) — só usado pra
+   * destacar dias FUTUROS com rotina prevista; dias passados/hoje sem registro real não usam isso,
+   * o destaque de treino "some" se o dia passar sem ninguém ter registrado o treino. */
+  let treinoPorDiaSemana = $state<Map<number, string>>(new Map());
   let loading = $state(true);
+
+  async function carregarRotinaSemana() {
+    try {
+      const treinos = await listTreinos();
+      treinoPorDiaSemana = new Map(
+        treinos.filter((t) => t.dia_semana != null).map((t) => [t.dia_semana as number, t.nome_treino]),
+      );
+    } catch {
+      // informativo — sem isso só deixa de destacar dias futuros, calendário continua funcionando
+    }
+  }
+
+  void carregarRotinaSemana();
 
   /** Deriva do path (não de estado local) pra que o botão "voltar" do navegador feche o modal, ou reabra ao voltar de uma tela navegada a partir dele (ex: link "Dia de X"). */
   const diaSelecionado = $derived.by(() => {
@@ -92,6 +112,7 @@
   }
 
   let meta = $state<PesoMeta | null>(null);
+  let metaHistorico = $state<PesoMetaHistorico[]>([]);
   let mostrarFormMeta = $state(false);
   /** "X dias/meses para o objetivo" — só existe pra meta percentual (ver getDiasParaObjetivo). */
   let textoObjetivo = $state<string | null>(null);
@@ -107,8 +128,9 @@
   }
 
   async function carregarMeta() {
-    const [metaCarregada, dias] = await Promise.all([getMeta(), getDiasParaObjetivo()]);
+    const [metaCarregada, historico, dias] = await Promise.all([getMeta(), listMetaHistorico(), getDiasParaObjetivo()]);
     meta = metaCarregada;
+    metaHistorico = historico;
     textoObjetivo = dias != null ? `${formatDiasObjetivo(dias)} para o objetivo` : null;
   }
 
@@ -198,10 +220,11 @@
     const primeiroDiaSemana = (mesInicio.getDay() + 6) % 7; // 0=Seg..6=Dom
     const lista: ({ dia: number; iso: string; peso: number | null; nomeTreino: string | null } | null)[] = [];
     for (let i = 0; i < primeiroDiaSemana; i++) lista.push(null);
+    const hoje = hojeISO();
     for (let dia = 1; dia <= totalDias; dia++) {
       const data = new Date(mesBase.getFullYear(), mesBase.getMonth(), dia);
       const iso = toISODate(data);
-      const nomeTreino = diasComTreino.get(iso) ?? null;
+      const nomeTreino = diasComTreino.get(iso) ?? (iso > hoje ? (treinoPorDiaSemana.get(data.getDay()) ?? null) : null);
       lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null, nomeTreino });
     }
     return lista;
@@ -245,78 +268,62 @@
     return `${formatPeso(mediaMovelGrafico[mediaMovelGrafico.length - 1].peso)} kg`;
   });
 
-  /** Peso esperado pela meta em cada dia plotado — sempre ancorado em HOJE (a média mais recente),
-   * nunca no início do período visível: senão o alvo mudaria de acordo com o filtro escolhido, e a
-   * meta semanal tem que continuar seguindo o mesmo ritmo % em cima da média real de hoje, ganhe,
-   * mantenha ou perca peso mais rápido que o previsto — não pode "perseguir" a média de um filtro
-   * maior/menor. Projeta pra trás a partir de hoje, então o último ponto da linha é sempre
-   * `mediaAtual * (1+percentual/100)`, igual ao valor mostrado no card "Meta semanal". Calculado
-   * sempre (não só quando a linha está visível no gráfico) pra bater com o card independente do
-   * toggle. */
-  /** Janela-base da média móvel (getPesoMedioAtual/calcularMediaMovel): 7 dias. Projetar a taxa
-   * semanal pra trás por cima dessa janela é razoável, mas além dela a curva exponencial diverge
-   * rápido da realidade — compõe o mesmo % por meses sem que o peso real tenha seguido esse ritmo,
-   * "inventando" uma média histórica que nunca existiu (ver correção abaixo). */
-  const JANELA_BASE_MEDIA_DIAS = 7;
-
-  const metaAlvoPorPonto = $derived.by(() => {
-    if (!meta || !mediaMovelGrafico.length) return null;
-    const ultimo = mediaMovelGrafico[mediaMovelGrafico.length - 1];
-    if (meta.tipo === "manutencao") {
-      if (meta.pesoAlvo == null) return null;
-      const alvo = meta.pesoAlvo;
-      return mediaMovelGrafico.map(() => alvo);
-    }
-    if (meta.percentual == null) return null;
-    const percentual = meta.percentual;
-    const pesoAlvoAtual = ultimo.peso * (1 + percentual / 100);
-    const dataHoje = parseISODate(ultimo.data);
-
-    const primeiro = mediaMovelGrafico[0];
-    const spanDias = Math.round((dataHoje.getTime() - parseISODate(primeiro.data).getTime()) / 86400000);
-
-    // Filtro mais largo que a janela-base: a linha vira reta, do início real (média real do
-    // primeiro ponto visível) até a meta de hoje — em vez de uma média imaginária calculada de
-    // trás pra frente.
-    if (spanDias > JANELA_BASE_MEDIA_DIAS) {
-      const mediaRealInicio = primeiro.peso;
-      if (spanDias === 0) return mediaMovelGrafico.map(() => pesoAlvoAtual);
-      return mediaMovelGrafico.map((p) => {
-        const diasDesdeInicio = Math.round((parseISODate(p.data).getTime() - parseISODate(primeiro.data).getTime()) / 86400000);
-        return mediaRealInicio + (pesoAlvoAtual - mediaRealInicio) * (diasDesdeInicio / spanDias);
-      });
-    }
-
-    return mediaMovelGrafico.map((p) => {
-      const diasAtras = Math.round((dataHoje.getTime() - parseISODate(p.data).getTime()) / 86400000);
-      return pesoAlvoAtual * Math.pow(1 + percentual / 100, -diasAtras / 7);
-    });
-  });
-
-  /** Valor exibido no card "Meta semanal": sempre o mesmo número do último ponto da linha da meta
-   * no gráfico (metaAlvoPorPonto), pra nunca "não bater" entre o card e o rótulo desenhado. */
+  /** Valor exibido no card "Meta semanal": ritmo da meta ATUAL em cima da média real de hoje —
+   * independente do histórico usado no gráfico, sempre reflete a meta vigente agora. */
   const metaSemanalTexto = $derived.by(() => {
-    if (!meta) return "Sem meta";
-    const alvos = metaAlvoPorPonto;
-    if (!alvos || !alvos.length) return "Sem meta";
-    return `${formatPeso(alvos[alvos.length - 1])} kg`;
+    if (!meta || !mediaMovelGrafico.length) return "Sem meta";
+    if (meta.tipo === "manutencao") return meta.pesoAlvo != null ? `${formatPeso(meta.pesoAlvo)} kg` : "Sem meta";
+    if (meta.percentual == null) return "Sem meta";
+    const mediaAtual = mediaMovelGrafico[mediaMovelGrafico.length - 1].peso;
+    return `${formatPeso(mediaAtual * (1 + meta.percentual / 100))} kg`;
   });
 
   const pesoAlvoTexto = $derived(meta?.pesoAlvo != null ? `${formatPeso(meta.pesoAlvo)} kg` : "Sem meta");
 
   /**
-   * Linha reta de meta: do alvo calculado pro primeiro dia visível até o alvo de hoje (ambos
-   * vindos de metaAlvoPorPonto, a mesma curva ancorada em hoje) — nunca a média REAL do primeiro
-   * dia, que é dado bruto sujeito à oscilação do peso e não representa o ritmo planejado (fazia a
-   * linha parecer quase reta/plana em filtros longos, sem relação com o %/semana da meta).
+   * Peso esperado pela meta em cada dia plotado, usando a meta que estava REALMENTE valendo naquele
+   * dia (metaHistorico/metaNaData) — não a meta atual projetada pra trás. Parte do peso real do
+   * primeiro dia visível e, a cada dia seguinte, compõe o ritmo semanal (%) da meta vigente naquele
+   * dia; se a meta era "manutenção" num trecho, o valor esperado nesse trecho é o próprio peso-alvo
+   * (sem ritmo). Isso faz a linha ter "quebras" nos dias em que a meta foi alterada — reflete o
+   * histórico real, não uma reta idealizada.
    */
+  const metaAlvoPorPonto = $derived.by(() => {
+    if (!metaHistorico.length || !mediaMovelGrafico.length) return null;
+    const primeiro = mediaMovelGrafico[0];
+    const metaInicial = metaNaData(metaHistorico, primeiro.data);
+    if (!metaInicial) return null;
+
+    const resultado: (number | null)[] = [];
+    let valorAnterior = metaInicial.tipo === "manutencao" ? (metaInicial.pesoAlvo ?? primeiro.peso) : primeiro.peso;
+    resultado.push(valorAnterior);
+
+    for (let i = 1; i < mediaMovelGrafico.length; i++) {
+      const dataAtual = mediaMovelGrafico[i].data;
+      const dataAnterior = mediaMovelGrafico[i - 1].data;
+      const metaDoDia = metaNaData(metaHistorico, dataAtual);
+      if (!metaDoDia) {
+        resultado.push(null);
+        continue;
+      }
+      if (metaDoDia.tipo === "manutencao") {
+        valorAnterior = metaDoDia.pesoAlvo ?? valorAnterior;
+      } else if (metaDoDia.percentual != null) {
+        const diasPassados =
+          Math.round((parseISODate(dataAtual).getTime() - parseISODate(dataAnterior).getTime()) / 86400000) || 1;
+        valorAnterior = valorAnterior * Math.pow(1 + metaDoDia.percentual / 100, diasPassados / 7);
+      }
+      resultado.push(valorAnterior);
+    }
+    return resultado;
+  });
+
+  /** Linha da meta no gráfico: o histórico real ponto a ponto (metaAlvoPorPonto), sem simplificar
+   * pra uma reta — as quebras/curvas refletem mudanças reais de meta ao longo do tempo. */
   const metaLinha = $derived.by(() => {
     const alvos = metaVisivel ? metaAlvoPorPonto : null;
-    if (!meta || !alvos || !alvos.length || pontosGrafico.length < 2) return null;
-    const linha = new Array<number | null>(pontosGrafico.length).fill(null);
-    linha[0] = alvos[0];
-    linha[linha.length - 1] = alvos[alvos.length - 1];
-    return linha;
+    if (!alvos || !alvos.length || pontosGrafico.length < 2 || alvos.length !== pontosGrafico.length) return null;
+    return alvos;
   });
 
   /**
