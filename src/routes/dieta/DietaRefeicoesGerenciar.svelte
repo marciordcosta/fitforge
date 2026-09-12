@@ -29,12 +29,16 @@
     carboidratoGDoDia,
     listRefeicoesModeloDia,
     definirRefeicoesDoDia,
+    getContextoMetaCatalogo,
+    salvarMetaNumericaRefeicao,
+    salvarMetaNumericaRefeicaoDias,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
     type MetaDiaModelo,
     type RefeicaoModeloDia,
     type LimiteParametro,
+    type ContextoMetaCatalogo,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV, listTreinos, type Treino } from "../../lib/treinoApi";
@@ -1335,8 +1339,8 @@
                 {@const treino = treinoDoDia(dia)}
                 <div class="dia-card-slot">
                   <p class="dia-card-treino-topo">{treino ?? ""}</p>
-                  <div class="dia-card" class:colorido={grupo.cor != null} style={grupo.cor ? `background:${grupo.cor}; border-color:${grupo.cor};` : ""}>
-                    <span class="dia-card-nome">{DIAS_SEMANA_ABREV[dia]}</span>
+                  <div class="dia-card">
+                    <span class="dia-card-nome" style={grupo.cor ? `color:${grupo.cor};` : ""}>{DIAS_SEMANA_ABREV[dia]}</span>
                     <span class="dia-card-cal">{Math.round(metaGrupo.calorias)}</span>
                   </div>
                 </div>
@@ -2168,6 +2172,8 @@
   }
   .secao-dias-lista .dia-card {
     cursor: default;
+    padding: var(--space-1) var(--space-2);
+    gap: 0;
   }
   .dias-acoes {
     display: flex;
