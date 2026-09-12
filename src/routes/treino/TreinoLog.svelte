@@ -1872,8 +1872,8 @@
   .descanso-anel {
     position: fixed;
     z-index: 60;
-    width: 70px;
-    height: 70px;
+    width: 80px;
+    height: 80px;
     padding: 0;
     border: none;
     background: none;
@@ -1905,8 +1905,8 @@
   }
   .anel-centro {
     position: relative;
-    width: 46px;
-    height: 46px;
+    width: 53px;
+    height: 53px;
     border-radius: 50%;
     background: var(--surface-card);
     box-shadow: var(--shadow-float);
@@ -1922,7 +1922,7 @@
   }
   .anel-tempo {
     position: relative;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--surface-fg);
     font-variant-numeric: tabular-nums;
