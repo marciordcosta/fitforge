@@ -1100,6 +1100,21 @@
     <path d="M3 17h14a4 4 0 0 0 4-4v-1" />
   </svg>
 {/snippet}
+{#snippet iconMover()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 9l-3 3 3 3" />
+    <path d="M9 5l3-3 3 3" />
+    <path d="M15 19l-3 3-3-3" />
+    <path d="M19 9l3 3-3 3" />
+    <path d="M2 12h20" />
+    <path d="M12 2v20" />
+  </svg>
+{/snippet}
+{#snippet iconExcluir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+{/snippet}
 
 {#snippet metaBarrasGrid(carboidratoG: number, gorduraG: number, proteinaG: number, calorias: number)}
   {@const pctCarbo = calorias > 0 ? ((carboidratoG * 4) / calorias) * 100 : 0}
@@ -1437,8 +1452,8 @@
     titulo={menuRefeicaoAberto.modelo.nome}
     onFechar={() => (menuRefeicaoAberto = null)}
     opcoes={[
-      { label: "Reordenar", onSelect: selecionarReordenar },
-      { label: "Excluir", destructive: true, onSelect: selecionarExcluir },
+      { label: "Reordenar", icon: iconMover, onSelect: selecionarReordenar },
+      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: selecionarExcluir },
     ]}
   />
 {/if}
