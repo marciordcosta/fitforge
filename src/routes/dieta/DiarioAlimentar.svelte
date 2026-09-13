@@ -608,37 +608,19 @@
           {#if metaAtual}
             <p class="pct-titulo">Meta de {refeicao.nome}</p>
             <div class="pct-grid">
-              <div class="pct-col">
-                <p class="pct-nome">Calorias</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaAtual.calorias)))}%; background:var(--color-secondary);`}></div>
-                </div>
-                <p class="pct-valor">{labelAbsoluto(totais.calorias, arredondarDezena(metaAtual.calorias), "")}</p>
-              </div>
-              <div class="pct-col">
-                <p class="pct-nome">Carb</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.carboidratoG, metaAtual.carboidratoG))}%; background:${COR_CARBO};`}></div>
-                </div>
-                <p class="pct-valor">{labelAbsoluto(totais.carboidratoG, metaAtual.carboidratoG, "g")}</p>
-              </div>
-              <div class="pct-col">
-                <p class="pct-nome">Gorduras</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.gorduraG, metaAtual.gorduraG))}%; background:${COR_GORDURA};`}></div>
-                </div>
-                <p class="pct-valor">{labelAbsoluto(totais.gorduraG, metaAtual.gorduraG, "g")}</p>
-              </div>
-              <div class="pct-col">
-                <p class="pct-nome">Proteínas</p>
-                <div class="pct-barra-wrap">
-                  <div class="pct-barra" style={`width:${larguraBarra(pctMeta(totais.proteinaG, metaAtual.proteinaG))}%; background:${COR_PROTEINA};`}></div>
-                </div>
-                <p class="pct-valor">{labelAbsoluto(totais.proteinaG, metaAtual.proteinaG, "g")}</p>
-              </div>
+              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaAtual.calorias))), labelAbsoluto(totais.calorias, arredondarDezena(metaAtual.calorias), ""))}
+              {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaAtual.carboidratoG)), labelAbsoluto(totais.carboidratoG, metaAtual.carboidratoG, "g"))}
+              {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaAtual.gorduraG)), labelAbsoluto(totais.gorduraG, metaAtual.gorduraG, "g"))}
+              {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaAtual.proteinaG)), labelAbsoluto(totais.proteinaG, metaAtual.proteinaG, "g"))}
             </div>
           {:else if temItens}
             <p class="pct-titulo">Refeição sem meta</p>
+            <div class="pct-grid">
+              {@render pctColuna("Calorias", "var(--color-secondary)", 0, totais.calorias.toFixed(0))}
+              {@render pctColuna("Carb", COR_CARBO, 0, `${totais.carboidratoG.toFixed(0)}g`)}
+              {@render pctColuna("Gorduras", COR_GORDURA, 0, `${totais.gorduraG.toFixed(0)}g`)}
+              {@render pctColuna("Proteínas", COR_PROTEINA, 0, `${totais.proteinaG.toFixed(0)}g`)}
+            </div>
           {:else}
             <p class="preview">{preview(refeicao.id)}</p>
           {/if}
@@ -672,6 +654,16 @@
     ]}
   />
 {/if}
+
+{#snippet pctColuna(nome: string, cor: string, largura: number, valorTexto: string)}
+  <div class="pct-col">
+    <p class="pct-nome">{nome}</p>
+    <div class="pct-barra-wrap">
+      <div class="pct-barra" style={`width:${largura}%; background:${cor};`}></div>
+    </div>
+    <p class="pct-valor">{valorTexto}</p>
+  </div>
+{/snippet}
 
 {#if mostrarCriarRefeicao}
   <DietaRefeicaoDiaFormSheet
