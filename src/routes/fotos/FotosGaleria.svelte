@@ -4,7 +4,7 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
-  import { listFotosAgrupadas, getUrlsAssinadas, adicionarFoto, type FotoGrupoData } from "../../lib/pesoApi";
+  import { listFotosAgrupadas, getUrlsAssinadas, adicionarFoto, type FotoGrupoData, type FotoItem } from "../../lib/pesoApi";
 
   let grupos = $state<FotoGrupoData[]>([]);
   let urls = $state<Map<string, string>>(new Map());
@@ -12,6 +12,10 @@
   let erro = $state<string | null>(null);
   /** Até 2 ids de foto — tocar numa terceira enquanto já há 2 selecionadas não faz nada. */
   let selecionadas = $state<string[]>([]);
+  /** Entra ao pressionar uma foto (seleciona a pressionada); enquanto ativo, tocar em qualquer
+   * foto alterna seleção em vez de abrir em tela cheia — igual às galerias do sistema. */
+  let modoSelecao = $state(false);
+  let fotoAberta = $state<FotoItem | null>(null);
 
   /** Miniaturas embaçadas por padrão (fotos pessoais) — só o "olho" no topo revela sem filtro;
    * a tela de comparação (ao abrir uma foto de fato) sempre mostra sem embaçar. */
@@ -53,15 +57,75 @@
   function alternarSelecao(id: string) {
     if (selecionadas.includes(id)) {
       selecionadas = selecionadas.filter((x) => x !== id);
+      if (!selecionadas.length) modoSelecao = false;
     } else if (selecionadas.length < 2) {
       selecionadas = [...selecionadas, id];
     }
+  }
+
+  function cancelarSelecao() {
+    selecionadas = [];
+    modoSelecao = false;
   }
 
   function abrirComparacao() {
     if (selecionadas.length !== 2) return;
     navigate(`/fotos/comparar/${selecionadas[0]}/${selecionadas[1]}`);
     selecionadas = [];
+    modoSelecao = false;
+  }
+
+  /** Tempo segurando a foto parada antes do toque virar "pressionar" (entra no modo de seleção) —
+   * evita disparar sem querer num toque rápido/rolagem. Mesmo padrão usado nos cards da Dieta. */
+  const ATRASO_PRESSIONAR_MS = 500;
+  const TOLERANCIA_MOVIMENTO_PX = 8;
+  let timeoutPressionar: ReturnType<typeof setTimeout> | undefined;
+  let pressionarX = 0;
+  let pressionarY = 0;
+  let pressionouLongo = false;
+
+  function aoPointerDownFoto(e: PointerEvent, id: string) {
+    pressionarX = e.clientX;
+    pressionarY = e.clientY;
+    pressionouLongo = false;
+    window.addEventListener("pointermove", aoPointerMovePressionar);
+    window.addEventListener("pointerup", aoPointerUpPressionar);
+    timeoutPressionar = setTimeout(() => {
+      pressionouLongo = true;
+      cancelarPressionar();
+      if (navigator.vibrate) navigator.vibrate(10);
+      modoSelecao = true;
+      alternarSelecao(id);
+    }, ATRASO_PRESSIONAR_MS);
+  }
+
+  function cancelarPressionar() {
+    clearTimeout(timeoutPressionar);
+    timeoutPressionar = undefined;
+    window.removeEventListener("pointermove", aoPointerMovePressionar);
+    window.removeEventListener("pointerup", aoPointerUpPressionar);
+  }
+
+  function aoPointerMovePressionar(e: PointerEvent) {
+    if (Math.hypot(e.clientX - pressionarX, e.clientY - pressionarY) > TOLERANCIA_MOVIMENTO_PX) {
+      cancelarPressionar();
+    }
+  }
+
+  function aoPointerUpPressionar() {
+    cancelarPressionar();
+  }
+
+  function aoClickFoto(foto: FotoItem) {
+    if (pressionouLongo) {
+      pressionouLongo = false;
+      return;
+    }
+    if (modoSelecao) {
+      alternarSelecao(foto.id);
+      return;
+    }
+    fotoAberta = foto;
   }
 
   function abrirAdicionar() {
@@ -124,18 +188,29 @@
     <line x1="1" y1="1" x2="23" y2="23" />
   </svg>
 {/snippet}
+{#snippet iconFechar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="6" y1="6" x2="18" y2="18" />
+    <line x1="18" y1="6" x2="6" y2="18" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <h1>Fotos</h1>
-    <button
-      class="icon-btn"
-      onclick={() => (mostrarNormal = !mostrarNormal)}
-      aria-label={mostrarNormal ? "Embaçar miniaturas" : "Mostrar miniaturas sem filtro"}
-    >
-      {@render (mostrarNormal ? iconOlho : iconOlhoFechado)()}
-    </button>
-    <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar foto">{@render iconMais()}</button>
+    {#if modoSelecao}
+      <button class="icon-btn" onclick={cancelarSelecao} aria-label="Cancelar seleção">{@render iconFechar()}</button>
+      <h1>{selecionadas.length} selecionada{selecionadas.length === 1 ? "" : "s"}</h1>
+    {:else}
+      <h1>Fotos</h1>
+      <button
+        class="icon-btn"
+        onclick={() => (mostrarNormal = !mostrarNormal)}
+        aria-label={mostrarNormal ? "Embaçar miniaturas" : "Mostrar miniaturas sem filtro"}
+      >
+        {@render (mostrarNormal ? iconOlho : iconOlhoFechado)()}
+      </button>
+      <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar foto">{@render iconMais()}</button>
+    {/if}
   </div>
 
   {#if loading}
@@ -153,8 +228,10 @@
             type="button"
             class="foto-item"
             class:selecionada={selecionadas.includes(foto.id)}
-            onclick={() => alternarSelecao(foto.id)}
-            aria-label="Selecionar foto"
+            onpointerdown={(e) => aoPointerDownFoto(e, foto.id)}
+            oncontextmenu={(e) => e.preventDefault()}
+            onclick={() => aoClickFoto(foto)}
+            aria-label="Abrir foto"
           >
             {#if urls.get(foto.path)}
               <img src={urls.get(foto.path)} alt="" loading="lazy" class:embacada={!mostrarNormal} />
@@ -172,6 +249,15 @@
 {#if selecionadas.length === 2}
   <div class="barra-comparar">
     <button type="button" class="comparar-btn" onclick={abrirComparacao}>Comparar</button>
+  </div>
+{/if}
+
+{#if fotoAberta}
+  <div class="visualizar-container">
+    <button class="visualizar-fechar" onclick={() => (fotoAberta = null)} aria-label="Fechar">{@render iconFechar()}</button>
+    {#if urls.get(fotoAberta.path)}
+      <img src={urls.get(fotoAberta.path)} alt="" class="visualizar-img" />
+    {/if}
   </div>
 {/if}
 
@@ -298,8 +384,8 @@
     display: block;
   }
   .foto-item img.embacada {
-    filter: blur(14px);
-    transform: scale(1.15);
+    filter: blur(7px);
+    transform: scale(1.08);
   }
   .foto-item.selecionada img {
     opacity: 0.6;
@@ -340,5 +426,39 @@
     font-weight: 600;
     box-shadow: var(--shadow-float);
     cursor: pointer;
+  }
+  .visualizar-container {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .visualizar-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .visualizar-fechar {
+    position: absolute;
+    top: max(var(--space-3), env(safe-area-inset-top, 0px));
+    left: var(--space-3);
+    z-index: 10;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .visualizar-fechar svg {
+    width: 18px;
+    height: 18px;
   }
 </style>
