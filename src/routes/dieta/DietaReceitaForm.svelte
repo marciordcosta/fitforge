@@ -364,6 +364,8 @@
     gap: var(--space-2);
   }
   .resumo-macros p {
+    flex: 1;
+    min-width: 0;
     margin: 0;
     font-size: var(--font-size-sm);
     text-align: center;

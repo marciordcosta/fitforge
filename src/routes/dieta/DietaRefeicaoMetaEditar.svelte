@@ -576,6 +576,8 @@
     color: var(--surface-fg);
   }
   .resumo-macros > span {
+    flex: 1;
+    min-width: 0;
     margin: 0;
     font-size: var(--font-size-sm);
     text-align: center;

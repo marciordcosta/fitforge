@@ -2215,6 +2215,7 @@
     gap: var(--space-2);
   }
   .meta-macro-col {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 0;
