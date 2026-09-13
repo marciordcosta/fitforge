@@ -29,9 +29,10 @@
     carboidratoGDoDia,
     listRefeicoesModeloDia,
     definirRefeicoesDoDia,
-    getContextoMetaCatalogo,
     salvarMetaNumericaRefeicao,
     salvarMetaNumericaRefeicaoDias,
+    getMetasDoDiaSemana,
+    getMetasDiarias,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
@@ -39,6 +40,7 @@
     type RefeicaoModeloDia,
     type LimiteParametro,
     type ContextoMetaCatalogo,
+    type MetasDiarias,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV, listTreinos, type Treino } from "../../lib/treinoApi";
@@ -932,6 +934,78 @@
   let mostrarMacrosRefeicao = $state(false);
   let modeloMacrosEditando = $state<{ modelo: RefeicaoModelo; grupo?: GrupoDias; contexto: ContextoMetaCatalogo } | null>(null);
 
+  /** Mesma resolução de getContextoMetaCatalogo, mas usando o catálogo/overrides já carregados
+   * nessa tela (modelos/modelosPorDia/metasDiaModelo) em vez de reconsultar tudo de novo — só a
+   * meta diária ainda precisa de uma consulta. Sem isso, cada toque num card fazia 3 idas ao banco
+   * redundantes (o mesmo catálogo já em memória) antes de mostrar a roda, com o modal demorando
+   * visivelmente pra aparecer. */
+  async function contextoMetaCatalogoLocal(modeloId: string, diasSemana?: number[]): Promise<ContextoMetaCatalogo> {
+    type Macros = { calorias: number; proteinaG: number; gorduraG: number; carboidratoG: number };
+    let siblings: RefeicaoModelo[];
+    let metaDiaria: MetasDiarias;
+    let macrosDe: (m: RefeicaoModelo) => Macros;
+
+    if (diasSemana?.length) {
+      const dia = diasSemana[0];
+      const linhas = modelosPorDia.filter((r) => r.diaSemana === dia);
+      const porId = new Map(modelos.map((m) => [m.id, m]));
+      siblings = linhas.length
+        ? linhas
+            .slice()
+            .sort((a, b) => a.ordem - b.ordem)
+            .map((r) => porId.get(r.modeloId))
+            .filter((m): m is RefeicaoModelo => m != null)
+        : modelos;
+      metaDiaria = await getMetasDoDiaSemana(dia);
+      const overridePorModelo = new Map(metasDiaModelo.filter((m) => m.diaSemana === dia).map((m) => [m.modeloId, m]));
+      macrosDe = (m) => {
+        const o = overridePorModelo.get(m.id);
+        return {
+          calorias: o?.metaCalorias ?? m.metaCalorias ?? 0,
+          proteinaG: o?.metaProteinaG ?? m.metaProteinaG ?? 0,
+          gorduraG: o?.metaGorduraG ?? m.metaGorduraG ?? 0,
+          carboidratoG: o?.metaCarboidratoG ?? m.metaCarboidratoG ?? 0,
+        };
+      };
+    } else {
+      siblings = modelos;
+      metaDiaria = await getMetasDiarias();
+      macrosDe = (m) => ({
+        calorias: m.metaCalorias ?? 0,
+        proteinaG: m.metaProteinaG ?? 0,
+        gorduraG: m.metaGorduraG ?? 0,
+        carboidratoG: m.metaCarboidratoG ?? 0,
+      });
+    }
+
+    const ultima = siblings[siblings.length - 1] ?? null;
+    const ehUltima = ultima?.id === modeloId;
+    const outras = siblings.filter((m) => m.id !== modeloId && m.id !== ultima?.id);
+    const somaOutras = outras.reduce(
+      (acc, m) => {
+        const v = macrosDe(m);
+        return {
+          calorias: acc.calorias + v.calorias,
+          proteinaG: acc.proteinaG + v.proteinaG,
+          gorduraG: acc.gorduraG + v.gorduraG,
+          carboidratoG: acc.carboidratoG + v.carboidratoG,
+        };
+      },
+      { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+    );
+
+    return {
+      ehUltima,
+      metaDiaria,
+      disponivel: {
+        calorias: metaDiaria.calorias - somaOutras.calorias,
+        proteinaG: metaDiaria.proteinaG - somaOutras.proteinaG,
+        gorduraG: metaDiaria.gorduraG - somaOutras.gorduraG,
+        carboidratoG: metaDiaria.carboidratoG - somaOutras.carboidratoG,
+      },
+    };
+  }
+
   /** Toca no corpo do card (fora do ícone): abre a roda tripla direto, sem navegar — só quando a
    * refeição não é a última (automática), que não tem edição manual. */
   async function abrirMacrosRefeicao(m: RefeicaoModelo, grupo?: GrupoDias): Promise<void> {
@@ -940,7 +1014,7 @@
       return;
     }
     try {
-      const contexto = await getContextoMetaCatalogo(m.id, grupo?.dias);
+      const contexto = await contextoMetaCatalogoLocal(m.id, grupo?.dias);
       modeloMacrosEditando = { modelo: m, grupo, contexto };
       mostrarMacrosRefeicao = true;
     } catch (err) {
@@ -993,6 +1067,62 @@
         await salvarMetaNumericaRefeicao(modelo.id, valores.proteinaG, valores.gorduraG, valores.carboidratoG);
       }
       mostrarMacrosRefeicao = false;
+      modeloMacrosEditando = null;
+      await carregar();
+    } catch (err) {
+      alert("Erro ao salvar meta: " + (err as Error).message);
+    }
+  }
+
+  let mostrarCaloriasRefeicao = $state(false);
+
+  /** Toca no anel de calorias do card: abre só a roda de calorias, igual ao anel da aba Calorias —
+   * ajustar o valor recalcula o carboidrato pra fechar a conta, mantendo gordura/proteína fixas. */
+  async function abrirCaloriasRefeicao(m: RefeicaoModelo, grupo?: GrupoDias): Promise<void> {
+    if (ehUltimaDaLista(m, grupo)) {
+      abrirMeta(m, grupo?.dias);
+      return;
+    }
+    try {
+      const contexto = await contextoMetaCatalogoLocal(m.id, grupo?.dias);
+      modeloMacrosEditando = { modelo: m, grupo, contexto };
+      mostrarCaloriasRefeicao = true;
+    } catch (err) {
+      alert("Erro ao carregar meta: " + (err as Error).message);
+    }
+  }
+
+  function infoCaloriasRefeicao() {
+    if (!modeloMacrosEditando) return { titulo: "Calorias (kcal)", opcoes: [], valorAtual: 0, onSelecionar: () => {} };
+    const { modelo, grupo, contexto } = modeloMacrosEditando;
+    const bruta = grupo
+      ? metaEfetivaDoDia(modelo, grupo.dias[0])
+      : { carboidratoG: modelo.metaCarboidratoG, gorduraG: modelo.metaGorduraG, proteinaG: modelo.metaProteinaG };
+    const proteinaG = bruta.proteinaG ?? 0;
+    const gorduraG = bruta.gorduraG ?? 0;
+    const carboidratoG = bruta.carboidratoG ?? 0;
+    const caloriasAtual = Math.round(4 * proteinaG + 9 * gorduraG + 4 * carboidratoG);
+    const teto = Math.max(caloriasAtual, Math.round(contexto.disponivel.calorias));
+    const opcoes: { valor: number; label: string }[] = [];
+    for (let v = 0; v <= teto; v += 10) opcoes.push({ valor: v, label: `${v} kcal` });
+    return {
+      titulo: "Calorias (kcal)",
+      opcoes,
+      valorAtual: Math.round(caloriasAtual / 10) * 10,
+      onSelecionar: (v: number) => confirmarCaloriasRefeicao(v, proteinaG, gorduraG),
+    };
+  }
+
+  async function confirmarCaloriasRefeicao(calorias: number, proteinaG: number, gorduraG: number): Promise<void> {
+    if (!modeloMacrosEditando) return;
+    const { modelo, grupo } = modeloMacrosEditando;
+    const novoCarboidratoG = Math.max(0, Math.round((calorias - 4 * proteinaG - 9 * gorduraG) / 4));
+    try {
+      if (grupo) {
+        await salvarMetaNumericaRefeicaoDias(modelo.id, grupo.dias, proteinaG, gorduraG, novoCarboidratoG);
+      } else {
+        await salvarMetaNumericaRefeicao(modelo.id, proteinaG, gorduraG, novoCarboidratoG);
+      }
       modeloMacrosEditando = null;
       await carregar();
     } catch (err) {
@@ -1197,18 +1327,27 @@
   </svg>
 {/snippet}
 
-{#snippet metaDonut(carboidratoG: number, gorduraG: number, proteinaG: number, calorias: number)}
+{#snippet metaDonut(carboidratoG: number, gorduraG: number, proteinaG: number, calorias: number, aoClicarCalorias: () => void)}
   {@const pctCarbo = calorias > 0 ? ((carboidratoG * 4) / calorias) * 100 : 0}
   {@const pctGordura = calorias > 0 ? ((gorduraG * 9) / calorias) * 100 : 0}
   {@const pctProteina = calorias > 0 ? ((proteinaG * 4) / calorias) * 100 : 0}
   {@const estiloDonut = `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`}
   <div class="meta-resumo">
-    <span class="meta-donut" style={estiloDonut}>
+    <button
+      type="button"
+      class="meta-donut"
+      style={estiloDonut}
+      onclick={(e) => {
+        e.stopPropagation();
+        aoClicarCalorias();
+      }}
+      aria-label="Ajustar calorias"
+    >
       <span class="meta-donut-centro">
         <strong>{calorias.toFixed(0)}</strong>
         <span>Cal</span>
       </span>
-    </span>
+    </button>
     <div class="meta-resumo-macros">
       <span class="meta-macro-col">
         <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong>
@@ -1478,7 +1617,7 @@
                       </span>
                     </div>
                     {#if meta.calorias != null}
-                      {@render metaDonut(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias)}
+                      {@render metaDonut(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias, () => abrirCaloriasRefeicao(m, grupo))}
                     {:else}
                       <p class="preview">Sem meta configurada</p>
                     {/if}
@@ -1540,7 +1679,7 @@
                     </span>
                   </div>
                   {#if ultima || m.metaCalorias != null}
-                    {@render metaDonut(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias)}
+                    {@render metaDonut(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias, () => abrirCaloriasRefeicao(m))}
                   {:else}
                     <p class="preview">Sem meta configurada</p>
                   {/if}
@@ -1681,6 +1820,17 @@
     onFechar={() => { mostrarMacrosRefeicao = false; modeloMacrosEditando = null; }}
     formatarRodape={formatarRodapeMacrosRefeicao}
     mostrarPct={false}
+  />
+{/if}
+
+{#if mostrarCaloriasRefeicao}
+  {@const info = infoCaloriasRefeicao()}
+  <WheelPicker
+    titulo={info.titulo}
+    opcoes={info.opcoes}
+    valorAtual={info.valorAtual}
+    onSelecionar={info.onSelecionar}
+    onFechar={() => { mostrarCaloriasRefeicao = false; modeloMacrosEditando = null; }}
   />
 {/if}
 
@@ -2034,6 +2184,11 @@
     height: 64px;
     border-radius: 50%;
     flex-shrink: 0;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font-family: inherit;
+    cursor: pointer;
   }
   .meta-donut-centro {
     position: absolute;
