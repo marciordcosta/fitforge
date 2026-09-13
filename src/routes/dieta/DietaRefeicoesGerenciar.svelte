@@ -869,10 +869,6 @@
     return meta > 0 ? (valor / meta) * 100 : 0;
   }
 
-  function larguraBarra(pct: number): number {
-    return Math.min(100, pct);
-  }
-
   /** Só pra exibição — arredonda a meta calculada da refeição pra dezena mais próxima (ex: 653 vira 650), sem alterar o valor real usado nos cálculos. */
   function arredondarDezena(valor: number): number {
     return Math.round(valor / 10) * 10;
@@ -1206,25 +1202,34 @@
   </svg>
 {/snippet}
 
-{#snippet metaBarrasGrid(carboidratoG: number, gorduraG: number, proteinaG: number, calorias: number)}
+{#snippet metaDonut(carboidratoG: number, gorduraG: number, proteinaG: number, calorias: number)}
   {@const pctCarbo = calorias > 0 ? ((carboidratoG * 4) / calorias) * 100 : 0}
   {@const pctGordura = calorias > 0 ? ((gorduraG * 9) / calorias) * 100 : 0}
   {@const pctProteina = calorias > 0 ? ((proteinaG * 4) / calorias) * 100 : 0}
-  <div class="pct-grid">
-    <div class="pct-col">
-      <p class="pct-nome">Carb</p>
-      <div class="pct-barra-wrap"><div class="pct-barra" style={`width:${larguraBarra(pctCarbo)}%; background:${COR_CARBO};`}></div></div>
-      <p class="pct-valor">{carboidratoG.toFixed(0)}g · {pctCarbo.toFixed(0)}%</p>
-    </div>
-    <div class="pct-col">
-      <p class="pct-nome">Gorduras</p>
-      <div class="pct-barra-wrap"><div class="pct-barra" style={`width:${larguraBarra(pctGordura)}%; background:${COR_GORDURA};`}></div></div>
-      <p class="pct-valor">{gorduraG.toFixed(0)}g · {pctGordura.toFixed(0)}%</p>
-    </div>
-    <div class="pct-col">
-      <p class="pct-nome">Proteínas</p>
-      <div class="pct-barra-wrap"><div class="pct-barra" style={`width:${larguraBarra(pctProteina)}%; background:${COR_PROTEINA};`}></div></div>
-      <p class="pct-valor">{proteinaG.toFixed(0)}g · {pctProteina.toFixed(0)}%</p>
+  {@const estiloDonut = `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`}
+  <div class="meta-resumo">
+    <span class="meta-donut" style={estiloDonut}>
+      <span class="meta-donut-centro">
+        <strong>{calorias.toFixed(0)}</strong>
+        <span>Cal</span>
+      </span>
+    </span>
+    <div class="meta-resumo-macros">
+      <span class="meta-macro-col">
+        <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong>
+        <span class="valor-g">{carboidratoG.toFixed(0)} g</span>
+        <span class="rotulo-macro">Carb</span>
+      </span>
+      <span class="meta-macro-col">
+        <strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong>
+        <span class="valor-g">{gorduraG.toFixed(0)} g</span>
+        <span class="rotulo-macro">Gorduras</span>
+      </span>
+      <span class="meta-macro-col">
+        <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
+        <span class="valor-g">{proteinaG.toFixed(0)} g</span>
+        <span class="rotulo-macro">Proteínas</span>
+      </span>
     </div>
   </div>
 {/snippet}
@@ -1479,7 +1484,7 @@
                       </span>
                     </div>
                     {#if meta.calorias != null}
-                      {@render metaBarrasGrid(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias)}
+                      {@render metaDonut(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias)}
                     {:else}
                       <p class="preview">Sem meta configurada</p>
                     {/if}
@@ -1542,7 +1547,7 @@
                     </span>
                   </div>
                   {#if ultima || m.metaCalorias != null}
-                    {@render metaBarrasGrid(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias)}
+                    {@render metaDonut(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias)}
                   {:else}
                     <p class="preview">Sem meta configurada</p>
                   {/if}
@@ -2028,34 +2033,58 @@
     font-size: var(--font-size-sm);
     margin: 0;
   }
-  .pct-grid {
+  .meta-resumo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding-top: var(--space-2);
+  }
+  .meta-donut {
+    position: relative;
+    display: block;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .meta-donut-centro {
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--surface-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .meta-donut-centro strong {
+    font-size: 15px;
+    color: var(--surface-fg);
+  }
+  .meta-donut-centro span {
+    font-size: 9px;
+    color: var(--surface-muted);
+  }
+  .meta-resumo-macros {
+    flex: 1;
     display: flex;
     justify-content: space-between;
     gap: var(--space-2);
   }
-  .pct-col {
-    flex: 1;
+  .meta-macro-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
     min-width: 0;
-  }
-  .pct-nome {
-    margin: 0 0 var(--space-1);
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     color: var(--surface-fg);
+    text-align: center;
+    line-height: 1.5;
   }
-  .pct-barra-wrap {
-    height: 6px;
-    background: var(--surface-border);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: var(--space-1);
+  .meta-macro-col .valor-g {
+    font-size: var(--font-size-base);
   }
-  .pct-barra {
-    height: 100%;
-    border-radius: 4px;
-  }
-  .pct-valor {
-    margin: 0;
-    font-size: 11px;
+  .meta-macro-col .rotulo-macro {
     color: var(--surface-muted);
   }
   .reordenar-card {
