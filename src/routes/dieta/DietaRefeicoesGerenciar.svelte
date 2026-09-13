@@ -31,8 +31,6 @@
     definirRefeicoesDoDia,
     salvarMetaNumericaRefeicao,
     salvarMetaNumericaRefeicaoDias,
-    getMetasDoDiaSemana,
-    getMetasDiarias,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
@@ -935,11 +933,12 @@
   let modeloMacrosEditando = $state<{ modelo: RefeicaoModelo; grupo?: GrupoDias; contexto: ContextoMetaCatalogo } | null>(null);
 
   /** Mesma resolução de getContextoMetaCatalogo, mas usando o catálogo/overrides já carregados
-   * nessa tela (modelos/modelosPorDia/metasDiaModelo) em vez de reconsultar tudo de novo — só a
-   * meta diária ainda precisa de uma consulta. Sem isso, cada toque num card fazia 3 idas ao banco
-   * redundantes (o mesmo catálogo já em memória) antes de mostrar a roda, com o modal demorando
-   * visivelmente pra aparecer. */
-  async function contextoMetaCatalogoLocal(modeloId: string, diasSemana?: number[]): Promise<ContextoMetaCatalogo> {
+   * nessa tela (modelos/modelosPorDia/metasDiaModelo) em vez de reconsultar tudo de novo, e a meta
+   * diária reaproveita os mesmos valores já carregados pra aba Calorias (caloriasCalc/metaMacrosDoDia
+   * — nenhuma consulta nova ao banco). Sem isso, cada toque num card fazia 4 idas ao banco
+   * redundantes (o mesmo catálogo e a mesma meta diária já em memória) antes de mostrar a roda, com
+   * o modal demorando visivelmente pra aparecer. */
+  function contextoMetaCatalogoLocal(modeloId: string, diasSemana?: number[]): ContextoMetaCatalogo {
     type Macros = { calorias: number; proteinaG: number; gorduraG: number; carboidratoG: number };
     let siblings: RefeicaoModelo[];
     let metaDiaria: MetasDiarias;
@@ -956,7 +955,7 @@
             .map((r) => porId.get(r.modeloId))
             .filter((m): m is RefeicaoModelo => m != null)
         : modelos;
-      metaDiaria = await getMetasDoDiaSemana(dia);
+      metaDiaria = metaMacrosDoDia(dia);
       const overridePorModelo = new Map(metasDiaModelo.filter((m) => m.diaSemana === dia).map((m) => [m.modeloId, m]));
       macrosDe = (m) => {
         const o = overridePorModelo.get(m.id);
@@ -969,7 +968,12 @@
       };
     } else {
       siblings = modelos;
-      metaDiaria = await getMetasDiarias();
+      metaDiaria = {
+        calorias: caloriasCalc,
+        proteinaG: proteinaGInput ?? 0,
+        gorduraG: gorduraGInput ?? 0,
+        carboidratoG: carboidratoGInput ?? 0,
+      };
       macrosDe = (m) => ({
         calorias: m.metaCalorias ?? 0,
         proteinaG: m.metaProteinaG ?? 0,
@@ -1014,7 +1018,7 @@
       return;
     }
     try {
-      const contexto = await contextoMetaCatalogoLocal(m.id, grupo?.dias);
+      const contexto = contextoMetaCatalogoLocal(m.id, grupo?.dias);
       modeloMacrosEditando = { modelo: m, grupo, contexto };
       mostrarMacrosRefeicao = true;
     } catch (err) {
@@ -1084,7 +1088,7 @@
       return;
     }
     try {
-      const contexto = await contextoMetaCatalogoLocal(m.id, grupo?.dias);
+      const contexto = contextoMetaCatalogoLocal(m.id, grupo?.dias);
       modeloMacrosEditando = { modelo: m, grupo, contexto };
       mostrarCaloriasRefeicao = true;
     } catch (err) {
