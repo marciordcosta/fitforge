@@ -601,6 +601,7 @@
         {@const metaAtual = metaRef ? metasRedistribuidas.get(refeicao.id) : null}
         <div
           class="refeicao-item"
+          class:sem-itens={!temItens}
           role="button"
           tabindex="0"
           onclick={() => navigate(`/dieta/refeicao/${refeicao.id}`)}
@@ -951,6 +952,10 @@
     font-size: var(--font-size-lg);
     margin: 0;
     color: var(--surface-fg);
+  }
+  .refeicao-item.sem-itens .card-header h2,
+  .refeicao-item.sem-itens .pct-nome {
+    color: var(--surface-muted);
   }
   .card-header-cal {
     flex-shrink: 0;
