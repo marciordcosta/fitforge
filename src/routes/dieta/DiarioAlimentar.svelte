@@ -670,19 +670,23 @@
 {#snippet pctColuna(nome: string, cor: string, largura: number, valorTexto: string)}
   <div class="pct-col">
     <p class="pct-nome">{nome}</p>
-    <div class="pct-barra-wrap">
-      <div class="pct-barra" style={`width:${largura}%; background:${cor};`}></div>
+    <div class="pct-col-conteudo">
+      <div class="pct-barra-wrap">
+        <div class="pct-barra" style={`width:${largura}%; background:${cor};`}></div>
+      </div>
+      <p class="pct-valor">{valorTexto}</p>
     </div>
-    <p class="pct-valor">{valorTexto}</p>
   </div>
 {/snippet}
 
 {#snippet pctColunaAnel(nome: string, cor: string, pct: number, valorTexto: string)}
   <div class="pct-col pct-col-anel">
     <p class="pct-nome">{nome}</p>
-    <div class="pct-anel" style={`background: conic-gradient(${cor} 0% ${pct}%, var(--surface-border) ${pct}% 100%);`}>
-      <div class="pct-anel-centro">
-        <span class="pct-anel-texto">{valorTexto}</span>
+    <div class="pct-col-conteudo">
+      <div class="pct-anel" style={`background: conic-gradient(${cor} 0% ${pct}%, var(--surface-border) ${pct}% 100%);`}>
+        <div class="pct-anel-centro">
+          <span class="pct-anel-texto">{valorTexto}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -1018,6 +1022,14 @@
   .pct-col {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .pct-col-conteudo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
   .pct-nome {
     margin: 0 0 var(--space-1);
@@ -1041,8 +1053,9 @@
     color: var(--surface-muted);
   }
   .pct-col-anel {
-    display: flex;
-    flex-direction: column;
+    align-items: center;
+  }
+  .pct-col-anel .pct-col-conteudo {
     align-items: center;
   }
   .pct-anel {
