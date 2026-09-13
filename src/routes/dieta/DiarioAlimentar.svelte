@@ -48,7 +48,7 @@
   let mostrarCriarRefeicao = $state(false);
   let mostrarMenuMais = $state(false);
   let mostrarData = $state(false);
-  let modoRestante = $state(false);
+  let modoRestante = $state(true);
   let rotinaHoje = $state<Treino | null>(null);
   let mostrarResumo = $state(false);
   /** Status de aderência à dieta (ritmo real de peso vs. ritmo esperado pela meta) — mesmo chip
@@ -326,6 +326,14 @@
 
   function labelAbsoluto(valor: number, meta: number, unidade: string): string {
     return `${valor.toFixed(0)}/${meta.toFixed(0)}${unidade}`;
+  }
+
+  /** Mesmo texto do anel de macros do topo: no modo restante, mostra o quanto falta (ou "acima" se
+   * já passou da meta) em vez de "consumido/meta" — aplicado também nos cards de cada refeição. */
+  function labelMeta(valor: number, meta: number, unidade: string): string {
+    if (!modoRestante) return labelAbsoluto(valor, meta, unidade);
+    if (passouMeta(valor, meta)) return `${(valor - meta).toFixed(0)}${unidade} acima`;
+    return `${restante(valor, meta).toFixed(0)}${unidade} restantes`;
   }
 
   /** Só pra exibição — arredonda a meta de calorias pra dezena mais próxima (ex: 653 vira 650), sem alterar o valor real usado nos cálculos. */
@@ -616,10 +624,10 @@
           {#if metaAtual}
             <p class="pct-titulo">Meta de {refeicao.nome}</p>
             <div class="pct-grid">
-              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaAtual.calorias))), labelAbsoluto(totais.calorias, arredondarDezena(metaAtual.calorias), ""))}
-              {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaAtual.carboidratoG)), labelAbsoluto(totais.carboidratoG, metaAtual.carboidratoG, "g"))}
-              {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaAtual.gorduraG)), labelAbsoluto(totais.gorduraG, metaAtual.gorduraG, "g"))}
-              {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaAtual.proteinaG)), labelAbsoluto(totais.proteinaG, metaAtual.proteinaG, "g"))}
+              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaAtual.calorias))), labelMeta(totais.calorias, arredondarDezena(metaAtual.calorias), ""))}
+              {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaAtual.carboidratoG)), labelMeta(totais.carboidratoG, metaAtual.carboidratoG, "g"))}
+              {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaAtual.gorduraG)), labelMeta(totais.gorduraG, metaAtual.gorduraG, "g"))}
+              {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaAtual.proteinaG)), labelMeta(totais.proteinaG, metaAtual.proteinaG, "g"))}
             </div>
           {:else if temItens}
             <p class="pct-titulo">Refeição sem meta</p>
