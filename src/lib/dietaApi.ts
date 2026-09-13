@@ -57,6 +57,11 @@ function mapAlimento(a: Record<string, unknown>): Alimento {
   };
 }
 
+/** Remove acentos ("á" -> "a", "ç" -> "c" etc.) pra busca não depender de digitar acento certo. */
+function semAcento(texto: string): string {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
 /** Divide o termo em palavras e aplica um ilike por palavra (AND) — acha o nome com as palavras em qualquer ordem. */
 function porPalavras<T>(builder: T, coluna: string, termo: string): T {
   const palavras = termo.trim().split(/\s+/).filter(Boolean);
@@ -66,13 +71,15 @@ function porPalavras<T>(builder: T, coluna: string, termo: string): T {
   );
 }
 
+/** Busca ignorando acento e maiúsculas — compara contra `nome_normalizado` (minúsculo, sem acento,
+ * mantido em dia por trigger no banco) em vez da coluna `nome` bruta. */
 export async function buscarAlimentos(query: string): Promise<Alimento[]> {
   const termo = query.trim();
   if (!termo) return [];
   const { data, error } = await porPalavras(
     supabase.from("alimentos").select(ALIMENTO_SELECT),
-    "nome",
-    termo,
+    "nome_normalizado",
+    semAcento(termo.toLowerCase()),
   )
     .order("nome", { ascending: true })
     .limit(30);
