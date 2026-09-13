@@ -146,6 +146,7 @@
         if (efetivo.metaCalorias !== null) mapa.set(m.nome, efetivo);
       }
       metasRefeicaoPorNome = mapa;
+      refeicaoAutomaticaNome = ultima?.nome ?? null;
     } catch {
       // opcional — sem meta cadastrada, os cards seguem mostrando só o percentual da meta diária
     }
@@ -233,65 +234,42 @@
     proteinaG: number;
   }
 
-  const CAMPOS_META = ["calorias", "carboidratoG", "gorduraG", "proteinaG"] as const;
+  /** Nome da refeição automática do dia (a última do catálogo, cuja meta é sempre "a sobra do
+   * dia") — setado por carregarMetasRefeicoes, junto com metasRefeicaoPorNome. */
+  let refeicaoAutomaticaNome = $state<string | null>(null);
 
-  function metaOriginalDoCampo(m: RefeicaoModelo, campo: (typeof CAMPOS_META)[number]): number {
-    if (campo === "calorias") return m.metaCalorias ?? 0;
-    if (campo === "carboidratoG") return m.metaCarboidratoG ?? 0;
-    if (campo === "gorduraG") return m.metaGorduraG ?? 0;
-    return m.metaProteinaG ?? 0;
-  }
-
-  /** Meta de cada refeição (com meta configurada) ajustada pelo que já foi comido nesse dia: uma
-   * refeição já lançada (tem pelo menos 1 item hoje) trava na meta original; o que sobrou ou
-   * faltou dela (calorias e os 3 macros, cada um independente) é redistribuído entre as refeições
-   * ainda sem nenhum item, na proporção da meta original de cada uma — assim quem ainda não foi
-   * comido reflete o que realmente falta pra bater a meta do dia, não só o valor fixo de sempre.
-   * Refeições avulsas (sem meta no catálogo) que já têm item contam integralmente como "gasto
-   * extra", já que não tinham nada reservado — senão o que foi comido nelas ficaria invisível pro
-   * cálculo e a refeição automática não encolheria pra refletir esse consumo. */
+  /** Meta AO VIVO da refeição automática: sobra do dia inteiro menos o que já foi realmente comido
+   * em TODAS as outras refeições de hoje — tenham meta configurada ou não, já tenham sido "fechadas"
+   * ou não. Diferente do cálculo estático usado em Gerenciar (que soma as METAS configuradas das
+   * outras refeições, não o consumo real): aqui o que importa é o alimento de fato lançado, senão
+   * uma refeição sem meta comida hoje ficaria invisível pra conta e a automática não encolheria. */
   const metasRedistribuidas = $derived.by((): Map<string, MetaRedistribuida> => {
     const resultado = new Map<string, MetaRedistribuida>();
-    const comMeta = refeicoes
-      .map((r) => ({ refeicao: r, meta: metasRefeicaoPorNome.get(r.nome) }))
-      .filter((x): x is { refeicao: RefeicaoDia; meta: RefeicaoModelo } => x.meta != null);
-    if (!comMeta.length) return resultado;
+    if (!refeicaoAutomaticaNome || !metas) return resultado;
+    const automatica = refeicoes.find((r) => r.nome === refeicaoAutomaticaNome);
+    if (!automatica) return resultado;
 
-    const feitas = comMeta.filter((x) => itens.some((i) => i.refeicaoId === x.refeicao.id));
-    const pendentes = comMeta.filter((x) => !itens.some((i) => i.refeicaoId === x.refeicao.id));
-    const avulsasComItens = refeicoes.filter(
-      (r) => metasRefeicaoPorNome.get(r.nome) == null && itens.some((i) => i.refeicaoId === r.id),
-    );
+    const consumidoOutras = refeicoes
+      .filter((r) => r.id !== automatica.id)
+      .reduce(
+        (acc, r) => {
+          const t = totaisRefeicao(r.id);
+          return {
+            calorias: acc.calorias + t.calorias,
+            carboidratoG: acc.carboidratoG + t.carboidratoG,
+            gorduraG: acc.gorduraG + t.gorduraG,
+            proteinaG: acc.proteinaG + t.proteinaG,
+          };
+        },
+        { calorias: 0, carboidratoG: 0, gorduraG: 0, proteinaG: 0 },
+      );
 
-    const deltaPorCampo = Object.fromEntries(
-      CAMPOS_META.map((campo) => [
-        campo,
-        feitas.reduce((acc, x) => acc + (totaisRefeicao(x.refeicao.id)[campo] - metaOriginalDoCampo(x.meta, campo)), 0) +
-          avulsasComItens.reduce((acc, r) => acc + totaisRefeicao(r.id)[campo], 0),
-      ]),
-    ) as Record<(typeof CAMPOS_META)[number], number>;
-
-    const somaPendentesPorCampo = Object.fromEntries(
-      CAMPOS_META.map((campo) => [campo, pendentes.reduce((acc, x) => acc + metaOriginalDoCampo(x.meta, campo), 0)]),
-    ) as Record<(typeof CAMPOS_META)[number], number>;
-
-    for (const x of feitas) {
-      resultado.set(x.refeicao.id, {
-        calorias: metaOriginalDoCampo(x.meta, "calorias"),
-        carboidratoG: metaOriginalDoCampo(x.meta, "carboidratoG"),
-        gorduraG: metaOriginalDoCampo(x.meta, "gorduraG"),
-        proteinaG: metaOriginalDoCampo(x.meta, "proteinaG"),
-      });
-    }
-    for (const x of pendentes) {
-      const ajustado = {} as MetaRedistribuida;
-      for (const campo of CAMPOS_META) {
-        const original = metaOriginalDoCampo(x.meta, campo);
-        const soma = somaPendentesPorCampo[campo];
-        ajustado[campo] = soma > 0 ? Math.max(0, original - deltaPorCampo[campo] * (original / soma)) : original;
-      }
-      resultado.set(x.refeicao.id, ajustado);
-    }
+    resultado.set(automatica.id, {
+      calorias: Math.max(0, metas.calorias - consumidoOutras.calorias),
+      carboidratoG: Math.max(0, metas.carboidratoG - consumidoOutras.carboidratoG),
+      gorduraG: Math.max(0, metas.gorduraG - consumidoOutras.gorduraG),
+      proteinaG: Math.max(0, metas.proteinaG - consumidoOutras.proteinaG),
+    });
     return resultado;
   });
 
@@ -617,7 +595,14 @@
         {@const totais = totaisRefeicao(refeicao.id)}
         {@const temItens = itens.some((i) => i.refeicaoId === refeicao.id)}
         {@const metaRef = metasRefeicaoPorNome.get(refeicao.nome)}
-        {@const metaAtual = metaRef ? metasRedistribuidas.get(refeicao.id) : null}
+        {@const metaAtual = metaRef
+          ? (metasRedistribuidas.get(refeicao.id) ?? {
+              calorias: metaRef.metaCalorias ?? 0,
+              carboidratoG: metaRef.metaCarboidratoG ?? 0,
+              gorduraG: metaRef.metaGorduraG ?? 0,
+              proteinaG: metaRef.metaProteinaG ?? 0,
+            })
+          : null}
         <div
           class="refeicao-item"
           class:sem-itens={!temItens}
