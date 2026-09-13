@@ -62,6 +62,13 @@
     return Math.min(100, pct);
   }
 
+  /** Mesmo texto usado no Diário: quanto falta da meta diária pra bater ("rest."), ou "X acima" se
+   * essa receita sozinha já passa da meta. */
+  function metaValorTexto(consumido: number, meta: number, unidade: string): string {
+    if (consumido > meta) return `${(consumido - meta).toFixed(0)}${unidade} acima`;
+    return `${Math.max(0, meta - consumido).toFixed(0)}${unidade} rest.`;
+  }
+
   const valido = $derived(receitaRascunho.nome.trim().length > 0 && receitaRascunho.itens.length > 0);
 
   async function salvar() {
@@ -153,32 +160,32 @@
         <p><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{totalProteina.toFixed(1)} g</span><br />Proteínas</p>
       </div>
     </div>
+  {/if}
 
-    {#if metas}
-      <p class="metas-titulo">Percentual das suas metas diárias</p>
-      <div class="metas-grid">
-        <div class="meta-col">
-          <span class="meta-label">Calorias</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metas.calorias))}%; background:var(--color-secondary);`}></div></div>
-          <span class="meta-valor">{pctMeta(totalCalorias, metas.calorias).toFixed(0)}% · {metas.calorias.toFixed(0)}</span>
-        </div>
-        <div class="meta-col">
-          <span class="meta-label">Carb</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
-          <span class="meta-valor">{pctMeta(totalCarboidrato, metas.carboidratoG).toFixed(0)}% · {metas.carboidratoG.toFixed(0)}g</span>
-        </div>
-        <div class="meta-col">
-          <span class="meta-label">Gorduras</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
-          <span class="meta-valor">{pctMeta(totalGordura, metas.gorduraG).toFixed(0)}% · {metas.gorduraG.toFixed(0)}g</span>
-        </div>
-        <div class="meta-col">
-          <span class="meta-label">Proteínas</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
-          <span class="meta-valor">{pctMeta(totalProteina, metas.proteinaG).toFixed(0)}% · {metas.proteinaG.toFixed(0)}g</span>
-        </div>
+  {#if metas}
+    <p class="metas-titulo">Percentual das suas metas diárias</p>
+    <div class="metas-grid">
+      <div class="meta-col">
+        <span class="meta-label">Calorias</span>
+        <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metas.calorias))}%; background:var(--color-secondary);`}></div></div>
+        <span class="meta-valor">{metaValorTexto(totalCalorias, metas.calorias, "")}</span>
       </div>
-    {/if}
+      <div class="meta-col">
+        <span class="meta-label">Carb</span>
+        <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
+        <span class="meta-valor">{metaValorTexto(totalCarboidrato, metas.carboidratoG, "g")}</span>
+      </div>
+      <div class="meta-col">
+        <span class="meta-label">Gorduras</span>
+        <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
+        <span class="meta-valor">{metaValorTexto(totalGordura, metas.gorduraG, "g")}</span>
+      </div>
+      <div class="meta-col">
+        <span class="meta-label">Proteínas</span>
+        <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
+        <span class="meta-valor">{metaValorTexto(totalProteina, metas.proteinaG, "g")}</span>
+      </div>
+    </div>
   {/if}
 
   <p class="itens-titulo">Itens</p>
