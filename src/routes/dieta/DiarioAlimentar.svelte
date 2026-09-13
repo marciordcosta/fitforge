@@ -10,6 +10,9 @@
     getDiarioDoDia,
     getMetasDoDia,
     listRefeicoesModelo,
+    listMetasDiaModelo,
+    listRefeicoesModeloDia,
+    getMetasDoDiaSemana,
     getParametros,
     getPerfilDietaEditavel,
     getStatusAdesaoDieta,
@@ -65,16 +68,88 @@
     return parametros.get(chave) ?? PARAMETROS_PADRAO[chave];
   }
 
-  async function carregarMetasRefeicoes() {
+  /** Meta efetiva de cada refeição do catálogo PRO DIA sendo exibido — respeita override do dia da
+   * semana (Ondulatória) e a automática (sobra do dia) da última refeição, igual já faz o resto do
+   * app (Gerenciar, tela de refeição, Adicionar Alimento). Antes só olhava a meta global do
+   * catálogo, então uma refeição configurada só por grupo de dias (sem meta global) nunca aparecia
+   * aqui, mesmo tendo meta de verdade nesse dia.
+   *
+   * Resolve tudo numa passada só (em vez de chamar getContextoMetaCatalogo por refeição, que
+   * refaria as mesmas 3 consultas do catálogo várias vezes) — soma uma vez só as refeições que não
+   * são a última do dia, e a partir dela deriva o "disponível" de cada uma. */
+  async function carregarMetasRefeicoes(data: string) {
     try {
-      const modelos = await listRefeicoesModelo();
-      metasRefeicaoPorNome = new Map(modelos.filter((m) => m.metaCalorias !== null).map((m) => [m.nome, m]));
+      const [modelos, metasDia, modelosPorDia] = await Promise.all([
+        listRefeicoesModelo(),
+        listMetasDiaModelo(),
+        listRefeicoesModeloDia(),
+      ]);
+      const diaSemana = parseISODate(data).getDay();
+      const linhasDoDia = modelosPorDia.filter((r) => r.diaSemana === diaSemana);
+      const porId = new Map(modelos.map((m) => [m.id, m]));
+      const siblings = linhasDoDia.length
+        ? linhasDoDia
+            .slice()
+            .sort((a, b) => a.ordem - b.ordem)
+            .map((r) => porId.get(r.modeloId))
+            .filter((m): m is RefeicaoModelo => m != null)
+        : modelos;
+      const ultima = siblings[siblings.length - 1] ?? null;
+      const overridePorModelo = new Map(metasDia.filter((md) => md.diaSemana === diaSemana).map((md) => [md.modeloId, md]));
+
+      function bruta(m: RefeicaoModelo) {
+        const o = overridePorModelo.get(m.id);
+        return {
+          calorias: o?.metaCalorias ?? m.metaCalorias ?? 0,
+          proteinaG: o?.metaProteinaG ?? m.metaProteinaG ?? 0,
+          gorduraG: o?.metaGorduraG ?? m.metaGorduraG ?? 0,
+          carboidratoG: o?.metaCarboidratoG ?? m.metaCarboidratoG ?? 0,
+        };
+      }
+
+      const semUltima = ultima ? siblings.slice(0, -1) : siblings;
+      const somaSemUltima = semUltima.reduce(
+        (acc, m) => {
+          const v = bruta(m);
+          return {
+            calorias: acc.calorias + v.calorias,
+            proteinaG: acc.proteinaG + v.proteinaG,
+            gorduraG: acc.gorduraG + v.gorduraG,
+            carboidratoG: acc.carboidratoG + v.carboidratoG,
+          };
+        },
+        { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+      );
+      const metaDiaria = ultima ? await getMetasDoDiaSemana(diaSemana) : null;
+
+      const mapa = new Map<string, RefeicaoModelo>();
+      for (const m of modelos) {
+        let efetivo: RefeicaoModelo;
+        if (ultima && m.id === ultima.id && metaDiaria) {
+          efetivo = {
+            ...m,
+            metaCalorias: Math.max(0, metaDiaria.calorias - somaSemUltima.calorias),
+            metaProteinaG: Math.max(0, metaDiaria.proteinaG - somaSemUltima.proteinaG),
+            metaGorduraG: Math.max(0, metaDiaria.gorduraG - somaSemUltima.gorduraG),
+            metaCarboidratoG: Math.max(0, metaDiaria.carboidratoG - somaSemUltima.carboidratoG),
+          };
+        } else {
+          const override = overridePorModelo.get(m.id);
+          efetivo = {
+            ...m,
+            metaCalorias: override?.metaCalorias ?? m.metaCalorias,
+            metaProteinaG: override?.metaProteinaG ?? m.metaProteinaG,
+            metaGorduraG: override?.metaGorduraG ?? m.metaGorduraG,
+            metaCarboidratoG: override?.metaCarboidratoG ?? m.metaCarboidratoG,
+          };
+        }
+        if (efetivo.metaCalorias !== null) mapa.set(m.nome, efetivo);
+      }
+      metasRefeicaoPorNome = mapa;
     } catch {
       // opcional — sem meta cadastrada, os cards seguem mostrando só o percentual da meta diária
     }
   }
-
-  void carregarMetasRefeicoes();
 
   async function carregarParametros() {
     try {
@@ -106,7 +181,13 @@
     erro = null;
     try {
       refeicoes = await garantirRefeicoesPadraoDoDia(dataAtual);
-      [itens, metas] = await Promise.all([getDiarioDoDia(dataAtual), getMetasDoDia(dataAtual)]);
+      const [itensRes, metasRes] = await Promise.all([
+        getDiarioDoDia(dataAtual),
+        getMetasDoDia(dataAtual),
+        carregarMetasRefeicoes(dataAtual),
+      ]);
+      itens = itensRes;
+      metas = metasRes;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
