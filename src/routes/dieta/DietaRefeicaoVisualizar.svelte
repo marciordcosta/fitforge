@@ -253,6 +253,14 @@
   </svg>
 {/snippet}
 
+{#snippet iconBaixar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="4" x2="12" y2="15" />
+    <polyline points="7 11 12 16 17 11" />
+    <line x1="6" y1="20" x2="18" y2="20" />
+  </svg>
+{/snippet}
+
 {#snippet iconInfo()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="9" />
@@ -263,12 +271,16 @@
 
 <div class="header-fixo">
   <div class="header-fixo-inner">
-    <button class="back" onclick={() => voltar("/dieta")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="icone-header" onclick={() => voltar("/dieta")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>
       {refeicao?.nome ?? ""}
       <span class="data-inline">{dataLabel}</span>
     </h1>
-    <span class="header-spacer"></span>
+    {#if receitaPadraoTemItens}
+      <button class="icone-header" disabled={lancandoPadrao} onclick={aoClicarRefeicaoPadrao} aria-label="Lançar Refeição Padrão">{@render iconBaixar()}</button>
+    {:else}
+      <span class="header-spacer"></span>
+    {/if}
   </div>
 </div>
 
@@ -361,9 +373,6 @@
     {/if}
 
     <div class="acoes-refeicao">
-      {#if receitaPadraoTemItens}
-        <button type="button" class="acao-padrao" disabled={lancandoPadrao} onclick={aoClicarRefeicaoPadrao}>Refeição Padrão</button>
-      {/if}
       <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/refeicao/${refeicaoId}`)}>+ Adicionar Alimento</button>
     </div>
     <button class="descartar" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>Descartar refeição</button>
@@ -436,7 +445,7 @@
     width: 36px;
     flex-shrink: 0;
   }
-  .back {
+  .icone-header {
     flex-shrink: 0;
     width: 36px;
     height: 36px;
@@ -450,9 +459,13 @@
     cursor: pointer;
     padding: 0;
   }
-  .back svg {
+  .icone-header svg {
     width: 18px;
     height: 18px;
+  }
+  .icone-header:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .data-inline {
     display: block;
@@ -612,12 +625,6 @@
     gap: var(--space-2);
     margin-top: var(--space-3);
   }
-  .acoes-refeicao .acao-adicionar,
-  .acoes-refeicao .acao-padrao {
-    flex: 1;
-    min-width: 0;
-    margin-top: 0;
-  }
   .acao-adicionar {
     width: 100%;
     padding: var(--space-3);
@@ -629,22 +636,6 @@
     font-weight: 600;
     font-size: var(--font-size-base);
     cursor: pointer;
-  }
-  .acao-padrao {
-    width: 100%;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px dashed var(--surface-border);
-    background: none;
-    color: var(--surface-muted);
-    font-weight: 600;
-    font-size: var(--font-size-base);
-    font-family: inherit;
-    cursor: pointer;
-  }
-  .acao-padrao:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
   .descartar {
     width: 100%;
