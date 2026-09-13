@@ -334,9 +334,9 @@
             </span>
           </span>
           <span class="resumo-macros">
-            <span><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br /><span class="valor-g">{(carboidratoG ?? 0).toFixed(0)} g</span><br />Carb</span>
-            <span><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br /><span class="valor-g">{(gorduraG ?? 0).toFixed(0)} g</span><br />Gorduras</span>
-            <span><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{(proteinaG ?? 0).toFixed(0)} g</span><br />Proteínas</span>
+            <span><strong class="valor-g">{(carboidratoG ?? 0).toFixed(0)} g</strong><br /><span class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</span><br />Carb</span>
+            <span><strong class="valor-g">{(gorduraG ?? 0).toFixed(0)} g</strong><br /><span class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</span><br />Gorduras</span>
+            <span><strong class="valor-g">{(proteinaG ?? 0).toFixed(0)} g</strong><br /><span class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</span><br />Proteínas</span>
           </span>
         </button>
       </div>
@@ -579,10 +579,11 @@
     line-height: 1.5;
   }
   .resumo-macros .pct {
-    font-size: var(--font-size-base);
+    font-size: 11px;
+    font-weight: 400;
   }
   .resumo-macros .valor-g {
-    font-size: 17px;
+    font-size: 18px;
   }
   .pct-titulo {
     margin: 0 0 var(--space-2);
