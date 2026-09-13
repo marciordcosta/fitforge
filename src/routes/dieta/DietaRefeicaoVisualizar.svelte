@@ -63,7 +63,7 @@
       refeicao = refeicaoRes;
       itens = itensRes;
       modeloRefeicao = refeicao ? (modelos.find((m) => m.nome === refeicao!.nome) ?? null) : null;
-      metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome, parseISODate(refeicao.data).getDay()) : null;
+      metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome, refeicao.data) : null;
 
       if (refeicao && modeloRefeicao) {
         const diaSemana = parseISODate(refeicao.data).getDay();

@@ -341,28 +341,45 @@ export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
  * `.limit(1)` em vez de `.maybeSingle()` — nomes deveriam ser únicos no catálogo, mas isso não é
  * garantido no banco; se algum dia existir duplicata, usa a primeira em vez de quebrar a tela
  * inteira com "multiple rows returned". */
-/** Meta de uma refeição do catálogo pelo nome — respeita o override do dia da semana (Ondulatória)
- * quando `diaSemana` é informado, e usa a meta automática (sobra do dia) se essa refeição for a
- * última da lista efetiva desse dia. Sem `diaSemana`, ignora overrides por dia e a automática. */
-export async function getMetaRefeicaoPorNome(nome: string, diaSemana?: number): Promise<MetasDiarias | null> {
-  const { data, error } = await supabase
+/** Meta de uma refeição do catálogo pelo nome, pra um dia específico — respeita o override do dia
+ * da semana (Ondulatória) quando `data` é informada. Se essa refeição for a automática (última da
+ * lista efetiva desse dia), a meta é AO VIVO: a diária menos o que já foi realmente consumido nas
+ * OUTRAS refeições desse dia (consumo real, não a meta configurada delas) — mesmo cálculo do
+ * Diário. Sem `data`, ignora overrides por dia e a automática (usa só a meta global do catálogo). */
+export async function getMetaRefeicaoPorNome(nome: string, data?: string): Promise<MetasDiarias | null> {
+  const { data: linhas, error } = await supabase
     .from("dieta_refeicoes_modelo")
     .select(REFEICAO_MODELO_SELECT)
     .eq("nome", nome)
     .limit(1);
   if (error) throw error;
-  const linha = data?.[0];
+  const linha = linhas?.[0];
   if (!linha) return null;
   const modelo = mapRefeicaoModelo(linha as Record<string, unknown>);
 
-  if (diaSemana != null) {
+  if (data != null) {
+    const diaSemana = parseISODate(data).getDay();
     const contexto = await getContextoMetaCatalogo(modelo.id, [diaSemana]);
     if (contexto.ehUltima) {
+      const [refeicoesHoje, itensHoje] = await Promise.all([getRefeicoesDoDia(data), getDiarioDoDia(data)]);
+      const atual = refeicoesHoje.find((r) => r.nome === nome);
+      const outrasIds = new Set(refeicoesHoje.filter((r) => r.id !== atual?.id).map((r) => r.id));
+      const consumidoOutras = itensHoje
+        .filter((i) => outrasIds.has(i.refeicaoId))
+        .reduce(
+          (acc, i) => ({
+            calorias: acc.calorias + i.calorias,
+            proteinaG: acc.proteinaG + i.proteinaG,
+            gorduraG: acc.gorduraG + i.gorduraG,
+            carboidratoG: acc.carboidratoG + i.carboidratoG,
+          }),
+          { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+        );
       return {
-        calorias: Math.max(0, contexto.disponivel.calorias),
-        proteinaG: Math.max(0, contexto.disponivel.proteinaG),
-        gorduraG: Math.max(0, contexto.disponivel.gorduraG),
-        carboidratoG: Math.max(0, contexto.disponivel.carboidratoG),
+        calorias: Math.max(0, contexto.metaDiaria.calorias - consumidoOutras.calorias),
+        proteinaG: Math.max(0, contexto.metaDiaria.proteinaG - consumidoOutras.proteinaG),
+        gorduraG: Math.max(0, contexto.metaDiaria.gorduraG - consumidoOutras.gorduraG),
+        carboidratoG: Math.max(0, contexto.metaDiaria.carboidratoG - consumidoOutras.carboidratoG),
       };
     }
     const metasDia = await listMetasDiaModelo();

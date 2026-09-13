@@ -1,7 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { parseISODate } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
@@ -131,7 +130,7 @@
       return;
     }
     let cancelado = false;
-    getMetaRefeicaoPorNome(nome, parseISODate(dataResolvida).getDay()).then((m) => {
+    getMetaRefeicaoPorNome(nome, dataResolvida).then((m) => {
       if (!cancelado) metaRefeicao = m;
     });
     return () => {
