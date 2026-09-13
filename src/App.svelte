@@ -17,6 +17,18 @@
     "/treino": "Treino",
   };
 
+  /** As 5 abas principais ficam sempre montadas (escondidas via `hidden`, nunca destruídas) assim
+   * que o usuário loga — cada uma carrega seus dados uma única vez (no boot, em paralelo) e trocar
+   * de aba depois disso é instantâneo, sem refetch nem tela de "Carregando…" a cada troca. */
+  const abaAtiva = $derived.by(() => {
+    if (router.path.startsWith("/treino")) return "treino";
+    if (router.path.startsWith("/peso")) return "peso";
+    if (router.path.startsWith("/dieta")) return "dieta";
+    if (router.path.startsWith("/fotos")) return "fotos";
+    if (router.path === "/inicio/configurar") return "configurar";
+    return "home";
+  });
+
   let blockedAlertShown = false;
 
   $effect(() => {
@@ -45,22 +57,15 @@
 {:else if router.path === "/login"}
   <Login />
 {:else if auth.user && auth.isAllowed}
-  {#if router.path === "/"}
-    <Home />
-  {:else if router.path === "/inicio/configurar"}
+  <div hidden={abaAtiva !== "home"}><Home /></div>
+  <div hidden={abaAtiva !== "treino"}><Treino /></div>
+  <div hidden={abaAtiva !== "peso"}><Peso /></div>
+  <div hidden={abaAtiva !== "dieta"}><Dieta /></div>
+  <div hidden={abaAtiva !== "fotos"}><Fotos /></div>
+  {#if abaAtiva === "configurar"}
     <HomeParametrizacao />
-  {:else if router.path.startsWith("/treino")}
-    <Treino />
-  {:else if router.path.startsWith("/peso")}
-    <Peso />
-  {:else if router.path.startsWith("/dieta")}
-    <Dieta />
-  {:else if router.path.startsWith("/fotos")}
-    <Fotos />
   {:else if sectionTitles[router.path]}
     <Placeholder titulo={sectionTitles[router.path]} />
-  {:else}
-    <Home />
   {/if}
   {#if !router.path.startsWith("/treino/log/") && !router.path.startsWith("/fotos/comparar/")}
     {#if treinoLogSessao.atual}
