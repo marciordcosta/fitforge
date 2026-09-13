@@ -254,7 +254,7 @@
     padding: 0;
   }
   .valor-num {
-    grid-column: 2;
+    grid-column: 2 / span 2;
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
