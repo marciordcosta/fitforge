@@ -246,7 +246,10 @@
    * refeição já lançada (tem pelo menos 1 item hoje) trava na meta original; o que sobrou ou
    * faltou dela (calorias e os 3 macros, cada um independente) é redistribuído entre as refeições
    * ainda sem nenhum item, na proporção da meta original de cada uma — assim quem ainda não foi
-   * comido reflete o que realmente falta pra bater a meta do dia, não só o valor fixo de sempre. */
+   * comido reflete o que realmente falta pra bater a meta do dia, não só o valor fixo de sempre.
+   * Refeições avulsas (sem meta no catálogo) que já têm item contam integralmente como "gasto
+   * extra", já que não tinham nada reservado — senão o que foi comido nelas ficaria invisível pro
+   * cálculo e a refeição automática não encolheria pra refletir esse consumo. */
   const metasRedistribuidas = $derived.by((): Map<string, MetaRedistribuida> => {
     const resultado = new Map<string, MetaRedistribuida>();
     const comMeta = refeicoes
@@ -256,11 +259,15 @@
 
     const feitas = comMeta.filter((x) => itens.some((i) => i.refeicaoId === x.refeicao.id));
     const pendentes = comMeta.filter((x) => !itens.some((i) => i.refeicaoId === x.refeicao.id));
+    const avulsasComItens = refeicoes.filter(
+      (r) => metasRefeicaoPorNome.get(r.nome) == null && itens.some((i) => i.refeicaoId === r.id),
+    );
 
     const deltaPorCampo = Object.fromEntries(
       CAMPOS_META.map((campo) => [
         campo,
-        feitas.reduce((acc, x) => acc + (totaisRefeicao(x.refeicao.id)[campo] - metaOriginalDoCampo(x.meta, campo)), 0),
+        feitas.reduce((acc, x) => acc + (totaisRefeicao(x.refeicao.id)[campo] - metaOriginalDoCampo(x.meta, campo)), 0) +
+          avulsasComItens.reduce((acc, r) => acc + totaisRefeicao(r.id)[campo], 0),
       ]),
     ) as Record<(typeof CAMPOS_META)[number], number>;
 
