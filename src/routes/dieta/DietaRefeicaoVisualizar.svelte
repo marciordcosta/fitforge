@@ -307,34 +307,34 @@
           <p><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{totalProteina.toFixed(1)} g</span><br />Proteínas</p>
         </div>
       </div>
+    {/if}
 
-      {#if metaRefeicao}
-        <p class="metas-titulo">Meta de {refeicao?.nome}</p>
-        <div class="metas-grid">
-          <div class="meta-col">
-            <span class="meta-label">Calorias</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metaRefeicao.calorias))}%; background:var(--color-secondary);`}></div></div>
-            <span class="meta-valor">{metaValorTexto(totalCalorias, metaRefeicao.calorias, "")}</span>
-          </div>
-          <div class="meta-col">
-            <span class="meta-label">Carb</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metaRefeicao.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
-            <span class="meta-valor">{metaValorTexto(totalCarboidrato, metaRefeicao.carboidratoG, "g")}</span>
-          </div>
-          <div class="meta-col">
-            <span class="meta-label">Gorduras</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metaRefeicao.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
-            <span class="meta-valor">{metaValorTexto(totalGordura, metaRefeicao.gorduraG, "g")}</span>
-          </div>
-          <div class="meta-col">
-            <span class="meta-label">Proteínas</span>
-            <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metaRefeicao.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
-            <span class="meta-valor">{metaValorTexto(totalProteina, metaRefeicao.proteinaG, "g")}</span>
-          </div>
+    {#if metaRefeicao}
+      <p class="metas-titulo">Meta de {refeicao?.nome}</p>
+      <div class="metas-grid">
+        <div class="meta-col">
+          <span class="meta-label">Calorias</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metaRefeicao.calorias))}%; background:var(--color-secondary);`}></div></div>
+          <span class="meta-valor">{metaValorTexto(totalCalorias, metaRefeicao.calorias, "")}</span>
         </div>
-      {:else}
-        <p class="metas-titulo">Refeição sem meta</p>
-      {/if}
+        <div class="meta-col">
+          <span class="meta-label">Carb</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metaRefeicao.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(totalCarboidrato, metaRefeicao.carboidratoG, "g")}</span>
+        </div>
+        <div class="meta-col">
+          <span class="meta-label">Gorduras</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metaRefeicao.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(totalGordura, metaRefeicao.gorduraG, "g")}</span>
+        </div>
+        <div class="meta-col">
+          <span class="meta-label">Proteínas</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metaRefeicao.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(totalProteina, metaRefeicao.proteinaG, "g")}</span>
+        </div>
+      </div>
+    {:else if itens.length}
+      <p class="metas-titulo">Refeição sem meta</p>
     {/if}
 
     {#if !itens.length}
