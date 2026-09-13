@@ -2,7 +2,6 @@
   import { navigate, voltar } from "../../lib/router.svelte";
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
-  import ActionSheet from "../../components/ActionSheet.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import {
     getRefeicaoDia,
@@ -12,8 +11,6 @@
     getMetaRefeicaoPorNome,
     getAlimento,
     atualizarItemDiario,
-    getRefeicoesDoDia,
-    moverItemDiario,
     listRefeicoesModelo,
     listMetasDiaModelo,
     getReceita,
@@ -51,10 +48,7 @@
   let processando = $state(false);
   let itemEditando = $state<ItemDiario | null>(null);
   let alimentoEditando = $state<Alimento | null>(null);
-  let itemParaMover = $state<ItemDiario | null>(null);
-  let refeicoesParaMover = $state<RefeicaoDia[]>([]);
-  let mostrarMoverItem = $state(false);
-  let menuItemAberto = $state<ItemDiario | null>(null);
+  let itemParaRemover = $state<ItemDiario | null>(null);
 
   async function carregar() {
     loading = true;
@@ -172,7 +166,7 @@
       pressionouLongo = true;
       cancelarPressionar();
       if (navigator.vibrate) navigator.vibrate(10);
-      menuItemAberto = item;
+      itemParaRemover = item;
     }, ATRASO_PRESSIONAR_MS);
   }
 
@@ -180,7 +174,7 @@
     e.preventDefault();
     cancelarPressionar();
     pressionouLongo = false;
-    menuItemAberto = item;
+    itemParaRemover = item;
   }
 
   function cancelarPressionar() {
@@ -208,42 +202,15 @@
     void abrirItem(item);
   }
 
-  async function abrirMoverItem(item: ItemDiario) {
-    if (!refeicao) return;
-    try {
-      const todas = await getRefeicoesDoDia(refeicao.data);
-      refeicoesParaMover = todas.filter((r) => r.id !== refeicaoId);
-      if (!refeicoesParaMover.length) {
-        alert("Não há outra refeição nesse dia pra mover o alimento.");
-        return;
-      }
-      itemParaMover = item;
-      mostrarMoverItem = true;
-    } catch (err) {
-      alert("Erro ao carregar refeições: " + (err as Error).message);
-    }
-  }
-
-  async function moverItemPara(destino: RefeicaoDia) {
-    if (!itemParaMover) return;
-    mostrarMoverItem = false;
+  async function remover() {
+    if (!itemParaRemover) return;
     processando = true;
     try {
-      await moverItemDiario(itemParaMover.id, destino.id);
-      itemParaMover = null;
+      await removerItemDiario(itemParaRemover.id);
+      itemParaRemover = null;
       await carregar();
     } catch (err) {
-      alert("Erro ao mover alimento: " + (err as Error).message);
-    } finally {
-      processando = false;
-    }
-  }
-
-  async function remover(item: ItemDiario) {
-    processando = true;
-    try {
-      await removerItemDiario(item.id);
-      await carregar();
+      alert("Erro ao excluir alimento: " + (err as Error).message);
     } finally {
       processando = false;
     }
@@ -286,26 +253,11 @@
   </svg>
 {/snippet}
 
-{#snippet iconExcluir()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 6L6 18M6 6l12 12" />
-  </svg>
-{/snippet}
 {#snippet iconInfo()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="9" />
     <line x1="12" y1="11" x2="12" y2="16" />
     <circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none" />
-  </svg>
-{/snippet}
-{#snippet iconMover()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M5 9l-3 3 3 3" />
-    <path d="M9 5l3-3 3 3" />
-    <path d="M15 19l-3 3-3-3" />
-    <path d="M19 9l3 3-3 3" />
-    <path d="M2 12h20" />
-    <path d="M12 2v20" />
   </svg>
 {/snippet}
 
@@ -439,23 +391,12 @@
   />
 {/if}
 
-{#if menuItemAberto !== null}
-  {@const itemMenu = menuItemAberto}
-  <ActionSheet
-    titulo={itemMenu.nome}
-    onFechar={() => (menuItemAberto = null)}
-    opcoes={[
-      { label: "Mover", icon: iconMover, onSelect: () => void abrirMoverItem(itemMenu) },
-      { label: "Excluir", icon: iconExcluir, destructive: true, onSelect: () => { menuItemAberto = null; void remover(itemMenu); } },
-    ]}
-  />
-{/if}
-
-{#if mostrarMoverItem && itemParaMover}
-  <ActionSheet
-    titulo={`Mover "${itemParaMover.nome}" para`}
-    onFechar={() => { mostrarMoverItem = false; itemParaMover = null; }}
-    opcoes={refeicoesParaMover.map((r) => ({ label: r.nome, onSelect: () => moverItemPara(r) }))}
+{#if itemParaRemover !== null}
+  <ConfirmDialog
+    titulo={`Tem certeza de que quer excluir "${itemParaRemover.nome}"?`}
+    textoConfirmar="Excluir"
+    onConfirmar={remover}
+    onCancelar={() => (itemParaRemover = null)}
   />
 {/if}
 
