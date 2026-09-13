@@ -470,14 +470,25 @@
       <div class="card-calorias">
         <p class="card-titulo">Calorias</p>
         <div class="calorias-linha">
-          <span class="calorias-valor"><strong>{totalCalorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
-          <span class="calorias-restantes">
-            {#if passouMeta(totalCalorias, metas.calorias)}
-              <strong>{(totalCalorias - metas.calorias).toFixed(0)}</strong> acima
-            {:else}
-              <strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes
-            {/if}
-          </span>
+          {#if modoRestante}
+            <span class="calorias-valor">
+              {#if passouMeta(totalCalorias, metas.calorias)}
+                <strong>{(totalCalorias - metas.calorias).toFixed(0)}</strong> acima
+              {:else}
+                <strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes
+              {/if}
+            </span>
+            <span class="calorias-restantes">{totalCalorias.toFixed(0)} cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
+          {:else}
+            <span class="calorias-valor"><strong>{totalCalorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
+            <span class="calorias-restantes">
+              {#if passouMeta(totalCalorias, metas.calorias)}
+                <strong>{(totalCalorias - metas.calorias).toFixed(0)}</strong> acima
+              {:else}
+                <strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes
+              {/if}
+            </span>
+          {/if}
         </div>
         <div class="barra-wrap-grande">
           <div class="barra-grande" style={`width:${larguraBarra(pctMeta(totalCalorias, metas.calorias))}%; background:var(--color-secondary);`}></div>
