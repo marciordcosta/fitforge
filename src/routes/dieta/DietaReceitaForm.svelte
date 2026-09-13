@@ -189,7 +189,10 @@
       <button class="item-card" onclick={() => (itemEditandoIndex = i)}>
         <div class="item-info">
           <p class="item-nome">{item.alimento.nome}</p>
-          <p class="item-qtd">{item.quantidade}{item.alimento.porcaoPadraoUnidade} · {caloriasItem(item).toFixed(0)} kcal</p>
+          <p class="item-qtd">
+            <strong class="item-qtd-valor">{item.quantidade}{item.alimento.porcaoPadraoUnidade}</strong>
+            <span class="item-qtd-detalhe">· {caloriasItem(item).toFixed(0)} kcal</span>
+          </p>
         </div>
         <span
           class="item-remover"
@@ -430,7 +433,14 @@
   }
   .item-qtd {
     margin: 2px 0 0;
-    font-size: var(--font-size-sm);
+  }
+  .item-qtd-valor {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--surface-fg);
+  }
+  .item-qtd-detalhe {
+    font-size: 12px;
     color: var(--surface-muted);
   }
   .item-remover {

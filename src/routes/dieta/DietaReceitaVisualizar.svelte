@@ -397,7 +397,8 @@
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
             <p class="item-qtd">
-              {item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal · {pctItem.toFixed(0)}% da refeição
+              <strong class="item-qtd-valor">{item.quantidade}{item.unidade}</strong>
+              <span class="item-qtd-detalhe">· {item.calorias.toFixed(0)} kcal · {pctItem.toFixed(0)}% da refeição</span>
             </p>
             <div class="item-barra-wrap">
               <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
@@ -685,7 +686,14 @@
   }
   .item-qtd {
     margin: 2px 0 0;
-    font-size: var(--font-size-sm);
+  }
+  .item-qtd-valor {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--surface-fg);
+  }
+  .item-qtd-detalhe {
+    font-size: 12px;
     color: var(--surface-muted);
   }
   .item-barra-wrap {
