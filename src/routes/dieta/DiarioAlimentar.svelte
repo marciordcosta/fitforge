@@ -620,7 +620,7 @@
           {#if metaAtual}
             <p class="pct-titulo">Meta de {refeicao.nome}</p>
             <div class="pct-grid">
-              {@render pctColunaAnel("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaAtual.calorias))), labelMeta(totais.calorias, arredondarDezena(metaAtual.calorias), ""))}
+              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaAtual.calorias))), labelMeta(totais.calorias, arredondarDezena(metaAtual.calorias), ""))}
               {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaAtual.carboidratoG)), labelMeta(totais.carboidratoG, metaAtual.carboidratoG, "g"))}
               {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaAtual.gorduraG)), labelMeta(totais.gorduraG, metaAtual.gorduraG, "g"))}
               {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaAtual.proteinaG)), labelMeta(totais.proteinaG, metaAtual.proteinaG, "g"))}
@@ -628,7 +628,7 @@
           {:else if temItens}
             <p class="pct-titulo">Refeição sem meta</p>
             <div class="pct-grid">
-              {@render pctColunaAnel("Calorias", "var(--color-secondary)", 0, `${totais.calorias.toFixed(0)} consumo`)}
+              {@render pctColuna("Calorias", "var(--color-secondary)", 0, `${totais.calorias.toFixed(0)} consumo`)}
               {@render pctColuna("Carb", COR_CARBO, 0, `${totais.carboidratoG.toFixed(0)}g consumo`)}
               {@render pctColuna("Gorduras", COR_GORDURA, 0, `${totais.gorduraG.toFixed(0)}g consumo`)}
               {@render pctColuna("Proteínas", COR_PROTEINA, 0, `${totais.proteinaG.toFixed(0)}g consumo`)}
@@ -674,17 +674,6 @@
       <div class="pct-barra" style={`width:${largura}%; background:${cor};`}></div>
     </div>
     <p class="pct-valor">{valorTexto}</p>
-  </div>
-{/snippet}
-
-{#snippet pctColunaAnel(nome: string, cor: string, pct: number, valorTexto: string)}
-  <div class="pct-col pct-col-anel">
-    <p class="pct-nome">{nome}</p>
-    <div class="pct-anel" style={`background: conic-gradient(${cor} 0% ${pct}%, var(--surface-border) ${pct}% 100%);`}>
-      <div class="pct-anel-centro">
-        <span class="pct-anel-texto">{valorTexto}</span>
-      </div>
-    </div>
   </div>
 {/snippet}
 
@@ -1039,32 +1028,6 @@
     margin: 0;
     font-size: 11px;
     color: var(--surface-muted);
-  }
-  .pct-col-anel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  .pct-anel {
-    position: relative;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-  }
-  .pct-anel-centro {
-    position: absolute;
-    inset: 5px;
-    border-radius: 50%;
-    background: var(--surface-card);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .pct-anel-texto {
-    font-size: 10px;
-    line-height: 1.15;
-    text-align: center;
-    color: var(--surface-fg);
   }
   .conteudo {
     transition: opacity 0.15s;
