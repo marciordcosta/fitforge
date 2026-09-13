@@ -869,11 +869,6 @@
     return meta > 0 ? (valor / meta) * 100 : 0;
   }
 
-  /** Só pra exibição — arredonda a meta calculada da refeição pra dezena mais próxima (ex: 653 vira 650), sem alterar o valor real usado nos cálculos. */
-  function arredondarDezena(valor: number): number {
-    return Math.round(valor / 10) * 10;
-  }
-
   async function carregar() {
     loading = true;
     erro = null;
@@ -1470,7 +1465,6 @@
                     <div class="card-header">
                       <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
                       <span class="card-header-direita">
-                        {#if meta.calorias != null}<span class="card-header-cal">{arredondarDezena(meta.calorias)} cal</span>{/if}
                         <span
                           class="item-detalhe"
                           role="button"
@@ -1533,7 +1527,6 @@
                   <div class="card-header">
                     <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
                     <span class="card-header-direita">
-                      {#if ultima || m.metaCalorias != null}<span class="card-header-cal">{arredondarDezena(efetivo.calorias)} cal</span>{/if}
                       <span
                         class="item-detalhe"
                         role="button"
@@ -1997,11 +1990,6 @@
     font-size: var(--font-size-lg);
     margin: 0;
     color: var(--surface-fg);
-  }
-  .card-header-cal {
-    flex-shrink: 0;
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
   }
   .card-header-direita {
     flex-shrink: 0;
