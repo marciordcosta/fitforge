@@ -683,6 +683,24 @@ export interface RefeicaoDia {
   data: string;
 }
 
+/** Lista efetiva do catálogo pra esse dia da semana (Ondulatória): usa a lista/ordem específica
+ * desse grupo de dias se houver (só as refeições incluídas nela); senão cai pro catálogo global
+ * inteiro, na ordem global — mesma resolução de modelosDoDia em Gerenciar > Refeições. */
+function resolverCatalogoEfetivoDoDia(
+  diaSemana: number,
+  catalogo: RefeicaoModelo[],
+  modelosPorDia: RefeicaoModeloDia[],
+): RefeicaoModelo[] {
+  const linhasDoDia = modelosPorDia.filter((r) => r.diaSemana === diaSemana);
+  if (!linhasDoDia.length) return catalogo;
+  const porId = new Map(catalogo.map((m) => [m.id, m]));
+  return linhasDoDia
+    .slice()
+    .sort((a, b) => a.ordem - b.ordem)
+    .map((r) => porId.get(r.modeloId))
+    .filter((m): m is RefeicaoModelo => !!m);
+}
+
 /** Ordena pelo mesmo critério de "Gerenciar Refeições" (por nome) — refeições avulsas, sem nome no catálogo, ficam no fim, na ordem em que foram criadas. */
 export async function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
   const diaSemana = parseISODate(data).getDay();
@@ -693,36 +711,44 @@ export async function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
   ]);
   if (linhasRes.error) throw linhasRes.error;
 
-  // Ordem efetiva desse dia da semana (Ondulatória): usa a lista/ordem específica desse grupo de
-  // dias se houver; senão cai pro catálogo global inteiro, na ordem global — mesma resolução de
-  // modelosDoDia em Gerenciar > Refeições.
-  const linhasDoDia = modelosPorDia.filter((r) => r.diaSemana === diaSemana);
+  const catalogoEfetivo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia);
   const ordemPorNome = new Map<string, number>();
-  if (linhasDoDia.length) {
-    const nomePorId = new Map(catalogo.map((m) => [m.id, m.nome]));
-    linhasDoDia
-      .slice()
-      .sort((a, b) => a.ordem - b.ordem)
-      .forEach((r, i) => {
-        const nome = nomePorId.get(r.modeloId);
-        if (nome) ordemPorNome.set(nome, i);
-      });
-  } else {
-    catalogo.forEach((m, i) => ordemPorNome.set(m.nome, i));
-  }
+  catalogoEfetivo.forEach((m, i) => ordemPorNome.set(m.nome, i));
 
   return [...(linhasRes.data ?? [])].sort(
     (a, b) => (ordemPorNome.get(a.nome) ?? Infinity) - (ordemPorNome.get(b.nome) ?? Infinity),
   );
 }
 
-/** Se o dia ainda não tem nenhuma refeição, cria uma pra cada item do catálogo (as refeições "padrão" de todo dia) e retorna a lista já pronta. */
+/** Se o dia ainda não tem nenhuma refeição, cria uma pra cada item do catálogo efetivo desse dia
+ * da semana (respeitando a lista específica da Ondulatória, se houver) e retorna a lista já pronta.
+ * Se já tiver refeições mas alguma foi criada antes de existir uma lista específica pro dia (ou de
+ * uma mudança na Ondulatória) e não pertence mais à lista efetiva de hoje, remove — só quando ainda
+ * está vazia, nunca uma que já tem alimento lançado. */
 export async function garantirRefeicoesPadraoDoDia(data: string): Promise<RefeicaoDia[]> {
   const existentes = await getRefeicoesDoDia(data);
-  if (existentes.length) return existentes;
-  const catalogo = await listRefeicoesModelo();
-  if (!catalogo.length) return existentes;
-  await Promise.all(catalogo.map((m) => criarRefeicaoDia(data, m.nome)));
+  const diaSemana = parseISODate(data).getDay();
+  const [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
+  const catalogoEfetivo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia);
+
+  if (existentes.length) {
+    const nomesEfetivos = new Set(catalogoEfetivo.map((m) => m.nome));
+    const nomesCatalogoTodo = new Set(catalogo.map((m) => m.nome));
+    const extras = existentes.filter((r) => nomesCatalogoTodo.has(r.nome) && !nomesEfetivos.has(r.nome));
+    if (extras.length) {
+      const itensHoje = await getDiarioDoDia(data);
+      const idsComItens = new Set(itensHoje.map((i) => i.refeicaoId));
+      const remover = extras.filter((r) => !idsComItens.has(r.id));
+      if (remover.length) {
+        await Promise.all(remover.map((r) => removerRefeicaoDia(r.id)));
+        return getRefeicoesDoDia(data);
+      }
+    }
+    return existentes;
+  }
+
+  if (!catalogoEfetivo.length) return existentes;
+  await Promise.all(catalogoEfetivo.map((m) => criarRefeicaoDia(data, m.nome)));
   return getRefeicoesDoDia(data);
 }
 
