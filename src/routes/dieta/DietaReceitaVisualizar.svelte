@@ -387,7 +387,7 @@
       <p class="muted">Nenhum alimento nessa refeição.</p>
     {:else}
       {#each itensLocais as item (item.id)}
-        {@const pctItem = metas ? pctMeta(item.calorias, metas.calorias) : 0}
+        {@const pctItem = pctMeta(item.calorias, totalCalorias)}
         <button
           class="item-card"
           onpointerdown={(e) => aoPointerDownItem(e, item)}
@@ -397,13 +397,11 @@
           <div class="item-info">
             <p class="item-nome">{item.nome}</p>
             <p class="item-qtd">
-              {item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal{#if metas} · {pctItem.toFixed(0)}% da meta{/if}
+              {item.quantidade}{item.unidade} · {item.calorias.toFixed(0)} kcal · {pctItem.toFixed(0)}% da refeição
             </p>
-            {#if metas}
-              <div class="item-barra-wrap">
-                <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
-              </div>
-            {/if}
+            <div class="item-barra-wrap">
+              <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
+            </div>
           </div>
           <span
             class="item-detalhe"
