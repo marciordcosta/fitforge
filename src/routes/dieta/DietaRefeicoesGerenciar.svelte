@@ -1206,32 +1206,25 @@
   </svg>
 {/snippet}
 
-{#snippet metaBarrasGrid(
-  carboidratoG: number,
-  gorduraG: number,
-  proteinaG: number,
-  carboidratoDiaG: number,
-  gorduraDiaG: number,
-  proteinaDiaG: number,
-)}
-  {@const pctCarbo = carboidratoDiaG > 0 ? (carboidratoG / carboidratoDiaG) * 100 : 0}
-  {@const pctGordura = gorduraDiaG > 0 ? (gorduraG / gorduraDiaG) * 100 : 0}
-  {@const pctProteina = proteinaDiaG > 0 ? (proteinaG / proteinaDiaG) * 100 : 0}
+{#snippet metaBarrasGrid(carboidratoG: number, gorduraG: number, proteinaG: number, calorias: number)}
+  {@const pctCarbo = calorias > 0 ? ((carboidratoG * 4) / calorias) * 100 : 0}
+  {@const pctGordura = calorias > 0 ? ((gorduraG * 9) / calorias) * 100 : 0}
+  {@const pctProteina = calorias > 0 ? ((proteinaG * 4) / calorias) * 100 : 0}
   <div class="pct-grid">
     <div class="pct-col">
       <p class="pct-nome">Carb</p>
       <div class="pct-barra-wrap"><div class="pct-barra" style={`width:${larguraBarra(pctCarbo)}%; background:${COR_CARBO};`}></div></div>
-      <p class="pct-valor">{carboidratoG.toFixed(0)}/{carboidratoDiaG.toFixed(0)}g</p>
+      <p class="pct-valor">{carboidratoG.toFixed(0)}g · {pctCarbo.toFixed(0)}%</p>
     </div>
     <div class="pct-col">
       <p class="pct-nome">Gorduras</p>
       <div class="pct-barra-wrap"><div class="pct-barra" style={`width:${larguraBarra(pctGordura)}%; background:${COR_GORDURA};`}></div></div>
-      <p class="pct-valor">{gorduraG.toFixed(0)}/{gorduraDiaG.toFixed(0)}g</p>
+      <p class="pct-valor">{gorduraG.toFixed(0)}g · {pctGordura.toFixed(0)}%</p>
     </div>
     <div class="pct-col">
       <p class="pct-nome">Proteínas</p>
       <div class="pct-barra-wrap"><div class="pct-barra" style={`width:${larguraBarra(pctProteina)}%; background:${COR_PROTEINA};`}></div></div>
-      <p class="pct-valor">{proteinaG.toFixed(0)}/{proteinaDiaG.toFixed(0)}g</p>
+      <p class="pct-valor">{proteinaG.toFixed(0)}g · {pctProteina.toFixed(0)}%</p>
     </div>
   </div>
 {/snippet}
@@ -1486,7 +1479,7 @@
                       </span>
                     </div>
                     {#if meta.calorias != null}
-                      {@render metaBarrasGrid(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, metaGrupo.carboidratoG, metaGrupo.gorduraG, metaGrupo.proteinaG)}
+                      {@render metaBarrasGrid(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias)}
                     {:else}
                       <p class="preview">Sem meta configurada</p>
                     {/if}
@@ -1549,7 +1542,7 @@
                     </span>
                   </div>
                   {#if ultima || m.metaCalorias != null}
-                    {@render metaBarrasGrid(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, metaGlobal.carboidratoG, metaGlobal.gorduraG, metaGlobal.proteinaG)}
+                    {@render metaBarrasGrid(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias)}
                   {:else}
                     <p class="preview">Sem meta configurada</p>
                   {/if}
