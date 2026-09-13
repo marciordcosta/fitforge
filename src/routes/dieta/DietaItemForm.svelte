@@ -169,8 +169,11 @@
     return Math.min(100, pct);
   }
 
+  /** Mesmo texto usado no Diário: quanto falta pra bater a meta ("rest."), ou "X acima" se já
+   * passou — em vez de "consumido de meta". */
   function metaValorTexto(consumido: number, meta: number, unidade: string): string {
-    return `${consumido.toFixed(0)} de ${meta.toFixed(0)}${unidade}`;
+    if (consumido > meta) return `${(consumido - meta).toFixed(0)}${unidade} acima`;
+    return `${Math.max(0, meta - consumido).toFixed(0)}${unidade} rest.`;
   }
 
   function sufixoRota(): string {
