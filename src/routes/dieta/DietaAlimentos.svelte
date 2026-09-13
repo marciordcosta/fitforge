@@ -17,7 +17,6 @@
   } from "../../lib/dietaApi";
   import { receitaRascunho, adicionarAoRascunho, definirContexto, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
-  import ActionSheet from "../../components/ActionSheet.svelte";
 
   /** Quando presente, cada alimento ganha um "+" pra adicionar direto a essa refeição, sem passar pelo detalhamento. Sem isso, é só o catálogo normal. */
   let {
@@ -48,7 +47,6 @@
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let busca = $state(untrack(() => lerBuscaDaUrl()));
-  let mostrarEscolhaCriar = $state(false);
   let mostrarCriarAlimento = $state(false);
   let refeicaoData = $state("");
   let refeicaoNome = $state("");
@@ -214,13 +212,6 @@
   </svg>
 {/snippet}
 
-{#snippet iconAlimento()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M7 3v7a2 2 0 0 0 2 2v9" />
-    <path d="M7 3v4M11 3v4" />
-    <path d="M17 3c-1.5 0-3 1.5-3 4v3a2 2 0 0 0 2 2v9" />
-  </svg>
-{/snippet}
 {#snippet iconMais()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" />
@@ -244,7 +235,7 @@
   <div class="header">
     <button class="back" onclick={voltar} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Alimentos</h1>
-    <button class="criar" onclick={() => (mostrarEscolhaCriar = true)}>Criar</button>
+    <button class="criar" onclick={() => (mostrarCriarAlimento = true)}>Criar</button>
   </div>
 
   <div class="busca-linha">
@@ -335,19 +326,13 @@
   <div class="toast">{mensagem}</div>
 {/if}
 
-{#if mostrarEscolhaCriar}
-  <ActionSheet
-    titulo="Criar"
-    onFechar={() => (mostrarEscolhaCriar = false)}
-    opcoes={[
-      { label: "Escanear", icon: iconScanner, onSelect: abrirScanner },
-      { label: "Adicionar Manual", icon: iconAlimento, onSelect: () => (mostrarCriarAlimento = true) },
-    ]}
-  />
-{/if}
-
 {#if mostrarCriarAlimento}
-  <DietaAlimentoFormSheet onFechar={() => (mostrarCriarAlimento = false)} onSalvo={carregarInicial} />
+  <DietaAlimentoFormSheet
+    refeicaoId={refeicaoIdFixo}
+    data={refeicaoData}
+    onFechar={() => (mostrarCriarAlimento = false)}
+    onSalvo={carregarInicial}
+  />
 {/if}
 
 <style>

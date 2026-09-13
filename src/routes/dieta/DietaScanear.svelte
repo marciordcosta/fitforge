@@ -3,11 +3,12 @@
   import { navigate } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
-  import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts } from "../../lib/dietaApi";
+  import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts, type AlimentoOpenFoodFactsInput } from "../../lib/dietaApi";
   import { buscarProdutoPorCodigoBarras } from "../../lib/openFoodFacts";
   import { receitaRascunho, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
   import Button from "../../components/Button.svelte";
   import Sheet from "../../components/Sheet.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
 
   let {
     data,
@@ -24,6 +25,11 @@
   let controls: IScannerControls | null = null;
   let mostrarManual = $state(false);
   let codigoManual = $state("");
+  /** Produto novo (não achado localmente) achado na Open Food Facts, aguardando a escolha de
+   * salvar no catálogo ou usar só nessa refeição — só perguntamos quando há uma refeição de
+   * contexto, senão o produto é sempre salvo no catálogo geral como já era. */
+  let produtoPendente = $state<AlimentoOpenFoodFactsInput | null>(null);
+  let mostrarEscolhaSalvar = $state(false);
 
   async function iniciarCamera(el: HTMLVideoElement) {
     try {
@@ -72,29 +78,50 @@
     return () => controls?.stop();
   });
 
+  function irParaItem(alimentoId: string) {
+    const destino = modoReceita
+      ? `/dieta/alimento/${alimentoId}/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`
+      : refeicaoId
+        ? `/dieta/alimento/${alimentoId}/${dataResolvida}/${refeicaoId}`
+        : `/dieta/alimento/${alimentoId}/${dataResolvida}`;
+    navigate(destino);
+  }
+
   async function aoDetectar(codigo: string) {
     fase = "buscando";
     try {
-      let alimentoId: string;
       const existente = await getAlimentoPorCodigoBarras(codigo);
       if (existente) {
-        alimentoId = existente.id;
-      } else {
-        const produto = await buscarProdutoPorCodigoBarras(codigo);
-        if (!produto) {
-          fase = "erro";
-          mensagemErro = "Produto não encontrado, ou sem informações nutricionais completas na Open Food Facts.";
-          return;
-        }
-        alimentoId = await criarAlimentoOpenFoodFacts({ ...produto, codigoBarras: codigo });
+        irParaItem(existente.id);
+        return;
       }
+      const produto = await buscarProdutoPorCodigoBarras(codigo);
+      if (!produto) {
+        fase = "erro";
+        mensagemErro = "Produto não encontrado, ou sem informações nutricionais completas na Open Food Facts.";
+        return;
+      }
+      const input = { ...produto, codigoBarras: codigo };
+      if (refeicaoId) {
+        produtoPendente = input;
+        mostrarEscolhaSalvar = true;
+        return;
+      }
+      irParaItem(await criarAlimentoOpenFoodFacts(input));
+    } catch (err) {
+      fase = "erro";
+      mensagemErro = (err as Error).message;
+    }
+  }
 
-      const destino = modoReceita
-        ? `/dieta/alimento/${alimentoId}/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`
-        : refeicaoId
-          ? `/dieta/alimento/${alimentoId}/${dataResolvida}/${refeicaoId}`
-          : `/dieta/alimento/${alimentoId}/${dataResolvida}`;
-      navigate(destino);
+  async function confirmarProdutoPendente(oculta: boolean) {
+    if (!produtoPendente) return;
+    mostrarEscolhaSalvar = false;
+    fase = "buscando";
+    try {
+      const alimentoId = await criarAlimentoOpenFoodFacts(produtoPendente, oculta);
+      produtoPendente = null;
+      irParaItem(alimentoId);
     } catch (err) {
       fase = "erro";
       mensagemErro = (err as Error).message;
@@ -144,6 +171,20 @@
   </svg>
 {/snippet}
 
+{#snippet iconCatalogo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16l7-4 7 4Z" />
+  </svg>
+{/snippet}
+
+{#snippet iconRefeicao()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3v7a2 2 0 0 0 2 2v9" />
+    <path d="M7 3v4M11 3v4" />
+    <path d="M17 3c-1.5 0-3 1.5-3 4v3a2 2 0 0 0 2 2v9" />
+  </svg>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={voltar} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -181,6 +222,33 @@
     />
     <Button onclick={buscarCodigoManual} disabled={!codigoManual.trim()}>Buscar</Button>
   </Sheet>
+{/if}
+
+{#if mostrarEscolhaSalvar}
+  <ActionSheet
+    titulo="Salvar esse alimento?"
+    onFechar={() => {
+      mostrarEscolhaSalvar = false;
+      produtoPendente = null;
+      tentarNovamente();
+    }}
+    opcoes={[
+      {
+        label: "Salvar no catálogo",
+        subtitulo: "Fica disponível pra usar em outras refeições depois",
+        icon: iconCatalogo,
+        manterAberto: true,
+        onSelect: () => confirmarProdutoPendente(false),
+      },
+      {
+        label: "Usar só nesta refeição",
+        subtitulo: "Não aparece na busca de alimentos depois",
+        icon: iconRefeicao,
+        manterAberto: true,
+        onSelect: () => confirmarProdutoPendente(true),
+      },
+    ]}
+  />
 {/if}
 
 <style>

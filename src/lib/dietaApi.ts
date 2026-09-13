@@ -77,7 +77,7 @@ export async function buscarAlimentos(query: string): Promise<Alimento[]> {
   const termo = query.trim();
   if (!termo) return [];
   const { data, error } = await porPalavras(
-    supabase.from("alimentos").select(ALIMENTO_SELECT),
+    supabase.from("alimentos").select(ALIMENTO_SELECT).eq("oculta", false),
     "nome_normalizado",
     semAcento(termo.toLowerCase()),
   )
@@ -92,6 +92,7 @@ export async function listAlimentos(limite = 50): Promise<Alimento[]> {
   const { data, error } = await supabase
     .from("alimentos")
     .select(ALIMENTO_SELECT)
+    .eq("oculta", false)
     .order("nome", { ascending: true })
     .limit(limite);
   if (error) throw error;
@@ -118,23 +119,32 @@ export interface AlimentoManualInput {
   gorduraInsaturadaG: number | null;
 }
 
-export async function criarAlimentoManual(input: AlimentoManualInput): Promise<void> {
-  const { error } = await supabase.from("alimentos").insert({
-    user_id: uid(),
-    nome: input.nome,
-    marca: input.marca,
-    porcao_padrao_qtd: input.porcaoPadraoQtd,
-    porcao_padrao_unidade: input.porcaoPadraoUnidade,
-    calorias_por_porcao: input.caloriasPorPorcao,
-    proteina_g: input.proteinaG,
-    gordura_g: input.gorduraG,
-    carboidrato_g: input.carboidratoG,
-    fibra_g: input.fibraG,
-    gordura_saturada_g: input.gorduraSaturadaG,
-    gordura_insaturada_g: input.gorduraInsaturadaG,
-    fonte: "manual",
-  });
+/** `oculta` (padrão false) marca um alimento criado só pra uso pontual numa refeição — não fica
+ * salvo no catálogo geral (some de listAlimentos/buscarAlimentos), mas continua acessível pelo id
+ * de quem já lançou ele no diário. Retorna o id criado, pra já lançar direto na refeição. */
+export async function criarAlimentoManual(input: AlimentoManualInput, oculta = false): Promise<string> {
+  const { data, error } = await supabase
+    .from("alimentos")
+    .insert({
+      user_id: uid(),
+      nome: input.nome,
+      marca: input.marca,
+      porcao_padrao_qtd: input.porcaoPadraoQtd,
+      porcao_padrao_unidade: input.porcaoPadraoUnidade,
+      calorias_por_porcao: input.caloriasPorPorcao,
+      proteina_g: input.proteinaG,
+      gordura_g: input.gorduraG,
+      carboidrato_g: input.carboidratoG,
+      fibra_g: input.fibraG,
+      gordura_saturada_g: input.gorduraSaturadaG,
+      gordura_insaturada_g: input.gorduraInsaturadaG,
+      fonte: "manual",
+      oculta,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  return data.id;
 }
 
 export async function atualizarAlimentoManual(id: string, input: AlimentoManualInput): Promise<void> {
@@ -211,8 +221,10 @@ export interface AlimentoOpenFoodFactsInput {
   codigoBarras: string;
 }
 
-/** Cria um alimento a partir de um produto escaneado (Open Food Facts) — valores sempre por 100g, como a API fornece. */
-export async function criarAlimentoOpenFoodFacts(input: AlimentoOpenFoodFactsInput): Promise<string> {
+/** Cria um alimento a partir de um produto escaneado (Open Food Facts) — valores sempre por 100g,
+ * como a API fornece. `oculta` (padrão false) marca um alimento só pra uso pontual numa refeição
+ * — a busca por código de barras continua achando ele normalmente, só some do catálogo geral. */
+export async function criarAlimentoOpenFoodFacts(input: AlimentoOpenFoodFactsInput, oculta = false): Promise<string> {
   const { data, error } = await supabase
     .from("alimentos")
     .insert({
@@ -230,6 +242,7 @@ export async function criarAlimentoOpenFoodFacts(input: AlimentoOpenFoodFactsInp
       gordura_insaturada_g: input.gorduraInsaturadaG,
       codigo_barras: input.codigoBarras,
       fonte: "openfoodfacts",
+      oculta,
     })
     .select("id")
     .single();

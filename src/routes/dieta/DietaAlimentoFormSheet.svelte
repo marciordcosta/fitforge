@@ -3,13 +3,30 @@
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
-  import { criarAlimentoManual, atualizarAlimentoManual, type Alimento } from "../../lib/dietaApi";
+  import {
+    criarAlimentoManual,
+    atualizarAlimentoManual,
+    adicionarItemDiario,
+    type Alimento,
+    type AlimentoManualInput,
+  } from "../../lib/dietaApi";
 
   let {
     alimento,
+    refeicaoId,
+    data,
     onFechar,
     onSalvo,
-  }: { alimento?: Alimento; onFechar: () => void; onSalvo: () => void } = $props();
+  }: {
+    alimento?: Alimento;
+    /** Quando informados (criação a partir de uma refeição específica), oferece a escolha de
+     * salvar no catálogo geral ou usar o alimento só nessa refeição — nesse caso ele já é lançado
+     * direto no diário, sem precisar de um segundo toque em "+" depois. */
+    refeicaoId?: string;
+    data?: string;
+    onFechar: () => void;
+    onSalvo: () => void;
+  } = $props();
 
   const editando = untrack(() => alimento != null);
 
@@ -27,6 +44,7 @@
     untrack(() => alimento?.gorduraSaturadaG != null || alimento?.gorduraInsaturadaG != null),
   );
   let mostrarEscolhaUnidade = $state(false);
+  let mostrarEscolhaSalvar = $state(false);
   let salvando = $state(false);
 
   $effect(() => {
@@ -62,27 +80,60 @@
       (gorduraExpandida ? gorduraSaturada != null || gorduraInsaturada != null : gordura != null),
   );
 
+  function montarInput(): AlimentoManualInput {
+    return {
+      nome: nome.trim(),
+      marca: marca.trim() || null,
+      porcaoPadraoQtd: porcaoQtd!,
+      porcaoPadraoUnidade: porcaoUnidade,
+      caloriasPorPorcao: calorias,
+      proteinaG: proteina!,
+      gorduraG: gordura ?? 0,
+      carboidratoG: carboidrato!,
+      fibraG: fibra,
+      gorduraSaturadaG: gorduraExpandida ? gorduraSaturada : null,
+      gorduraInsaturadaG: gorduraExpandida ? gorduraInsaturada : null,
+    };
+  }
+
   async function salvar() {
     if (!valido) return;
+    if (editando) {
+      salvando = true;
+      try {
+        await atualizarAlimentoManual(alimento!.id, montarInput());
+        onSalvo();
+        onFechar();
+      } catch (err) {
+        alert("Erro ao salvar alimento: " + (err as Error).message);
+        salvando = false;
+      }
+      return;
+    }
+    if (refeicaoId && data) {
+      mostrarEscolhaSalvar = true;
+      return;
+    }
+    await criarNovo(false);
+  }
+
+  /** `oculta=true` (opção "Usar só nesta refeição") já lança direto no diário sem salvar no
+   * catálogo geral; `oculta=false` ("Salvar no catálogo") também lança quando há uma refeição de
+   * contexto, mas fica disponível pra reusar depois. */
+  async function criarNovo(oculta: boolean) {
+    mostrarEscolhaSalvar = false;
     salvando = true;
     try {
-      const input = {
-        nome: nome.trim(),
-        marca: marca.trim() || null,
-        porcaoPadraoQtd: porcaoQtd!,
-        porcaoPadraoUnidade: porcaoUnidade,
-        caloriasPorPorcao: calorias,
-        proteinaG: proteina!,
-        gorduraG: gordura ?? 0,
-        carboidratoG: carboidrato!,
-        fibraG: fibra,
-        gorduraSaturadaG: gorduraExpandida ? gorduraSaturada : null,
-        gorduraInsaturadaG: gorduraExpandida ? gorduraInsaturada : null,
-      };
-      if (editando) {
-        await atualizarAlimentoManual(alimento!.id, input);
-      } else {
-        await criarAlimentoManual(input);
+      const input = montarInput();
+      const novoId = await criarAlimentoManual(input, oculta);
+      if (refeicaoId && data) {
+        const novoAlimento: Alimento = {
+          id: novoId,
+          ...input,
+          fonte: "manual",
+          codigoBarras: null,
+        };
+        await adicionarItemDiario({ alimento: novoAlimento, data, refeicaoId, quantidade: input.porcaoPadraoQtd });
       }
       onSalvo();
       onFechar();
@@ -96,6 +147,20 @@
 {#snippet iconChevron()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M6 9l6 6 6-6" />
+  </svg>
+{/snippet}
+
+{#snippet iconCatalogo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16l7-4 7 4Z" />
+  </svg>
+{/snippet}
+
+{#snippet iconRefeicao()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3v7a2 2 0 0 0 2 2v9" />
+    <path d="M7 3v4M11 3v4" />
+    <path d="M17 3c-1.5 0-3 1.5-3 4v3a2 2 0 0 0 2 2v9" />
   </svg>
 {/snippet}
 
@@ -198,6 +263,27 @@
       { label: "g", onSelect: () => (porcaoUnidade = "g") },
       { label: "ml", onSelect: () => (porcaoUnidade = "ml") },
       { label: "unidade", onSelect: () => (porcaoUnidade = "unidade") },
+    ]}
+  />
+{/if}
+
+{#if mostrarEscolhaSalvar}
+  <ActionSheet
+    titulo="Salvar esse alimento?"
+    onFechar={() => (mostrarEscolhaSalvar = false)}
+    opcoes={[
+      {
+        label: "Salvar no catálogo",
+        subtitulo: "Fica disponível pra usar em outras refeições depois",
+        icon: iconCatalogo,
+        onSelect: () => criarNovo(false),
+      },
+      {
+        label: "Usar só nesta refeição",
+        subtitulo: "Não aparece na busca de alimentos depois",
+        icon: iconRefeicao,
+        onSelect: () => criarNovo(true),
+      },
     ]}
   />
 {/if}
