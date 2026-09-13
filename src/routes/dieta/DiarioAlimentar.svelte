@@ -632,10 +632,10 @@
           {:else if temItens}
             <p class="pct-titulo">Refeição sem meta</p>
             <div class="pct-grid">
-              {@render pctColuna("Calorias", "var(--color-secondary)", 0, totais.calorias.toFixed(0))}
-              {@render pctColuna("Carb", COR_CARBO, 0, `${totais.carboidratoG.toFixed(0)}g`)}
-              {@render pctColuna("Gorduras", COR_GORDURA, 0, `${totais.gorduraG.toFixed(0)}g`)}
-              {@render pctColuna("Proteínas", COR_PROTEINA, 0, `${totais.proteinaG.toFixed(0)}g`)}
+              {@render pctColuna("Calorias", "var(--color-secondary)", 0, `${totais.calorias.toFixed(0)} consumido`)}
+              {@render pctColuna("Carb", COR_CARBO, 0, `${totais.carboidratoG.toFixed(0)}g consumido`)}
+              {@render pctColuna("Gorduras", COR_GORDURA, 0, `${totais.gorduraG.toFixed(0)}g consumido`)}
+              {@render pctColuna("Proteínas", COR_PROTEINA, 0, `${totais.proteinaG.toFixed(0)}g consumido`)}
             </div>
           {:else}
             <p class="preview">{preview(refeicao.id)}</p>
