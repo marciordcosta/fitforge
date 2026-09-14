@@ -1465,17 +1465,21 @@
     }
   }
 
-  // ---------------- Mover exercício pra outra rotina ----------------
+  // ---------------- Trocar exercício de rotina (troca de lugar com outro exercício) ----------------
 
   /** Item cujo submenu "Ir para Lista / Ir para Rotinas" (dentro de Trocar Exercício) está aberto. */
   let menuTrocarSubmenu = $state<ItemMusculoRotina | null>(null);
-  /** Item sendo movido — o fluxo só pergunta a rotina de destino; ao escolher, move na hora e
-   * volta pro editor. Sempre é uma ação IMEDIATA (grava direto no banco), mesmo se aberta a
-   * partir do editor completo — envolve DUAS rotinas, uma delas nunca está no rascunho local
-   * aberto no momento. */
+  /** Item de origem da troca — o fluxo é em 2 passos: escolhe a rotina de destino, depois qual
+   * exercício de lá troca de lugar com esse. Sempre é uma ação IMEDIATA (grava direto no banco),
+   * mesmo se aberta a partir do editor completo — envolve DUAS rotinas, e a de destino nunca está
+   * no rascunho local aberto no momento. Diferente de "Reordenar" (modoReordenarEditor), que só
+   * muda a posição DENTRO da mesma rotina e continua sendo rascunho local, revertível ao
+   * descartar. */
   let movendoItem = $state<ItemMusculoRotina | null>(null);
   let mostrarPickerMover = $state(false);
-  let movendoExercicio = $state(false);
+  /** Rotina de destino já escolhida (passo 2: qual exercício dela troca de lugar). */
+  let rotinaDestinoTroca = $state<TreinoComExercicios | null>(null);
+  let trocandoExercicioRotina = $state(false);
 
   function abrirSubmenuTrocar(item: ItemMusculoRotina): void {
     menuTrocarSubmenu = item;
@@ -1484,57 +1488,81 @@
 
   function abrirMoverExercicio(item: ItemMusculoRotina): void {
     movendoItem = item;
+    rotinaDestinoTroca = null;
     mostrarPickerMover = true;
     menuExercicioMusculo = null;
     menuTrocarSubmenu = null;
   }
 
-  /** Só rotinas diferentes da atual e que ainda não têm esse exercício — mover pra uma que já
-   * tem duplicaria o exercício nela. */
+  /** Só rotinas diferentes da atual, com pelo menos 1 exercício (precisa de alguém pra trocar de
+   * lugar) e que ainda não têm esse exercício — teria os dois exercícios duplicados na mesma
+   * rotina depois da troca. */
   const rotinasParaMover = $derived(
     movendoItem
       ? treinos.filter(
-          (t) => t.id !== movendoItem!.treinoId && !t.exercicios.some((te) => te.exercicio_id === movendoItem!.exercicioId),
+          (t) =>
+            t.id !== movendoItem!.treinoId &&
+            t.exercicios.length > 0 &&
+            !t.exercicios.some((te) => te.exercicio_id === movendoItem!.exercicioId),
         )
       : [],
   );
 
+  function escolherRotinaDestino(treino: TreinoComExercicios): void {
+    rotinaDestinoTroca = treino;
+  }
+
+  function voltarParaEscolherRotina(): void {
+    rotinaDestinoTroca = null;
+  }
+
   function fecharMover(): void {
     mostrarPickerMover = false;
     movendoItem = null;
+    rotinaDestinoTroca = null;
   }
 
-  /** Move o exercício pra rotina de destino como um item novo (fica ao lado do que já existe lá,
-   * sem substituir/trocar de lugar com nenhum exercício de lá) e remove da rotina de origem. */
-  async function moverExercicio(destino: TreinoComExercicios): Promise<void> {
-    if (!movendoItem) return;
+  /** Troca os dois exercícios de rotina entre si: o de origem vai pra rotina de destino, e o
+   * escolhido lá vai pra rotina de origem — nenhuma das duas fica com um exercício a mais ou a
+   * menos. Cada lado é recriado com o número de séries que já tinha (mesma limitação de sempre:
+   * a série detalhada — peso/reps — não é preservada, só a quantidade). */
+  async function trocarExercicioDeRotina(destinoItem: ItemMusculoRotina): Promise<void> {
+    if (!movendoItem || !rotinaDestinoTroca) return;
     const origem = movendoItem;
-    movendoExercicio = true;
+    const destinoRotinaId = rotinaDestinoTroca.id;
+    trocandoExercicioRotina = true;
     try {
-      await adicionarTreinoExercicio(destino.id, origem.exercicioId, origem.series, []);
+      await adicionarTreinoExercicio(destinoRotinaId, origem.exercicioId, origem.series, []);
+      await adicionarTreinoExercicio(origem.treinoId, destinoItem.exercicioId, destinoItem.series, []);
       await removerTreinoExercicio(origem.treinoExercicioId);
+      await removerTreinoExercicio(destinoItem.treinoExercicioId);
       await refrescarTreinoMusculo(origem.treinoId);
-      await refrescarTreinoMusculo(destino.id);
-      // O editor completo é um rascunho local (não sincroniza sozinho) — se a rotina de origem
-      // é a que está aberta nele, remove a linha de lá também, senão o rascunho fica
-      // desatualizado (e Salvar poderia gravar o exercício de volta sem querer).
+      await refrescarTreinoMusculo(destinoRotinaId);
+      // O editor completo é um rascunho local (não sincroniza sozinho) — se uma das duas rotinas
+      // envolvidas é a que está aberta nele, remove a linha correspondente de lá também, senão o
+      // rascunho fica desatualizado (e Salvar poderia gravar o exercício de volta sem querer).
       if (modalEditorRotina?.id === origem.treinoId) {
         modalEditorRotina = {
           ...modalEditorRotina,
           exercicios: modalEditorRotina.exercicios.filter((te) => te.id !== origem.treinoExercicioId),
         };
+      } else if (modalEditorRotina?.id === destinoRotinaId) {
+        modalEditorRotina = {
+          ...modalEditorRotina,
+          exercicios: modalEditorRotina.exercicios.filter((te) => te.id !== destinoItem.treinoExercicioId),
+        };
       }
       if (modalMusculoRotina) {
         statusAjusteMusculo = {
           tipo: "ok",
-          texto: `"${origem.exercicioNome}" foi movido pra "${destino.nome_treino}".`,
+          texto: `"${origem.exercicioNome}" e "${destinoItem.exercicioNome}" trocaram de rotina.`,
         };
       }
       fecharMover();
     } catch (e) {
-      alert("Erro ao mover exercício: " + (e as Error).message);
+      alert("Erro ao trocar exercício de rotina: " + (e as Error).message);
     } finally {
-      movendoExercicio = false;
+      trocandoExercicioRotina = false;
     }
   }
 
@@ -2911,7 +2939,7 @@
           onSelect: () => abrirSubmenuTrocar(item),
         },
         {
-          label: "Mover",
+          label: "Trocar de Rotina",
           icon: iconMover,
           onSelect: () => abrirMoverExercicio(item),
         },
@@ -2979,21 +3007,54 @@
   <div class="acima-editor">
     <div class="tela-editor-rotina">
       <div class="editor-conteudo">
-        <div class="header">
-          <button class="back" onclick={fecharMover} aria-label="Voltar">{@render iconVoltar()}</button>
-          <h1>Mover "{movendoItem.exercicioNome}"</h1>
-          <span class="spacer"></span>
-        </div>
-        {#if !rotinasParaMover.length}
-          <p class="muted">Nenhuma rotina disponível — todas as outras já têm esse exercício.</p>
+        {#if !rotinaDestinoTroca}
+          <div class="header">
+            <button class="back" onclick={fecharMover} aria-label="Voltar">{@render iconVoltar()}</button>
+            <h1>Trocar "{movendoItem.exercicioNome}"</h1>
+            <span class="spacer"></span>
+          </div>
+          <p class="muted">Escolha a rotina de destino.</p>
+          {#if !rotinasParaMover.length}
+            <p class="muted">Nenhuma rotina disponível pra troca — as outras estão vazias ou já têm esse exercício.</p>
+          {:else}
+            <ul class="picker-lista-mover">
+              {#each rotinasParaMover as treinoOpcao (treinoOpcao.id)}
+                <li>
+                  <button class="picker-item-mover" onclick={() => escolherRotinaDestino(treinoOpcao)}>
+                    <span class="picker-item-mover-nome">{treinoOpcao.nome_treino}</span>
+                    <span class="picker-item-mover-sub"
+                    >{treinoOpcao.exercicios.length} {treinoOpcao.exercicios.length === 1 ? "exercício" : "exercícios"}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          {/if}
         {:else}
+          <div class="header">
+            <button class="back" onclick={voltarParaEscolherRotina} aria-label="Voltar">{@render iconVoltar()}</button>
+            <h1>Trocar por qual exercício?</h1>
+            <span class="spacer"></span>
+          </div>
+          <p class="muted">"{movendoItem.exercicioNome}" vai pra "{rotinaDestinoTroca.nome_treino}" — escolha quem troca de lugar com ele.</p>
           <ul class="picker-lista-mover">
-            {#each rotinasParaMover as treinoOpcao (treinoOpcao.id)}
+            {#each rotinaDestinoTroca.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te (te.id)}
               <li>
-                <button class="picker-item-mover" onclick={() => moverExercicio(treinoOpcao)} disabled={movendoExercicio}>
-                  <span class="picker-item-mover-nome">{treinoOpcao.nome_treino}</span>
-                  <span class="picker-item-mover-sub"
-                  >{treinoOpcao.exercicios.length} {treinoOpcao.exercicios.length === 1 ? "exercício" : "exercícios"}</span>
+                <button
+                  class="picker-item-mover"
+                  disabled={trocandoExercicioRotina}
+                  onclick={() =>
+                    trocarExercicioDeRotina({
+                      treinoId: rotinaDestinoTroca!.id,
+                      treinoNome: rotinaDestinoTroca!.nome_treino,
+                      treinoExercicioId: te.id,
+                      exercicioId: te.exercicio_id,
+                      exercicioNome: te.exercicio?.nome ?? "",
+                      series: te.series.length,
+                      posicao: te.ordem + 1,
+                    })}
+                >
+                  <span class="picker-item-mover-nome">{te.exercicio?.nome ?? ""}</span>
+                  <span class="picker-item-mover-sub">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
                 </button>
               </li>
             {/each}
