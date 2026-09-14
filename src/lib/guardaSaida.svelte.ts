@@ -24,8 +24,15 @@ import { registrarGuardaSaida, limparGuardaSaida } from "./router.svelte";
 export function criarGuardaSaida(estaSujo: () => boolean) {
   let confirmando = $state(false);
   let prosseguirPendente: (() => void) | null = null;
+  /** true depois que resolverSaida decide sair de vez — nunca mais rearma daí em diante, mesmo
+   * que estaSujo() volte a "true" nesse meio-tempo (ex: a própria tela limpa o rascunho/sessão
+   * antes de navegar, o que costuma zerar um "original" e fazer o dirty-check reagir como se
+   * tivesse alteração de novo — sem essa trava, o alerta reaparecia bem na hora de sair depois de
+   * salvar com sucesso). */
+  let saindo = false;
 
   function armar(): void {
+    if (saindo) return;
     registrarGuardaSaida((prosseguir) => {
       prosseguirPendente = prosseguir;
       confirmando = true;
@@ -38,7 +45,7 @@ export function criarGuardaSaida(estaSujo: () => boolean) {
   // acabou de escolher ir. As chamadas explícitas de cada tela (limpar o dirty-flag antes de
   // resolverSaida) já desarmam o degrau no fluxo normal.
   $effect(() => {
-    if (estaSujo()) armar();
+    if (!saindo && estaSujo()) armar();
     else limparGuardaSaida();
   });
 
@@ -61,6 +68,7 @@ export function criarGuardaSaida(estaSujo: () => boolean) {
      * senão o degrau de proteção seria religado por engano no meio do caminho. */
     resolverSaida(fecharLocal: () => void): void {
       confirmando = false;
+      saindo = true;
       const p = prosseguirPendente;
       prosseguirPendente = null;
       if (p) {
