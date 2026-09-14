@@ -6,6 +6,7 @@
   import WheelPicker from "../../components/WheelPicker.svelte";
   import WheelPickerMacros from "../../components/WheelPickerMacros.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
   import {
     listRefeicoesModelo,
     criarRefeicaoModelo,
@@ -93,6 +94,31 @@
   let modoCaloriasOriginal = $state<"fixa" | "ondulatoria">("fixa");
   let manuaisCompletos = $state<Map<number, CaloriasDiaManual>>(new Map());
   let manuaisOriginal = $state<Map<number, CaloriasDiaManual>>(new Map());
+  /** Snapshot da aba Calorias no último carregamento/salvamento — dirty-check pro alerta de sair
+   * sem salvar (voltar do app e voltar físico/gesto). */
+  let originalCalorias = "";
+  function snapshotCalorias(): string {
+    return JSON.stringify({
+      proteinaGInput,
+      gorduraGInput,
+      carboidratoGInput,
+      modoCalorias,
+      manuais: [...manuaisCompletos.entries()].sort((a, b) => a[0] - b[0]),
+    });
+  }
+  function sujoCalorias(): boolean {
+    return perfilCarregado && snapshotCalorias() !== originalCalorias;
+  }
+  const guardaSaidaCalorias = criarGuardaSaida(sujoCalorias);
+  let confirmandoDescartarCalorias = $state(false);
+
+  function aoVoltarGerenciar(): void {
+    if (sujoCalorias()) {
+      confirmandoDescartarCalorias = true;
+      return;
+    }
+    voltar("/dieta");
+  }
   const manuaisDias = $derived(new Map([...manuaisCompletos].map(([dia, v]) => [dia, v.calorias])));
   let diasSelecionados = $state<Set<number>>(new Set());
 
@@ -261,6 +287,7 @@
       manuaisOriginal = new Map(manuais);
       parametros = parametrosCarregados;
       perfilCarregado = true;
+      originalCalorias = snapshotCalorias();
     } catch (err) {
       erroMetas = (err as Error).message;
     }
@@ -628,6 +655,7 @@
 
       modoCaloriasOriginal = modoCalorias;
       manuaisOriginal = new Map(manuaisCompletos);
+      originalCalorias = snapshotCalorias();
     } catch (err) {
       alert("Erro ao salvar metas: " + (err as Error).message);
     } finally {
@@ -1391,7 +1419,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/dieta")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={aoVoltarGerenciar} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Gerenciar</h1>
     {#if aba === "refeicoes"}
       <button class="criar" onclick={abrirNovo} aria-label="Nova refeição">{@render iconMais()}</button>
@@ -1753,6 +1781,21 @@
     textoConfirmar="Remover"
     onConfirmar={confirmarRemoverDoGrupo}
     onCancelar={() => (paraRemoverDoGrupo = null)}
+  />
+{/if}
+
+{#if confirmandoDescartarCalorias || guardaSaidaCalorias.confirmando}
+  <ConfirmDialog
+    titulo="Descartar alterações nas metas de calorias?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoDescartarCalorias = false;
+      guardaSaidaCalorias.resolverSaida(() => voltar("/dieta"));
+    }}
+    onCancelar={() => {
+      confirmandoDescartarCalorias = false;
+      guardaSaidaCalorias.cancelar();
+    }}
   />
 {/if}
 

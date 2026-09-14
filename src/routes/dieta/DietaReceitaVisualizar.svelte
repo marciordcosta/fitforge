@@ -24,6 +24,7 @@
     type MetasDiarias,
   } from "../../lib/dietaApi";
   import { receitaRascunho, limparRascunho } from "../../lib/receitaRascunho.svelte";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
 
   let { receitaId }: { receitaId: string } = $props();
 
@@ -54,6 +55,8 @@
   let itensLocais = $state<ReceitaItem[]>([]);
   let idsParaRemover = $state<string[]>([]);
   let salvandoEdicoes = $state(false);
+  let confirmandoDescartar = $state(false);
+  let original = "";
 
   function round1(n: number): number {
     return Math.round(n * 10) / 10;
@@ -77,6 +80,7 @@
       idsParaRemover = [];
 
       const itensSalvos = receitaRes?.itens ?? [];
+      original = JSON.stringify({ nome: receitaRes?.nome ?? "", itens: itensSalvos });
       const itensPendentes = receitaRascunho.contexto === receitaId ? receitaRascunho.itens : [];
       const itensNovos: ReceitaItem[] = itensPendentes.map((it) => {
         const fator = it.quantidade / it.alimento.porcaoPadraoQtd;
@@ -106,6 +110,21 @@
   }
 
   void carregar();
+
+  function sujo(): boolean {
+    if (loading || !receita) return false;
+    return JSON.stringify({ nome: nomeEditavel.trim(), itens: itensLocais }) !== original;
+  }
+
+  const guardaSaida = criarGuardaSaida(sujo);
+
+  function aoVoltar(): void {
+    if (sujo()) {
+      confirmandoDescartar = true;
+      return;
+    }
+    voltar("/dieta/receitas");
+  }
 
   async function salvarEdicoes() {
     if (!receita) return;
@@ -281,7 +300,7 @@
     excluindo = true;
     try {
       await excluirReceita(receita.id);
-      navigate("/dieta/receitas");
+      voltar("/dieta/receitas");
     } catch (err) {
       alert("Erro ao excluir refeição: " + (err as Error).message);
       excluindo = false;
@@ -310,7 +329,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/dieta/receitas")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={aoVoltar} aria-label="Voltar">{@render iconVoltar()}</button>
     {#if nomeEditando}
       <input
         class="nome-input"
@@ -440,6 +459,21 @@
     textoConfirmar="Excluir Refeição"
     onConfirmar={excluir}
     onCancelar={() => (confirmandoExclusao = false)}
+  />
+{/if}
+
+{#if confirmandoDescartar || guardaSaida.confirmando}
+  <ConfirmDialog
+    titulo="Descartar alterações nessa refeição?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.resolverSaida(() => voltar("/dieta/receitas"));
+    }}
+    onCancelar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.cancelar();
+    }}
   />
 {/if}
 
