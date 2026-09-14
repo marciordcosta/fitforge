@@ -23,6 +23,7 @@
     type Alimento,
     type RefeicaoModelo,
   } from "../../lib/dietaApi";
+  import { receitaRascunho, definirContexto, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
 
   let { refeicaoId }: { refeicaoId: string } = $props();
 
@@ -242,12 +243,13 @@
     }
   }
 
+  let mostrarMenuSalvar = $state(false);
   let confirmandoSalvarPadrao = $state(false);
   let salvandoPadrao = $state(false);
+  let preparandoNovaReceita = $state(false);
 
-  /** Caminho inverso: salva os alimentos de hoje como a nova Refeição Padrão desse dia da semana,
-   * substituindo a lista antiga (se houver) — botão só aparece quando já tem algum alimento
-   * lançado hoje. */
+  /** Caminho inverso de "Lançar Refeição Padrão": salva os alimentos de hoje como a nova Refeição
+   * Padrão desse dia da semana, substituindo a lista antiga (se houver). */
   async function salvarComoPadrao() {
     confirmandoSalvarPadrao = false;
     if (!refeicao || !modeloRefeicao) return;
@@ -264,6 +266,27 @@
       alert("Erro ao salvar refeição padrão: " + (err as Error).message);
     } finally {
       salvandoPadrao = false;
+    }
+  }
+
+  /** Diferente de "Salvar como Refeição Padrão" (sobrescreve o catálogo direto): aqui só prepara
+   * o rascunho com os alimentos de hoje e abre a tela de Nova Refeição, pra revisar/renomear antes
+   * de confirmar — vira uma refeição salva normal, na lista de Receitas. */
+  async function prepararNovaReceita() {
+    if (!refeicao) return;
+    preparandoNovaReceita = true;
+    try {
+      const alimentos = await Promise.all(itens.map((item) => getAlimento(item.alimentoId)));
+      definirContexto("nova");
+      receitaRascunho.nome = refeicao.nome;
+      receitaRascunho.itens = itens
+        .map((item, i) => ({ alimento: alimentos[i], quantidade: item.quantidade }))
+        .filter((it): it is { alimento: Alimento; quantidade: number } => it.alimento != null);
+      navigate(urlNovaReceitaMeta());
+    } catch (err) {
+      alert("Erro ao preparar nova refeição: " + (err as Error).message);
+    } finally {
+      preparandoNovaReceita = false;
     }
   }
 
@@ -340,7 +363,7 @@
       <span class="data-inline">{dataLabel}</span>
     </h1>
     {#if itens.length && modeloRefeicao}
-      <button class="icone-header" disabled={salvandoPadrao} onclick={() => (confirmandoSalvarPadrao = true)} aria-label="Salvar Refeição Padrão">{@render iconSubir()}</button>
+      <button class="icone-header" disabled={salvandoPadrao || preparandoNovaReceita} onclick={() => (mostrarMenuSalvar = true)} aria-label="Salvar Refeição">{@render iconSubir()}</button>
     {:else if receitaPadraoTemItens}
       <button class="icone-header" disabled={lancandoPadrao} onclick={aoClicarRefeicaoPadrao} aria-label="Lançar Refeição Padrão">{@render iconBaixar()}</button>
     {:else}
@@ -483,6 +506,25 @@
     textoConfirmar="Excluir Refeição"
     onConfirmar={descartarRefeicao}
     onCancelar={() => (confirmandoExclusaoRefeicao = false)}
+  />
+{/if}
+
+{#if mostrarMenuSalvar}
+  <ActionSheet
+    titulo="Salvar refeição"
+    onFechar={() => (mostrarMenuSalvar = false)}
+    opcoes={[
+      {
+        label: "Salvar Refeição",
+        subtitulo: "Vira uma refeição salva normal, na lista de Receitas",
+        onSelect: () => prepararNovaReceita(),
+      },
+      {
+        label: "Salvar como Refeição Padrão",
+        subtitulo: "Substitui a lista de alimentos padrão desse dia da semana",
+        onSelect: () => (confirmandoSalvarPadrao = true),
+      },
+    ]}
   />
 {/if}
 

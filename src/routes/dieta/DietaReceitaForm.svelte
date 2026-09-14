@@ -1,6 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { criarReceita, getMetasDiarias, type MetasDiarias } from "../../lib/dietaApi";
+  import { criarReceita } from "../../lib/dietaApi";
   import { receitaRascunho, removerDoRascunho, limparRascunho, type ItemRascunho } from "../../lib/receitaRascunho.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -12,7 +12,6 @@
 
   let salvando = $state(false);
   let itemEditandoIndex = $state<number | null>(null);
-  let metas = $state<MetasDiarias | null>(null);
   let confirmandoDescartar = $state(false);
 
   /** A receita inteira é um rascunho local (receitaRascunho) até tocar Salvar. */
@@ -29,8 +28,6 @@
     }
     voltar("/dieta/receitas");
   }
-
-  void getMetasDiarias().then((m) => (metas = m));
 
   function fatorItem(item: ItemRascunho): number {
     return item.quantidade / item.alimento.porcaoPadraoQtd;
@@ -71,21 +68,6 @@
   const donutStyle = $derived(
     `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
   );
-
-  function pctMeta(valor: number, meta: number): number {
-    return meta > 0 ? (valor / meta) * 100 : 0;
-  }
-
-  function larguraBarra(pct: number): number {
-    return Math.min(100, pct);
-  }
-
-  /** Mesmo texto usado no Diário: quanto falta da meta diária pra bater ("rest."), ou "X acima" se
-   * essa receita sozinha já passa da meta. */
-  function metaValorTexto(consumido: number, meta: number, unidade: string): string {
-    if (consumido > meta) return `${(consumido - meta).toFixed(0)}${unidade} acima`;
-    return `${Math.max(0, meta - consumido).toFixed(0)}${unidade} rest.`;
-  }
 
   const valido = $derived(receitaRascunho.nome.trim().length > 0 && receitaRascunho.itens.length > 0);
 
@@ -176,32 +158,6 @@
         <p><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br /><span class="valor-g">{totalCarboidrato.toFixed(1)} g</span><br />Carb</p>
         <p><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br /><span class="valor-g">{totalGordura.toFixed(1)} g</span><br />Gorduras</p>
         <p><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{totalProteina.toFixed(1)} g</span><br />Proteínas</p>
-      </div>
-    </div>
-  {/if}
-
-  {#if metas}
-    <p class="metas-titulo">Percentual das suas metas diárias</p>
-    <div class="metas-grid">
-      <div class="meta-col">
-        <span class="meta-label">Calorias</span>
-        <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metas.calorias))}%; background:var(--color-secondary);`}></div></div>
-        <span class="meta-valor">{metaValorTexto(totalCalorias, metas.calorias, "")}</span>
-      </div>
-      <div class="meta-col">
-        <span class="meta-label">Carb</span>
-        <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
-        <span class="meta-valor">{metaValorTexto(totalCarboidrato, metas.carboidratoG, "g")}</span>
-      </div>
-      <div class="meta-col">
-        <span class="meta-label">Gorduras</span>
-        <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
-        <span class="meta-valor">{metaValorTexto(totalGordura, metas.gorduraG, "g")}</span>
-      </div>
-      <div class="meta-col">
-        <span class="meta-label">Proteínas</span>
-        <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
-        <span class="meta-valor">{metaValorTexto(totalProteina, metas.proteinaG, "g")}</span>
       </div>
     </div>
   {/if}
@@ -410,38 +366,6 @@
   }
   .resumo-macros .valor-g {
     font-size: 17px;
-  }
-  .metas-titulo {
-    font-weight: 600;
-    margin: var(--space-2) 0 var(--space-3);
-  }
-  .metas-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-3);
-    margin-bottom: var(--space-6);
-  }
-  .meta-col {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  .meta-label {
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
-  }
-  .meta-barra {
-    height: 4px;
-    border-radius: 2px;
-    background: var(--surface-border);
-    overflow: hidden;
-  }
-  .meta-barra-fill {
-    height: 100%;
-  }
-  .meta-valor {
-    font-size: 11px;
-    color: var(--surface-muted);
   }
   .itens-titulo {
     font-weight: 600;
