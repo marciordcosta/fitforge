@@ -1963,7 +1963,11 @@
           })),
       );
       for (const p of pendentes) {
-        await adicionarTreinoExercicio(p.destinoTreinoId, p.exercicioEntraId, p.exercicioEntraNumSeries, []);
+        // "Mover" também merece vir com peso/reps pré-preenchidos do último registro desse
+        // exercício, igual "Substituir Exercício" já fazia — sem isso as séries chegavam em
+        // branco na rotina de destino, mesmo já tendo histórico registrado.
+        const anterior = await getUltimoRegistro(p.exercicioEntraId);
+        await adicionarTreinoExercicio(p.destinoTreinoId, p.exercicioEntraId, p.exercicioEntraNumSeries, anterior);
         if (p.exercicioSaiTreinoExercicioId) await removerTreinoExercicio(p.exercicioSaiTreinoExercicioId);
       }
       // Dia só é alterado de verdade aqui — mudar dentro do editor até aqui só mexeu no rascunho.
