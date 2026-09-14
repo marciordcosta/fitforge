@@ -7,7 +7,7 @@
   import PieChart from "../../components/PieChart.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
   import Exercicios from "./Exercicios.svelte";
-  import { treinoEditorRascunho } from "../../lib/treinoEditorRascunho.svelte";
+  import { treinoEditorRascunho, type PendenteMoverTrocar } from "../../lib/treinoEditorRascunho.svelte";
   import {
     listMusculos,
     listTreinos,
@@ -1469,14 +1469,12 @@
 
   /** Item cujo submenu "Ir para Lista / Ir para Rotinas" (dentro de Trocar Exercício) está aberto. */
   let menuTrocarSubmenu = $state<ItemMusculoRotina | null>(null);
-  /** Item de origem — "Mover" (relocaliza só ele, de forma definitiva) e "Trocar de Rotina" (troca
-   * de lugar com outro exercício, nenhuma das duas rotinas fica com um a mais ou a menos) são
-   * ações DIFERENTES que compartilham o mesmo primeiro passo (escolher a rotina de destino);
-   * `modoPickerRotina` decide qual das duas está em andamento. Sempre são ações IMEDIATAS (gravam
-   * direto no banco), mesmo abertas a partir do editor completo — envolvem DUAS rotinas, e a de
-   * destino nunca está no rascunho local aberto no momento. Diferente de "Reordenar"
-   * (modoReordenarEditor), que só muda a posição DENTRO da mesma rotina e continua sendo rascunho
-   * local, revertível ao descartar. */
+  /** Item de origem — "Mover" (relocaliza só ele, de forma definitiva) e "Substituir Exercício"
+   * (troca de lugar com outro exercício, nenhuma das duas rotinas fica com um a mais ou a menos)
+   * são ações DIFERENTES que compartilham o mesmo primeiro passo (escolher a rotina de destino);
+   * `modoPickerRotina` decide qual das duas está em andamento. Envolvem DUAS rotinas — a de
+   * destino nunca está aberta no editor no momento — mas ainda assim ficam só no rascunho local
+   * (staged em `pendentesMoverTrocar`) até Salvar, igual a qualquer outra ação do editor. */
   let movendoItem = $state<ItemMusculoRotina | null>(null);
   let modoPickerRotina = $state<"mover" | "trocar" | null>(null);
   /** Rotina de destino já escolhida — só usado no modo "trocar" (passo 2: qual exercício dela
@@ -1529,7 +1527,7 @@
 
   function escolherRotinaDestino(treino: TreinoComExercicios): void {
     if (modoPickerRotina === "mover") {
-      void moverExercicio(treino);
+      moverExercicio(treino);
     } else {
       rotinaDestinoTroca = treino;
     }
@@ -1545,82 +1543,74 @@
     rotinaDestinoTroca = null;
   }
 
-  /** Move o exercício pra rotina de destino como um item novo (fica ao lado do que já existe lá,
-   * sem trocar de lugar com nenhum exercício de lá) e remove da rotina de origem. */
-  async function moverExercicio(destino: TreinoComExercicios): Promise<void> {
-    if (!movendoItem) return;
+  /** Move o exercício pra rotina de destino — só no RASCUNHO local (nada é gravado até Salvar):
+   * some da lista aberta no editor agora, e fica anotado em pendentesMoverTrocar pra, ao salvar,
+   * também entrar de verdade na rotina de destino. Descartando o editor, a anotação some junto e
+   * nada muda pra nenhuma das duas rotinas. */
+  function moverExercicio(destino: TreinoComExercicios): void {
+    if (!movendoItem || !modalEditorRotina) return;
     const origem = movendoItem;
-    processandoPickerRotina = true;
-    try {
-      await adicionarTreinoExercicio(destino.id, origem.exercicioId, origem.series, []);
-      await removerTreinoExercicio(origem.treinoExercicioId);
-      await refrescarTreinoMusculo(origem.treinoId);
-      await refrescarTreinoMusculo(destino.id);
-      // O editor completo é um rascunho local (não sincroniza sozinho) — se a rotina de origem
-      // é a que está aberta nele, remove a linha de lá também, senão o rascunho fica
-      // desatualizado (e Salvar poderia gravar o exercício de volta sem querer).
-      if (modalEditorRotina?.id === origem.treinoId) {
-        modalEditorRotina = {
-          ...modalEditorRotina,
-          exercicios: modalEditorRotina.exercicios.filter((te) => te.id !== origem.treinoExercicioId),
-        };
-      }
-      if (modalMusculoRotina) {
-        statusAjusteMusculo = {
-          tipo: "ok",
-          texto: `"${origem.exercicioNome}" foi movido pra "${destino.nome_treino}".`,
-        };
-      }
-      fecharMover();
-    } catch (e) {
-      alert("Erro ao mover exercício: " + (e as Error).message);
-    } finally {
-      processandoPickerRotina = false;
-    }
+    modalEditorRotina = {
+      ...modalEditorRotina,
+      exercicios: modalEditorRotina.exercicios.filter((te) => te.id !== origem.treinoExercicioId),
+    };
+    pendentesMoverTrocar = [
+      ...pendentesMoverTrocar,
+      {
+        destinoTreinoId: destino.id,
+        destinoTreinoNome: destino.nome_treino,
+        exercicioEntraId: origem.exercicioId,
+        exercicioEntraNumSeries: origem.series,
+      },
+    ];
+    editorSujo = true;
+    fecharMover();
   }
 
-  /** Troca os dois exercícios de rotina entre si: o de origem vai pra rotina de destino, e o
-   * escolhido lá vai pra rotina de origem — nenhuma das duas fica com um exercício a mais ou a
-   * menos. Cada lado é recriado com o número de séries que já tinha (mesma limitação de sempre:
-   * a série detalhada — peso/reps — não é preservada, só a quantidade). */
+  /** Troca os dois exercícios de rotina entre si: o de origem sai da lista aberta no editor e o
+   * escolhido na rotina de destino entra no lugar dele — só no RASCUNHO local, igual mover. Ao
+   * salvar, a rotina de destino perde o exercício escolhido e ganha o de origem (nenhuma das duas
+   * fica com um a mais ou a menos); descartando, nada muda em nenhuma das duas. O que entra aqui
+   * é pré-preenchido com o último desempenho registrado desse exercício, igual "+ Adicionar
+   * Exercício" — a série que ele tinha na rotina de destino não é preservada, só a quantidade. */
   async function trocarExercicioDeRotina(destinoItem: ItemMusculoRotina): Promise<void> {
-    if (!movendoItem || !rotinaDestinoTroca) return;
+    if (!movendoItem || !rotinaDestinoTroca || !modalEditorRotina) return;
     const origem = movendoItem;
-    const destinoRotinaId = rotinaDestinoTroca.id;
+    const destino = rotinaDestinoTroca;
     processandoPickerRotina = true;
-    try {
-      await adicionarTreinoExercicio(destinoRotinaId, origem.exercicioId, origem.series, []);
-      await adicionarTreinoExercicio(origem.treinoId, destinoItem.exercicioId, destinoItem.series, []);
-      await removerTreinoExercicio(origem.treinoExercicioId);
-      await removerTreinoExercicio(destinoItem.treinoExercicioId);
-      await refrescarTreinoMusculo(origem.treinoId);
-      await refrescarTreinoMusculo(destinoRotinaId);
-      // O editor completo é um rascunho local (não sincroniza sozinho) — se uma das duas rotinas
-      // envolvidas é a que está aberta nele, remove a linha correspondente de lá também, senão o
-      // rascunho fica desatualizado (e Salvar poderia gravar o exercício de volta sem querer).
-      if (modalEditorRotina?.id === origem.treinoId) {
-        modalEditorRotina = {
-          ...modalEditorRotina,
-          exercicios: modalEditorRotina.exercicios.filter((te) => te.id !== origem.treinoExercicioId),
-        };
-      } else if (modalEditorRotina?.id === destinoRotinaId) {
-        modalEditorRotina = {
-          ...modalEditorRotina,
-          exercicios: modalEditorRotina.exercicios.filter((te) => te.id !== destinoItem.treinoExercicioId),
-        };
-      }
-      if (modalMusculoRotina) {
-        statusAjusteMusculo = {
-          tipo: "ok",
-          texto: `"${origem.exercicioNome}" e "${destinoItem.exercicioNome}" trocaram de rotina.`,
-        };
-      }
-      fecharMover();
-    } catch (e) {
-      alert("Erro ao trocar exercício de rotina: " + (e as Error).message);
-    } finally {
-      processandoPickerRotina = false;
-    }
+    const anterior = await getUltimoRegistro(destinoItem.exercicioId);
+    processandoPickerRotina = false;
+    if (!modalEditorRotina) return;
+    const proximaOrdem = modalEditorRotina.exercicios.reduce((acc, te) => Math.max(acc, te.ordem), -1) + 1;
+    const itemEntrando: TreinoComExercicios["exercicios"][number] = {
+      id: `novo:${crypto.randomUUID()}`,
+      treino_id: modalEditorRotina.id,
+      exercicio_id: destinoItem.exercicioId,
+      descanso_seg: null,
+      observacao: null,
+      ordem: proximaOrdem,
+      exercicio: destino.exercicios.find((te) => te.id === destinoItem.treinoExercicioId)?.exercicio,
+      series: Array.from({ length: destinoItem.series }, (_, i) => {
+        const ant = anterior.find((a) => a.serie === i + 1);
+        return { id: `novo:${crypto.randomUUID()}`, serie: i + 1, peso_alvo: ant?.peso ?? null, rep_min: ant?.repeticoes ?? null, rep_max: ant?.repeticoes ?? null };
+      }),
+    };
+    modalEditorRotina = {
+      ...modalEditorRotina,
+      exercicios: [...modalEditorRotina.exercicios.filter((te) => te.id !== origem.treinoExercicioId), itemEntrando],
+    };
+    pendentesMoverTrocar = [
+      ...pendentesMoverTrocar,
+      {
+        destinoTreinoId: destino.id,
+        destinoTreinoNome: destino.nome_treino,
+        exercicioEntraId: origem.exercicioId,
+        exercicioEntraNumSeries: origem.series,
+        exercicioSaiTreinoExercicioId: destinoItem.treinoExercicioId,
+      },
+    ];
+    editorSujo = true;
+    fecharMover();
   }
 
   // ---------------- Modal: edição visual da rotina inteira (add/remover/reordenar exercícios) ----------------
@@ -1634,6 +1624,9 @@
   /** true assim que alguma alteração (remover/reordenar/ajustar séries/trocar/adicionar) foi
    * feita no rascunho local, mas ainda não foi gravada com o botão Salvar. */
   let editorSujo = $state(false);
+  /** "Mover"/"Substituir Exercício" pendentes de aplicar numa SEGUNDA rotina (que não está aberta
+   * no editor) — só executadas de verdade ao Salvar; descartando o editor, somem sem afetar nada. */
+  let pendentesMoverTrocar = $state<PendenteMoverTrocar[]>([]);
   let confirmandoFecharEditor = $state(false);
   /** Preenchido só quando o editor é aberto a partir de uma célula da grade "Distribuição na
    * Semana" — o exercício que trabalha esse músculo fica destacado na cor primária, pra saber
@@ -1866,10 +1859,12 @@
       modalEditorRotina = rascunho.treino;
       baselineEditor = rascunho.baseline;
       editorSujo = rascunho.sujo;
+      pendentesMoverTrocar = rascunho.pendentes;
     } else {
       modalEditorRotina = treino;
       capturarBaselineEditor(treino);
       editorSujo = false;
+      pendentesMoverTrocar = [];
     }
     editorFiltroMusculoId = editorFiltroInicialId;
     editorFiltroInicialId = null;
@@ -1880,7 +1875,13 @@
    * definirModalEditor recuperá-lo depois de o componente ser desmontado e remontado. */
   $effect(() => {
     if (modalEditorRotina && baselineEditor) {
-      treinoEditorRascunho.definir({ treinoId: modalEditorRotina.id, treino: modalEditorRotina, baseline: baselineEditor, sujo: editorSujo });
+      treinoEditorRascunho.definir({
+        treinoId: modalEditorRotina.id,
+        treino: modalEditorRotina,
+        baseline: baselineEditor,
+        sujo: editorSujo,
+        pendentes: pendentesMoverTrocar,
+      });
     }
   });
 
@@ -1900,6 +1901,7 @@
   function fecharEditorSemSalvar(): void {
     modalEditorRotina = null;
     editorSujo = false;
+    pendentesMoverTrocar = [];
     treinoEditorRascunho.limpar();
     if (editorUrlTreino) window.history.back();
   }
@@ -1911,12 +1913,14 @@
   }
 
   /** Grava o rascunho inteiro de uma vez (substitui a composição da rotina — mesma função usada
-   * pela tela básica de edição) e recarrega a lista principal, refletindo nos cards. Só agora,
-   * ao Salvar, é que qualquer chamada à API acontece — todas as ações do editor até aqui mexem
-   * só no rascunho local. */
+   * pela tela básica de edição), aplica na rotina de destino os "Mover"/"Substituir Exercício"
+   * pendentes (a única chamada de verdade ao banco por conta deles) e recarrega a lista principal,
+   * refletindo nos cards. Só agora, ao Salvar, é que qualquer chamada à API acontece — todas as
+   * ações do editor até aqui mexem só no rascunho local. */
   async function salvarEditor(): Promise<void> {
     if (!modalEditorRotina) return;
     const treinoId = modalEditorRotina.id;
+    const pendentes = pendentesMoverTrocar;
     salvandoEditor = true;
     try {
       await salvarExerciciosRotina(
@@ -1931,6 +1935,10 @@
             series: te.series.map((s) => ({ serie: s.serie, peso_alvo: s.peso_alvo, rep_min: s.rep_min, rep_max: s.rep_max })),
           })),
       );
+      for (const p of pendentes) {
+        await adicionarTreinoExercicio(p.destinoTreinoId, p.exercicioEntraId, p.exercicioEntraNumSeries, []);
+        if (p.exercicioSaiTreinoExercicioId) await removerTreinoExercicio(p.exercicioSaiTreinoExercicioId);
+      }
       // A meta é um alvo pra guiar o ajuste — uma vez salvo o resultado, ela deixa de fazer
       // sentido e some, até o usuário definir um novo alvo na grade.
       await limparMetasMusculoRotina(treinoId);
@@ -1944,8 +1952,12 @@
       if (atualizado) treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
       // O trigger no banco já resetou composicao_atualizada_em — recontar os "registros" do rodapé.
       void carregarRegistrosPorTreino(treinos);
+      // Refresca cada rotina de destino envolvida (uma só vez por rotina, mesmo com vários pendentes).
+      const destinosUnicos = [...new Set(pendentes.map((p) => p.destinoTreinoId))];
+      for (const destinoId of destinosUnicos) await refrescarTreinoMusculo(destinoId);
       editorSujo = false;
       modalEditorRotina = null;
+      pendentesMoverTrocar = [];
       treinoEditorRascunho.limpar();
       if (editorUrlTreino) window.history.back();
     } catch (e) {
@@ -3009,7 +3021,7 @@
           onSelect: () => abrirMoverExercicio(item),
         },
         {
-          label: "Trocar de Rotina",
+          label: "Substituir Exercício",
           icon: iconTrocarRotina,
           onSelect: () => abrirTrocarDeRotina(item),
         },
@@ -3080,7 +3092,7 @@
         {#if !rotinaDestinoTroca}
           <div class="header">
             <button class="back" onclick={fecharMover} aria-label="Voltar">{@render iconVoltar()}</button>
-            <h1>{modoPickerRotina === "mover" ? "Mover" : "Trocar"} "{movendoItem.exercicioNome}"</h1>
+            <h1>{modoPickerRotina === "mover" ? "Mover" : "Substituir"} "{movendoItem.exercicioNome}"</h1>
             <span class="spacer"></span>
           </div>
           <p class="muted">Escolha a rotina de destino.</p>

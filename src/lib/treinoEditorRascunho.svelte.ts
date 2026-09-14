@@ -14,11 +14,24 @@ export interface BaselineEditorRotina {
   totalPorMusculo: Map<string, number>;
 }
 
+/** "Mover"/"Substituir Exercício" (troca) envolvem uma SEGUNDA rotina que não está aberta no
+ * editor — fica registrado aqui até Salvar, junto do resto do rascunho, pra também ser
+ * descartável. `exercicioSaiTreinoExercicioId` só existe na troca (o exercício que sai de lá pra
+ * dar lugar ao que está entrando); ausente no mover simples (a rotina de destino só ganha). */
+export interface PendenteMoverTrocar {
+  destinoTreinoId: string;
+  destinoTreinoNome: string;
+  exercicioEntraId: string;
+  exercicioEntraNumSeries: number;
+  exercicioSaiTreinoExercicioId?: string;
+}
+
 export interface RascunhoEditorRotina {
   treinoId: string;
   treino: TreinoComExercicios;
   baseline: BaselineEditorRotina;
   sujo: boolean;
+  pendentes: PendenteMoverTrocar[];
 }
 
 let atual = $state<RascunhoEditorRotina | null>(null);
