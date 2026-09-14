@@ -1291,7 +1291,14 @@ export interface ParametrosDistribuicao {
    * que já estão em alguma rotina; marcando, inverte pra destacar os que ainda não estão em
    * nenhuma — útil pra quem usa a tela pra achar o que falta organizar. */
   destacarExerciciosSemRotina: boolean;
+  /** Ordem da lista de rotinas na Home do Treino: "dia" (padrão) sempre sobe a rotina do dia da
+   * semana mais próximo pro topo, tenha sido feita ou não essa semana. "pendente" pula rotinas já
+   * executadas essa semana e sobe a próxima ainda não feita, mesmo que o dia dela não seja o mais
+   * próximo. */
+  ordenacaoHome: OrdenacaoHome;
 }
+
+export type OrdenacaoHome = "dia" | "pendente";
 
 export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   seriesManutencaoMin: 4,
@@ -1310,6 +1317,7 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   graficoCampo: "destacada",
   homeModoGrupos: "todos",
   destacarExerciciosSemRotina: false,
+  ordenacaoHome: "dia",
 };
 
 export type ClasseVolumeSemanal = "insuficiente" | "manutencao" | "moderado" | "foco" | "excessivo";
@@ -1332,7 +1340,7 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
   const { data, error } = await supabase
     .from("treino_parametros")
     .select(
-      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, campo_grade, grafico_campo, home_modo_grupos, destacar_exercicios_sem_rotina",
+      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, campo_grade, grafico_campo, home_modo_grupos, destacar_exercicios_sem_rotina, ordenacao_home",
     )
     .maybeSingle();
   if (error) throw error;
@@ -1354,6 +1362,7 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
     graficoCampo: data.grafico_campo === "total" || data.grafico_campo === "ponderado" ? data.grafico_campo : "destacada",
     homeModoGrupos: data.home_modo_grupos === "proximo" ? "proximo" : "todos",
     destacarExerciciosSemRotina: data.destacar_exercicios_sem_rotina ?? false,
+    ordenacaoHome: data.ordenacao_home === "pendente" ? "pendente" : "dia",
   };
 }
 
@@ -1376,6 +1385,7 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     grafico_campo: p.graficoCampo,
     home_modo_grupos: p.homeModoGrupos,
     destacar_exercicios_sem_rotina: p.destacarExerciciosSemRotina,
+    ordenacao_home: p.ordenacaoHome,
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;

@@ -10,6 +10,7 @@
     type FadigaModo,
     type GraficoCampo,
     type HomeModoGrupos,
+    type OrdenacaoHome,
   } from "../../lib/treinoApi";
 
   let carregando = $state(true);
@@ -32,6 +33,12 @@
   let graficoCampo = $state<GraficoCampo>(PARAMETROS_DISTRIBUICAO_PADRAO.graficoCampo);
   let homeModoGrupos = $state<HomeModoGrupos>(PARAMETROS_DISTRIBUICAO_PADRAO.homeModoGrupos);
   let destacarExerciciosSemRotina = $state(PARAMETROS_DISTRIBUICAO_PADRAO.destacarExerciciosSemRotina);
+  let ordenacaoHome = $state<OrdenacaoHome>(PARAMETROS_DISTRIBUICAO_PADRAO.ordenacaoHome);
+
+  const OPCOES_ORDENACAO_HOME: { valor: OrdenacaoHome; label: string; desc: string }[] = [
+    { valor: "dia", label: "Por dia", desc: "Sempre sobe a rotina do dia mais próximo, feita ou não essa semana" },
+    { valor: "pendente", label: "Por rotina pendente", desc: "Pula rotinas já feitas essa semana e sobe a próxima ainda não executada" },
+  ];
 
   const OPCOES_FADIGA: { valor: FadigaModo; label: string }[] = [
     { valor: "fases", label: "Fases" },
@@ -97,6 +104,7 @@
       graficoCampo = p.graficoCampo;
       homeModoGrupos = p.homeModoGrupos;
       destacarExerciciosSemRotina = p.destacarExerciciosSemRotina;
+      ordenacaoHome = p.ordenacaoHome;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -126,6 +134,7 @@
         graficoCampo,
         homeModoGrupos,
         destacarExerciciosSemRotina,
+        ordenacaoHome,
       };
       await salvarParametrosDistribuicao(p);
       navigate("/treino");
@@ -291,6 +300,14 @@
           <button type="button" class:ativo={homeModoGrupos === opcao.valor} onclick={() => (homeModoGrupos = opcao.valor)}>{opcao.label}</button>
         {/each}
       </div>
+
+      <p class="param-subtitulo">Ordem das Rotinas (Início)</p>
+      <div class="opcoes-toggle">
+        {#each OPCOES_ORDENACAO_HOME as opcao (opcao.valor)}
+          <button type="button" class:ativo={ordenacaoHome === opcao.valor} onclick={() => (ordenacaoHome = opcao.valor)}>{opcao.label}</button>
+        {/each}
+      </div>
+      <p class="param-card-desc">{OPCOES_ORDENACAO_HOME.find((o) => o.valor === ordenacaoHome)?.desc}</p>
 
       <p class="param-subtitulo">Lista de Exercícios</p>
       <label class="checkbox-linha">

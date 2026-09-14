@@ -40,6 +40,18 @@
     return [...comDia, ...semDia];
   }
 
+  /** Parametrização "Por rotina pendente": pula rotinas já executadas essa semana (têm série
+   * registrada de segunda até hoje) e sobe a próxima ainda não feita, mesmo que o dia dela não
+   * seja o mais próximo — só depois delas voltam as já feitas, ambas na ordem de dia mais próximo
+   * entre si. Sem dia definido, entram por último, na ordem manual. */
+  function ordenarPorPendente(lista: TreinoComExercicios[], feitas: Map<string, number>): TreinoComExercicios[] {
+    const porDia = ordenarPorDia(lista.filter((t) => t.dia_semana != null));
+    const semDia = lista.filter((t) => t.dia_semana == null);
+    const pendentes = porDia.filter((t) => !feitas.has(t.id));
+    const jaFeitas = porDia.filter((t) => feitas.has(t.id));
+    return [...pendentes, ...jaFeitas, ...semDia];
+  }
+
   /** Semana ancorada em segunda-feira (exceção — o resto do app usa terça, ver inicioSemana em dates.ts), só pros cards de progresso semanal de treino. */
   function segundaISO(): string {
     const hoje = new Date();
@@ -57,7 +69,6 @@
         getRegistrosPorTreinoPeriodo(segundaISO(), hojeISO()),
         getParametrosDistribuicao(),
       ]);
-      treinos = ordenarPorDia(treinosCarregados);
       musculos = musculosCarregados;
       parametrosDistribuicao = parametros;
 
@@ -86,6 +97,10 @@
       }
       seriesPorTreino = mapaSeriesPorTreino;
       feitoPorMusculoSalvo = mapaFeito;
+      treinos =
+        parametros.ordenacaoHome === "pendente"
+          ? ordenarPorPendente(treinosCarregados, mapaSeriesPorTreino)
+          : ordenarPorDia(treinosCarregados);
     } catch (e) {
       erroCarregar = (e as Error).message;
     } finally {
@@ -343,6 +358,7 @@
     <p class="muted">Nenhuma rotina ainda. Crie a primeira.</p>
   {:else}
     {#each treinos as treino, i (treino.id)}
+      {@const destacada = i === 0 && treino.dia_semana != null}
       <div
         class="rotina-item"
         role="button"
@@ -351,7 +367,7 @@
         onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
       >
         <div class="card-header">
-          <h2>
+          <h2 class:nome-neutro={!destacada}>
             {treino.nome_treino}
             {#if treino.dia_semana != null}
               <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
@@ -359,7 +375,7 @@
           </h2>
         </div>
         <p class="preview">{preview(treino)}</p>
-        {#if i === 0 && treino.dia_semana != null}
+        {#if destacada}
           <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
         {:else}
           <button type="button" class="iniciar-secundario" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</button>
@@ -595,6 +611,9 @@
   .card-header h2 {
     font-size: var(--font-size-lg);
     margin: 0;
+  }
+  .nome-neutro {
+    color: var(--surface-muted);
   }
   .dia-tag {
     font-size: var(--font-size-sm);
