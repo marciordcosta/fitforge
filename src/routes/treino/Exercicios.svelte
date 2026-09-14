@@ -296,15 +296,9 @@
     <ul class="lista">
       {#each filtrados as ex (ex.id)}
         <li>
-          <div class="item">
+          <div class="item" class:item-fora-rotina={!rotinaPorExercicio.has(ex.id)}>
             {#if modoSelecao}
-              <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
-                {#if rotinaPorExercicio.has(ex.id)}
-                  <span class="avatar-rotina-texto">{rotinaPorExercicio.get(ex.id)?.nome}</span>
-                {:else}
-                  {iniciais(ex.nome)}
-                {/if}
-              </span>
+              <span class="avatar">{iniciais(ex.nome)}</span>
               <button class="conteudo-btn" onclick={() => (verDetalheId = ex.id)}>
                 {@render infoExercicio(ex)}
               </button>
@@ -326,13 +320,7 @@
                 }}
                 aria-label={rotinaPorExercicio.has(ex.id) ? `Ver rotina ${rotinaPorExercicio.get(ex.id)?.nome}` : `Adicionar ${ex.nome} a uma rotina`}
               >
-                <span class="avatar" class:avatar-rotina={rotinaPorExercicio.has(ex.id)}>
-                  {#if rotinaPorExercicio.has(ex.id)}
-                    <span class="avatar-rotina-texto">{rotinaPorExercicio.get(ex.id)?.nome}</span>
-                  {:else}
-                    {iniciais(ex.nome)}
-                  {/if}
-                </span>
+                <span class="avatar">{iniciais(ex.nome)}</span>
               </button>
               <button class="conteudo-btn" onclick={() => navigate(`/treino/exercicios/${ex.id}`)}>
                 {@render infoExercicio(ex)}
@@ -547,19 +535,20 @@
     font-weight: 600;
     flex-shrink: 0;
   }
-  .avatar-rotina {
-    border: 2px solid var(--color-primary);
-    color: var(--surface-fg);
+  /** Exercícios fora de qualquer rotina ficam discretos — os que já estão em rotina (identificação
+   * antes feita com anel colorido no avatar) passam a ser o visual "normal"/de destaque. */
+  .item-fora-rotina .avatar {
+    opacity: 0.55;
   }
-  .avatar-rotina-texto {
-    max-width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    padding: 0 3px;
-    font-size: 5px;
-    font-weight: 700;
-    text-align: center;
+  .item-fora-rotina .nome {
+    color: var(--surface-muted);
+  }
+  .item-fora-rotina .musculo-nome-mini,
+  .item-fora-rotina .musculo-pct-mini {
+    opacity: 0.7;
+  }
+  .item-fora-rotina .musculo-barra-mini {
+    opacity: 0.6;
   }
   .info {
     flex: 1;
