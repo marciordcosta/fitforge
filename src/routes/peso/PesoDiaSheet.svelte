@@ -2,9 +2,11 @@
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { parseISODate } from "../../lib/dates";
   import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
   import { navigate } from "../../lib/router.svelte";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
   import {
     getPesoDoDia,
     getFotoDoDia,
@@ -38,6 +40,22 @@
   let mostrarOpcoesFoto = $state(false);
   let inputCamera = $state<HTMLInputElement | undefined>();
   let inputGaleria = $state<HTMLInputElement | undefined>();
+  let confirmandoDescartar = $state(false);
+
+  function sujo(): boolean {
+    return !carregando && peso !== pesoOriginal;
+  }
+
+  /** Cobre voltar físico (rota /peso/dia/:data) além de fechar pelo Sheet (toque fora, arrastar). */
+  const guardaSaida = criarGuardaSaida(sujo);
+
+  function aoTentarFechar(): void {
+    if (sujo()) {
+      confirmandoDescartar = true;
+      return;
+    }
+    onFechar();
+  }
 
   const diaSemanaLabel = $derived.by(() => {
     const texto = parseISODate(data).toLocaleDateString("pt-BR", { weekday: "long" });
@@ -152,7 +170,7 @@
   </svg>
 {/snippet}
 
-<Sheet {onFechar}>
+<Sheet onFechar={aoTentarFechar}>
   <div class="titulo-dia">
     <strong>{diaSemanaLabel}</strong><span class="titulo-data-complemento">, {dataComplementoLabel}</span>
   </div>
@@ -217,6 +235,21 @@
       { label: "Câmera", icon: iconCamera, onSelect: () => inputCamera?.click() },
       { label: "Galeria", icon: iconGaleria, onSelect: () => inputGaleria?.click() },
     ]}
+  />
+{/if}
+
+{#if confirmandoDescartar || guardaSaida.confirmando}
+  <ConfirmDialog
+    titulo="Descartar alteração no peso do dia?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.resolverSaida(onFechar);
+    }}
+    onCancelar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.cancelar();
+    }}
   />
 {/if}
 

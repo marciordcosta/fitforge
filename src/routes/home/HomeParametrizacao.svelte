@@ -1,25 +1,44 @@
 <script lang="ts">
   import { voltar } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import { getLayoutHome, salvarLayoutHome, CATALOGO_CARDS, type HomeCardTipo } from "../../lib/homeApi";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
 
   let itens = $state<HomeCardTipo[]>([]);
+  let itensOriginal: HomeCardTipo[] = [];
   let loading = $state(true);
   let erro = $state<string | null>(null);
   let salvando = $state(false);
   let mostrarAdicionar = $state(false);
+  let confirmandoDescartar = $state(false);
 
   async function carregar() {
     loading = true;
     erro = null;
     try {
       itens = await getLayoutHome();
+      itensOriginal = itens.slice();
     } catch (err) {
       erro = (err as Error).message;
     } finally {
       loading = false;
     }
+  }
+
+  function sujo(): boolean {
+    return !loading && JSON.stringify(itens) !== JSON.stringify(itensOriginal);
+  }
+
+  const guardaSaida = criarGuardaSaida(sujo);
+
+  function aoVoltar(): void {
+    if (sujo()) {
+      confirmandoDescartar = true;
+      return;
+    }
+    voltar("/");
   }
 
   void carregar();
@@ -148,7 +167,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={aoVoltar} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Cards da Início</h1>
     <span class="header-spacer"></span>
   </div>
@@ -191,6 +210,21 @@
 
 {#if mostrarAdicionar}
   <ActionSheet titulo="Adicionar card" opcoes={opcoesAdicionar()} onFechar={() => (mostrarAdicionar = false)} />
+{/if}
+
+{#if confirmandoDescartar || guardaSaida.confirmando}
+  <ConfirmDialog
+    titulo="Descartar alterações nos cards da Início?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.resolverSaida(() => voltar("/"));
+    }}
+    onCancelar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.cancelar();
+    }}
+  />
 {/if}
 
 <style>

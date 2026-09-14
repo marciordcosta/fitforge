@@ -1,6 +1,7 @@
 <script lang="ts">
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { navigate } from "../../lib/router.svelte";
   import { getMeta, getUltimoPeso, salvarMeta, excluirMeta } from "../../lib/pesoApi";
   import { getTipoDieta, type TipoDieta } from "../../lib/dietaApi";
@@ -26,6 +27,8 @@
   let carregando = $state(true);
   let salvando = $state(false);
   let temMetaSalva = $state(false);
+  let confirmandoDescartar = $state(false);
+  let original = "";
 
   /** Faixa segura de ritmo semanal pra fisiculturismo natural (perda ~0,5-1%/semana, ganho magro
    * ~0,25-0,5%/semana — aqui uma faixa única, generosa o bastante pros dois casos, já que o tipo
@@ -48,6 +51,7 @@
       pesoAlvo = metaAtual?.pesoAlvo ?? ultimoPeso;
       percentual = metaAtual?.tipo === "percentual" && metaAtual.percentual != null ? Math.abs(metaAtual.percentual) : null;
       clampPercentual();
+      original = JSON.stringify({ tipoDieta, percentual, pesoAlvo });
     } finally {
       carregando = false;
     }
@@ -57,6 +61,20 @@
 
   const precisaPercentual = $derived(tipoDieta !== "manutencao");
   const podeSalvar = $derived(pesoAlvo != null && (!precisaPercentual || percentual != null));
+
+  function sujo(): boolean {
+    return !carregando && JSON.stringify({ tipoDieta, percentual, pesoAlvo }) !== original;
+  }
+
+  /** Sheet sem botão de voltar dedicado — fechar (toque fora, arrastar pra baixo) é o próprio
+   * "voltar" daqui; intercepta antes de descartar silenciosamente o que foi digitado. */
+  function aoTentarFechar(): void {
+    if (sujo()) {
+      confirmandoDescartar = true;
+      return;
+    }
+    onFechar();
+  }
 
   async function salvar() {
     if (!podeSalvar || pesoAlvo == null) return;
@@ -89,7 +107,7 @@
   }
 </script>
 
-<Sheet titulo="Meta" {onFechar}>
+<Sheet titulo="Meta" onFechar={aoTentarFechar}>
   {#if carregando}
     <p class="muted">Carregando…</p>
   {:else}
@@ -127,6 +145,18 @@
     {/if}
   {/if}
 </Sheet>
+
+{#if confirmandoDescartar}
+  <ConfirmDialog
+    titulo="Descartar alterações na meta?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoDescartar = false;
+      onFechar();
+    }}
+    onCancelar={() => (confirmandoDescartar = false)}
+  />
+{/if}
 
 <style>
   .tipo-dieta-info {
