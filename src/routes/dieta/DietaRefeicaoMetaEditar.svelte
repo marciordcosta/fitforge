@@ -3,6 +3,7 @@
   import { hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import WheelPicker from "../../components/WheelPicker.svelte";
   import WheelPickerMacros from "../../components/WheelPickerMacros.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import {
@@ -177,6 +178,29 @@
     }
   }
 
+  let mostrarCalorias = $state(false);
+
+  /** Toca no anel: abre só a roda de calorias, igual ao anel da aba Calorias/Gerenciar — ajustar o
+   * valor recalcula o carboidrato pra fechar a conta, mantendo gordura/proteína fixas. */
+  function infoCalorias() {
+    const proteina = proteinaG ?? 0;
+    const gordura = gorduraG ?? 0;
+    const teto = Math.max(Math.round(caloriasCalc), contexto ? Math.round(contexto.disponivel.calorias) : Math.round(caloriasCalc));
+    const opcoes: { valor: number; label: string }[] = [];
+    for (let v = 0; v <= teto; v += 10) opcoes.push({ valor: v, label: `${v} kcal` });
+    return {
+      titulo: "Calorias (kcal)",
+      opcoes,
+      valorAtual: Math.round(caloriasCalc / 10) * 10,
+      onSelecionar: (v: number) => confirmarCalorias(v, proteina, gordura),
+    };
+  }
+
+  async function confirmarCalorias(calorias: number, proteina: number, gordura: number): Promise<void> {
+    const novoCarboidratoG = Math.max(0, Math.round((calorias - 4 * proteina - 9 * gordura) / 4));
+    await confirmarMacros({ proteinaG: proteina, gorduraG: gordura, carboidratoG: novoCarboidratoG });
+  }
+
   let itemEditando = $state<ReceitaItem | null>(null);
   let itemParaRemover = $state<ReceitaItem | null>(null);
 
@@ -320,25 +344,26 @@
           Meta da Refeição
           {#if ehUltima}<span class="card-meta-auto">Automática — sobra do dia</span>{/if}
         </p>
-        <button
-          type="button"
-          class="resumo"
-          class:resumo-auto={ehUltima}
-          disabled={ehUltima}
-          onclick={() => (mostrarMacros = true)}
-        >
-          <span class="donut" style={donutStyle}>
+        <div class="resumo">
+          <button
+            type="button"
+            class="donut"
+            disabled={ehUltima}
+            onclick={() => (mostrarCalorias = true)}
+            style={donutStyle}
+            aria-label="Ajustar calorias"
+          >
             <span class="donut-centro">
               <strong>{caloriasCalc.toFixed(0)}</strong>
               <span>Cal</span>
             </span>
-          </span>
-          <span class="resumo-macros">
+          </button>
+          <button type="button" class="resumo-macros" disabled={ehUltima} onclick={() => (mostrarMacros = true)} aria-label="Ajustar macros">
             <span><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br /><span class="valor-g">{(carboidratoG ?? 0).toFixed(0)} g</span><br />Carb</span>
             <span><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br /><span class="valor-g">{(gorduraG ?? 0).toFixed(0)} g</span><br />Gorduras</span>
             <span><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{(proteinaG ?? 0).toFixed(0)} g</span><br />Proteínas</span>
-          </span>
-        </button>
+          </button>
+        </div>
       </div>
 
       {#if totaisItens}
@@ -430,6 +455,17 @@
     onFechar={() => (mostrarMacros = false)}
     formatarRodape={formatarRodapeCalorias}
     mostrarPct={false}
+  />
+{/if}
+
+{#if mostrarCalorias}
+  {@const info = infoCalorias()}
+  <WheelPicker
+    titulo={info.titulo}
+    opcoes={info.opcoes}
+    valorAtual={info.valorAtual}
+    onSelecionar={info.onSelecionar}
+    onFechar={() => (mostrarCalorias = false)}
   />
 {/if}
 
@@ -533,13 +569,9 @@
     align-items: center;
     gap: var(--space-5);
     padding: var(--space-3) 0 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
   }
-  .resumo-auto {
+  .donut:disabled,
+  .resumo-macros:disabled {
     cursor: default;
   }
   .donut {
@@ -549,6 +581,12 @@
     height: 84px;
     border-radius: 50%;
     flex-shrink: 0;
+    border: none;
+    padding: 0;
+    background-color: transparent;
+    color: inherit;
+    font-family: inherit;
+    cursor: pointer;
   }
   .donut-centro {
     position: absolute;
@@ -574,6 +612,12 @@
     justify-content: space-between;
     gap: var(--space-2);
     color: var(--surface-fg);
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
   }
   .resumo-macros > span {
     flex: 1;
