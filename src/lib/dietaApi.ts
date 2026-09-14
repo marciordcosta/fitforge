@@ -806,6 +806,30 @@ export async function lancarReceitaPadrao(modeloId: string, diaSemana: number, r
   return true;
 }
 
+/** Caminho inverso de lancarReceitaPadrao: substitui a lista de alimentos padrão dessa refeição
+ * (efetiva pro dia da semana — override do dia se houver, senão a global; cria uma nova global se
+ * ainda não houver nenhuma) pelos itens realmente lançados hoje. Ação manual (botão "Salvar
+ * Refeição Padrão" no Diário, quando a refeição já tem algum alimento). */
+export async function salvarComoReceitaPadrao(
+  modeloId: string,
+  nomeModelo: string,
+  diaSemana: number,
+  itens: { alimentoId: string; quantidade: number }[],
+): Promise<void> {
+  const [modelos, metasDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo()]);
+  const modelo = modelos.find((m) => m.id === modeloId);
+  const override = metasDia.find((m) => m.modeloId === modeloId && m.diaSemana === diaSemana);
+  const receitaIdEfetiva = override?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
+  const receitaId = receitaIdEfetiva ?? (await garantirReceitaPrivadaRefeicao(modeloId, nomeModelo, null));
+  const receitaAtual = await getReceita(receitaId);
+  if (receitaAtual?.itens.length) {
+    await Promise.all(receitaAtual.itens.map((item) => removerItemReceita(item.id)));
+  }
+  for (const item of itens) {
+    await adicionarItemReceita(receitaId, item.alimentoId, item.quantidade);
+  }
+}
+
 export async function getRefeicaoDia(id: string): Promise<RefeicaoDia | null> {
   const { data, error } = await supabase.from("dieta_refeicoes_dia").select("id, nome, data").eq("id", id).maybeSingle();
   if (error) throw error;

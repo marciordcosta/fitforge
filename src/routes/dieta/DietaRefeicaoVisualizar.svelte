@@ -16,6 +16,7 @@
     listMetasDiaModelo,
     getReceita,
     lancarReceitaPadrao,
+    salvarComoReceitaPadrao,
     type RefeicaoDia,
     type ItemDiario,
     type MetasDiarias,
@@ -241,6 +242,31 @@
     }
   }
 
+  let confirmandoSalvarPadrao = $state(false);
+  let salvandoPadrao = $state(false);
+
+  /** Caminho inverso: salva os alimentos de hoje como a nova Refeição Padrão desse dia da semana,
+   * substituindo a lista antiga (se houver) — botão só aparece quando já tem algum alimento
+   * lançado hoje. */
+  async function salvarComoPadrao() {
+    confirmandoSalvarPadrao = false;
+    if (!refeicao || !modeloRefeicao) return;
+    salvandoPadrao = true;
+    try {
+      await salvarComoReceitaPadrao(
+        modeloRefeicao.id,
+        modeloRefeicao.nome,
+        parseISODate(refeicao.data).getDay(),
+        itens.map((item) => ({ alimentoId: item.alimentoId, quantidade: item.quantidade })),
+      );
+      receitaPadraoTemItens = true;
+    } catch (err) {
+      alert("Erro ao salvar refeição padrão: " + (err as Error).message);
+    } finally {
+      salvandoPadrao = false;
+    }
+  }
+
   async function descartarRefeicao() {
     processando = true;
     try {
@@ -290,6 +316,14 @@
   </svg>
 {/snippet}
 
+{#snippet iconSubir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="20" x2="12" y2="9" />
+    <polyline points="7 13 12 8 17 13" />
+    <line x1="6" y1="4" x2="18" y2="4" />
+  </svg>
+{/snippet}
+
 {#snippet iconInfo()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="9" />
@@ -305,7 +339,9 @@
       {refeicao?.nome ?? ""}
       <span class="data-inline">{dataLabel}</span>
     </h1>
-    {#if receitaPadraoTemItens}
+    {#if itens.length && modeloRefeicao}
+      <button class="icone-header" disabled={salvandoPadrao} onclick={() => (confirmandoSalvarPadrao = true)} aria-label="Salvar Refeição Padrão">{@render iconSubir()}</button>
+    {:else if receitaPadraoTemItens}
       <button class="icone-header" disabled={lancandoPadrao} onclick={aoClicarRefeicaoPadrao} aria-label="Lançar Refeição Padrão">{@render iconBaixar()}</button>
     {:else}
       <span class="header-spacer"></span>
@@ -447,6 +483,16 @@
     textoConfirmar="Excluir Refeição"
     onConfirmar={descartarRefeicao}
     onCancelar={() => (confirmandoExclusaoRefeicao = false)}
+  />
+{/if}
+
+{#if confirmandoSalvarPadrao}
+  <ConfirmDialog
+    titulo="Salvar os alimentos de hoje como a Refeição Padrão desse dia? A lista antiga (se houver) é substituída."
+    textoConfirmar="Salvar Refeição"
+    destrutivo={false}
+    onConfirmar={salvarComoPadrao}
+    onCancelar={() => (confirmandoSalvarPadrao = false)}
   />
 {/if}
 
