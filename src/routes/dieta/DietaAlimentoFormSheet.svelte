@@ -71,9 +71,9 @@
     Math.round(4 * (proteina ?? 0) + 4 * (carboidrato ?? 0) + 9 * (gordura ?? 0)),
   );
 
-  /** Só nome e porção são obrigatórios — qualquer macro em branco entra como 0, sem travar o
-   * salvar (nem todo registro precisa da tabela nutricional completa pra já ser útil). */
-  const valido = $derived(nome.trim().length > 0 && porcaoQtd != null && porcaoQtd > 0);
+  /** Nome, porção e pelo menos um macro preenchido (calorias > 0) — não precisa da tabela
+   * nutricional completa, mas não faz sentido salvar um alimento com 0 caloria. */
+  const valido = $derived(nome.trim().length > 0 && porcaoQtd != null && porcaoQtd > 0 && calorias > 0);
 
   function montarInput(): AlimentoManualInput {
     return {
