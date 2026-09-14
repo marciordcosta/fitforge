@@ -24,6 +24,9 @@ export interface PendenteMoverTrocar {
   exercicioEntraId: string;
   exercicioEntraNumSeries: number;
   exercicioSaiTreinoExercicioId?: string;
+  /** Ordem que o exercício que sai (exercicioSaiTreinoExercicioId) tinha na rotina de destino —
+   * só existe na troca; o que entra assume essa mesma posição, no lugar de ir pro fim da lista. */
+  destinoOrdem?: number;
 }
 
 export interface RascunhoEditorRotina {

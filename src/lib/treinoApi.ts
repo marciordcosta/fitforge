@@ -846,26 +846,32 @@ export async function atualizarOrdemTreinoExercicios(idsOrdenados: string[]): Pr
   );
 }
 
-/** Adiciona um exercício a uma rotina já salva, no fim da ordem — usado pela edição visual na
- * tela de Distribuição Muscular, grava direto sem passar pelo rascunho do editor de rotina. */
+/** Adiciona um exercício a uma rotina já salva — usado pela edição visual na tela de Distribuição
+ * Muscular, grava direto sem passar pelo rascunho do editor de rotina. Por padrão entra no fim da
+ * ordem; `ordemForcada` (usado ao substituir um exercício por outro entre rotinas) faz o novo
+ * assumir a posição exata de quem saiu, em vez de ir pro final da lista. */
 export async function adicionarTreinoExercicio(
   treinoId: string,
   exercicioId: string,
   numSeries: number,
   anterior: SetRegistro[],
+  ordemForcada?: number,
 ): Promise<string> {
-  const { data: existentes, error: ordError } = await supabase
-    .from("treino_exercicios")
-    .select("ordem")
-    .eq("treino_id", treinoId)
-    .order("ordem", { ascending: false })
-    .limit(1);
-  if (ordError) throw ordError;
-  const proximaOrdem = existentes?.length ? existentes[0].ordem + 1 : 0;
+  let ordem = ordemForcada;
+  if (ordem == null) {
+    const { data: existentes, error: ordError } = await supabase
+      .from("treino_exercicios")
+      .select("ordem")
+      .eq("treino_id", treinoId)
+      .order("ordem", { ascending: false })
+      .limit(1);
+    if (ordError) throw ordError;
+    ordem = existentes?.length ? existentes[0].ordem + 1 : 0;
+  }
 
   const { data: te, error: insError } = await supabase
     .from("treino_exercicios")
-    .insert({ user_id: uid(), treino_id: treinoId, exercicio_id: exercicioId, ordem: proximaOrdem })
+    .insert({ user_id: uid(), treino_id: treinoId, exercicio_id: exercicioId, ordem })
     .select("id")
     .single();
   if (insError) throw insError;

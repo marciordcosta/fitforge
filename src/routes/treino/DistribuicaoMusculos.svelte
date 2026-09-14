@@ -1578,9 +1578,10 @@
   /** Troca os dois exercícios de rotina entre si: o de origem sai da lista aberta no editor e o
    * escolhido na rotina de destino entra no lugar dele — só no RASCUNHO local, igual mover. Ao
    * salvar, a rotina de destino perde o exercício escolhido e ganha o de origem (nenhuma das duas
-   * fica com um a mais ou a menos); descartando, nada muda em nenhuma das duas. O que entra aqui
-   * é pré-preenchido com o último desempenho registrado desse exercício, igual "+ Adicionar
-   * Exercício" — a série que ele tinha na rotina de destino não é preservada, só a quantidade. */
+   * fica com um a mais ou a menos); descartando, nada muda em nenhuma das duas. Cada exercício que
+   * entra assume a MESMA posição (ordem) e o MESMO número de séries de quem saiu daquele lugar —
+   * o slot continua igual, só muda qual exercício ocupa ele. Peso/reps são pré-preenchidos com o
+   * último desempenho registrado desse exercício, igual "+ Adicionar Exercício". */
   async function trocarExercicioDeRotina(destinoItem: ItemMusculoRotina): Promise<void> {
     if (!movendoItem || !rotinaDestinoTroca || !modalEditorRotina) return;
     const origem = movendoItem;
@@ -1589,16 +1590,19 @@
     const anterior = await getUltimoRegistro(destinoItem.exercicioId);
     processandoPickerRotina = false;
     if (!modalEditorRotina) return;
-    const proximaOrdem = modalEditorRotina.exercicios.reduce((acc, te) => Math.max(acc, te.ordem), -1) + 1;
+    // O que entra assume a MESMA posição e o MESMO número de séries de quem saiu daquele lugar —
+    // em cada rotina, o "slot" continua com a config que já tinha, só troca o exercício.
+    const origemTe = modalEditorRotina.exercicios.find((te) => te.id === origem.treinoExercicioId);
+    const ordemOrigem = origemTe?.ordem ?? 0;
     const itemEntrando: TreinoComExercicios["exercicios"][number] = {
       id: `novo:${crypto.randomUUID()}`,
       treino_id: modalEditorRotina.id,
       exercicio_id: destinoItem.exercicioId,
       descanso_seg: null,
       observacao: null,
-      ordem: proximaOrdem,
+      ordem: ordemOrigem,
       exercicio: destino.exercicios.find((te) => te.id === destinoItem.treinoExercicioId)?.exercicio,
-      series: Array.from({ length: destinoItem.series }, (_, i) => {
+      series: Array.from({ length: origem.series }, (_, i) => {
         const ant = anterior.find((a) => a.serie === i + 1);
         return { id: `novo:${crypto.randomUUID()}`, serie: i + 1, peso_alvo: ant?.peso ?? null, rep_min: ant?.repeticoes ?? null, rep_max: ant?.repeticoes ?? null };
       }),
@@ -1607,14 +1611,16 @@
       ...modalEditorRotina,
       exercicios: [...modalEditorRotina.exercicios.filter((te) => te.id !== origem.treinoExercicioId), itemEntrando],
     };
+    const destinoTe = destino.exercicios.find((te) => te.id === destinoItem.treinoExercicioId);
     pendentesMoverTrocar = [
       ...pendentesMoverTrocar,
       {
         destinoTreinoId: destino.id,
         destinoTreinoNome: destino.nome_treino,
         exercicioEntraId: origem.exercicioId,
-        exercicioEntraNumSeries: origem.series,
+        exercicioEntraNumSeries: destinoItem.series,
         exercicioSaiTreinoExercicioId: destinoItem.treinoExercicioId,
+        destinoOrdem: destinoTe?.ordem,
       },
     ];
     editorSujo = true;
@@ -1967,7 +1973,7 @@
         // exercício, igual "Substituir Exercício" já fazia — sem isso as séries chegavam em
         // branco na rotina de destino, mesmo já tendo histórico registrado.
         const anterior = await getUltimoRegistro(p.exercicioEntraId);
-        await adicionarTreinoExercicio(p.destinoTreinoId, p.exercicioEntraId, p.exercicioEntraNumSeries, anterior);
+        await adicionarTreinoExercicio(p.destinoTreinoId, p.exercicioEntraId, p.exercicioEntraNumSeries, anterior, p.destinoOrdem);
         if (p.exercicioSaiTreinoExercicioId) await removerTreinoExercicio(p.exercicioSaiTreinoExercicioId);
       }
       // Dia só é alterado de verdade aqui — mudar dentro do editor até aqui só mexeu no rascunho.
