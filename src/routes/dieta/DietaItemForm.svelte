@@ -15,6 +15,7 @@
     getMetaRefeicaoPorNome,
     adicionarItemDiario,
     atualizarItemDiario,
+    adicionarItemReceita,
     duplicarAlimento,
     excluirAlimento,
     type Alimento,
@@ -216,7 +217,22 @@
   async function salvar() {
     if (!alimento) return;
     if (modoReceita) {
-      definirContexto(receitaIdExistente ?? "nova");
+      if (receitaIdExistente) {
+        // Receita já existe (lista de alimentos de uma refeição do catálogo, ou "+ Adicionar
+        // Alimento" de dentro de uma receita salva) — grava direto, sem depender do rascunho +
+        // "concluir" na tela de visualizar receita (que se perdia se o usuário saísse por outro
+        // caminho, inclusive o próprio botão de voltar).
+        salvando = true;
+        try {
+          await adicionarItemReceita(receitaIdExistente, alimento.id, quantidade);
+          voltar(destinoVoltar());
+        } catch (err) {
+          alert("Erro ao salvar alimento: " + (err as Error).message);
+          salvando = false;
+        }
+        return;
+      }
+      definirContexto("nova");
       adicionarAoRascunho(alimento, quantidade);
       voltar(destinoVoltar());
       return;

@@ -12,6 +12,7 @@
     getRefeicaoDia,
     getItensDaRefeicao,
     getReceita,
+    adicionarItemReceita,
     type Alimento,
     type ReceitaResumo,
   } from "../../lib/dietaApi";
@@ -170,9 +171,28 @@
     }
   }
 
-  function adicionarNaReceita(a: Alimento) {
+  /** Receita já existente (caso mais comum aqui: lista de alimentos de uma refeição do catálogo,
+   * ou "+ Adicionar Alimento" de dentro de uma receita já salva) grava direto no banco — sem isso,
+   * o item ficava só no rascunho em memória, e só era gravado de verdade se o usuário passasse
+   * pela tela de visualizar receita e tocasse em "concluir"; saindo por qualquer outro caminho
+   * (inclusive o botão de voltar dessa própria tela), o alimento se perdia sem aviso. Sem receita
+   * ainda criada (fluxo de "Nova Receita"), continua usando o rascunho normalmente. */
+  async function adicionarNaReceita(a: Alimento) {
     if (adicionadosIds.has(a.id)) return;
-    definirContexto(receitaIdExistente ?? "nova");
+    if (receitaIdExistente) {
+      adicionandoId = a.id;
+      try {
+        await adicionarItemReceita(receitaIdExistente, a.id, a.porcaoPadraoQtd);
+        adicionadosIds = new Set(adicionadosIds).add(a.id);
+        mostrarMensagem(`${a.nome} adicionado`);
+      } catch (err) {
+        alert("Erro ao adicionar alimento: " + (err as Error).message);
+      } finally {
+        adicionandoId = null;
+      }
+      return;
+    }
+    definirContexto("nova");
     adicionarAoRascunho(a);
     adicionadosIds = new Set(adicionadosIds).add(a.id);
     mostrarMensagem(`${a.nome} adicionado`);
@@ -306,10 +326,10 @@
                 class="add-btn"
                 class:adicionado={adicionadosIds.has(a.id)}
                 onclick={() => adicionarNaReceita(a)}
-                disabled={adicionadosIds.has(a.id)}
+                disabled={adicionandoId === a.id || adicionadosIds.has(a.id)}
                 aria-label="Adicionar"
               >
-                {@render iconMais()}
+                {#if adicionandoId === a.id}…{:else}{@render iconMais()}{/if}
               </button>
             {:else}
               <span class="chevron">›</span>
