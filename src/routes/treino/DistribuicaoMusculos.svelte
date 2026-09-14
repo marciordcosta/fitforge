@@ -2013,28 +2013,28 @@
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   }
 
-  /** Cards ficam lado a lado (rolagem horizontal), então a comparação de posição durante o
-   * arrasto é pelo eixo X (clientX/rect.left), não Y como seria numa lista vertical. */
+  /** Cards ficam em grade (3 por linha) — a troca acontece quando o ponteiro entra de fato dentro
+   * do retângulo de outro card (em vez de só comparar clientX, que só funcionava numa fileira
+   * única em rolagem horizontal). */
   function moverDuranteArrasteEditor(e: PointerEvent): void {
     if (arrastandoIdxEditor === null || !modalEditorRotina) return;
     const x = e.clientX;
+    const y = e.clientY;
     for (let i = 0; i < itemEditorRefs.length; i++) {
       const el = itemEditorRefs[i];
       if (!el || i === arrastandoIdxEditor) continue;
       const rect = el.getBoundingClientRect();
-      const meio = rect.left + rect.width / 2;
-      if ((i < arrastandoIdxEditor && x < meio) || (i > arrastandoIdxEditor && x > meio)) {
-        const ordenados = modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
-        const [item] = ordenados.splice(arrastandoIdxEditor, 1);
-        ordenados.splice(i, 0, item);
-        modalEditorRotina = {
-          ...modalEditorRotina,
-          exercicios: ordenados.map((te, idx2) => ({ ...te, ordem: idx2 })),
-        };
-        arrastandoIdxEditor = i;
-        editorSujo = true;
-        break;
-      }
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+      const ordenados = modalEditorRotina.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+      const [item] = ordenados.splice(arrastandoIdxEditor, 1);
+      ordenados.splice(i, 0, item);
+      modalEditorRotina = {
+        ...modalEditorRotina,
+        exercicios: ordenados.map((te, idx2) => ({ ...te, ordem: idx2 })),
+      };
+      arrastandoIdxEditor = i;
+      editorSujo = true;
+      break;
     }
   }
 
@@ -4259,11 +4259,11 @@
   /* Rolagem horizontal de cards quadrados — mesmo formato que os chips de músculo tinham na
      versão anterior do editor, só que maiores (o conteúdo principal de edição agora é aqui). */
   .editor-exercicios-lista {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--space-2);
-    overflow-x: auto;
     /* Espaço extra em cima: sem isso a alça de arrastar (que estoura pra fora do card, top:-8px)
-       e o balãozinho de delta de séries ficavam cortados pelo próprio scroll. */
+       e o balãozinho de delta de séries ficavam cortados. */
     padding: 10px 4px var(--space-2);
     margin-bottom: var(--space-4);
     transition: opacity 0.15s;
@@ -4295,8 +4295,7 @@
   }
   .editor-exercicio-card {
     position: relative;
-    flex-shrink: 0;
-    width: 118px;
+    min-width: 0;
   }
   .editor-exercicio-card.editor-item-oculto {
     display: none;
