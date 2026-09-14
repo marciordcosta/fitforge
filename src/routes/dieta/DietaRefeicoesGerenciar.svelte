@@ -31,6 +31,7 @@
     definirRefeicoesDoDia,
     salvarMetaNumericaRefeicao,
     salvarMetaNumericaRefeicaoDias,
+    getCaloriasReceitas,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
@@ -647,6 +648,18 @@
   }
 
   let modelos = $state<RefeicaoModelo[]>([]);
+  /** Calorias de cada lista de alimentos privada (chave: metaReceitaId), carregada uma vez só pra
+   * todo o catálogo — mostrada como "refeição com X cal" no card, ao lado do ícone de detalhes. */
+  let caloriasListaRefeicao = $state<Map<string, number>>(new Map());
+
+  /** "sem refeição" quando a refeição não tem nenhum alimento inserido (nunca ganhou uma lista
+   * própria); "refeição com X cal" quando tem, somando os itens dela — não é a META, é o que foi
+   * de fato cadastrado na lista (usada pro lançamento automático no diário). */
+  function textoListaAlimentos(m: RefeicaoModelo): string {
+    if (!m.metaReceitaId) return "sem refeição";
+    const cal = caloriasListaRefeicao.get(m.metaReceitaId) ?? 0;
+    return `refeição com ${Math.round(cal)} cal`;
+  }
   let metasDiaModelo = $state<MetaDiaModelo[]>([]);
   let modelosPorDia = $state<RefeicaoModeloDia[]>([]);
   let loading = $state(true);
@@ -874,6 +887,10 @@
     erro = null;
     try {
       [modelos, metasDiaModelo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo(), listRefeicoesModeloDia()]);
+      const receitaIds = modelos.map((m) => m.metaReceitaId).filter((id): id is string => id != null);
+      void getCaloriasReceitas(receitaIds)
+        .then((mapa) => (caloriasListaRefeicao = mapa))
+        .catch(() => {});
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -1058,7 +1075,7 @@
   function formatarRodapeMacrosRefeicao(caloriasEscolhidas: number): string {
     if (!modeloMacrosEditando) return `≈ ${caloriasEscolhidas} kcal`;
     const restante = Math.max(0, Math.round(modeloMacrosEditando.contexto.disponivel.calorias - caloriasEscolhidas));
-    return `${caloriasEscolhidas} consumido / ${restante} restante`;
+    return `${caloriasEscolhidas}/${restante} restantes`;
   }
 
   async function confirmarMacrosRefeicao(valores: Record<string, number>): Promise<void> {
@@ -1608,6 +1625,7 @@
                     <div class="card-header">
                       <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
                       <span class="card-header-direita">
+                        <span class="lista-alimentos-badge">{textoListaAlimentos(m)}</span>
                         <span
                           class="item-detalhe"
                           role="button"
@@ -1670,6 +1688,7 @@
                   <div class="card-header">
                     <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
                     <span class="card-header-direita">
+                      <span class="lista-alimentos-badge">{textoListaAlimentos(m)}</span>
                       <span
                         class="item-detalhe"
                         role="button"
@@ -2169,6 +2188,12 @@
     font-size: 11px;
     font-weight: 400;
     color: var(--surface-muted);
+  }
+  .lista-alimentos-badge {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--surface-muted);
+    white-space: nowrap;
   }
   .preview {
     color: var(--surface-muted);

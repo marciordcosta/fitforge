@@ -1606,6 +1606,16 @@ export async function listReceitas(limite = 50): Promise<ReceitaResumo[]> {
   return (data ?? []).map((l) => mapReceitaResumo(l as unknown as Record<string, unknown>));
 }
 
+/** Soma de calorias de cada lista de alimentos privada de refeição (dieta_receitas ocultas),
+ * carregada de uma vez pra todo o catálogo — usado só pra mostrar "refeição com X cal" no card de
+ * Gerenciar Refeições, sem precisar abrir o detalhe (nem repetir a consulta por card). */
+export async function getCaloriasReceitas(receitaIds: string[]): Promise<Map<string, number>> {
+  if (!receitaIds.length) return new Map();
+  const { data, error } = await supabase.from("dieta_receitas").select(RECEITA_RESUMO_SELECT).in("id", receitaIds);
+  if (error) throw error;
+  return new Map((data ?? []).map((l) => mapReceitaResumo(l as unknown as Record<string, unknown>)).map((r) => [r.id, r.calorias]));
+}
+
 export async function getReceita(id: string): Promise<Receita | null> {
   const [receitaRes, itensRes] = await Promise.all([
     supabase.from("dieta_receitas").select("id, nome, oculta").eq("id", id).maybeSingle(),

@@ -123,6 +123,7 @@
     {/each}
   </div>
   <div class="rodape">
+    <button class="feito" onclick={confirmar}>Feito</button>
     <p class="total-cal">
       {#if formatarRodape}
         {formatarRodape(caloriasTotais)}
@@ -130,7 +131,6 @@
         ≈ <strong>{caloriasTotais}</strong> kcal
       {/if}
     </p>
-    <button class="feito" onclick={confirmar}>Feito</button>
   </div>
 </Sheet>
 
@@ -143,6 +143,10 @@
   .total-cal {
     flex: 1;
     margin: 0;
+    box-sizing: border-box;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
     text-align: center;
     color: var(--surface-muted);
     font-size: var(--font-size-sm);

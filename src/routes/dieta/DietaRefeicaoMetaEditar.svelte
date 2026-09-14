@@ -162,7 +162,7 @@
   function formatarRodapeCalorias(caloriasEscolhidas: number): string {
     if (!contexto) return `≈ ${caloriasEscolhidas} kcal`;
     const restante = Math.max(0, Math.round(contexto.disponivel.calorias - caloriasEscolhidas));
-    return `${caloriasEscolhidas} consumido / ${restante} restante`;
+    return `${caloriasEscolhidas}/${restante} restantes`;
   }
 
   async function confirmarMacros(valores: Record<string, number>): Promise<void> {
