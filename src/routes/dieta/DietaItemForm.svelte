@@ -19,6 +19,7 @@
     adicionarItemReceita,
     duplicarAlimento,
     excluirAlimento,
+    renomearAlimento,
     type Alimento,
     type MetasDiarias,
     type RefeicaoDia,
@@ -231,6 +232,38 @@
     }
   }
 
+  let nomeEditando = $state(false);
+  let nomeEditavel = $state("");
+  let salvandoNome = $state(false);
+
+  /** Renomear é separado de "Editar" (que mexe na tabela nutricional inteira e só existe pra
+   * alimentos manuais) — só o nome, disponível pra qualquer alimento, tocando nele aqui. */
+  function abrirRenomear(): void {
+    if (!alimento) return;
+    nomeEditavel = alimento.nome;
+    nomeEditando = true;
+  }
+
+  function focarAoMontar(el: HTMLInputElement): void {
+    el.focus();
+  }
+
+  async function confirmarRenomear(): Promise<void> {
+    if (!alimento) return;
+    nomeEditando = false;
+    const novoNome = nomeEditavel.trim();
+    if (!novoNome || novoNome === alimento.nome) return;
+    salvandoNome = true;
+    try {
+      await renomearAlimento(alimento.id, novoNome);
+      alimento = { ...alimento, nome: novoNome };
+    } catch (err) {
+      alert("Erro ao renomear alimento: " + (err as Error).message);
+    } finally {
+      salvandoNome = false;
+    }
+  }
+
   async function excluir() {
     if (!alimento) return;
     processandoAlimento = true;
@@ -347,7 +380,18 @@
   {:else}
     <div class="conteudo" class:carregando={loading}>
     <h2 class="nome-alimento">
-      {alimento.nome}
+      {#if nomeEditando}
+        <input
+          class="nome-alimento-input"
+          type="text"
+          bind:value={nomeEditavel}
+          onblur={confirmarRenomear}
+          onkeydown={(e) => e.key === "Enter" && confirmarRenomear()}
+          use:focarAoMontar
+        />
+      {:else}
+        <button type="button" class="nome-alimento-btn" onclick={abrirRenomear} disabled={salvandoNome}>{alimento.nome}</button>
+      {/if}
       <span class="porcao-padrao">{alimento.porcaoPadraoQtd}{alimento.porcaoPadraoUnidade}</span>
     </h2>
 
@@ -602,6 +646,35 @@
   .nome-alimento {
     font-size: var(--font-size-lg);
     margin: 0 0 var(--space-4);
+  }
+  .nome-alimento-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .nome-alimento-input {
+    box-sizing: border-box;
+    max-width: 100%;
+    border: none;
+    border-bottom: 1px solid var(--surface-border);
+    background: none;
+    padding: 0;
+    margin: 0;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  .nome-alimento-input:focus {
+    outline: none;
+    border-bottom-color: var(--color-primary);
   }
   .porcao-padrao {
     font-size: var(--font-size-sm);

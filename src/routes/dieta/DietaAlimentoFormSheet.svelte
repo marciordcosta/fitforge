@@ -71,14 +71,9 @@
     Math.round(4 * (proteina ?? 0) + 4 * (carboidrato ?? 0) + 9 * (gordura ?? 0)),
   );
 
-  const valido = $derived(
-    nome.trim().length > 0 &&
-      porcaoQtd != null &&
-      porcaoQtd > 0 &&
-      proteina != null &&
-      carboidrato != null &&
-      (gorduraExpandida ? gorduraSaturada != null || gorduraInsaturada != null : gordura != null),
-  );
+  /** Só nome e porção são obrigatórios — qualquer macro em branco entra como 0, sem travar o
+   * salvar (nem todo registro precisa da tabela nutricional completa pra já ser útil). */
+  const valido = $derived(nome.trim().length > 0 && porcaoQtd != null && porcaoQtd > 0);
 
   function montarInput(): AlimentoManualInput {
     return {
@@ -87,9 +82,9 @@
       porcaoPadraoQtd: porcaoQtd!,
       porcaoPadraoUnidade: porcaoUnidade,
       caloriasPorPorcao: calorias,
-      proteinaG: proteina!,
+      proteinaG: proteina ?? 0,
       gorduraG: gordura ?? 0,
-      carboidratoG: carboidrato!,
+      carboidratoG: carboidrato ?? 0,
       fibraG: fibra,
       gorduraSaturadaG: gorduraExpandida ? gorduraSaturada : null,
       gorduraInsaturadaG: gorduraExpandida ? gorduraInsaturada : null,

@@ -266,19 +266,9 @@
     {#if !ex.musculos.length}
       <span class="sub">Sem músculo definido</span>
     {:else}
-      <span class="musculos-linhas">
-        {#each distribuicao(ex) as m (m.nome)}
-          <span class="musculo-coluna">
-            <span class="musculo-nome-mini">{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome}</span>
-            <span class="musculo-linha-barra">
-              <span class="musculo-barra-mini-wrap">
-                <span class="musculo-barra-mini" style={`width: ${m.pct}%; background: ${m.cor};`}></span>
-              </span>
-              <span class="musculo-pct-mini">{m.pct.toFixed(0)}%</span>
-            </span>
-          </span>
-        {/each}
-      </span>
+      <span class="sub musculos-texto"
+        >{#each distribuicao(ex) as m, i (m.nome)}{i > 0 ? " · " : ""}{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome} {m.pct.toFixed(0)}%{/each}</span
+      >
     {/if}
   </span>
 {/snippet}
@@ -556,12 +546,8 @@
   .item-apagado .nome {
     color: var(--surface-muted);
   }
-  .item-apagado .musculo-nome-mini,
-  .item-apagado .musculo-pct-mini {
+  .item-apagado .musculos-texto {
     opacity: 0.7;
-  }
-  .item-apagado .musculo-barra-mini {
-    opacity: 0.6;
   }
   .info {
     flex: 1;
@@ -577,46 +563,13 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
-  .musculos-linhas {
-    display: flex;
-    gap: var(--space-3);
-    margin-top: var(--space-1);
-  }
-  .musculo-coluna {
-    flex: 0 0 calc((100% - 3 * var(--space-3)) / 4);
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .musculo-nome-mini {
-    font-size: 10px;
-    color: var(--surface-muted);
+  .musculos-texto {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .musculo-linha-barra {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-  }
-  .musculo-barra-mini-wrap {
-    flex: 1;
-    min-width: 0;
-    height: 4px;
-    border-radius: 2px;
-    overflow: hidden;
-    background: var(--surface-border);
-  }
-  .musculo-barra-mini {
-    display: block;
-    height: 100%;
-  }
-  .musculo-pct-mini {
-    flex-shrink: 0;
-    font-size: 9px;
-    color: var(--surface-muted);
   }
   .chevron {
     color: var(--surface-muted);

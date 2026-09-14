@@ -192,6 +192,13 @@ export async function duplicarAlimento(alimento: Alimento): Promise<string> {
   return data.id;
 }
 
+/** Só o nome — usado pelo toque no nome no detalhamento do alimento, sem precisar abrir o
+ * formulário completo de edição (esse continua restrito a alimentos manuais). */
+export async function renomearAlimento(id: string, nome: string): Promise<void> {
+  const { error } = await supabase.from("alimentos").update({ nome }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function excluirAlimento(id: string): Promise<void> {
   const { error } = await supabase.from("alimentos").delete().eq("id", id);
   if (error) throw error;
