@@ -1287,6 +1287,10 @@ export interface ParametrosDistribuicao {
   campoGrade: GraficoCampo;
   graficoCampo: GraficoCampo;
   homeModoGrupos: HomeModoGrupos;
+  /** Na lista de Exercícios, qual grupo fica em destaque (o outro fica apagado): por padrão os
+   * que já estão em alguma rotina; marcando, inverte pra destacar os que ainda não estão em
+   * nenhuma — útil pra quem usa a tela pra achar o que falta organizar. */
+  destacarExerciciosSemRotina: boolean;
 }
 
 export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
@@ -1305,6 +1309,7 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   campoGrade: "destacada",
   graficoCampo: "destacada",
   homeModoGrupos: "todos",
+  destacarExerciciosSemRotina: false,
 };
 
 export type ClasseVolumeSemanal = "insuficiente" | "manutencao" | "moderado" | "foco" | "excessivo";
@@ -1327,7 +1332,7 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
   const { data, error } = await supabase
     .from("treino_parametros")
     .select(
-      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, campo_grade, grafico_campo, home_modo_grupos",
+      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, campo_grade, grafico_campo, home_modo_grupos, destacar_exercicios_sem_rotina",
     )
     .maybeSingle();
   if (error) throw error;
@@ -1348,6 +1353,7 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
     campoGrade: data.campo_grade === "total" || data.campo_grade === "ponderado" ? data.campo_grade : "destacada",
     graficoCampo: data.grafico_campo === "total" || data.grafico_campo === "ponderado" ? data.grafico_campo : "destacada",
     homeModoGrupos: data.home_modo_grupos === "proximo" ? "proximo" : "todos",
+    destacarExerciciosSemRotina: data.destacar_exercicios_sem_rotina ?? false,
   };
 }
 
@@ -1369,6 +1375,7 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     campo_grade: p.campoGrade,
     grafico_campo: p.graficoCampo,
     home_modo_grupos: p.homeModoGrupos,
+    destacar_exercicios_sem_rotina: p.destacarExerciciosSemRotina,
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;

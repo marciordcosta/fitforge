@@ -31,6 +31,7 @@
   let campoGrade = $state<GraficoCampo>(PARAMETROS_DISTRIBUICAO_PADRAO.campoGrade);
   let graficoCampo = $state<GraficoCampo>(PARAMETROS_DISTRIBUICAO_PADRAO.graficoCampo);
   let homeModoGrupos = $state<HomeModoGrupos>(PARAMETROS_DISTRIBUICAO_PADRAO.homeModoGrupos);
+  let destacarExerciciosSemRotina = $state(PARAMETROS_DISTRIBUICAO_PADRAO.destacarExerciciosSemRotina);
 
   const OPCOES_FADIGA: { valor: FadigaModo; label: string }[] = [
     { valor: "fases", label: "Fases" },
@@ -95,6 +96,7 @@
       campoGrade = p.campoGrade;
       graficoCampo = p.graficoCampo;
       homeModoGrupos = p.homeModoGrupos;
+      destacarExerciciosSemRotina = p.destacarExerciciosSemRotina;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -123,6 +125,7 @@
         campoGrade,
         graficoCampo,
         homeModoGrupos,
+        destacarExerciciosSemRotina,
       };
       await salvarParametrosDistribuicao(p);
       navigate("/treino");
@@ -288,6 +291,12 @@
           <button type="button" class:ativo={homeModoGrupos === opcao.valor} onclick={() => (homeModoGrupos = opcao.valor)}>{opcao.label}</button>
         {/each}
       </div>
+
+      <p class="param-subtitulo">Lista de Exercícios</p>
+      <label class="checkbox-linha">
+        <input type="checkbox" bind:checked={destacarExerciciosSemRotina} />
+        <span>Destacar na lista Exercícios os que ainda não estão em nenhuma rotina (em vez dos que já estão)</span>
+      </label>
     </div>
 
     <Button onclick={salvar} disabled={salvando}>Salvar</Button>

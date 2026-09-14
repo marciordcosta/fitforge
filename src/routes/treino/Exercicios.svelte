@@ -19,6 +19,8 @@
     construirSeriesPadrao,
     createExercicio,
     construirMusculosInput,
+    getParametrosDistribuicao,
+    PARAMETROS_DISTRIBUICAO_PADRAO,
     type Exercicio,
     type TreinoComExercicios,
     type ItemRotina,
@@ -112,12 +114,16 @@
   /** Rotinas cadastradas — guardada pra alimentar o ActionSheet "adicionar a uma rotina" sem
    * precisar buscar de novo. */
   let treinos = $state<TreinoComExercicios[]>([]);
+  /** Padrão: destaca quem já está em rotina, apagando o resto — marcando o parâmetro em
+   * Parametrização, inverte pra destacar quem ainda não está em nenhuma. */
+  let destacarSemRotina = $state(PARAMETROS_DISTRIBUICAO_PADRAO.destacarExerciciosSemRotina);
 
   async function carregar() {
     loading = true;
-    const [exs, treinosCarregados] = await Promise.all([listExercicios(), listTreinos()]);
+    const [exs, treinosCarregados, parametros] = await Promise.all([listExercicios(), listTreinos(), getParametrosDistribuicao()]);
     exercicios = exs;
     treinos = treinosCarregados;
+    destacarSemRotina = parametros.destacarExerciciosSemRotina;
     const mapa = new Map<string, { id: string; nome: string }>();
     for (const t of treinosCarregados) {
       for (const te of t.exercicios) {
@@ -166,6 +172,13 @@
     } finally {
       salvandoNaRotina = false;
     }
+  }
+
+  /** Qual grupo fica apagado na lista: por padrão quem não está em rotina; com o parâmetro
+   * destacarSemRotina marcado, inverte e apaga quem já está. */
+  function apagado(ex: Exercicio): boolean {
+    const emRotina = rotinaPorExercicio.has(ex.id);
+    return destacarSemRotina ? emRotina : !emRotina;
   }
 
   function iniciais(nome: string): string {
@@ -296,7 +309,7 @@
     <ul class="lista">
       {#each filtrados as ex (ex.id)}
         <li>
-          <div class="item" class:item-fora-rotina={!rotinaPorExercicio.has(ex.id)}>
+          <div class="item" class:item-apagado={apagado(ex)}>
             {#if modoSelecao}
               <span class="avatar">{iniciais(ex.nome)}</span>
               <button class="conteudo-btn" onclick={() => (verDetalheId = ex.id)}>
@@ -535,19 +548,19 @@
     font-weight: 600;
     flex-shrink: 0;
   }
-  /** Exercícios fora de qualquer rotina ficam discretos — os que já estão em rotina (identificação
-   * antes feita com anel colorido no avatar) passam a ser o visual "normal"/de destaque. */
-  .item-fora-rotina .avatar {
+  /** Grupo apagado (função apagado() no script) fica discreto; o outro grupo é o visual
+   * "normal"/de destaque — qual dos dois é decidido pelo parâmetro destacarSemRotina. */
+  .item-apagado .avatar {
     opacity: 0.55;
   }
-  .item-fora-rotina .nome {
+  .item-apagado .nome {
     color: var(--surface-muted);
   }
-  .item-fora-rotina .musculo-nome-mini,
-  .item-fora-rotina .musculo-pct-mini {
+  .item-apagado .musculo-nome-mini,
+  .item-apagado .musculo-pct-mini {
     opacity: 0.7;
   }
-  .item-fora-rotina .musculo-barra-mini {
+  .item-apagado .musculo-barra-mini {
     opacity: 0.6;
   }
   .info {
