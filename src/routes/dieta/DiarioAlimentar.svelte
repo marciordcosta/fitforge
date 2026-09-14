@@ -314,6 +314,16 @@
     return `${restante(valor, meta).toFixed(0)}${unidade} rest.`;
   }
 
+  /** Mesma lógica de labelMeta, mas sem o "rest." quando a refeição tem meta e ainda não recebeu
+   * nenhum alimento — nesse caso o valor mostrado É a própria meta (nada foi consumido ainda), não
+   * faz sentido chamar de "restante". Com algum item já lançado, continua "rest." normalmente. */
+  function labelMetaCard(valor: number, meta: number, unidade: string, temItens: boolean): string {
+    if (modoRestante && !temItens && !passouMeta(valor, meta)) {
+      return `${restante(valor, meta).toFixed(0)}${unidade}`;
+    }
+    return labelMeta(valor, meta, unidade);
+  }
+
   /** Só pra exibição — arredonda a meta de calorias pra dezena mais próxima (ex: 653 vira 650), sem alterar o valor real usado nos cálculos. */
   function arredondarDezena(valor: number): number {
     return Math.round(valor / 10) * 10;
@@ -614,16 +624,16 @@
           <div class="card-header">
             <span class="card-header-nome">
               <h2>{refeicao.nome}</h2>
-              {#if metaAtual}<span class="card-header-cal">{arredondarDezena(metaAtual.calorias)} cal</span>{/if}
+              {#if metaAtual}<span class="card-header-cal">{totais.calorias.toFixed(0)} de {arredondarDezena(metaAtual.calorias)} cal</span>{/if}
             </span>
           </div>
           {#if metaAtual}
             <p class="pct-titulo">Meta de {refeicao.nome}</p>
             <div class="pct-grid">
-              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaAtual.calorias))), labelMeta(totais.calorias, arredondarDezena(metaAtual.calorias), ""))}
-              {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaAtual.carboidratoG)), labelMeta(totais.carboidratoG, metaAtual.carboidratoG, "g"))}
-              {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaAtual.gorduraG)), labelMeta(totais.gorduraG, metaAtual.gorduraG, "g"))}
-              {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaAtual.proteinaG)), labelMeta(totais.proteinaG, metaAtual.proteinaG, "g"))}
+              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaAtual.calorias))), labelMetaCard(totais.calorias, arredondarDezena(metaAtual.calorias), "", temItens))}
+              {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaAtual.carboidratoG)), labelMetaCard(totais.carboidratoG, metaAtual.carboidratoG, "g", temItens))}
+              {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaAtual.gorduraG)), labelMetaCard(totais.gorduraG, metaAtual.gorduraG, "g", temItens))}
+              {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaAtual.proteinaG)), labelMetaCard(totais.proteinaG, metaAtual.proteinaG, "g", temItens))}
             </div>
           {:else if temItens}
             <p class="pct-titulo">Refeição sem meta</p>

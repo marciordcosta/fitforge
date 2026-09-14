@@ -2626,14 +2626,6 @@
     <path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" />
   </svg>
 {/snippet}
-{#snippet iconTrocarRotina()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="8 3 4 7 8 11" />
-    <line x1="4" y1="7" x2="20" y2="7" />
-    <polyline points="16 13 20 17 16 21" />
-    <line x1="20" y1="17" x2="4" y2="17" />
-  </svg>
-{/snippet}
 {#snippet iconGrade()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -3060,11 +3052,6 @@
           onSelect: () => abrirMoverExercicio(item),
         },
         {
-          label: "Substituir Exercício",
-          icon: iconTrocarRotina,
-          onSelect: () => abrirTrocarDeRotina(item),
-        },
-        {
           label: "Reordenar",
           icon: iconReordenarMenu,
           // Limpa o filtro por músculo ao entrar em modo de reordenar: com itens escondidos
@@ -3101,7 +3088,7 @@
         {
           label: "Ir para Rotinas",
           icon: iconMover,
-          onSelect: () => abrirMoverExercicio(item),
+          onSelect: () => abrirTrocarDeRotina(item),
         },
       ]}
     />

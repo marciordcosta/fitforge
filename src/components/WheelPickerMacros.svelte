@@ -148,8 +148,9 @@
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     text-align: center;
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
+    color: #fff;
+    font-size: var(--font-size-lg);
+    font-weight: 700;
   }
   .total-cal strong {
     color: var(--surface-fg);
