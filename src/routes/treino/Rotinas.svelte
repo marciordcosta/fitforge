@@ -27,7 +27,7 @@
    * e a sessão ao vivo com músculos, ponderando cada série pelo peso configurado no exercício
    * (mesmo critério da coluna "Pond." da Distribuição Semanal). */
   let musculosPorExercicio = $state<Map<string, { musculo_id: string; peso: number }[]>>(new Map());
-  let modoRestante = $state(false);
+  let modoRestante = $state(true);
   let mostrarMenuNovo = $state(false);
 
   /** Rotinas com dia informado sobem pro topo, ordenadas pelo dia mais próximo; sem dia, mantém a ordenação manual. */
@@ -253,14 +253,25 @@
     <div class="card-series">
       <p class="card-titulo">Séries</p>
       <div class="series-linha">
-        <span class="series-valor"><strong>{executado}</strong> <span class="series-meta">/ {programado}</span></span>
-        <span class="series-restantes">
-          {#if passouMeta(executado, programado)}
-            <strong>{executado - programado}</strong> acima
-          {:else}
-            <strong>{restante(executado, programado)}</strong> restantes
-          {/if}
-        </span>
+        {#if modoRestante}
+          <span class="series-valor">
+            {#if passouMeta(executado, programado)}
+              <strong>{executado - programado}</strong> acima
+            {:else}
+              <strong>{restante(executado, programado)}</strong> restantes
+            {/if}
+          </span>
+          <span class="series-restantes">{executado} <span class="series-meta">/ {programado}</span></span>
+        {:else}
+          <span class="series-valor"><strong>{executado}</strong> <span class="series-meta">/ {programado}</span></span>
+          <span class="series-restantes">
+            {#if passouMeta(executado, programado)}
+              <strong>{executado - programado}</strong> acima
+            {:else}
+              <strong>{restante(executado, programado)}</strong> restantes
+            {/if}
+          </span>
+        {/if}
       </div>
       <div class="barra-wrap-grande">
         <div class="barra-grande" style={`width:${larguraBarra(pctMeta(executado, programado))}%; background:var(--color-secondary);`}></div>
