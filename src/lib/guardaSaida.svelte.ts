@@ -7,24 +7,39 @@ import { registrarGuardaSaida, limparGuardaSaida } from "./router.svelte";
  *
  *   const guarda = criarGuardaSaida(() => sujo);
  *   // no ConfirmDialog de "descartar alterações?" que já existe pro botão do app:
- *   function aoDescartar() { guarda.resolverDescarte(() => voltar("/pai")); }
- *   function aoCancelarDialogo() { guarda.cancelar(); }
- *   // template: {#if confirmandoSaida || guarda.confirmando} <ConfirmDialog .../> {/if}
+ *   function aoConfirmarDescarte() {
+ *     mostrarConfirmDoBotao = false;
+ *     guarda.resolverSaida(() => voltar("/pai"));
+ *   }
+ *   function aoCancelarDialogo() {
+ *     mostrarConfirmDoBotao = false;
+ *     guarda.cancelar();
+ *   }
+ *   // template: {#if mostrarConfirmDoBotao || guarda.confirmando} <ConfirmDialog .../> {/if}
+ *
+ * Se salvar (em vez de descartar) também deve fechar a tela, chame `voltar(...)`/`fecharLocal`
+ * dentro do próprio `resolverSaida(fecharLocal)` depois de persistir — o mesmo `fecharLocal` serve
+ * pros dois casos (veio do botão, ou veio do voltar físico).
  */
 export function criarGuardaSaida(estaSujo: () => boolean) {
   let confirmando = $state(false);
   let prosseguirPendente: (() => void) | null = null;
 
+  function armar(): void {
+    registrarGuardaSaida((prosseguir) => {
+      prosseguirPendente = prosseguir;
+      confirmando = true;
+    });
+  }
+
+  // Sem cleanup no unmount de propósito: um unmount fora do fluxo de voltar já guardado (ex:
+  // trocar de aba pela navegação inferior enquanto essa tela está suja) não deve disparar um
+  // window.history.back() por conta própria — isso navegaria o usuário pra longe de onde ele
+  // acabou de escolher ir. As chamadas explícitas de cada tela (limpar o dirty-flag antes de
+  // resolverSaida) já desarmam o degrau no fluxo normal.
   $effect(() => {
-    if (estaSujo()) {
-      registrarGuardaSaida((prosseguir) => {
-        prosseguirPendente = prosseguir;
-        confirmando = true;
-      });
-    } else {
-      limparGuardaSaida();
-    }
-    return () => limparGuardaSaida();
+    if (estaSujo()) armar();
+    else limparGuardaSaida();
   });
 
   return {
@@ -32,21 +47,31 @@ export function criarGuardaSaida(estaSujo: () => boolean) {
     get confirmando() {
       return confirmando;
     },
-    /** Usuário cancelou o alerta (quer continuar editando) — não sai, o degrau de proteção
-     * já foi religado automaticamente (limparGuardaSaida + $effect rearmam sozinhos). */
+    /** Usuário cancelou o alerta (quer continuar editando) — não sai. Rearma na hora: o $effect só
+     * reagiria a uma mudança de `estaSujo()`, que aqui não mudou (continua sujo). */
     cancelar(): void {
       confirmando = false;
       prosseguirPendente = null;
+      if (estaSujo()) armar();
     },
-    /** Usuário confirmou (salvar ou descartar) — chama `fecharLocal` (o mesmo fechamento que o
-     * botão de voltar do app já usa) quando o alerta não veio do voltar físico, ou libera o voltar
-     * físico pendente quando veio de lá. */
+    /** Usuário confirmou (salvar ou descartar) — `fecharLocal` deve fazer o que o botão de voltar
+     * do app já faz (persistir se for o caso, e navegar) quando o alerta NÃO veio do voltar físico;
+     * quando veio de lá, libera o voltar físico pendente em vez de navegar de novo por conta
+     * própria (senão navegaria duas vezes). Chame só DEPOIS de já ter limpado o dirty-flag local,
+     * senão o degrau de proteção seria religado por engano no meio do caminho. */
     resolverSaida(fecharLocal: () => void): void {
       confirmando = false;
       const p = prosseguirPendente;
       prosseguirPendente = null;
-      if (p) p();
-      else fecharLocal();
+      if (p) {
+        p();
+      } else {
+        // Ainda pode estar armado (o $effect que desarma sozinho só roda depois deste tick) —
+        // desarma na mão antes de navegar, senão o primeiro passo do voltar só consumiria o
+        // degrau de proteção (mesma URL) em vez de sair de verdade.
+        limparGuardaSaida();
+        fecharLocal();
+      }
     },
   };
 }

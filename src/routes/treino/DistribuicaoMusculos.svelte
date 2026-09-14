@@ -8,6 +8,7 @@
   import WheelPicker from "../../components/WheelPicker.svelte";
   import Exercicios from "./Exercicios.svelte";
   import { treinoEditorRascunho, type PendenteMoverTrocar } from "../../lib/treinoEditorRascunho.svelte";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
   import {
     listMusculos,
     listTreinos,
@@ -1910,14 +1911,21 @@
     navigate(`/treino/distribuicao/rotina/${treino.id}/editor`);
   }
 
-  /** Fecha o editor sem gravar nada (rascunho é descartado) — usado direto quando não há
-   * alteração pendente, ou depois de confirmar o descarte quando há. */
-  function fecharEditorSemSalvar(): void {
+  /** Só a parte de limpar o rascunho local, sem navegar — usada tanto por fecharEditorSemSalvar
+   * (botão/estado limpo) quanto pelo caminho do voltar FÍSICO (que não deve chamar
+   * window.history.back() aqui, o próprio guarda já cuida disso). */
+  function limparEstadoEditor(): void {
     modalEditorRotina = null;
     editorSujo = false;
     pendentesMoverTrocar = [];
     diaSemanaOriginalEditor = null;
     treinoEditorRascunho.limpar();
+  }
+
+  /** Fecha o editor sem gravar nada (rascunho é descartado) — usado direto quando não há
+   * alteração pendente, ou depois de confirmar o descarte quando há. */
+  function fecharEditorSemSalvar(): void {
+    limparEstadoEditor();
     if (editorUrlTreino) window.history.back();
   }
 
@@ -1926,6 +1934,10 @@
     if (editorSujo) confirmandoFecharEditor = true;
     else fecharEditorSemSalvar();
   }
+
+  /** Cobre também o voltar FÍSICO/gesto do editor completo (o botão de voltar dele já se protege
+   * sozinho acima, via tentarFecharEditor). */
+  const guardaSaidaEditor = criarGuardaSaida(() => editorSujo);
 
   /** Grava o rascunho inteiro de uma vez (substitui a composição da rotina — mesma função usada
    * pela tela básica de edição), aplica na rotina de destino os "Mover"/"Substituir Exercício"
@@ -3354,15 +3366,21 @@
   </div>
 {/if}
 
-{#if confirmandoFecharEditor}
+{#if confirmandoFecharEditor || guardaSaidaEditor.confirmando}
   <ConfirmDialog
     titulo="Descartar as alterações não salvas?"
     textoConfirmar="Descartar"
     onConfirmar={() => {
       confirmandoFecharEditor = false;
-      fecharEditorSemSalvar();
+      limparEstadoEditor();
+      guardaSaidaEditor.resolverSaida(() => {
+        if (editorUrlTreino) window.history.back();
+      });
     }}
-    onCancelar={() => (confirmandoFecharEditor = false)}
+    onCancelar={() => {
+      confirmandoFecharEditor = false;
+      guardaSaidaEditor.cancelar();
+    }}
   />
 {/if}
 

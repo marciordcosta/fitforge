@@ -19,6 +19,7 @@
     type SetRegistro,
   } from "../../lib/treinoApi";
   import { rotinaEditorSessao, type Linha, type LinhaSerie } from "../../lib/rotinaEditorSessao.svelte";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
 
   let { treinoId }: { treinoId: string | null } = $props();
 
@@ -113,6 +114,10 @@
       window.history.back();
     }
   }
+
+  /** Cobre também o voltar FÍSICO/gesto (o botão "Cancelar" já se protege sozinho acima) — mesmo
+   * alerta de descartar, só reaproveitando o ConfirmDialog que já existe. */
+  const guardaSaida = criarGuardaSaida(() => !loading && !erroCarregar && temAlteracoes());
 
   $effect(() => {
     if (loading || erroCarregar) return;
@@ -424,15 +429,19 @@
   />
 {/if}
 
-{#if mostrarConfirmCancelar}
+{#if mostrarConfirmCancelar || guardaSaida.confirmando}
   <ConfirmDialog
     titulo="Tem certeza de que quer descartar todas as alterações à rotina?"
     textoConfirmar="Descartar alterações"
     onConfirmar={() => {
+      mostrarConfirmCancelar = false;
       rotinaEditorSessao.limpar();
-      window.history.back();
+      guardaSaida.resolverSaida(() => window.history.back());
     }}
-    onCancelar={() => (mostrarConfirmCancelar = false)}
+    onCancelar={() => {
+      mostrarConfirmCancelar = false;
+      guardaSaida.cancelar();
+    }}
   />
 {/if}
 

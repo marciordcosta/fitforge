@@ -2,8 +2,10 @@
   import { voltar } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import Exercicios from "./Exercicios.svelte";
   import { construirSeriesPadrao, salvarRegistrosDoDia, type Exercicio, type SetRegistro } from "../../lib/treinoApi";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
 
   interface SerieAvulsa {
     serie: number;
@@ -44,10 +46,18 @@
     itens = itens.map((i) => (i.exercicio.id === exercicioId ? { ...i, series: i.series.filter((s) => s.serie !== serie) } : i));
   }
 
+  let confirmandoDescartar = $state(false);
+
   function aoVoltar(): void {
-    if (itens.length && !confirm("Descartar treino avulso?")) return;
+    if (itens.length) {
+      confirmandoDescartar = true;
+      return;
+    }
     voltar("/treino");
   }
+
+  /** Cobre também o voltar FÍSICO/gesto (o botão de voltar já se protege sozinho acima). */
+  const guardaSaida = criarGuardaSaida(() => itens.length > 0);
 
   async function salvar(): Promise<void> {
     salvando = true;
@@ -117,6 +127,21 @@
     excluirIds={itens.map((i) => i.exercicio.id)}
     onSelecionar={adicionarExercicio}
     onFechar={() => (mostrarPicker = false)}
+  />
+{/if}
+
+{#if confirmandoDescartar || guardaSaida.confirmando}
+  <ConfirmDialog
+    titulo="Descartar treino avulso?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.resolverSaida(() => voltar("/treino"));
+    }}
+    onCancelar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.cancelar();
+    }}
   />
 {/if}
 
