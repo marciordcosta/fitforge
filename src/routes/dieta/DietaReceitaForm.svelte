@@ -3,6 +3,8 @@
   import { criarReceita, getMetasDiarias, type MetasDiarias } from "../../lib/dietaApi";
   import { receitaRascunho, removerDoRascunho, limparRascunho, type ItemRascunho } from "../../lib/receitaRascunho.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -11,6 +13,22 @@
   let salvando = $state(false);
   let itemEditandoIndex = $state<number | null>(null);
   let metas = $state<MetasDiarias | null>(null);
+  let confirmandoDescartar = $state(false);
+
+  /** A receita inteira é um rascunho local (receitaRascunho) até tocar Salvar. */
+  function sujo(): boolean {
+    return receitaRascunho.nome.trim().length > 0 || receitaRascunho.itens.length > 0;
+  }
+
+  const guardaSaida = criarGuardaSaida(sujo);
+
+  function aoVoltar(): void {
+    if (sujo()) {
+      confirmandoDescartar = true;
+      return;
+    }
+    voltar("/dieta/receitas");
+  }
 
   void getMetasDiarias().then((m) => (metas = m));
 
@@ -80,7 +98,7 @@
         receitaRascunho.itens.map((i) => ({ alimentoId: i.alimento.id, quantidade: i.quantidade })),
       );
       limparRascunho();
-      navigate("/dieta/receitas");
+      voltar("/dieta/receitas");
     } catch (err) {
       alert("Erro ao criar refeição: " + (err as Error).message);
       salvando = false;
@@ -126,7 +144,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/dieta/receitas")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={aoVoltar} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Nova Refeição</h1>
     <button class="salvar" onclick={salvar} disabled={salvando || !valido} aria-label="Salvar">
       {@render iconCheck()}
@@ -223,6 +241,22 @@
     porcaoPadraoUnidade={receitaRascunho.itens[itemEditandoIndex].alimento.porcaoPadraoUnidade}
     onSalvar={aoSalvarQuantidade}
     onFechar={() => (itemEditandoIndex = null)}
+  />
+{/if}
+
+{#if confirmandoDescartar || guardaSaida.confirmando}
+  <ConfirmDialog
+    titulo="Descartar essa nova refeição?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoDescartar = false;
+      limparRascunho();
+      guardaSaida.resolverSaida(() => voltar("/dieta/receitas"));
+    }}
+    onCancelar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.cancelar();
+    }}
   />
 {/if}
 

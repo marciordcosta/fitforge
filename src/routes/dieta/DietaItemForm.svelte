@@ -3,6 +3,7 @@
   import { navigate, voltar } from "../../lib/router.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
@@ -74,6 +75,9 @@
   let salvando = $state(false);
   let processandoAlimento = $state(false);
   let erro = $state<string | null>(null);
+  let confirmandoDescartar = $state(false);
+  let quantidadeOriginal = 0;
+  let refeicaoOriginalId: string | null = null;
 
   async function carregar() {
     loading = true;
@@ -92,6 +96,8 @@
         metas = metasRes;
         dataResolvida = refeicaoRes?.data ?? "";
         quantidade = item.quantidade;
+        quantidadeOriginal = item.quantidade;
+        refeicaoOriginalId = item.refeicaoId;
       } else {
         const [alimentoRes, metasRes, refeicaoRes] = await Promise.all([
           getAlimento(alimentoId!),
@@ -102,6 +108,8 @@
         metas = metasRes;
         refeicao = refeicaoRes;
         quantidade = alimentoRes ? alimentoRes.porcaoPadraoQtd : 0;
+        quantidadeOriginal = quantidade;
+        refeicaoOriginalId = refeicaoRes?.id ?? null;
       }
     } catch (err) {
       erro = (err as Error).message;
@@ -184,6 +192,20 @@
   function sufixoRota(): string {
     if (modoReceita) return `/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`;
     return refeicao ? `/${dataResolvida}/${refeicao.id}` : dataResolvida ? `/${dataResolvida}` : "";
+  }
+
+  function sujo(): boolean {
+    return !loading && (quantidade !== quantidadeOriginal || (refeicao?.id ?? null) !== refeicaoOriginalId);
+  }
+
+  const guardaSaida = criarGuardaSaida(sujo);
+
+  function aoVoltar(): void {
+    if (sujo()) {
+      confirmandoDescartar = true;
+      return;
+    }
+    voltar(destinoVoltar());
   }
 
   function destinoVoltar(): string {
@@ -302,7 +324,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar(destinoVoltar())} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={aoVoltar} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>{editandoItem ? "Editar Alimento" : "Adicionar Alimento"}</h1>
     <div class="header-acoes">
       {#if alimento?.fonte === "manual"}
@@ -473,6 +495,21 @@
     textoConfirmar="Excluir Alimento"
     onConfirmar={excluir}
     onCancelar={() => (confirmandoExclusao = false)}
+  />
+{/if}
+
+{#if confirmandoDescartar || guardaSaida.confirmando}
+  <ConfirmDialog
+    titulo="Descartar alterações?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.resolverSaida(() => voltar(destinoVoltar()));
+    }}
+    onCancelar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.cancelar();
+    }}
   />
 {/if}
 

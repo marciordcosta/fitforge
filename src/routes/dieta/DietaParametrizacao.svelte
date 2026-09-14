@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { navigate, voltar } from "../../lib/router.svelte";
+  import { voltar } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
   import {
     getPerfilDietaEditavel,
     getParametros,
@@ -24,6 +26,8 @@
   let valores = $state<Record<string, LimiteParametro>>({ ...PARAMETROS_PADRAO });
   let categoriasAbertas = $state<Set<string>>(new Set());
   let tipoDieta = $state<TipoDieta>("manutencao");
+  let confirmandoDescartar = $state(false);
+  let original = "";
 
   const OPCOES_TIPO_DIETA: { valor: TipoDieta; label: string }[] = [
     { valor: "cutting", label: "Cutting" },
@@ -70,6 +74,7 @@
       for (const [chave, limite] of parametros) novo[chave] = limite;
       valores = novo;
       tipoDieta = tipo;
+      original = JSON.stringify({ valores, tipoDieta });
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -78,6 +83,20 @@
   }
 
   void carregar();
+
+  function sujo(): boolean {
+    return !carregando && JSON.stringify({ valores, tipoDieta }) !== original;
+  }
+
+  const guardaSaida = criarGuardaSaida(sujo);
+
+  function aoVoltar(): void {
+    if (sujo()) {
+      confirmandoDescartar = true;
+      return;
+    }
+    voltar("/dieta");
+  }
 
   async function salvar() {
     salvando = true;
@@ -95,7 +114,7 @@
         }),
       );
       await salvarTipoDieta(tipoDieta);
-      navigate("/dieta");
+      voltar("/dieta");
     } catch (err) {
       alert("Erro ao salvar parâmetros: " + (err as Error).message);
     } finally {
@@ -118,7 +137,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => voltar("/dieta")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={aoVoltar} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>Parâmetros</h1>
     <span class="header-spacer"></span>
   </div>
@@ -226,6 +245,21 @@
     <Button onclick={salvar} disabled={salvando}>Salvar</Button>
   {/if}
 </div>
+
+{#if confirmandoDescartar || guardaSaida.confirmando}
+  <ConfirmDialog
+    titulo="Descartar alterações nos parâmetros?"
+    textoConfirmar="Descartar"
+    onConfirmar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.resolverSaida(() => voltar("/dieta"));
+    }}
+    onCancelar={() => {
+      confirmandoDescartar = false;
+      guardaSaida.cancelar();
+    }}
+  />
+{/if}
 
 <style>
   .container {
