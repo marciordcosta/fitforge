@@ -1089,23 +1089,20 @@
 {/if}
 
 {#if mostrarEscolhaEstrutura}
-  <ActionSheet
-    titulo="Concluir como"
-    onFechar={() => (mostrarEscolhaEstrutura = false)}
-    opcoes={[
-      {
-        label: "Rotina padrão",
-        subtitulo: "Salva o treino de hoje sem alterar a rotina",
-        onSelect: () => finalizarComEscolha(false),
-      },
-      {
-        label: "Rotina ajustada",
-        subtitulo: "Salva o treino de hoje e também as mudanças na rotina",
-        onSelect: () => finalizarComEscolha(true),
-      },
-      { label: "Cancelar", onSelect: () => (mostrarEscolhaEstrutura = false) },
-    ]}
-  />
+  <div class="escolha-overlay" role="presentation" onclick={() => (mostrarEscolhaEstrutura = false)}>
+    <div class="escolha-card" role="presentation" onclick={(e) => e.stopPropagation()}>
+      <p class="escolha-titulo">Concluir como?</p>
+      <button class="escolha-btn" onclick={() => finalizarComEscolha(false)}>
+        <span class="escolha-btn-label">Rotina padrão</span>
+        <span class="escolha-btn-sub">Salva o treino de hoje sem alterar a rotina</span>
+      </button>
+      <button class="escolha-btn" onclick={() => finalizarComEscolha(true)}>
+        <span class="escolha-btn-label">Rotina ajustada</span>
+        <span class="escolha-btn-sub">Salva o treino de hoje e também as mudanças na rotina</span>
+      </button>
+      <button class="escolha-cancelar" onclick={() => (mostrarEscolhaEstrutura = false)}>Cancelar</button>
+    </div>
+  </div>
 {/if}
 
 {#if reordenando}
@@ -1249,6 +1246,68 @@
     margin: 0 auto;
     padding: var(--space-4);
     padding-bottom: var(--space-6);
+  }
+  /* Alerta central (não bottom-sheet) pra escolha de "concluir como" — mesmo motivo/estilo do
+     ConfirmDialog, só que com 2 opções reais + subtítulo em vez de confirmar/cancelar. */
+  .escolha-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    z-index: 200;
+  }
+  .escolha-card {
+    width: 100%;
+    max-width: 320px;
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    box-shadow: var(--shadow-float);
+  }
+  .escolha-titulo {
+    text-align: center;
+    font-size: var(--font-size-base);
+    margin: 0 0 var(--space-4);
+  }
+  .escolha-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--surface-border);
+    color: var(--surface-fg);
+    font-family: inherit;
+    cursor: pointer;
+    margin-bottom: var(--space-2);
+  }
+  .escolha-btn-label {
+    display: block;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+  }
+  .escolha-btn-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .escolha-cancelar {
+    display: block;
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: none;
+    background: none;
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
   }
   .header-fixo {
     position: sticky;
