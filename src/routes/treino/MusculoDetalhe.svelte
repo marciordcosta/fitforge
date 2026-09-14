@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import {
     getMusculo,
     updateMusculo,
@@ -71,6 +72,7 @@
     try {
       const seriesMinimasNum = seriesMinimas.trim() ? Number(seriesMinimas) : null;
       await updateMusculo(musculoId, nome, agrupamentoId || null, seriesMinimasNum);
+      mostrarToast("Salvo");
       voltar("/treino/musculos");
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);

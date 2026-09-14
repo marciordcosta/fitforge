@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { findOrCreateMusculo, listAgrupamentosMusculares, type AgrupamentoMuscular } from "../../lib/treinoApi";
   import WheelPicker from "../../components/WheelPicker.svelte";
 
@@ -32,6 +33,7 @@
     salvando = true;
     try {
       const musculo = await findOrCreateMusculo(nome, agrupamentoId);
+      mostrarToast("Salvo");
       navigate(`/treino/musculos/${musculo.id}`);
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);

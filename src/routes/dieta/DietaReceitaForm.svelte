@@ -5,6 +5,7 @@
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -80,6 +81,7 @@
         receitaRascunho.itens.map((i) => ({ alimentoId: i.alimento.id, quantidade: i.quantidade })),
       );
       limparRascunho();
+      mostrarToast("Salvo");
       // Não chama voltar() direto: o $effect do guarda de saída que reagiria a essa limpeza
       // ainda não rodou nesse instante (é assíncrono) — o guarda continuaria armado e
       // interceptaria essa navegação como se fosse um descarte.

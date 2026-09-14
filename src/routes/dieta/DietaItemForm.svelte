@@ -4,6 +4,7 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
@@ -257,6 +258,7 @@
     try {
       await renomearAlimento(alimento.id, novoNome);
       alimento = { ...alimento, nome: novoNome };
+      mostrarToast("Salvo");
     } catch (err) {
       alert("Erro ao renomear alimento: " + (err as Error).message);
     } finally {
@@ -287,6 +289,7 @@
         salvando = true;
         try {
           await adicionarItemReceita(receitaIdExistente, alimento.id, quantidade);
+          mostrarToast("Salvo");
           guardaSaida.resolverSaida(() => voltar(destinoVoltar()));
         } catch (err) {
           alert("Erro ao salvar alimento: " + (err as Error).message);
@@ -311,6 +314,7 @@
       } else {
         await adicionarItemDiario({ alimento, data: dataResolvida, refeicaoId: refeicao.id, quantidade });
       }
+      mostrarToast("Salvo");
       guardaSaida.resolverSaida(() => voltar(destinoVoltar()));
     } catch (err) {
       alert("Erro ao salvar alimento: " + (err as Error).message);

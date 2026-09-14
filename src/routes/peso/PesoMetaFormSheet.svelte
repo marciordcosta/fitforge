@@ -3,6 +3,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { navigate } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { getMeta, getUltimoPeso, salvarMeta, excluirMeta } from "../../lib/pesoApi";
   import { getTipoDieta, type TipoDieta } from "../../lib/dietaApi";
 
@@ -86,6 +87,7 @@
         const sinal = tipoDieta === "bulking" ? 1 : -1;
         await salvarMeta("percentual", sinal * Math.abs(percentual!), pesoAlvo);
       }
+      mostrarToast("Salvo");
       onSalvo();
       onFechar();
     } catch (err) {

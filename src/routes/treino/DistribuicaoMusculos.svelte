@@ -10,6 +10,7 @@
   import Exercicios from "./Exercicios.svelte";
   import { treinoEditorRascunho, type PendenteMoverTrocar } from "../../lib/treinoEditorRascunho.svelte";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import {
     listMusculos,
     listTreinos,
@@ -2009,6 +2010,7 @@
       pendentesMoverTrocar = [];
       diaSemanaOriginalEditor = null;
       treinoEditorRascunho.limpar();
+      mostrarToast("Salvo");
       // Não chama window.history.back() direto: o $effect do guarda de saída que reagiria a
       // editorSujo virar false ainda não rodou nesse instante — o guarda continuaria armado e
       // interceptaria essa navegação como se fosse um descarte (mostrando o alerta errado).

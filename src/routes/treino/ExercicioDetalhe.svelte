@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { parseISODate } from "../../lib/dates";
   import {
     getExercicio,
@@ -102,6 +103,7 @@
       });
       await carregar();
       aba = "historico";
+      mostrarToast("Salvo");
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
     } finally {

@@ -7,6 +7,7 @@
   import WheelPickerMacros from "../../components/WheelPickerMacros.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import {
     listRefeicoesModelo,
     criarRefeicaoModelo,
@@ -656,6 +657,7 @@
       modoCaloriasOriginal = modoCalorias;
       manuaisOriginal = new Map(manuaisCompletos);
       originalCalorias = snapshotCalorias();
+      mostrarToast("Salvo");
     } catch (err) {
       alert("Erro ao salvar metas: " + (err as Error).message);
     } finally {

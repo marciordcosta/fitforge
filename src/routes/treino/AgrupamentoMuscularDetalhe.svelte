@@ -1,5 +1,6 @@
 <script lang="ts">
   import { voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { getAgrupamentoMuscular, updateAgrupamentoMuscular, deleteAgrupamentoMuscular } from "../../lib/treinoApi";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
 
@@ -32,6 +33,7 @@
     salvando = true;
     try {
       await updateAgrupamentoMuscular(agrupamentoId, nome);
+      mostrarToast("Salvo");
       voltar("/treino/agrupamentos");
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);

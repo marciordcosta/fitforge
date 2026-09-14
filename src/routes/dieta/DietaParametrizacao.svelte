@@ -3,6 +3,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import {
     getPerfilDietaEditavel,
     getParametros,
@@ -114,6 +115,7 @@
         }),
       );
       await salvarTipoDieta(tipoDieta);
+      mostrarToast("Salvo");
       guardaSaida.resolverSaida(() => voltar("/dieta"));
     } catch (err) {
       alert("Erro ao salvar parâmetros: " + (err as Error).message);

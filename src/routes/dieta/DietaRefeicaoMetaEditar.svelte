@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -173,6 +174,7 @@
         await salvarMetaNumericaRefeicao(modeloId, valores.proteinaG, valores.gorduraG, valores.carboidratoG);
       }
       await carregar();
+      mostrarToast("Salvo");
     } catch (err) {
       alert("Erro ao salvar meta: " + (err as Error).message);
     }
@@ -210,6 +212,7 @@
       await atualizarItemReceita(itemEditando.id, novaQuantidade);
       itemEditando = null;
       await carregar();
+      mostrarToast("Salvo");
     } catch (err) {
       alert("Erro ao salvar quantidade: " + (err as Error).message);
     }

@@ -3,6 +3,7 @@
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import {
     criarAlimentoManual,
     atualizarAlimentoManual,
@@ -97,6 +98,7 @@
       salvando = true;
       try {
         await atualizarAlimentoManual(alimento!.id, montarInput());
+        mostrarToast("Salvo");
         onSalvo();
         onFechar();
       } catch (err) {
@@ -130,6 +132,7 @@
         };
         await adicionarItemDiario({ alimento: novoAlimento, data, refeicaoId, quantidade: input.porcaoPadraoQtd });
       }
+      mostrarToast("Salvo");
       onSalvo();
       onFechar();
     } catch (err) {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { hojeISO } from "../../lib/dates";
   import { formatMinSeg } from "../../lib/tempo";
   import {
@@ -721,6 +722,7 @@
     try {
       await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
       treinoLogSessao.limpar();
+      mostrarToast("Salvo");
       voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);
@@ -750,6 +752,7 @@
         );
       }
       treinoLogSessao.limpar();
+      mostrarToast("Salvo");
       voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);

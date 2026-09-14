@@ -7,6 +7,7 @@
   import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
   import { navigate } from "../../lib/router.svelte";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import {
     getPesoDoDia,
     getFotoDoDia,
@@ -136,6 +137,7 @@
     try {
       await salvarPeso(data, peso);
       onSalvo();
+      mostrarToast("Salvo");
       guardaSaida.resolverSaida(onFechar);
     } catch (err) {
       alert("Erro ao salvar: " + (err as Error).message);

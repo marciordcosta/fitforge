@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { createPadraoMovimentoComMusculos } from "../../lib/treinoApi";
   import MovimentoCampos from "./MovimentoCampos.svelte";
 
@@ -18,6 +19,7 @@
         nome,
         linhasMusculos.map((l) => l.nome),
       );
+      mostrarToast("Salvo");
       navigate(`/treino/movimentos/${novoId}`);
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);

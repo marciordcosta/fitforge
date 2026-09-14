@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { hojeISO } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import Button from "../../components/Button.svelte";
@@ -147,6 +148,7 @@
       }
       nomeEditando = false;
       await carregar();
+      mostrarToast("Salvo");
     } catch (err) {
       alert("Erro ao salvar alterações: " + (err as Error).message);
     } finally {

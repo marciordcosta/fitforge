@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
@@ -149,6 +150,7 @@
       itemEditando = null;
       alimentoEditando = null;
       await carregar();
+      mostrarToast("Salvo");
     } catch (err) {
       alert("Erro ao atualizar item: " + (err as Error).message);
     } finally {

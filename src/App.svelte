@@ -4,6 +4,7 @@
   import { treinoLogSessao } from "./lib/treinoLogSessao.svelte";
   import BottomNav from "./components/BottomNav.svelte";
   import TreinoMinimizado from "./components/TreinoMinimizado.svelte";
+  import Toast from "./components/Toast.svelte";
   import Login from "./routes/login/Login.svelte";
   import Home from "./routes/Home.svelte";
   import HomeParametrizacao from "./routes/home/HomeParametrizacao.svelte";
@@ -66,6 +67,7 @@
     {/if}
     <BottomNav />
   {/if}
+  <Toast />
 {/if}
 
 <style>

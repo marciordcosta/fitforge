@@ -1,6 +1,7 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
   import { formatMinSeg } from "../../lib/tempo";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DescansoPicker from "../../components/DescansoPicker.svelte";
@@ -292,6 +293,7 @@
       // já valia salvando pelo editor embutido em DistribuicaoMusculos.svelte.
       await limparMetasMusculoRotina(id);
       rotinaEditorSessao.limpar();
+      mostrarToast("Salvo");
       // Não usa window.history.back() direto: o guarda de saída (voltar físico) continuaria
       // armado nesse instante — limpar() zera rotinaEditorSessao.original, o que faz
       // temAlteracoes() voltar true — e interceptaria essa navegação como se fosse um descarte.

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { createExercicio, construirMusculosInput, type LinhaMusculoInput } from "../../lib/treinoApi";
   import ExercicioCampos from "./ExercicioCampos.svelte";
 
@@ -30,6 +31,7 @@
         padrao_id: padraoId || null,
         musculos: musculosInput,
       });
+      mostrarToast("Salvo");
       if (voltarAoSalvar) {
         voltar("/treino/exercicios");
       } else {

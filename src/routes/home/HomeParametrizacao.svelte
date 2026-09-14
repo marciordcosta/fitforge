@@ -5,6 +5,7 @@
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import { getLayoutHome, salvarLayoutHome, CATALOGO_CARDS, type HomeCardTipo } from "../../lib/homeApi";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
 
   let itens = $state<HomeCardTipo[]>([]);
   let itensOriginal: HomeCardTipo[] = [];
@@ -65,6 +66,7 @@
     salvando = true;
     try {
       await salvarLayoutHome(itens);
+      mostrarToast("Salvo");
       guardaSaida.resolverSaida(() => voltar("/"));
     } catch (err) {
       alert("Erro ao salvar: " + (err as Error).message);
