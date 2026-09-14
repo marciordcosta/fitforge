@@ -112,7 +112,7 @@
           getUltimoRegistro(te.exercicio_id, fonte === "ultima_rotina" ? treinoId : undefined),
           getRecordesExercicio(te.exercicio_id),
         ]);
-        const nSets = Math.max(te.series.length, anterior.length, 1);
+        const nSets = Math.max(te.series.length, 1);
         const sets: SetSessao[] = Array.from({ length: nSets }, (_, i) => {
           const ant = anterior.find((a) => a.serie === i + 1);
           const alvo = te.series.find((s) => s.serie === i + 1);
