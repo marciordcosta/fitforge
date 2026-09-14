@@ -2009,7 +2009,10 @@
       pendentesMoverTrocar = [];
       diaSemanaOriginalEditor = null;
       treinoEditorRascunho.limpar();
-      if (editorUrlTreino) window.history.back();
+      // Não chama window.history.back() direto: o $effect do guarda de saída que reagiria a
+      // editorSujo virar false ainda não rodou nesse instante — o guarda continuaria armado e
+      // interceptaria essa navegação como se fosse um descarte (mostrando o alerta errado).
+      if (editorUrlTreino) guardaSaidaEditor.resolverSaida(() => window.history.back());
     } catch (e) {
       alert("Erro ao salvar rotina: " + (e as Error).message);
     } finally {

@@ -114,7 +114,7 @@
         }),
       );
       await salvarTipoDieta(tipoDieta);
-      voltar("/dieta");
+      guardaSaida.resolverSaida(() => voltar("/dieta"));
     } catch (err) {
       alert("Erro ao salvar parâmetros: " + (err as Error).message);
     } finally {

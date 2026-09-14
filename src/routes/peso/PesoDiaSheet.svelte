@@ -136,7 +136,7 @@
     try {
       await salvarPeso(data, peso);
       onSalvo();
-      onFechar();
+      guardaSaida.resolverSaida(onFechar);
     } catch (err) {
       alert("Erro ao salvar: " + (err as Error).message);
       salvando = false;
@@ -148,7 +148,7 @@
     try {
       await excluirPeso(data);
       onSalvo();
-      onFechar();
+      guardaSaida.resolverSaida(onFechar);
     } catch (err) {
       alert("Erro ao excluir: " + (err as Error).message);
       salvando = false;

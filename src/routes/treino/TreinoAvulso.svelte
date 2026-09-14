@@ -66,7 +66,9 @@
         itens.map((i) => [i.exercicio.id, i.series.map((s) => ({ serie: s.serie, peso: s.peso, repeticoes: s.repeticoes }))]),
       );
       await salvarRegistrosDoDia(null, hojeISO(), porExercicio);
-      voltar("/treino");
+      // Não chama voltar() direto: itens continua com o conteúdo salvo (guarda ainda vê como
+      // "sujo") e o guarda de saída interceptaria essa navegação como se fosse um descarte.
+      guardaSaida.resolverSaida(() => voltar("/treino"));
     } catch (err) {
       alert("Erro ao salvar treino avulso: " + (err as Error).message);
     } finally {

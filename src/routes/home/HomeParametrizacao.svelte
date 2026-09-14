@@ -65,7 +65,7 @@
     salvando = true;
     try {
       await salvarLayoutHome(itens);
-      voltar("/");
+      guardaSaida.resolverSaida(() => voltar("/"));
     } catch (err) {
       alert("Erro ao salvar: " + (err as Error).message);
       salvando = false;

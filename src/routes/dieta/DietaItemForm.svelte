@@ -287,7 +287,7 @@
         salvando = true;
         try {
           await adicionarItemReceita(receitaIdExistente, alimento.id, quantidade);
-          voltar(destinoVoltar());
+          guardaSaida.resolverSaida(() => voltar(destinoVoltar()));
         } catch (err) {
           alert("Erro ao salvar alimento: " + (err as Error).message);
           salvando = false;
@@ -296,12 +296,12 @@
       }
       definirContexto("nova");
       adicionarAoRascunho(alimento, quantidade);
-      voltar(destinoVoltar());
+      guardaSaida.resolverSaida(() => voltar(destinoVoltar()));
       return;
     }
     if (!refeicao) {
       // Sem refeição escolhida não há o que lançar no diário — o alimento já foi criado/salvo no catálogo antes de chegar aqui.
-      voltar(destinoVoltar());
+      guardaSaida.resolverSaida(() => voltar(destinoVoltar()));
       return;
     }
     salvando = true;
@@ -311,7 +311,7 @@
       } else {
         await adicionarItemDiario({ alimento, data: dataResolvida, refeicaoId: refeicao.id, quantidade });
       }
-      voltar(destinoVoltar());
+      guardaSaida.resolverSaida(() => voltar(destinoVoltar()));
     } catch (err) {
       alert("Erro ao salvar alimento: " + (err as Error).message);
       salvando = false;

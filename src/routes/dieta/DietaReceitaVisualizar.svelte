@@ -300,7 +300,7 @@
     excluindo = true;
     try {
       await excluirReceita(receita.id);
-      voltar("/dieta/receitas");
+      guardaSaida.resolverSaida(() => voltar("/dieta/receitas"));
     } catch (err) {
       alert("Erro ao excluir refeição: " + (err as Error).message);
       excluindo = false;

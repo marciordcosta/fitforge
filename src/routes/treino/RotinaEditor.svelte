@@ -292,7 +292,10 @@
       // já valia salvando pelo editor embutido em DistribuicaoMusculos.svelte.
       await limparMetasMusculoRotina(id);
       rotinaEditorSessao.limpar();
-      window.history.back();
+      // Não usa window.history.back() direto: o guarda de saída (voltar físico) continuaria
+      // armado nesse instante — limpar() zera rotinaEditorSessao.original, o que faz
+      // temAlteracoes() voltar true — e interceptaria essa navegação como se fosse um descarte.
+      guardaSaida.resolverSaida(() => window.history.back());
     } catch (e) {
       alert("Erro ao salvar: " + (e as Error).message);
     } finally {

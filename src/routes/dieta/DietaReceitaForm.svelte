@@ -80,7 +80,10 @@
         receitaRascunho.itens.map((i) => ({ alimentoId: i.alimento.id, quantidade: i.quantidade })),
       );
       limparRascunho();
-      voltar("/dieta/receitas");
+      // Não chama voltar() direto: o $effect do guarda de saída que reagiria a essa limpeza
+      // ainda não rodou nesse instante (é assíncrono) — o guarda continuaria armado e
+      // interceptaria essa navegação como se fosse um descarte.
+      guardaSaida.resolverSaida(() => voltar("/dieta/receitas"));
     } catch (err) {
       alert("Erro ao criar refeição: " + (err as Error).message);
       salvando = false;
