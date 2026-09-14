@@ -669,19 +669,26 @@
     }
   }
 
-  /** Dia (na roleta) e o próprio treino cujo dia está sendo movido, dentro da grade semanal. */
-  let movendoDiaTreino = $state<{ treinoId: string; treinoNome: string; diaAtual: number } | null>(null);
+  /** Dia (na roleta) e o próprio treino cujo dia está sendo movido, dentro da grade semanal — OU
+   * (`doEditor: true`) de dentro do editor completo, caso em que a mudança fica só no rascunho. */
+  let movendoDiaTreino = $state<{ treinoId: string; treinoNome: string; diaAtual: number; doEditor: boolean } | null>(null);
   let salvandoDiaTreino = $state(false);
 
-  function abrirMoverDiaTreino(treinoId: string, treinoNome: string, diaAtual: number): void {
-    movendoDiaTreino = { treinoId, treinoNome, diaAtual };
+  function abrirMoverDiaTreino(treinoId: string, treinoNome: string, diaAtual: number, doEditor = false): void {
+    movendoDiaTreino = { treinoId, treinoNome, diaAtual, doEditor };
   }
 
   const opcoesDiaSemana = ORDEM_DIAS.map((dia) => ({ valor: dia, label: DIAS_SEMANA_COMPLETO[dia] }));
 
   async function moverTreinoParaDia(novoDia: number): Promise<void> {
     if (!movendoDiaTreino) return;
-    const { treinoId, treinoNome } = movendoDiaTreino;
+    const { treinoId, treinoNome, doEditor } = movendoDiaTreino;
+    if (doEditor && modalEditorRotina?.id === treinoId) {
+      modalEditorRotina = { ...modalEditorRotina, dia_semana: novoDia };
+      editorSujo = true;
+      movendoDiaTreino = null;
+      return;
+    }
     salvandoDiaTreino = true;
     try {
       await renameTreino(treinoId, treinoNome, novoDia);
@@ -1729,6 +1736,10 @@
    * Sem isso, baixar as séries e depois voltar ao número original mostraria um "aumento"
    * (relativo ao valor intermediário) em vez de sumir. */
   let baselineEditor = $state<{ seriesPorExercicio: Map<string, number>; totalPorMusculo: Map<string, number> } | null>(null);
+  /** Dia da semana ANTES de qualquer edição no rascunho — mudar o dia dentro do editor só altera
+   * `modalEditorRotina.dia_semana` localmente; comparar com este valor, ao Salvar, é o que decide
+   * se `renameTreino` precisa rodar. */
+  let diaSemanaOriginalEditor = $state<number | null>(null);
 
   function capturarBaselineEditor(treino: TreinoComExercicios): void {
     const seriesPorExercicio = new Map<string, number>();
@@ -1860,11 +1871,13 @@
       baselineEditor = rascunho.baseline;
       editorSujo = rascunho.sujo;
       pendentesMoverTrocar = rascunho.pendentes;
+      diaSemanaOriginalEditor = rascunho.diaSemanaOriginal;
     } else {
       modalEditorRotina = treino;
       capturarBaselineEditor(treino);
       editorSujo = false;
       pendentesMoverTrocar = [];
+      diaSemanaOriginalEditor = treino.dia_semana ?? null;
     }
     editorFiltroMusculoId = editorFiltroInicialId;
     editorFiltroInicialId = null;
@@ -1881,6 +1894,7 @@
         baseline: baselineEditor,
         sujo: editorSujo,
         pendentes: pendentesMoverTrocar,
+        diaSemanaOriginal: diaSemanaOriginalEditor,
       });
     }
   });
@@ -1902,6 +1916,7 @@
     modalEditorRotina = null;
     editorSujo = false;
     pendentesMoverTrocar = [];
+    diaSemanaOriginalEditor = null;
     treinoEditorRascunho.limpar();
     if (editorUrlTreino) window.history.back();
   }
@@ -1939,6 +1954,10 @@
         await adicionarTreinoExercicio(p.destinoTreinoId, p.exercicioEntraId, p.exercicioEntraNumSeries, []);
         if (p.exercicioSaiTreinoExercicioId) await removerTreinoExercicio(p.exercicioSaiTreinoExercicioId);
       }
+      // Dia só é alterado de verdade aqui — mudar dentro do editor até aqui só mexeu no rascunho.
+      if (modalEditorRotina.dia_semana !== diaSemanaOriginalEditor) {
+        await renameTreino(treinoId, modalEditorRotina.nome_treino, modalEditorRotina.dia_semana ?? null);
+      }
       // A meta é um alvo pra guiar o ajuste — uma vez salvo o resultado, ela deixa de fazer
       // sentido e some, até o usuário definir um novo alvo na grade.
       await limparMetasMusculoRotina(treinoId);
@@ -1958,6 +1977,7 @@
       editorSujo = false;
       modalEditorRotina = null;
       pendentesMoverTrocar = [];
+      diaSemanaOriginalEditor = null;
       treinoEditorRascunho.limpar();
       if (editorUrlTreino) window.history.back();
     } catch (e) {
@@ -3172,7 +3192,7 @@
         <button
           class="editor-dia-btn"
           onclick={() =>
-            abrirMoverDiaTreino(modalEditorRotina!.id, modalEditorRotina!.nome_treino, modalEditorRotina!.dia_semana ?? 0)}
+            abrirMoverDiaTreino(modalEditorRotina!.id, modalEditorRotina!.nome_treino, modalEditorRotina!.dia_semana ?? 0, true)}
         >{modalEditorRotina.dia_semana != null ? DIAS_SEMANA_ABREV[modalEditorRotina.dia_semana] : "Dia"}</button>
       </div>
       {#if modoReordenarEditor}

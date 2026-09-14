@@ -32,6 +32,9 @@ export interface RascunhoEditorRotina {
   baseline: BaselineEditorRotina;
   sujo: boolean;
   pendentes: PendenteMoverTrocar[];
+  /** Dia da semana ANTES de qualquer edição no rascunho — usado ao Salvar pra saber se o dia foi
+   * mudado (e só então chamar renameTreino; mudar o dia dentro do editor não grava na hora). */
+  diaSemanaOriginal: number | null;
 }
 
 let atual = $state<RascunhoEditorRotina | null>(null);
