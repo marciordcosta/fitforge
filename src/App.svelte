@@ -7,15 +7,10 @@
   import Login from "./routes/login/Login.svelte";
   import Home from "./routes/Home.svelte";
   import HomeParametrizacao from "./routes/home/HomeParametrizacao.svelte";
-  import Placeholder from "./routes/Placeholder.svelte";
   import Treino from "./routes/treino/Treino.svelte";
   import Peso from "./routes/peso/Peso.svelte";
   import Dieta from "./routes/dieta/Dieta.svelte";
   import Fotos from "./routes/fotos/Fotos.svelte";
-
-  const sectionTitles: Record<string, string> = {
-    "/treino": "Treino",
-  };
 
   /** As 5 abas principais ficam sempre montadas (escondidas via `hidden`, nunca destruídas) assim
    * que o usuário loga — cada uma carrega seus dados uma única vez (no boot, em paralelo) e trocar
@@ -64,8 +59,6 @@
   <div hidden={abaAtiva !== "fotos"}><Fotos /></div>
   {#if abaAtiva === "configurar"}
     <HomeParametrizacao />
-  {:else if sectionTitles[router.path]}
-    <Placeholder titulo={sectionTitles[router.path]} />
   {/if}
   {#if !router.path.startsWith("/treino/log/") && !router.path.startsWith("/fotos/comparar/")}
     {#if treinoLogSessao.atual}
