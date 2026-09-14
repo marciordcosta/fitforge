@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { navigate, voltar, router } from "../../lib/router.svelte";
   import { toISODate, parseISODate } from "../../lib/dates";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
@@ -2311,6 +2312,24 @@
     abrirDetalheRotina(treino.nome_treino, itens, formatValor(total), "séries", coresAbcAcumulado(itens), "bruto");
     modalDetalheOrigem = { tipo: "treino", treino };
   }
+
+  /** `modalDetalheRotina` é um snapshot tirado no momento em que o anel abre — sem isso, editar
+   * uma série (add/remover exercício, ajustar séries) enquanto o anel está aberto por cima deixava
+   * o número mostrado no centro (ao tocar numa fatia) desatualizado até fechar e abrir de novo.
+   * Refaz só itens/centro/cores aqui — não mexe em modoDetalhe, pra não resetar o toggle
+   * ABC/Volume do usuário a cada mudança nos dados. */
+  $effect(() => {
+    const origem = modalDetalheOrigem;
+    const campo = campoGrafico;
+    if (!origem) return;
+    const dadosOrigem = origem.tipo === "semanal" ? linhasSemanal : (distribuicaoPorTreino.find((d) => d.treino.id === origem.treino.id)?.lista ?? []);
+    const { itens, total } = itensParaGrafico(dadosOrigem, campo);
+    const cores = coresAbcAcumulado(itens);
+    untrack(() => {
+      if (!modalDetalheRotina) return;
+      modalDetalheRotina = { ...modalDetalheRotina, itens, centroValor: formatValor(total), cores };
+    });
+  });
 </script>
 
 {#snippet iconVoltar()}
@@ -2891,7 +2910,10 @@
   <div class="acima-editor">
     <Sheet
       titulo={LABEL_TITULO_GRADE[campoGrafico]}
-      onFechar={() => (modalDetalheRotina = null)}
+      onFechar={() => {
+        modalDetalheRotina = null;
+        modalDetalheOrigem = null;
+      }}
       aoClicarTitulo={colunasAtivas.length > 1 && parametrosDistribuicao.graficoCampo === "destacada" ? alternarColunaDetalhe : undefined}
       acaoTituloDireita={modalDetalheRotina.itens.length ? alternarModoDetalhe : undefined}
     >
