@@ -2,6 +2,7 @@
   import { navigate, voltar } from "../../lib/router.svelte";
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import {
     getRefeicaoDia,
@@ -44,6 +45,8 @@
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
+  let mostrarMenuExcluir = $state(false);
+  let confirmandoExcluirAlimentos = $state(false);
   let confirmandoExclusaoRefeicao = $state(false);
   let processando = $state(false);
   let itemEditando = $state<ItemDiario | null>(null);
@@ -248,11 +251,34 @@
       processando = false;
     }
   }
+
+  /** Só os alimentos — a refeição em si continua existindo (vazia) pro dia, diferente de
+   * descartarRefeicao (que apaga o "slot" inteiro). */
+  async function excluirTodosAlimentos(): Promise<void> {
+    processando = true;
+    try {
+      await Promise.all(itens.map((item) => removerItemDiario(item.id)));
+      await carregar();
+    } catch (err) {
+      alert("Erro ao excluir alimentos: " + (err as Error).message);
+    } finally {
+      processando = false;
+    }
+  }
 </script>
 
 {#snippet iconVoltar()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="15 6 9 12 15 18" />
+  </svg>
+{/snippet}
+
+{#snippet iconLixeira()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
   </svg>
 {/snippet}
 
@@ -378,15 +404,47 @@
     <div class="acoes-refeicao">
       <button class="acao-adicionar" onclick={() => navigate(`/dieta/alimentos/refeicao/${refeicaoId}`)}>+ Adicionar Alimento</button>
     </div>
-    <button class="descartar" disabled={processando} onclick={() => (confirmandoExclusaoRefeicao = true)}>Descartar refeição</button>
+    <button class="descartar" disabled={processando} onclick={() => (mostrarMenuExcluir = true)}>Excluir</button>
     </div>
   {/if}
 </div>
 
+{#if mostrarMenuExcluir}
+  <ActionSheet
+    titulo="O que deseja excluir?"
+    onFechar={() => (mostrarMenuExcluir = false)}
+    opcoes={[
+      {
+        label: "Excluir Alimentos",
+        subtitulo: "A refeição continua, só os itens somem",
+        icon: iconLixeira,
+        destructive: true,
+        onSelect: () => (confirmandoExcluirAlimentos = true),
+      },
+      {
+        label: "Excluir Refeição",
+        subtitulo: "Remove a refeição inteira desse dia",
+        icon: iconLixeira,
+        destructive: true,
+        onSelect: () => (confirmandoExclusaoRefeicao = true),
+      },
+    ]}
+  />
+{/if}
+
+{#if confirmandoExcluirAlimentos}
+  <ConfirmDialog
+    titulo="Tem certeza de que quer excluir todos os alimentos dessa refeição?"
+    textoConfirmar="Excluir Alimentos"
+    onConfirmar={excluirTodosAlimentos}
+    onCancelar={() => (confirmandoExcluirAlimentos = false)}
+  />
+{/if}
+
 {#if confirmandoExclusaoRefeicao}
   <ConfirmDialog
-    titulo="Tem certeza de que quer descartar esta refeição? Todos os alimentos dela serão apagados."
-    textoConfirmar="Descartar Refeição"
+    titulo="Tem certeza de que quer excluir esta refeição? Todos os alimentos dela serão apagados."
+    textoConfirmar="Excluir Refeição"
     onConfirmar={descartarRefeicao}
     onCancelar={() => (confirmandoExclusaoRefeicao = false)}
   />

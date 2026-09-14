@@ -267,7 +267,7 @@
       <span class="sub">Sem músculo definido</span>
     {:else}
       <span class="sub musculos-texto"
-        >{#each distribuicao(ex) as m, i (m.nome)}{i > 0 ? " · " : ""}{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome} {m.pct.toFixed(0)}%{/each}</span
+        >{#each distribuicao(ex) as m, i (m.nome)}{i > 0 ? " · " : ""}{ex.musculos.length > 1 ? abreviarMusculo(m.nome) : m.nome}{/each}</span
       >
     {/if}
   </span>
