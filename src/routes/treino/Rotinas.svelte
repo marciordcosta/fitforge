@@ -322,37 +322,51 @@
     </button>
   </div>
 
-  <p class="rotinas-titulo">Rotinas</p>
-
   {#if loading}
+    <p class="rotinas-titulo">Rotinas</p>
     <p class="muted">Carregando…</p>
   {:else if erroCarregar}
+    <p class="rotinas-titulo">Rotinas</p>
     <p class="erro">Erro ao carregar: {erroCarregar}</p>
   {:else if !treinos.length}
+    <p class="rotinas-titulo">Rotinas</p>
     <p class="muted">Nenhuma rotina ainda. Crie a primeira.</p>
   {:else}
-    {#each treinos as treino (treino.id)}
-      <div
-        class="rotina-item"
-        role="button"
-        tabindex="0"
-        onclick={() => navigate(`/treino/rotina/${treino.id}/ver`)}
-        onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
-      >
-        <div class="card-header">
-          <h2>
-            {treino.nome_treino}
-            {#if treino.dia_semana != null}
-              <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
-            {/if}
-          </h2>
-        </div>
-        <p class="preview">{preview(treino)}</p>
-        <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
-      </div>
+    {@const proxima = treinos[0]?.dia_semana != null ? treinos[0] : null}
+    {@const demais = proxima ? treinos.slice(1) : treinos}
+    {#if proxima}
+      <p class="rotinas-titulo">Próxima Rotina</p>
+      {@render rotinaCard(proxima)}
+      <p class="rotinas-titulo rotinas-titulo-separado">Rotinas</p>
+    {:else}
+      <p class="rotinas-titulo">Rotinas</p>
+    {/if}
+    {#each demais as treino (treino.id)}
+      {@render rotinaCard(treino)}
     {/each}
   {/if}
 </div>
+
+{#snippet rotinaCard(treino: TreinoComExercicios)}
+  <div
+    class="rotina-item"
+    role="button"
+    tabindex="0"
+    onclick={() => navigate(`/treino/rotina/${treino.id}/ver`)}
+    onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
+  >
+    <div class="card-header">
+      <h2>
+        {treino.nome_treino}
+        {#if treino.dia_semana != null}
+          <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
+        {/if}
+      </h2>
+    </div>
+    <p class="preview">{preview(treino)}</p>
+    <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+  </div>
+{/snippet}
 
 {#if mostrarMenuNovo}
   <ActionSheet
@@ -550,6 +564,11 @@
   .rotinas-titulo {
     font-weight: 600;
     margin: 0 0 var(--space-3);
+  }
+  .rotinas-titulo-separado {
+    margin-top: var(--space-2);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--surface-border);
   }
   .rotina-item {
     cursor: pointer;
