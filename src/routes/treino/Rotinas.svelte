@@ -331,7 +331,7 @@
   {:else if !treinos.length}
     <p class="muted">Nenhuma rotina ainda. Crie a primeira.</p>
   {:else}
-    {#each treinos as treino (treino.id)}
+    {#each treinos as treino, i (treino.id)}
       <div
         class="rotina-item"
         role="button"
@@ -348,7 +348,11 @@
           </h2>
         </div>
         <p class="preview">{preview(treino)}</p>
-        <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+        {#if i === 0 && treino.dia_semana != null}
+          <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+        {:else}
+          <button type="button" class="iniciar-secundario" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</button>
+        {/if}
       </div>
     {/each}
   {/if}
@@ -558,6 +562,18 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
+  }
+  .iniciar-secundario {
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--surface-border);
+    background: none;
+    color: var(--color-primary);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    cursor: pointer;
   }
   .card-header {
     display: flex;
