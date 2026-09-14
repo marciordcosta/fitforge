@@ -83,7 +83,7 @@
     mostrarConfirmExcluir = false;
     try {
       await deleteMusculo(musculoId);
-      navigate("/treino/musculos");
+      voltar("/treino/musculos");
     } catch (e) {
       alert("Erro ao excluir: " + (e as Error).message);
     }

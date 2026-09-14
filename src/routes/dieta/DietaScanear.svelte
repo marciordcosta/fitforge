@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar as voltarRouter } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
   import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts, type AlimentoOpenFoodFactsInput } from "../../lib/dietaApi";
@@ -150,17 +150,19 @@
     navigate(refeicaoId ? `/dieta/alimentos/refeicao/${refeicaoId}` : "/dieta/alimentos");
   }
 
+  /** O padrão abaixo só é usado se a tela foi aberta direto (deep link/recarregar) — em uso
+   * normal, `voltarRouter` já volta pro pai real de verdade (window.history.back()). */
   function voltar() {
     if (modoReceita) {
       if (receitaIdExistente) {
-        navigate(`/dieta/receitas/ver/${receitaIdExistente}`);
+        voltarRouter(`/dieta/alimentos/receita/${receitaIdExistente}`);
       } else {
-        navigate(urlNovaReceitaMeta());
+        voltarRouter(urlNovaReceitaMeta());
       }
     } else if (refeicaoId) {
-      navigate(`/dieta/refeicao/${refeicaoId}`);
+      voltarRouter(`/dieta/refeicao/${refeicaoId}`);
     } else {
-      navigate("/dieta");
+      voltarRouter("/dieta");
     }
   }
 </script>

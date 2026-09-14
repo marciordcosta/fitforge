@@ -112,7 +112,8 @@
   async function tentarExcluir() {
     try {
       await deleteExercicio(exercicioId);
-      navigate("/treino/exercicios");
+      if (onFechar) onFechar();
+      else voltar("/treino/exercicios");
     } catch (e) {
       const err = e as { code?: string; message?: string };
       if (err.code === "23503" && err.message?.includes("treino_registros")) {

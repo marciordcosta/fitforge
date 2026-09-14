@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate, voltar } from "../../lib/router.svelte";
+  import { voltar } from "../../lib/router.svelte";
   import { getAgrupamentoMuscular, updateAgrupamentoMuscular, deleteAgrupamentoMuscular } from "../../lib/treinoApi";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
 
@@ -44,7 +44,7 @@
     mostrarConfirmExcluir = false;
     try {
       await deleteAgrupamentoMuscular(agrupamentoId);
-      navigate("/treino/agrupamentos");
+      voltar("/treino/agrupamentos");
     } catch (e) {
       alert("Erro ao excluir: " + (e as Error).message);
     }

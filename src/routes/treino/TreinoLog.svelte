@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import { formatMinSeg } from "../../lib/tempo";
   import {
@@ -32,6 +32,11 @@
   import { treinoLogSessao, type SetSessao, type ExercicioSessao } from "../../lib/treinoLogSessao.svelte";
 
   let { treinoId }: { treinoId: string } = $props();
+
+  /** "Iniciar Rotina" é tocado a partir de 3 telas diferentes (Rotinas, Ver Rotina, Histórico do
+   * dia) — quem navega pra cá complementa com ?origem= informando a real; "/treino" (a lista) é
+   * um fallback razoável só quando ausente. */
+  const origemPadrao = new URLSearchParams(window.location.search).get("origem") ?? "/treino";
 
   let treino = $state<TreinoComExercicios | null>(null);
   let nomeTreino = $state("");
@@ -716,7 +721,7 @@
     try {
       await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
       treinoLogSessao.limpar();
-      navigate("/treino");
+      voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);
       salvando = false;
@@ -745,7 +750,7 @@
         );
       }
       treinoLogSessao.limpar();
-      navigate("/treino");
+      voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);
     } finally {
@@ -758,7 +763,7 @@
   function descartarTreino() {
     mostrarConfirmDescartar = false;
     treinoLogSessao.limpar();
-    navigate("/treino");
+    voltar(origemPadrao);
   }
 
   /** Essas telas cobrem a lista de exercícios com um overlay cheio, sem navegar de verdade pra
@@ -776,7 +781,7 @@
   <div class="header-fixo-inner">
     <div class="stat-inline stat-treino">
       <span class="stat-label">Treino</span>
-      <button class="voltar" onclick={() => navigate("/treino")}>▾ {nomeTreino}</button>
+      <button class="voltar" onclick={() => voltar(origemPadrao)}>▾ {nomeTreino}</button>
     </div>
     <div class="stat-inline">
       <span class="stat-label">Duração</span>

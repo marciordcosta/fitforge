@@ -51,7 +51,7 @@
     processando = true;
     try {
       await deleteTreino(treino.id);
-      navigate("/treino");
+      voltar("/treino");
     } catch (err) {
       alert("Erro ao excluir rotina: " + (err as Error).message);
       processando = false;
@@ -157,7 +157,11 @@
           {/if}
         </div>
       {/each}
-      <button class="iniciar-rotina-btn" onclick={() => navigate(`/treino/log/${treino!.id}`)}>
+      <button
+        class="iniciar-rotina-btn"
+        onclick={() =>
+          navigate(`/treino/log/${treino!.id}?origem=${encodeURIComponent(`/treino/rotina/${treino!.id}/ver`)}`)}
+      >
         Iniciar Rotina
       </button>
     {/if}

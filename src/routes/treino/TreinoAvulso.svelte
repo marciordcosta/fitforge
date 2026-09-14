@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate, voltar } from "../../lib/router.svelte";
+  import { voltar } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import Exercicios from "./Exercicios.svelte";
@@ -56,7 +56,7 @@
         itens.map((i) => [i.exercicio.id, i.series.map((s) => ({ serie: s.serie, peso: s.peso, repeticoes: s.repeticoes }))]),
       );
       await salvarRegistrosDoDia(null, hojeISO(), porExercicio);
-      navigate("/treino");
+      voltar("/treino");
     } catch (err) {
       alert("Erro ao salvar treino avulso: " + (err as Error).message);
     } finally {

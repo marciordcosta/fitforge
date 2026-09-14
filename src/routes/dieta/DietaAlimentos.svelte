@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar as voltarRouter } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import {
     buscarAlimentos,
@@ -28,6 +28,11 @@
 
   const modoAdicionar = untrack(() => refeicaoId != null);
   const refeicaoIdFixo = untrack(() => refeicaoId);
+  /** Essa tela é reaberta a partir de mais de uma origem com a MESMA URL de resto (ex: uma receita
+   * salva de verdade, OU a lista de alimentos privada de uma refeição do catálogo) — quem navega
+   * pra cá pode informar o pai real via ?origem=, usado só como fallback (deep link/recarregar);
+   * em uso normal o voltar físico/botão já volta pro pai de verdade via histórico. */
+  const origemPadrao = untrack(() => new URLSearchParams(window.location.search).get("origem"));
 
   function lerBuscaDaUrl(): string {
     return new URLSearchParams(window.location.search).get("q") ?? "";
@@ -134,16 +139,20 @@
   }
 
   function voltar() {
+    if (origemPadrao) {
+      voltarRouter(origemPadrao);
+      return;
+    }
     if (modoReceita) {
       if (receitaIdExistente) {
-        navigate(`/dieta/receitas/ver/${receitaIdExistente}`);
+        voltarRouter(`/dieta/receitas/ver/${receitaIdExistente}`);
       } else {
-        navigate(urlNovaReceitaMeta());
+        voltarRouter(urlNovaReceitaMeta());
       }
     } else if (refeicaoId) {
-      navigate(`/dieta/refeicao/${refeicaoId}`);
+      voltarRouter(`/dieta/refeicao/${refeicaoId}`);
     } else {
-      navigate("/dieta");
+      voltarRouter("/dieta");
     }
   }
 

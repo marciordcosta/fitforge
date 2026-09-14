@@ -161,7 +161,8 @@
         sessao: novaSessao,
         houveAlteracaoEstrutura: false,
       });
-      navigate(`/treino/log/${idRotina}`);
+      const origemPropria = `/treino/historico/${treinoId ?? "avulso"}/${data}`;
+      navigate(`/treino/log/${idRotina}?origem=${encodeURIComponent(origemPropria)}`);
     } catch (e) {
       alert("Erro ao copiar treinamento: " + (e as Error).message);
     } finally {

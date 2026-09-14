@@ -68,7 +68,7 @@
     mostrarConfirmExcluir = false;
     try {
       await deletePadraoMovimento(padraoId);
-      navigate("/treino/movimentos");
+      voltar("/treino/movimentos");
     } catch (e) {
       alert("Erro ao excluir: " + (e as Error).message);
     }

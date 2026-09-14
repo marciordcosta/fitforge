@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate, voltar } from "../../lib/router.svelte";
+  import { voltar } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import { getLayoutHome, salvarLayoutHome, CATALOGO_CARDS, type HomeCardTipo } from "../../lib/homeApi";
@@ -46,7 +46,7 @@
     salvando = true;
     try {
       await salvarLayoutHome(itens);
-      navigate("/");
+      voltar("/");
     } catch (err) {
       alert("Erro ao salvar: " + (err as Error).message);
       salvando = false;

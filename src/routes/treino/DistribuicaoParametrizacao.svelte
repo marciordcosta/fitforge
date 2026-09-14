@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate, voltar } from "../../lib/router.svelte";
+  import { voltar } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
   import {
     getParametrosDistribuicao,
@@ -137,7 +137,7 @@
         ordenacaoHome,
       };
       await salvarParametrosDistribuicao(p);
-      navigate("/treino");
+      voltar("/treino");
     } catch (err) {
       alert("Erro ao salvar parâmetros: " + (err as Error).message);
     } finally {

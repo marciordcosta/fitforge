@@ -2112,6 +2112,9 @@
   $effect(() => {
     if (!graficoUrlTreino) {
       if (urlAbertaChave?.startsWith("grafico:")) urlAbertaChave = null;
+      // Voltar físico/gesto muda a URL por baixo do Sheet — sem isso ele ficava visualmente
+      // aberto, mostrando dados de uma rota que já não é mais a atual.
+      if (modalGraficoTreino) modalGraficoTreino = null;
       return;
     }
     const chave = `grafico:${graficoUrlTreino.id}`;
@@ -2134,6 +2137,7 @@
   $effect(() => {
     if (!musculoUrlContexto) {
       if (urlAbertaChave?.startsWith("musculo:")) urlAbertaChave = null;
+      if (modalMusculoRotina) modalMusculoRotina = null;
       return;
     }
     const chave = `musculo:${musculoUrlContexto.treino.id}:${musculoUrlContexto.musculo.id}`;
@@ -2152,6 +2156,9 @@
   $effect(() => {
     if (!editorUrlTreino) {
       if (urlAbertaChave?.startsWith("editor:")) urlAbertaChave = null;
+      // Voltar físico já passou pelo guard de rascunho sujo (registrarGuardaSaida) antes da URL
+      // mudar de verdade — a essa altura é seguro só limpar o estado local do editor.
+      if (modalEditorRotina) fecharEditorSemSalvar();
       return;
     }
     const chave = `editor:${editorUrlTreino.id}`;

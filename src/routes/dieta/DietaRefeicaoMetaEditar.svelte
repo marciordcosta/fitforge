@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../../lib/router.svelte";
+  import { navigate, voltar } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -97,7 +97,7 @@
 
   function abrirDetalheItem(item: ReceitaItem): void {
     if (!receita) return;
-    navigate(`/dieta/alimento/${item.alimentoId}/${hojeISO()}/receita/${receita.id}`);
+    navigate(`/dieta/alimento/${item.alimentoId}/${hojeISO()}/receita/${receita.id}?origem=${encodeURIComponent(caminhoProprio())}`);
   }
 
   const ehUltima = $derived(contexto?.ehUltima ?? false);
@@ -228,11 +228,19 @@
 
   let preparandoAlimento = $state(false);
 
+  /** Caminho desta própria tela — usado como "pai" explícito ao abrir "Adicionar Alimentos", já
+   * que essa tela também é aberta a partir de uma receita salva de verdade (destino padrão
+   * diferente) e não dá pra distinguir isso só pelo id da receita oculta do outro lado. */
+  function caminhoProprio(): string {
+    const diasSeg = diasSemana?.length ? `/${diasSemana.join(",")}` : "";
+    return `/dieta/refeicoes/meta/${modeloId}/${encodeURIComponent(nome)}${diasSeg}`;
+  }
+
   async function abrirAdicionarAlimento(): Promise<void> {
     preparandoAlimento = true;
     try {
       const receitaId = await garantirReceitaPrivadaRefeicao(modeloId, nome, receitaIdAtual, diasSemana);
-      navigate(`/dieta/alimentos/receita/${receitaId}`);
+      navigate(`/dieta/alimentos/receita/${receitaId}?origem=${encodeURIComponent(caminhoProprio())}`);
     } catch (err) {
       alert("Erro ao preparar lista de alimentos: " + (err as Error).message);
     } finally {
@@ -305,7 +313,7 @@
         await desvincularMetaReceita(modeloId);
       }
       if (receita?.oculta) await excluirReceita(receita.id);
-      navigate("/dieta/refeicoes/gerenciar?aba=refeicoes");
+      voltar("/dieta/refeicoes/gerenciar?aba=refeicoes");
     } catch (err) {
       alert("Erro ao remover meta: " + (err as Error).message);
       removendoMeta = false;
@@ -328,7 +336,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <button class="back" onclick={() => navigate("/dieta/refeicoes/gerenciar?aba=refeicoes")} aria-label="Voltar">{@render iconVoltar()}</button>
+    <button class="back" onclick={() => voltar("/dieta/refeicoes/gerenciar?aba=refeicoes")} aria-label="Voltar">{@render iconVoltar()}</button>
     <h1>{nome}</h1>
     <span class="header-spacer"></span>
   </div>

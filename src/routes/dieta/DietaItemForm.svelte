@@ -46,6 +46,11 @@
   } = $props();
 
   const editandoItem = untrack(() => itemDiarioId != null);
+  /** Essa rota (`/dieta/alimento/:id/:data/receita/:receitaId`) é usada tanto a partir de uma
+   * receita salva de verdade quanto da lista de alimentos privada de uma refeição do catálogo —
+   * `voltarPara` (prop, calculado no route table) assume sempre o primeiro caso; quem navega pra
+   * cá no segundo caso complementa com ?origem= pra corrigir o destino real. */
+  const origemPadrao = untrack(() => new URLSearchParams(window.location.search).get("origem"));
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
@@ -182,6 +187,8 @@
   }
 
   function destinoVoltar(): string {
+    if (origemPadrao) return origemPadrao;
+    if (voltarPara) return voltarPara;
     if (modoReceita) {
       if (receitaIdExistente) return `/dieta/receitas/ver/${receitaIdExistente}`;
       return urlNovaReceitaMeta();
