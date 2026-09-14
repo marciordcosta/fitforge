@@ -310,8 +310,16 @@
     subItens: { musculo: Musculo; valor: number; bruto: number; partes: Partes; pesoGradual: number }[] | null;
   }
 
+  /** `treinos` com a rotina em edição (modalEditorRotina) substituída pelo rascunho ao vivo, quando
+   * o editor completo está aberto — usado por toda estatística/gráfico derivado de séries (cards,
+   * grade semanal, anéis) pra refletir na hora add/remover/mover/substituir exercício, sem esperar
+   * "Salvar". As outras rotinas continuam vindo do que está salvo. */
+  const treinosEfetivos = $derived.by(() =>
+    modalEditorRotina ? treinos.map((t) => (t.id === modalEditorRotina!.id ? modalEditorRotina! : t)) : treinos,
+  );
+
   const distribuicaoPorTreino = $derived.by(() => {
-    return treinos.map((t) => {
+    return treinosEfetivos.map((t) => {
       const totalSeries = t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
       const mapaValor = contarSeriesPorMusculoPonderado(t);
       const mapaBruto = contarSeriesPorMusculo(t);
@@ -549,7 +557,7 @@
   const totaisSemanais = $derived.by(() => {
     let exercicios = 0;
     let series = 0;
-    for (const t of treinos) {
+    for (const t of treinosEfetivos) {
       exercicios += t.exercicios.length;
       series += t.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
     }
@@ -708,11 +716,10 @@
   }
 
   /** Grade semanal: uma coluna por dia (seg→dom), com a rotina daquele dia (ou descanso) e as séries por músculo.
-   * Quando o editor completo de uma rotina está aberto (modalEditorRotina), essa rotina entra com o
-   * RASCUNHO ao vivo em vez do que está salvo — sem isso, inserir um exercício ou ajustar séries só
-   * refletia aqui depois de "Salvar". As outras rotinas da semana continuam vindo do que está salvo. */
+   * Usa treinosEfetivos (rascunho ao vivo da rotina em edição, se houver) — sem isso, inserir um
+   * exercício ou ajustar séries só refletia aqui depois de "Salvar". */
   const gradeSemanal = $derived.by(() => {
-    const treinosParaGrade = modalEditorRotina ? treinos.map((t) => (t.id === modalEditorRotina!.id ? modalEditorRotina! : t)) : treinos;
+    const treinosParaGrade = treinosEfetivos;
     const colunas = ORDEM_DIAS.map((dia) => {
       const treino = treinosParaGrade.find((t) => t.dia_semana === dia) ?? null;
       return {
@@ -786,7 +793,7 @@
    * rotinas, sem tentar achar uma "posição única" entre rotinas diferentes (que não existiria).
    * Mesma regra 20/30/50 das barras de cada rotina, agora funcionando com rotinas diferentes
    * porque a soma acontece DEPOIS de cada rotina já ter feito sua própria classificação. */
-  function partesFadigaSemanal(treinosLista: TreinoComExercicios[] = treinos): Map<string, Partes> {
+  function partesFadigaSemanal(treinosLista: TreinoComExercicios[] = treinosEfetivos): Map<string, Partes> {
     const mapa = new Map<string, Partes>();
     for (const t of treinosLista) {
       for (const [musculoId, partes] of contarSeriesPorFaixaDePosicao(t)) {
@@ -798,7 +805,7 @@
 
   /** Peso gradual (fatorPerformanceGradual) de cada músculo, somado entre TODAS as rotinas da
    * semana — mesmo princípio de partesFadigaSemanal, só que pro modo de fadiga "gradual". */
-  function pesoGradualSemanal(treinosLista: TreinoComExercicios[] = treinos): Map<string, number> {
+  function pesoGradualSemanal(treinosLista: TreinoComExercicios[] = treinosEfetivos): Map<string, number> {
     const mapa = new Map<string, number>();
     for (const t of treinosLista) {
       for (const [musculoId, peso] of contarPesoGradualPorMusculo(t)) {
@@ -811,7 +818,7 @@
   const distribuicaoSemanal = $derived.by(() => {
     const mapa = new Map<string, number>();
     const mapaBruto = new Map<string, number>();
-    for (const t of treinos) {
+    for (const t of treinosEfetivos) {
       for (const [id, v] of contarSeriesPorMusculo(t)) {
         mapaBruto.set(id, (mapaBruto.get(id) ?? 0) + v);
       }
@@ -1185,7 +1192,7 @@
     let totalBruto = 0;
     let totalValido = 0;
     let totalAcumulado = 0;
-    for (const treino of treinos) {
+    for (const treino of treinosEfetivos) {
       if (!treinoIds.has(treino.id)) continue;
       totalBruto += contarSeriesPorMusculo(treino).get(musculo.id) ?? 0;
       totalValido += contarSeriesPorMusculoPonderado(treino).get(musculo.id) ?? 0;
@@ -2289,6 +2296,7 @@
    * em anel em vez de barras. Sem isso os dois ficavam mostrando números diferentes pro
    * mesmo músculo (um bruto sem agrupar, outro ponderado agrupado). */
   let modalGraficoTreino = $state<{
+    treinoId: string;
     titulo: string;
     totalSeries: number;
     porSerie: LinhaRotina[];
@@ -2297,8 +2305,23 @@
   function abrirGraficoTreino(treino: TreinoComExercicios): void {
     const lista = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
     const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    modalGraficoTreino = { titulo: treino.nome_treino, totalSeries, porSerie: lista };
+    modalGraficoTreino = { treinoId: treino.id, titulo: treino.nome_treino, totalSeries, porSerie: lista };
   }
+
+  /** Mantém o anel por rotina (posição/fadiga) sincronizado ao vivo com treinosEfetivos — mesmo
+   * motivo do efeito de modalDetalheRotina: sem isso, editar séries com o anel aberto por cima
+   * deixava o número no centro (e as fatias) desatualizados até fechar e abrir de novo. */
+  $effect(() => {
+    if (!modalGraficoTreino) return;
+    const treinoId = modalGraficoTreino.treinoId;
+    const dados = distribuicaoPorTreino.find((d) => d.treino.id === treinoId);
+    if (!dados) return;
+    const totalSeries = treinosEfetivos.find((t) => t.id === treinoId)?.exercicios.reduce((acc, ex) => acc + ex.series.length, 0) ?? 0;
+    untrack(() => {
+      if (!modalGraficoTreino) return;
+      modalGraficoTreino = { ...modalGraficoTreino, totalSeries, porSerie: dados.lista };
+    });
+  });
 
   /** Anel por dominância (mesma conta da Distribuição Semanal, coresAbcAcumulado), só que
    * dessa rotina isolada — mesma lista já usada pelo card (distribuicaoPorTreino), reprojetada
