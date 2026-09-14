@@ -269,14 +269,14 @@
       <p class="card-titulo">Séries</p>
       <div class="series-linha">
         {#if modoRestante}
-          <span class="series-valor">
+          <span class="series-valor"><strong>{pctMeta(executado, programado).toFixed(0)}%</strong></span>
+          <span class="series-restantes">
             {#if passouMeta(executado, programado)}
               <strong>{executado - programado}</strong> acima
             {:else}
               <strong>{restante(executado, programado)}</strong> restantes
             {/if}
           </span>
-          <span class="series-restantes">{executado} <span class="series-meta">/ {programado}</span></span>
         {:else}
           <span class="series-valor"><strong>{executado}</strong> <span class="series-meta">/ {programado}</span></span>
           <span class="series-restantes">
