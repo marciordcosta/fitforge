@@ -12,7 +12,7 @@
     excluirRegistrosDoDia,
     criarRotinaAPartirDeSessao,
     getRecordesExercicio,
-    listObservacoesExercicio,
+    listObservacoesExerciciosEmLote,
     observacaoParaHistorico,
     type SetRegistro,
   } from "../../lib/treinoApi";
@@ -60,10 +60,10 @@
       exercicioNome: ex.exercicioNome,
       sets: ex.sets.map((s) => ({ ...s })),
     }));
-    const pares = await Promise.all(
-      sessao.map(async (ex) => [ex.exercicioId, observacaoParaHistorico(await listObservacoesExercicio(ex.exercicioId), data)] as const),
+    const observacoesPorId = await listObservacoesExerciciosEmLote(sessao.map((ex) => ex.exercicioId));
+    observacoesPorExercicio = new Map(
+      sessao.map((ex) => [ex.exercicioId, observacaoParaHistorico(observacoesPorId.get(ex.exercicioId) ?? [], data)]),
     );
-    observacoesPorExercicio = new Map(pares);
     loading = false;
   }
 

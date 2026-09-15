@@ -690,6 +690,25 @@ export async function listObservacoesExercicio(exercicioId: string): Promise<Obs
   return data ?? [];
 }
 
+/** Mesmo que listObservacoesExercicio, em lote — evita N+1 em telas que resolvem a observação de
+ * vários exercícios de uma vez (ex: todos os exercícios de um dia no histórico). */
+export async function listObservacoesExerciciosEmLote(exercicioIds: string[]): Promise<Map<string, ObservacaoExercicio[]>> {
+  const mapa = new Map<string, ObservacaoExercicio[]>();
+  if (!exercicioIds.length) return mapa;
+  const { data, error } = await supabase
+    .from("treino_observacoes")
+    .select("exercicio_id, data, observacao")
+    .in("exercicio_id", exercicioIds)
+    .order("data", { ascending: true });
+  if (error) throw error;
+  for (const r of data ?? []) {
+    const lista = mapa.get(r.exercicio_id) ?? [];
+    lista.push({ data: r.data, observacao: r.observacao });
+    mapa.set(r.exercicio_id, lista);
+  }
+  return mapa;
+}
+
 /** Resolve, numa lista ascendente de versões, qual observação valia numa data (última versão
  * com data <= a informada) — null se nenhuma versão existia ainda naquela data. */
 export function observacaoNaData(lista: ObservacaoExercicio[], data: string): string | null {
