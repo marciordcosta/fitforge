@@ -489,7 +489,13 @@
             <p class="picker-vazio">Nenhuma outra data com fotos pra comparar.</p>
           {:else}
             {#each outrosGrupos as grupo (grupo.data)}
-              <p class="data-titulo">{formatarData(grupo.data)}</p>
+              <p class="data-titulo picker-data-titulo">{formatarData(grupo.data)}</p>
+              {#if pesoPorData.has(grupo.data) || mediaPorData.has(grupo.data)}
+                <p class="data-peso">
+                  {formatarPeso(pesoPorData.get(grupo.data))}
+                  <span class="data-peso-media">· méd. sem. {formatarPeso(mediaPorData.get(grupo.data))}</span>
+                </p>
+              {/if}
               <div class="grade-fotos">
                 {#each grupo.fotos as foto (foto.id)}
                   <button type="button" class="foto-item" onclick={() => selecionarParaComparar(foto)} aria-label="Comparar com esta foto">
@@ -628,6 +634,9 @@
   }
   .data-titulo:first-of-type {
     margin-top: 0;
+  }
+  .picker-data-titulo {
+    color: var(--surface-fg);
   }
   /** Grupo de uma data na lista principal — encolhe suavemente (grid-rows) quando escolhido pra
    * comparar, em vez de sumir com um salto no resto da lista (transform sozinho não afeta layout). */

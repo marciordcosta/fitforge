@@ -181,14 +181,17 @@
   <div class="foto-topo">
     <div class="foto-info">
       <strong class="foto-info-data">{formatarDataCurta(data)}</strong>
-      {#if pesoDia != null || mediaSemana != null}
-        <span class="foto-info-peso">{formatarPeso(pesoDia)}{mediaSemana != null ? ` · méd. ${formatarPeso(mediaSemana)}` : ""}</span>
-      {/if}
     </div>
     {#if fotos.length > 1}
       <span class="foto-contador">{indice + 1}/{fotos.length}</span>
     {/if}
   </div>
+
+  {#if pesoDia != null || mediaSemana != null}
+    <div class="foto-rodape">
+      <span class="foto-rodape-peso">{formatarPeso(pesoDia)}{mediaSemana != null ? ` · méd. ${formatarPeso(mediaSemana)}` : ""}</span>
+    </div>
+  {/if}
 
   {#if fotos.length > 1}
     <div class="foto-pontos">
@@ -252,7 +255,9 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-3);
-    padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) var(--space-6);
+    /* padding-left maior que o padrão: deixa espaço pro botão de fechar/voltar (36px + margem)
+       que a tela que usa este painel desenha por cima, no mesmo canto — evitava sobrepor a data. */
+    padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) var(--space-6) 52px;
     background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
     pointer-events: none;
   }
@@ -268,9 +273,18 @@
     font-weight: 600;
     letter-spacing: 0.2px;
   }
-  .foto-info-peso {
+  .foto-rodape {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: var(--space-6) var(--space-3) max(var(--space-3), env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+    pointer-events: none;
+  }
+  .foto-rodape-peso {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.85);
   }
   .foto-contador {
     flex-shrink: 0;
