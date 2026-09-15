@@ -18,6 +18,7 @@
     getPerfilDietaEditavel,
     getStatusAdesaoDieta,
     reordenarRefeicoesDoDia,
+    getPreferenciasRefeicoesHome,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
     gramasDoParametro,
@@ -27,6 +28,8 @@
     type LimiteParametro,
     type RefeicaoModelo,
     type StatusAdesaoDieta,
+    type PreferenciasRefeicoesHome,
+    type BaseReferenciaRefeicao,
   } from "../../lib/dietaApi";
   import { mostrarToast } from "../../lib/toast.svelte";
   import { listTreinos, type Treino } from "../../lib/treinoApi";
@@ -141,6 +144,7 @@
   let metasRefeicaoPorNome = $state<Map<string, RefeicaoModelo>>(new Map());
   let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
   let pesoAtual = $state(76);
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresBase: "refeicao" });
   const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
 
   function parametro(chave: string): LimiteParametro {
@@ -244,9 +248,15 @@
 
   async function carregarParametros() {
     try {
-      const [params, pesoMedio, perfil] = await Promise.all([getParametros(), getPesoMedioAtual(), getPerfilDietaEditavel()]);
+      const [params, pesoMedio, perfil, prefs] = await Promise.all([
+        getParametros(),
+        getPesoMedioAtual(),
+        getPerfilDietaEditavel(),
+        getPreferenciasRefeicoesHome(),
+      ]);
       parametros = params;
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
+      prefsRefeicoes = prefs;
     } catch {
       // informativo — Gordura Saturada/Fibras seguem com os padrões se falhar
     }
@@ -381,6 +391,15 @@
 
   function pctMeta(valor: number, meta: number): number {
     return meta > 0 ? (valor / meta) * 100 : 0;
+  }
+
+  /** Resolve a que a barra/valor de um macro do card de refeição correspondem como "100%",
+   * conforme a Parametrização (Exibição das Refeições): a meta redistribuída DAQUELA refeição
+   * (padrão) ou a meta diária inteira — permite ver, ex., que a proteína "estourou" a meta da
+   * refeição mas ainda está OK no total do dia. */
+  function metaCardPara(campo: keyof MetaRedistribuida, metaRef: MetaRedistribuida, base: BaseReferenciaRefeicao): number {
+    if (base === "diaria" && metas) return metas[campo];
+    return metaRef[campo];
   }
 
   function larguraBarra(pct: number): number {
@@ -730,12 +749,24 @@
             </span>
           </div>
           {#if metaAtual}
+            {@const metaBarra = {
+              calorias: arredondarDezena(metaCardPara("calorias", metaAtual, prefsRefeicoes.barraBase)),
+              carboidratoG: metaCardPara("carboidratoG", metaAtual, prefsRefeicoes.barraBase),
+              gorduraG: metaCardPara("gorduraG", metaAtual, prefsRefeicoes.barraBase),
+              proteinaG: metaCardPara("proteinaG", metaAtual, prefsRefeicoes.barraBase),
+            }}
+            {@const metaValor = {
+              calorias: arredondarDezena(metaCardPara("calorias", metaAtual, prefsRefeicoes.valoresBase)),
+              carboidratoG: metaCardPara("carboidratoG", metaAtual, prefsRefeicoes.valoresBase),
+              gorduraG: metaCardPara("gorduraG", metaAtual, prefsRefeicoes.valoresBase),
+              proteinaG: metaCardPara("proteinaG", metaAtual, prefsRefeicoes.valoresBase),
+            }}
             <p class="pct-titulo">Meta de {refeicao.nome}</p>
             <div class="pct-grid">
-              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, arredondarDezena(metaAtual.calorias))), labelMetaCard(totais.calorias, arredondarDezena(metaAtual.calorias), "", temItens))}
-              {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaAtual.carboidratoG)), labelMetaCard(totais.carboidratoG, metaAtual.carboidratoG, "g", temItens))}
-              {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaAtual.gorduraG)), labelMetaCard(totais.gorduraG, metaAtual.gorduraG, "g", temItens))}
-              {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaAtual.proteinaG)), labelMetaCard(totais.proteinaG, metaAtual.proteinaG, "g", temItens))}
+              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, metaBarra.calorias)), labelMetaCard(totais.calorias, metaValor.calorias, "", temItens))}
+              {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaBarra.carboidratoG)), labelMetaCard(totais.carboidratoG, metaValor.carboidratoG, "g", temItens))}
+              {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaBarra.gorduraG)), labelMetaCard(totais.gorduraG, metaValor.gorduraG, "g", temItens))}
+              {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaBarra.proteinaG)), labelMetaCard(totais.proteinaG, metaValor.proteinaG, "g", temItens))}
             </div>
           {:else if temItens}
             <p class="pct-titulo">Refeição sem meta</p>

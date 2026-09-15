@@ -1317,6 +1317,40 @@ export async function salvarTipoDieta(tipo: TipoDieta): Promise<void> {
   if (error) throw error;
 }
 
+/** A que a barra/o valor exibidos nos cards de refeição (home e detalhe da refeição) correspondem
+ * como "100%": a meta daquela refeição (redistribuída) ou a meta diária inteira. */
+export type BaseReferenciaRefeicao = "refeicao" | "diaria";
+
+export interface PreferenciasRefeicoesHome {
+  barraBase: BaseReferenciaRefeicao;
+  valoresBase: BaseReferenciaRefeicao;
+}
+
+const PREFERENCIAS_REFEICOES_PADRAO: PreferenciasRefeicoesHome = { barraBase: "refeicao", valoresBase: "refeicao" };
+
+export async function getPreferenciasRefeicoesHome(): Promise<PreferenciasRefeicoesHome> {
+  const { data, error } = await supabase.from("dieta_perfil").select("refeicoes_barra_base, refeicoes_valores_base").maybeSingle();
+  if (error) throw error;
+  if (!data) return PREFERENCIAS_REFEICOES_PADRAO;
+  return {
+    barraBase: (data.refeicoes_barra_base as BaseReferenciaRefeicao | null) ?? "refeicao",
+    valoresBase: (data.refeicoes_valores_base as BaseReferenciaRefeicao | null) ?? "refeicao",
+  };
+}
+
+export async function salvarPreferenciasRefeicoesHome(prefs: PreferenciasRefeicoesHome): Promise<void> {
+  const { error } = await supabase.from("dieta_perfil").upsert(
+    {
+      user_id: uid(),
+      refeicoes_barra_base: prefs.barraBase,
+      refeicoes_valores_base: prefs.valoresBase,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
+  if (error) throw error;
+}
+
 // ---------------- Distribuição semanal de calorias (Fixa / Ondulatória) ----------------
 
 export interface CaloriasPorDia {

@@ -10,12 +10,15 @@
     salvarParametro,
     getTipoDieta,
     salvarTipoDieta,
+    getPreferenciasRefeicoesHome,
+    salvarPreferenciasRefeicoesHome,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
     gramasDoParametro,
     type LimiteParametro,
     type DefinicaoParametro,
     type TipoDieta,
+    type BaseReferenciaRefeicao,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
 
@@ -27,6 +30,9 @@
   let valores = $state<Record<string, LimiteParametro>>({ ...PARAMETROS_PADRAO });
   let categoriasAbertas = $state<Set<string>>(new Set());
   let tipoDieta = $state<TipoDieta>("manutencao");
+  let barraBase = $state<BaseReferenciaRefeicao>("refeicao");
+  let valoresBase = $state<BaseReferenciaRefeicao>("refeicao");
+  let abertaExibicao = $state(false);
   let confirmandoDescartar = $state(false);
   let original = "";
 
@@ -34,6 +40,11 @@
     { valor: "cutting", label: "Cutting" },
     { valor: "manutencao", label: "Manutenção" },
     { valor: "bulking", label: "Bulking" },
+  ];
+
+  const OPCOES_BASE_REFEICAO: { valor: BaseReferenciaRefeicao; label: string }[] = [
+    { valor: "refeicao", label: "Meta da refeição" },
+    { valor: "diaria", label: "Meta diária" },
   ];
 
   const categorias = [...new Set(DEFINICOES_PARAMETROS.map((d) => d.categoria))];
@@ -63,11 +74,12 @@
     carregando = true;
     erro = null;
     try {
-      const [perfil, pesoMedio, parametros, tipo] = await Promise.all([
+      const [perfil, pesoMedio, parametros, tipo, prefsRefeicoes] = await Promise.all([
         getPerfilDietaEditavel(),
         getPesoMedioAtual(),
         getParametros(),
         getTipoDieta(),
+        getPreferenciasRefeicoesHome(),
       ]);
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
       caloriasCalc = Math.round(4 * perfil.proteinaGKg * pesoAtual + 9 * perfil.gorduraGKg * pesoAtual + 4 * perfil.carboidratoGKg * pesoAtual);
@@ -75,7 +87,9 @@
       for (const [chave, limite] of parametros) novo[chave] = limite;
       valores = novo;
       tipoDieta = tipo;
-      original = JSON.stringify({ valores, tipoDieta });
+      barraBase = prefsRefeicoes.barraBase;
+      valoresBase = prefsRefeicoes.valoresBase;
+      original = JSON.stringify({ valores, tipoDieta, barraBase, valoresBase });
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -86,7 +100,7 @@
   void carregar();
 
   function sujo(): boolean {
-    return !carregando && JSON.stringify({ valores, tipoDieta }) !== original;
+    return !carregando && JSON.stringify({ valores, tipoDieta, barraBase, valoresBase }) !== original;
   }
 
   const guardaSaida = criarGuardaSaida(sujo);
@@ -115,6 +129,7 @@
         }),
       );
       await salvarTipoDieta(tipoDieta);
+      await salvarPreferenciasRefeicoesHome({ barraBase, valoresBase });
       mostrarToast("Salvo");
       guardaSaida.resolverSaida(() => voltar("/dieta"));
     } catch (err) {
@@ -243,6 +258,33 @@
         {/if}
       </div>
     {/each}
+
+    <div class="param-card">
+      <button type="button" class="param-card-header" onclick={() => (abertaExibicao = !abertaExibicao)}>
+        <span>Exibição das Refeições</span>
+        <span class="chevron" class:aberto={abertaExibicao}>{@render iconChevron()}</span>
+      </button>
+      {#if abertaExibicao}
+        <div class="param-card-body">
+          <div class="param-linha param-tipo-dieta">
+            <p class="param-nome">Barras das refeições correspondem a</p>
+            <div class="tipo-dieta-opcoes">
+              {#each OPCOES_BASE_REFEICAO as opcao (opcao.valor)}
+                <button type="button" class:ativo={barraBase === opcao.valor} onclick={() => (barraBase = opcao.valor)}>{opcao.label}</button>
+              {/each}
+            </div>
+          </div>
+          <div class="param-linha param-tipo-dieta">
+            <p class="param-nome">Valores das refeições (home) correspondem a</p>
+            <div class="tipo-dieta-opcoes">
+              {#each OPCOES_BASE_REFEICAO as opcao (opcao.valor)}
+                <button type="button" class:ativo={valoresBase === opcao.valor} onclick={() => (valoresBase = opcao.valor)}>{opcao.label}</button>
+              {/each}
+            </div>
+          </div>
+        </div>
+      {/if}
+    </div>
 
     <Button onclick={salvar} disabled={salvando}>Salvar</Button>
   {/if}

@@ -15,6 +15,8 @@
     atualizarItemDiario,
     listRefeicoesModelo,
     listMetasDiaModelo,
+    getMetasDoDia,
+    getPreferenciasRefeicoesHome,
     getReceita,
     lancarReceitaPadrao,
     salvarComoReceitaPadrao,
@@ -23,6 +25,8 @@
     type MetasDiarias,
     type Alimento,
     type RefeicaoModelo,
+    type PreferenciasRefeicoesHome,
+    type BaseReferenciaRefeicao,
   } from "../../lib/dietaApi";
   import { receitaRascunho, definirContexto, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
 
@@ -40,6 +44,8 @@
   let refeicao = $state<RefeicaoDia | null>(null);
   let itens = $state<ItemDiario[]>([]);
   let metaRefeicao = $state<MetasDiarias | null>(null);
+  let metaDiaria = $state<MetasDiarias | null>(null);
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresBase: "refeicao" });
   let modeloRefeicao = $state<RefeicaoModelo | null>(null);
   /** Só mostra o botão "Refeição Padrão" quando a lista de alimentos efetiva desse dia (override do
    * dia se houver, senão a global) realmente tem algum item — senão o botão aparece sem ter nada
@@ -60,16 +66,20 @@
     loading = true;
     erro = null;
     try {
-      const [refeicaoRes, itensRes, modelos, metasDia] = await Promise.all([
+      const [refeicaoRes, itensRes, modelos, metasDia, prefs] = await Promise.all([
         getRefeicaoDia(refeicaoId),
         getItensDaRefeicao(refeicaoId),
         listRefeicoesModelo(),
         listMetasDiaModelo(),
+        getPreferenciasRefeicoesHome(),
       ]);
       refeicao = refeicaoRes;
       itens = itensRes;
+      prefsRefeicoes = prefs;
       modeloRefeicao = refeicao ? (modelos.find((m) => m.nome === refeicao!.nome) ?? null) : null;
-      metaRefeicao = refeicao ? await getMetaRefeicaoPorNome(refeicao.nome, refeicao.data) : null;
+      [metaRefeicao, metaDiaria] = refeicao
+        ? await Promise.all([getMetaRefeicaoPorNome(refeicao.nome, refeicao.data), getMetasDoDia(refeicao.data)])
+        : [null, null];
 
       if (refeicao && modeloRefeicao) {
         const diaSemana = parseISODate(refeicao.data).getDay();
@@ -120,6 +130,13 @@
 
   function larguraBarra(pct: number): number {
     return Math.min(100, pct);
+  }
+
+  /** Mesma regra do Diário (Exibição das Refeições, em Parametrização): a barra e o valor podem
+   * corresponder à meta DESSA refeição (padrão) ou à meta diária inteira, cada um independente. */
+  function metaPara(campo: keyof MetasDiarias, metaRef: MetasDiarias, base: BaseReferenciaRefeicao): number {
+    if (base === "diaria" && metaDiaria) return metaDiaria[campo];
+    return metaRef[campo];
   }
 
   /** Mesmo texto usado no Diário: quanto falta pra bater a meta ("rest."), ou "X acima" se já
@@ -400,27 +417,39 @@
     {/if}
 
     {#if metaRefeicao}
+      {@const metaBarra = {
+        calorias: metaPara("calorias", metaRefeicao, prefsRefeicoes.barraBase),
+        carboidratoG: metaPara("carboidratoG", metaRefeicao, prefsRefeicoes.barraBase),
+        gorduraG: metaPara("gorduraG", metaRefeicao, prefsRefeicoes.barraBase),
+        proteinaG: metaPara("proteinaG", metaRefeicao, prefsRefeicoes.barraBase),
+      }}
+      {@const metaValor = {
+        calorias: metaPara("calorias", metaRefeicao, prefsRefeicoes.valoresBase),
+        carboidratoG: metaPara("carboidratoG", metaRefeicao, prefsRefeicoes.valoresBase),
+        gorduraG: metaPara("gorduraG", metaRefeicao, prefsRefeicoes.valoresBase),
+        proteinaG: metaPara("proteinaG", metaRefeicao, prefsRefeicoes.valoresBase),
+      }}
       <p class="metas-titulo">Meta de {refeicao?.nome}</p>
       <div class="metas-grid">
         <div class="meta-col">
           <span class="meta-label">Calorias</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metaRefeicao.calorias))}%; background:var(--color-secondary);`}></div></div>
-          <span class="meta-valor">{metaValorTexto(totalCalorias, metaRefeicao.calorias, "")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metaBarra.calorias))}%; background:var(--color-secondary);`}></div></div>
+          <span class="meta-valor">{metaValorTexto(totalCalorias, metaValor.calorias, "")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Carb</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metaRefeicao.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(totalCarboidrato, metaRefeicao.carboidratoG, "g")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metaBarra.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(totalCarboidrato, metaValor.carboidratoG, "g")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Gorduras</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metaRefeicao.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(totalGordura, metaRefeicao.gorduraG, "g")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metaBarra.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(totalGordura, metaValor.gorduraG, "g")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Proteínas</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metaRefeicao.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(totalProteina, metaRefeicao.proteinaG, "g")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metaBarra.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(totalProteina, metaValor.proteinaG, "g")}</span>
         </div>
       </div>
     {:else if itens.length}
