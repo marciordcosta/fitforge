@@ -718,6 +718,7 @@ export interface RefeicaoDia {
   id: string;
   nome: string;
   data: string;
+  ordem: number;
 }
 
 /** Lista efetiva do catálogo pra esse dia da semana (Ondulatória): usa a lista/ordem específica
@@ -738,22 +739,24 @@ function resolverCatalogoEfetivoDoDia(
     .filter((m): m is RefeicaoModelo => !!m);
 }
 
-/** Ordena pelo mesmo critério de "Gerenciar Refeições" (por nome) — refeições avulsas, sem nome no catálogo, ficam no fim, na ordem em que foram criadas. */
+/** Ordem própria de cada refeição DENTRO DO DIA (coluna `ordem`, arrastar/setas na Home) — fixada
+ * na criação (catálogo entra na posição do catálogo nesse momento; avulsa entra no fim) e livre
+ * pra reordenar depois, sem nunca mexer no catálogo/padrão configurado. */
 export async function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
-  const diaSemana = parseISODate(data).getDay();
-  const [linhasRes, catalogo, modelosPorDia] = await Promise.all([
-    supabase.from("dieta_refeicoes_dia").select("id, nome, data").eq("data", data).order("created_at", { ascending: true }),
-    listRefeicoesModelo(),
-    listRefeicoesModeloDia(),
-  ]);
-  if (linhasRes.error) throw linhasRes.error;
+  const { data: linhas, error } = await supabase
+    .from("dieta_refeicoes_dia")
+    .select("id, nome, data, ordem")
+    .eq("data", data)
+    .order("ordem", { ascending: true });
+  if (error) throw error;
+  return linhas ?? [];
+}
 
-  const catalogoEfetivo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia);
-  const ordemPorNome = new Map<string, number>();
-  catalogoEfetivo.forEach((m, i) => ordemPorNome.set(m.nome, i));
-
-  return [...(linhasRes.data ?? [])].sort(
-    (a, b) => (ordemPorNome.get(a.nome) ?? Infinity) - (ordemPorNome.get(b.nome) ?? Infinity),
+/** Salva a nova ordem das refeições de um dia (arrastar/setas na Home) — só esse dia; nunca
+ * reordena o catálogo/padrão configurado em Gerenciar Refeições. */
+export async function reordenarRefeicoesDoDia(idsOrdenados: string[]): Promise<void> {
+  await Promise.all(
+    idsOrdenados.map((id, i) => supabase.from("dieta_refeicoes_dia").update({ ordem: i }).eq("id", id)),
   );
 }
 
@@ -785,7 +788,7 @@ export async function garantirRefeicoesPadraoDoDia(data: string): Promise<Refeic
   }
 
   if (!catalogoEfetivo.length) return existentes;
-  await Promise.all(catalogoEfetivo.map((m) => criarRefeicaoDia(data, m.nome)));
+  await Promise.all(catalogoEfetivo.map((m, i) => criarRefeicaoDia(data, m.nome, i)));
   return getRefeicoesDoDia(data);
 }
 
@@ -831,15 +834,28 @@ export async function salvarComoReceitaPadrao(
 }
 
 export async function getRefeicaoDia(id: string): Promise<RefeicaoDia | null> {
-  const { data, error } = await supabase.from("dieta_refeicoes_dia").select("id, nome, data").eq("id", id).maybeSingle();
+  const { data, error } = await supabase.from("dieta_refeicoes_dia").select("id, nome, data, ordem").eq("id", id).maybeSingle();
   if (error) throw error;
   return data ?? null;
 }
 
-export async function criarRefeicaoDia(data: string, nome: string): Promise<string> {
+/** `ordem` omitido = entra no fim da lista do dia (avulsa nova, "copiar para"); informado = entra
+ * numa posição específica (refeições padrão do catálogo, na hora de montar um dia novo). */
+export async function criarRefeicaoDia(data: string, nome: string, ordem?: number): Promise<string> {
+  let ordemFinal = ordem;
+  if (ordemFinal == null) {
+    const { data: existentes, error: ordError } = await supabase
+      .from("dieta_refeicoes_dia")
+      .select("ordem")
+      .eq("data", data)
+      .order("ordem", { ascending: false })
+      .limit(1);
+    if (ordError) throw ordError;
+    ordemFinal = existentes?.length ? existentes[0].ordem + 1 : 0;
+  }
   const { data: linha, error } = await supabase
     .from("dieta_refeicoes_dia")
-    .insert({ user_id: uid(), data, nome })
+    .insert({ user_id: uid(), data, nome, ordem: ordemFinal })
     .select("id")
     .single();
   if (error) throw error;

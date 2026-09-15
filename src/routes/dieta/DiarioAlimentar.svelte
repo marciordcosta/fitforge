@@ -2,6 +2,7 @@
   import { navigate } from "../../lib/router.svelte";
   import { parseISODate, toISODate, hojeISO } from "../../lib/dates";
   import Sheet from "../../components/Sheet.svelte";
+  import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import DietaResumoModal from "./DietaResumoModal.svelte";
@@ -16,6 +17,7 @@
     getParametros,
     getPerfilDietaEditavel,
     getStatusAdesaoDieta,
+    reordenarRefeicoesDoDia,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
     gramasDoParametro,
@@ -26,6 +28,7 @@
     type RefeicaoModelo,
     type StatusAdesaoDieta,
   } from "../../lib/dietaApi";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { listTreinos, type Treino } from "../../lib/treinoApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
 
@@ -51,6 +54,68 @@
   let mostrarData = $state(false);
   type ModoExibicaoMacro = "restante" | "absoluto" | "porPeso";
   let modoExibicao = $state<ModoExibicaoMacro>("restante");
+
+  // ---------------- Reordenar refeições do dia (segurar o card) ----------------
+  let reordenando = $state(false);
+  let refeicoesReordenando = $state<RefeicaoDia[]>([]);
+  let pressTimer: ReturnType<typeof setTimeout> | null = null;
+  let pressAtivouReordenar = false;
+
+  function abrirReordenar(): void {
+    refeicoesReordenando = refeicoes.slice();
+    reordenando = true;
+  }
+
+  function iniciarPressao(): void {
+    pressAtivouReordenar = false;
+    pressTimer = setTimeout(() => {
+      pressAtivouReordenar = true;
+      if (navigator.vibrate) navigator.vibrate(15);
+      abrirReordenar();
+    }, 500);
+  }
+
+  function cancelarPressao(): void {
+    if (pressTimer) clearTimeout(pressTimer);
+    pressTimer = null;
+  }
+
+  /** Botão direito no PC — equivalente a segurar o card no celular. */
+  function aoClicarComBotaoDireito(e: MouseEvent): void {
+    e.preventDefault();
+    cancelarPressao();
+    abrirReordenar();
+  }
+
+  /** Segurar o card abre o modo de reordenar em vez de navegar — sem isso, soltar o dedo depois
+   * de segurar também disparava o clique normal, abrindo a refeição por baixo do modo. */
+  function aoClicarRefeicao(refeicaoId: string): void {
+    if (pressAtivouReordenar) {
+      pressAtivouReordenar = false;
+      return;
+    }
+    navigate(`/dieta/refeicao/${refeicaoId}`);
+  }
+
+  function moverRefeicao(idx: number, delta: number): void {
+    const novoIdx = idx + delta;
+    if (novoIdx < 0 || novoIdx >= refeicoesReordenando.length) return;
+    const lista = refeicoesReordenando.slice();
+    const [item] = lista.splice(idx, 1);
+    lista.splice(novoIdx, 0, item);
+    refeicoesReordenando = lista;
+  }
+
+  /** Fecha e já aplica a nova ordem na tela — a gravação acontece por baixo, sem travar o fechar
+   * do sheet; só essa data muda, o catálogo/padrão configurado nunca é tocado. */
+  function fecharReordenar(): void {
+    reordenando = false;
+    const idsFinal = refeicoesReordenando.map((r) => r.id);
+    refeicoes = refeicoesReordenando;
+    void reordenarRefeicoesDoDia(idsFinal)
+      .then(() => mostrarToast("Salvo"))
+      .catch((err) => alert("Erro ao reordenar: " + (err as Error).message));
+  }
 
   function proximoModoExibicao(atual: ModoExibicaoMacro): ModoExibicaoMacro {
     if (atual === "restante") return "absoluto";
@@ -379,6 +444,16 @@
     <polyline points="6 9 12 15 18 9" />
   </svg>
 {/snippet}
+{#snippet iconSetaCima()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="18 15 12 9 6 15" />
+  </svg>
+{/snippet}
+{#snippet iconSetaBaixo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+{/snippet}
 {#snippet anelCentroMacro(valor: number, meta: number, corTexto: string | null = null)}
   {@const estilo = corTexto ? `color:${corTexto};` : ""}
   {#if modoExibicao === "restante" && passouMeta(valor, meta)}
@@ -640,8 +715,13 @@
           class:sem-itens={!temItens}
           role="button"
           tabindex="0"
-          onclick={() => navigate(`/dieta/refeicao/${refeicao.id}`)}
+          onclick={() => aoClicarRefeicao(refeicao.id)}
           onkeydown={(e) => e.key === "Enter" && navigate(`/dieta/refeicao/${refeicao.id}`)}
+          onpointerdown={iniciarPressao}
+          onpointerup={cancelarPressao}
+          onpointerleave={cancelarPressao}
+          onpointercancel={cancelarPressao}
+          oncontextmenu={aoClicarComBotaoDireito}
         >
           <div class="card-header">
             <span class="card-header-nome">
@@ -687,6 +767,33 @@
 
 {#if mostrarResumo}
   <DietaResumoModal onFechar={() => (mostrarResumo = false)} />
+{/if}
+
+{#if reordenando}
+  <Sheet titulo="Reordenar Refeições" onFechar={fecharReordenar}>
+    <p class="reordenar-refeicoes-ajuda">Vale só para hoje — não muda o padrão configurado.</p>
+    <ul class="reordenar-refeicoes-lista">
+      {#each refeicoesReordenando as r, idx (r.id)}
+        <li class="reordenar-refeicoes-item">
+          <span class="reordenar-refeicoes-nome">{r.nome}</span>
+          <div class="reordenar-refeicoes-setas">
+            <button type="button" disabled={idx === 0} onclick={() => moverRefeicao(idx, -1)} aria-label="Mover para cima">
+              {@render iconSetaCima()}
+            </button>
+            <button
+              type="button"
+              disabled={idx === refeicoesReordenando.length - 1}
+              onclick={() => moverRefeicao(idx, 1)}
+              aria-label="Mover para baixo"
+            >
+              {@render iconSetaBaixo()}
+            </button>
+          </div>
+        </li>
+      {/each}
+    </ul>
+    <Button onclick={fecharReordenar}>Concluir</Button>
+  </Sheet>
 {/if}
 
 {#if mostrarMenuMais}
@@ -1095,5 +1202,56 @@
     font-weight: 600;
     font-size: var(--font-size-base);
     cursor: pointer;
+  }
+  .reordenar-refeicoes-ajuda {
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+    text-align: center;
+  }
+  .reordenar-refeicoes-lista {
+    list-style: none;
+    margin: 0 0 var(--space-4);
+    padding: 0;
+  }
+  .reordenar-refeicoes-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .reordenar-refeicoes-item:last-child {
+    border-bottom: none;
+  }
+  .reordenar-refeicoes-nome {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+  }
+  .reordenar-refeicoes-setas {
+    display: flex;
+    gap: var(--space-2);
+    flex-shrink: 0;
+  }
+  .reordenar-refeicoes-setas button {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .reordenar-refeicoes-setas button svg {
+    width: 16px;
+    height: 16px;
+  }
+  .reordenar-refeicoes-setas button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
   }
 </style>
