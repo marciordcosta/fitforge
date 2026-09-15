@@ -67,15 +67,18 @@
     loading = true;
     erro = null;
     try {
-      const [receitaRes, metasRes, refeicoesHoje, ehMeta] = await Promise.all([
+      const [receitaRes, metasRes, , ehMeta] = await Promise.all([
         getReceita(receitaId),
         getMetasDiarias(),
+        // Garante que as refeições padrão de hoje existam (pro picker "Adicionar à refeição"
+        // abrir já com elas), mas sem pré-selecionar nenhuma — sem escolha explícita do usuário,
+        // dava a falsa impressão de que a receita já ia entrar numa refeição específica.
         garantirRefeicoesPadraoDoDia(hojeISO()),
         receitaEhMetaDeRefeicao(receitaId),
       ]);
       receita = receitaRes;
       metas = metasRes;
-      refeicao = refeicoesHoje[0] ?? null;
+      refeicao = null;
       ehMetaPadrao = ehMeta;
       nomeEditavel = receitaRes?.nome ?? "";
       idsParaRemover = [];
