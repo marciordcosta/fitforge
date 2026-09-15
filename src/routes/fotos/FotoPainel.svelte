@@ -257,16 +257,20 @@
     gap: var(--space-3);
     /* padding-left maior que o padrão: deixa espaço pro botão de fechar/voltar (36px + margem)
        que a tela que usa este painel desenha por cima, no mesmo canto — evitava sobrepor a data. */
-    padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) var(--space-6) 52px;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
+    padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) 0 52px;
     pointer-events: none;
   }
+  /* Selo só atrás do texto (como o contador), em vez de um degradê cobrindo a largura toda —
+     esse degradê escurecia demais a foto na comparação, onde os dois painéis são bem baixos. */
   .foto-info {
     display: flex;
     flex-direction: column;
     gap: 2px;
     color: #fff;
     min-width: 0;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
   }
   .foto-info-data {
     font-size: 15px;
@@ -276,15 +280,17 @@
   .foto-rodape {
     position: absolute;
     left: 0;
-    right: 0;
     bottom: 0;
-    padding: var(--space-6) var(--space-3) max(var(--space-3), env(safe-area-inset-bottom, 0px));
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+    padding: var(--space-3) var(--space-3) max(var(--space-3), env(safe-area-inset-bottom, 0px));
     pointer-events: none;
   }
   .foto-rodape-peso {
+    display: inline-block;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.85);
+    color: #fff;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
   }
   .foto-contador {
     flex-shrink: 0;
