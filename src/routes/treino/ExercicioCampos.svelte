@@ -19,12 +19,26 @@
   } = $props();
 
   let padroes = $state<PadraoMovimento[]>([]);
+  let erroPadroes = $state(false);
 
   async function carregarPadroes() {
-    padroes = await listPadroesMovimento();
+    erroPadroes = false;
+    try {
+      padroes = await listPadroesMovimento();
+    } catch {
+      erroPadroes = true;
+    }
   }
 
   void carregarPadroes();
+
+  function abrirPadraoPicker(): void {
+    if (erroPadroes) {
+      void carregarPadroes();
+      return;
+    }
+    mostrarPadraoPicker = true;
+  }
 
   /** Ao escolher um Padrão de Movimento, lança automaticamente todos os músculos
    * cadastrados nele — a contribuição de quem já estava na lista é preservada. */
@@ -60,8 +74,8 @@
 
 <div class="field">
   <span>Padrão de Movimento</span>
-  <button type="button" class="select-btn" onclick={() => (mostrarPadraoPicker = true)}>
-    {padroes.find((p) => p.id === padraoId)?.nome ?? "Nenhum"}
+  <button type="button" class="select-btn" onclick={abrirPadraoPicker}>
+    {erroPadroes ? "Erro ao carregar — toque para tentar de novo" : (padroes.find((p) => p.id === padraoId)?.nome ?? "Nenhum")}
   </button>
 </div>
 

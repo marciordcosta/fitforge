@@ -185,7 +185,22 @@
     agora = Date.now();
     checarDescansosConcluidos();
   }, 1000);
-  $effect(() => () => clearInterval(timerId));
+  /** setInterval fica suspenso com a aba/app em segundo plano — sem isso, ao voltar,
+   * `agora` fica preso no passado e o restante do descanso aparece bem maior por um
+   * instante, até o próximo tick corrigir sozinho. Resincroniza na hora. */
+  function resincronizarAoVoltar(): void {
+    if (!document.hidden) {
+      agora = Date.now();
+      checarDescansosConcluidos();
+    }
+  }
+  document.addEventListener("visibilitychange", resincronizarAoVoltar);
+  window.addEventListener("focus", resincronizarAoVoltar);
+  $effect(() => () => {
+    clearInterval(timerId);
+    document.removeEventListener("visibilitychange", resincronizarAoVoltar);
+    window.removeEventListener("focus", resincronizarAoVoltar);
+  });
 
   /** O cronômetro (anel ou barra) continua visível depois de zerar, contando o atraso em negativo,
    * até o usuário pular ou uma nova série iniciar outro descanso. */
