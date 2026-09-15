@@ -660,7 +660,7 @@
     font-family: inherit;
     font-size: var(--font-size-sm);
     font-weight: 600;
-    color: var(--surface-muted);
+    color: var(--surface-fg);
     cursor: pointer;
   }
   .grupo-data-wrap:first-of-type .data-titulo-btn {
