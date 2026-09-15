@@ -2,6 +2,11 @@
   import { untrack } from "svelte";
   import type { FotoItem } from "../../lib/pesoApi";
 
+  const MESES = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  ];
+
   let {
     fotos,
     indiceInicial,
@@ -9,6 +14,7 @@
     pesoDia,
     mediaSemana,
     data,
+    dataCentralizada = false,
     onIndiceChange,
   }: {
     fotos: FotoItem[];
@@ -17,6 +23,9 @@
     pesoDia: number | null;
     mediaSemana: number | null;
     data: string;
+    /** Tela cheia (uma foto por vez): data centralizada no topo, por extenso com o ano. Na
+     * comparação (dois painéis curtos lado a lado) fica compacta no canto, como antes. */
+    dataCentralizada?: boolean;
     /** Avisa o pai qual foto do carrossel está em exibição agora — usado por quem precisa saber
      * a foto "atual" mesmo depois do usuário arrastar pra outra do mesmo dia (ex: pra comparar). */
     onIndiceChange?: (indice: number) => void;
@@ -28,6 +37,11 @@
   function formatarDataCurta(iso: string): string {
     const [, m, d] = iso.split("-");
     return `${d}/${m}`;
+  }
+
+  function formatarDataCompleta(iso: string): string {
+    const [ano, mes, dia] = iso.split("-");
+    return `${dia} de ${MESES[Number(mes) - 1]} de ${ano}`;
   }
 
   function formatarPeso(v: number | null): string {
@@ -178,14 +192,23 @@
     {/each}
   </div>
 
-  <div class="foto-topo">
-    <div class="foto-info">
-      <strong class="foto-info-data">{formatarDataCurta(data)}</strong>
+  {#if dataCentralizada}
+    <div class="foto-topo foto-topo-centralizada">
+      <span class="foto-info-central">{formatarDataCompleta(data)}</span>
+      {#if fotos.length > 1}
+        <span class="foto-contador foto-contador-central">{indice + 1}/{fotos.length}</span>
+      {/if}
     </div>
-    {#if fotos.length > 1}
-      <span class="foto-contador">{indice + 1}/{fotos.length}</span>
-    {/if}
-  </div>
+  {:else}
+    <div class="foto-topo">
+      <div class="foto-info">
+        <strong class="foto-info-data">{formatarDataCurta(data)}</strong>
+      </div>
+      {#if fotos.length > 1}
+        <span class="foto-contador">{indice + 1}/{fotos.length}</span>
+      {/if}
+    </div>
+  {/if}
 
   {#if pesoDia != null || mediaSemana != null}
     <div class="foto-rodape">
@@ -276,6 +299,23 @@
     font-size: 15px;
     font-weight: 600;
     letter-spacing: 0.2px;
+  }
+  .foto-topo-centralizada {
+    justify-content: center;
+  }
+  .foto-info-central {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 5px 14px;
+    border-radius: var(--radius-sm);
+  }
+  .foto-contador-central {
+    position: absolute;
+    top: max(var(--space-3), env(safe-area-inset-top, 0px));
+    right: var(--space-3);
   }
   .foto-rodape {
     position: absolute;

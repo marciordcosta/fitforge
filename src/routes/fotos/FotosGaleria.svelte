@@ -479,6 +479,7 @@
           pesoDia={fotoAberta.pesoDia}
           mediaSemana={fotoAberta.mediaSemana}
           data={fotoAberta.grupo.data}
+          dataCentralizada
           onIndiceChange={(i) => (indiceAtualAberta = i)}
         />
       </div>
