@@ -32,6 +32,7 @@
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
   const COR_PROTEINA = "#fbbf24";
+  const COR_ALERTA = "#f87171";
 
   const MESES_ABREV = [
     "jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez",
@@ -79,6 +80,17 @@
 
   function parametro(chave: string): LimiteParametro {
     return parametros.get(chave) ?? PARAMETROS_PADRAO[chave];
+  }
+
+  /** Compara o consumido (em g/kg de peso corporal) contra a faixa Mín/Máx definida em
+   * Parametrização > Macronutrientes — usado pra colorir os anéis de Carb/Gorduras/Proteínas. */
+  function statusMacroPorPeso(totalG: number, chave: string): "abaixo" | "acima" | "dentro" {
+    if (pesoAtual <= 0) return "dentro";
+    const gkg = totalG / pesoAtual;
+    const { min, max } = parametro(chave);
+    if (gkg < min) return "abaixo";
+    if (gkg > max) return "acima";
+    return "dentro";
   }
 
   /** Meta efetiva de cada refeição do catálogo PRO DIA sendo exibido — respeita override do dia da
@@ -298,6 +310,10 @@
   const totalFibras = $derived(itens.reduce((acc, i) => acc + i.fibraG, 0));
   const totalGorduraSaturada = $derived(itens.reduce((acc, i) => acc + i.gorduraSaturadaG, 0));
 
+  const statusCarbo = $derived(statusMacroPorPeso(totalCarboidrato, "carboidrato"));
+  const statusGordura = $derived(statusMacroPorPeso(totalGordura, "gordura"));
+  const statusProteina = $derived(statusMacroPorPeso(totalProteina, "proteina"));
+
   function pctMeta(valor: number, meta: number): number {
     return meta > 0 ? (valor / meta) * 100 : 0;
   }
@@ -356,18 +372,19 @@
     <polyline points="6 9 12 15 18 9" />
   </svg>
 {/snippet}
-{#snippet anelCentroMacro(valor: number, meta: number)}
+{#snippet anelCentroMacro(valor: number, meta: number, corTexto: string | null = null)}
+  {@const estilo = corTexto ? `color:${corTexto};` : ""}
   {#if modoExibicao === "restante" && passouMeta(valor, meta)}
-    <strong>{(valor - meta).toFixed(0)}g</strong>
+    <strong style={estilo}>{(valor - meta).toFixed(0)}g</strong>
     <span class="macro-meta">acima</span>
   {:else if modoExibicao === "restante"}
-    <strong>{restante(valor, meta).toFixed(0)}g</strong>
+    <strong style={estilo}>{restante(valor, meta).toFixed(0)}g</strong>
     <span class="macro-meta">rest.</span>
   {:else if modoExibicao === "absoluto"}
-    <strong>{valor.toFixed(0)}g</strong>
+    <strong style={estilo}>{valor.toFixed(0)}g</strong>
     <span class="macro-meta">/{meta.toFixed(0)}</span>
   {:else}
-    <strong>{gPorKg(valor)}</strong>
+    <strong style={estilo}>{gPorKg(valor)}</strong>
     <span class="macro-meta">g/kg</span>
   {/if}
 {/snippet}
@@ -524,25 +541,34 @@
         <div class="macros-grid">
           <div class="macro-col">
             <p class="macro-nome">Carb</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}% 100%);`}>
+            <div
+              class="macro-anel"
+              style={`background: conic-gradient(${statusCarbo === "abaixo" ? COR_ALERTA : COR_CARBO} 0% ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}% 100%);`}
+            >
               <div class="macro-anel-centro">
-                {@render anelCentroMacro(totalCarboidrato, metas.carboidratoG)}
+                {@render anelCentroMacro(totalCarboidrato, metas.carboidratoG, statusCarbo === "acima" ? COR_ALERTA : null)}
               </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Gorduras</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}% 100%);`}>
+            <div
+              class="macro-anel"
+              style={`background: conic-gradient(${statusGordura === "abaixo" ? COR_ALERTA : COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}% 100%);`}
+            >
               <div class="macro-anel-centro">
-                {@render anelCentroMacro(totalGordura, metas.gorduraG)}
+                {@render anelCentroMacro(totalGordura, metas.gorduraG, statusGordura === "acima" ? COR_ALERTA : null)}
               </div>
             </div>
           </div>
           <div class="macro-col">
             <p class="macro-nome">Proteínas</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}% 100%);`}>
+            <div
+              class="macro-anel"
+              style={`background: conic-gradient(${statusProteina === "abaixo" ? COR_ALERTA : COR_PROTEINA} 0% ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}% 100%);`}
+            >
               <div class="macro-anel-centro">
-                {@render anelCentroMacro(totalProteina, metas.proteinaG)}
+                {@render anelCentroMacro(totalProteina, metas.proteinaG, statusProteina === "acima" ? COR_ALERTA : null)}
               </div>
             </div>
           </div>
