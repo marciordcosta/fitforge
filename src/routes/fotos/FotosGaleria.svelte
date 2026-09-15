@@ -90,7 +90,17 @@
     mediaPorData = mediaMap;
   }
 
-  function formatarPeso(v: number | undefined): string {
+  const MESES = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  ];
+
+  function formatarDataCompleta(iso: string): string {
+    const [ano, mes, dia] = iso.split("-");
+    return `${dia} de ${MESES[Number(mes) - 1]} de ${ano}`;
+  }
+
+  function formatarPeso(v: number | null | undefined): string {
     return v == null ? "—" : `${v.toFixed(1).replace(".", ",")} kg`;
   }
 
@@ -469,7 +479,12 @@
 
 {#if fotoAberta}
   <div class="visualizar-container">
-    <button class="visualizar-fechar" onclick={fecharFotoAberta} aria-label="Fechar">{@render iconFechar()}</button>
+    <div class="visualizar-topbar">
+      <button class="visualizar-fechar" onclick={fecharFotoAberta} aria-label="Fechar">{@render iconFechar()}</button>
+      {#if fotoAberta.grupo.fotos.length > 1}
+        <span class="visualizar-contador">{indiceAtualAberta + 1}/{fotoAberta.grupo.fotos.length}</span>
+      {/if}
+    </div>
     <div class="visualizar-split" class:comparando={mostrarPickerComparar}>
       <div class="visualizar-topo">
         <FotoPainel
@@ -479,7 +494,9 @@
           pesoDia={fotoAberta.pesoDia}
           mediaSemana={fotoAberta.mediaSemana}
           data={fotoAberta.grupo.data}
-          dataCentralizada
+          ocultarTopo
+          ocultarRodape
+          ocultarContador
           onIndiceChange={(i) => (indiceAtualAberta = i)}
         />
       </div>
@@ -514,13 +531,21 @@
     {#if mostrarPickerComparar}
       <button type="button" class="picker-cancelar" onclick={() => (mostrarPickerComparar = false)}>Cancelar</button>
     {:else}
-      <div class="visualizar-acoes">
-        <button type="button" class="visualizar-acao-btn comparar" onclick={() => (mostrarPickerComparar = true)} aria-label="Comparar">
-          {@render iconComparar()}
-        </button>
-        <button type="button" class="visualizar-acao-btn excluir" disabled={excluindo} onclick={() => (confirmandoExcluirUnica = true)} aria-label="Excluir">
-          {@render iconLixeira()}
-        </button>
+      <div class="visualizar-rodape">
+        <div class="visualizar-rodape-info">
+          <strong>{formatarDataCompleta(fotoAberta.grupo.data)}</strong>
+          {#if fotoAberta.pesoDia != null || fotoAberta.mediaSemana != null}
+            <span>{formatarPeso(fotoAberta.pesoDia)}{fotoAberta.mediaSemana != null ? ` · méd. ${formatarPeso(fotoAberta.mediaSemana)}` : ""}</span>
+          {/if}
+        </div>
+        <div class="visualizar-acoes">
+          <button type="button" class="visualizar-acao-btn comparar" onclick={() => (mostrarPickerComparar = true)} aria-label="Comparar">
+            {@render iconComparar()}
+          </button>
+          <button type="button" class="visualizar-acao-btn excluir" disabled={excluindo} onclick={() => (confirmandoExcluirUnica = true)} aria-label="Excluir">
+            {@render iconLixeira()}
+          </button>
+        </div>
       </div>
     {/if}
   </div>
@@ -853,6 +878,21 @@
     display: flex;
     flex-direction: column;
   }
+  .visualizar-topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-4) var(--space-3);
+  }
+  .visualizar-contador {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 4px 12px;
+    border-radius: 999px;
+  }
   .visualizar-split {
     flex: 1;
     min-height: 0;
@@ -888,11 +928,34 @@
     text-align: center;
     padding: var(--space-4) 0;
   }
+  .visualizar-rodape {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  }
+  .visualizar-rodape-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: #fff;
+    text-align: center;
+  }
+  .visualizar-rodape-info strong {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .visualizar-rodape-info span {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+  }
   .visualizar-acoes {
     display: flex;
     justify-content: center;
     gap: var(--space-4);
-    padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom, 0px));
   }
   .visualizar-acao-btn {
     width: 52px;
@@ -931,14 +994,11 @@
     padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
   }
   .visualizar-fechar {
-    position: absolute;
-    top: max(var(--space-3), env(safe-area-inset-top, 0px));
-    left: var(--space-3);
-    z-index: 10;
+    flex-shrink: 0;
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(255, 255, 255, 0.15);
     border: none;
     color: #fff;
     display: flex;

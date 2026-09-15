@@ -2,11 +2,6 @@
   import { untrack } from "svelte";
   import type { FotoItem } from "../../lib/pesoApi";
 
-  const MESES = [
-    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
-  ];
-
   let {
     fotos,
     indiceInicial,
@@ -14,9 +9,9 @@
     pesoDia,
     mediaSemana,
     data,
-    dataCentralizada = false,
     ocultarTopo = false,
     ocultarRodape = false,
+    ocultarContador = false,
     onIndiceChange,
   }: {
     fotos: FotoItem[];
@@ -25,14 +20,12 @@
     pesoDia: number | null;
     mediaSemana: number | null;
     data: string;
-    /** Tela cheia (uma foto por vez): data centralizada no topo, por extenso com o ano. Na
-     * comparação (dois painéis curtos lado a lado) fica compacta no canto, como antes. */
-    dataCentralizada?: boolean;
-    /** Na comparação, a data/peso dos dois painéis que ficam na junção (o de baixo do painel de
-     * cima, o de cima do painel de baixo) somem daqui — quem os mostra é um selo único compartilhado
-     * desenhado pela tela de comparação bem na linha da junção, pra não duplicar/empilhar infos. */
+    /** Pra telas que preferem desenhar a data/peso/contador combinados por fora (num topbar/rodapé
+     * próprios, fora da foto) em vez do selo flutuante padrão deste painel — usado na tela cheia
+     * (topbar/rodapé da galeria) e na comparação (selo único na junção dos dois painéis). */
     ocultarTopo?: boolean;
     ocultarRodape?: boolean;
+    ocultarContador?: boolean;
     /** Avisa o pai qual foto do carrossel está em exibição agora — usado por quem precisa saber
      * a foto "atual" mesmo depois do usuário arrastar pra outra do mesmo dia (ex: pra comparar). */
     onIndiceChange?: (indice: number) => void;
@@ -51,11 +44,6 @@
   function formatarDataCurta(iso: string): string {
     const [, m, d] = iso.split("-");
     return `${d}/${m}`;
-  }
-
-  function formatarDataCompleta(iso: string): string {
-    const [ano, mes, dia] = iso.split("-");
-    return `${dia} de ${MESES[Number(mes) - 1]} de ${ano}`;
   }
 
   function formatarPeso(v: number | null): string {
@@ -297,20 +285,14 @@
   </div>
 
   {#if !ocultarTopo}
-    {#if dataCentralizada}
-      <div class="foto-topo foto-topo-centralizada">
-        <span class="foto-info-central">{formatarDataCompleta(data)}</span>
+    <div class="foto-topo">
+      <div class="foto-info">
+        <strong class="foto-info-data">{formatarDataCurta(data)}</strong>
       </div>
-    {:else}
-      <div class="foto-topo">
-        <div class="foto-info">
-          <strong class="foto-info-data">{formatarDataCurta(data)}</strong>
-        </div>
-      </div>
-    {/if}
+    </div>
   {/if}
 
-  {#if fotos.length > 1}
+  {#if !ocultarContador && fotos.length > 1}
     <span class="foto-contador">{indice + 1}/{fotos.length}</span>
   {/if}
 
@@ -400,18 +382,6 @@
     font-size: 15px;
     font-weight: 600;
     letter-spacing: 0.2px;
-  }
-  .foto-topo-centralizada {
-    justify-content: center;
-  }
-  .foto-info-central {
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-    text-align: center;
-    background: rgba(0, 0, 0, 0.45);
-    padding: 5px 14px;
-    border-radius: var(--radius-sm);
   }
   .foto-rodape {
     position: absolute;
