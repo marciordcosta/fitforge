@@ -15,6 +15,7 @@
     type Musculo,
     type ParametrosDistribuicao,
   } from "../../lib/treinoApi";
+  import { partesFadigaSemanal, partesParaSegmentos, CORES_FAIXA } from "../../lib/fadiga";
 
   let treinos = $state<TreinoComExercicios[]>([]);
   let parametrosDistribuicao = $state<ParametrosDistribuicao>(PARAMETROS_DISTRIBUICAO_PADRAO);
@@ -181,6 +182,16 @@
       : planejadoPorMusculoDe(treinos),
   );
 
+  /** Mesma distribuição por faixa de fadiga (A/B/C, por posição da série na sessão) usada nas
+   * barras de edição de Distribuição Muscular — aqui só pra recolorir o preenchimento do anel,
+   * a % total preenchida continua sendo pctMeta(feito, planejado), sem mudança nenhuma nela. */
+  const partesPorMusculo = $derived(
+    partesFadigaSemanal(
+      parametrosDistribuicao.homeModoGrupos === "proximo" ? treinos.slice(0, 1) : treinos,
+      parametrosDistribuicao,
+    ),
+  );
+
   /** Os 6 músculos com maior volume planejado — só entram os que aparecem em alguma rotina
    * considerada (todas, ou só a próxima, conforme planejadoPorMusculo). */
   const top6 = $derived.by(() =>
@@ -206,6 +217,27 @@
 
   function larguraBarra(pct: number): number {
     return Math.min(100, pct);
+  }
+
+  /** Preenchimento do anel dividido pelas faixas de fadiga (A/B/C) do músculo, na mesma
+   * proporção das barras de edição — o total preenchido continua sendo `pct`, só a cor
+   * interna passa a variar em vez de ser uma única cor sólida. */
+  function gradienteFadiga(musculoId: string, pct: number): string {
+    const preenchido = larguraBarra(pct);
+    const partes = partesPorMusculo.get(musculoId);
+    const total = partes ? partes.a + partes.b + partes.c : 0;
+    const segmentos = total > 0 ? partesParaSegmentos(partes!) : [{ valor: 1, cor: CORES_FAIXA.a }];
+
+    let acumulado = 0;
+    const stops: string[] = [];
+    for (const seg of segmentos) {
+      if (seg.valor <= 0) continue;
+      const inicio = acumulado;
+      acumulado += (seg.valor / (total || 1)) * preenchido;
+      stops.push(`${seg.cor} ${inicio}% ${acumulado}%`);
+    }
+    stops.push(`var(--surface-border) ${preenchido}% 100%`);
+    return `conic-gradient(${stops.join(", ")})`;
   }
 </script>
 
@@ -307,7 +339,7 @@
               <p class="musculo-nome">{item.musculo.nome}</p>
               <div
                 class="musculo-anel"
-                style={`background: conic-gradient(var(--color-primary) 0% ${larguraBarra(pctMeta(item.feito, item.planejado))}%, var(--surface-border) ${larguraBarra(pctMeta(item.feito, item.planejado))}% 100%);`}
+                style={`background: ${gradienteFadiga(item.musculo.id, pctMeta(item.feito, item.planejado))};`}
               >
                 <div class="musculo-anel-centro">
                   {#if modoRestante && passouMeta(item.feito, item.planejado)}

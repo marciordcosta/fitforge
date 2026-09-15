@@ -12,6 +12,15 @@
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
   import {
+    partesVazias,
+    somarPartes,
+    partesParaSegmentos,
+    CORES_FAIXA,
+    contarSeriesPorFaixaDePosicao as contarSeriesPorFaixaDePosicaoBase,
+    partesFadigaSemanal as partesFadigaSemanalBase,
+    type Partes,
+  } from "../../lib/fadiga";
+  import {
     listMusculos,
     listTreinos,
     getTreino,
@@ -196,7 +205,6 @@
   const CORTE_A = 20;
   const CORTE_B = 50;
   const MARGEM_FAIXA = 5;
-  const CORES_FAIXA = { a: "#60a5fa", b: "#fbbf24", c: "#f87171" };
 
   function corPorFaixa(acumulado: number): string {
     if (acumulado <= CORTE_A + MARGEM_FAIXA) return CORES_FAIXA.a;
@@ -204,71 +212,10 @@
     return CORES_FAIXA.c;
   }
 
-  interface Partes {
-    a: number;
-    b: number;
-    c: number;
-  }
-
-  function partesVazias(): Partes {
-    return { a: 0, b: 0, c: 0 };
-  }
-
-  function somarPartes(...listas: Partes[]): Partes {
-    return listas.reduce((acc, p) => ({ a: acc.a + p.a, b: acc.b + p.b, c: acc.c + p.c }), partesVazias());
-  }
-
-  function partesParaSegmentos(p: Partes): { valor: number; cor: string }[] {
-    return [
-      { valor: p.a, cor: CORES_FAIXA.a },
-      { valor: p.b, cor: CORES_FAIXA.b },
-      { valor: p.c, cor: CORES_FAIXA.c },
-    ];
-  }
-
-  /** Faixa A/B/C pela posição RELATIVA da série na sessão (% do total de séries do treino,
-   * não nº absoluto) — corte configurável em Parametrização (fadigaFasesCorteA/B, em %). Isto
-   * não modela fadiga fisiológica real (impossível de medir de forma confiável, varia dia a
-   * dia) — é uma heurística de priorização 80/20: os primeiros X% da sessão são o "bloco" de
-   * maior retorno, e exercícios foco devem cair ali, independente do treino ter 8 ou 18 séries.
-   * Deliberadamente independente de corPorFaixa/CORTE_A/CORTE_B: aquilo classifica dominância
-   * de músculo no volume total (outro fenômeno 80/20), isto classifica posição dentro da sessão —
-   * usar os mesmos dois números pros dois já causou confusão de acoplamento sem necessidade. */
-  function faixaPorPosicaoRelativa(posicao: number, totalSeries: number, p: ParametrosDistribuicao): "a" | "b" | "c" {
-    const percentual = totalSeries > 0 ? (posicao / totalSeries) * 100 : 100;
-    if (percentual <= p.fadigaFasesCorteA) return "a";
-    if (percentual <= p.fadigaFasesCorteB) return "b";
-    return "c";
-  }
-
-  /**
-   * Classifica cada série da rotina pela POSIÇÃO no treino (não pelo músculo) — serve pra
-   * priorização 80/20 (ver faixaPorPosicaoRelativa), não pra medir fadiga real. Modo de
-   * contribuição: cada série soma peso_contribuicao (não 1 inteiro) pra cada músculo que ela
-   * trabalha, igual contarSeriesPorMusculoPonderado — as partes de cada músculo somam o mesmo
-   * total ponderado dele.
-   */
+  /** Wrapper fino: as contas de fadiga por posição são compartilhadas com o anel da Home
+   * (Rotinas.svelte) via src/lib/fadiga.ts — aqui só injeta o parametrosDistribuicao local. */
   function contarSeriesPorFaixaDePosicao(treino: TreinoComExercicios): Map<string, Partes> {
-    const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
-    const totalSeries = exerciciosOrdenados.reduce((soma, ex) => soma + ex.series.length, 0);
-    const mapa = new Map<string, Partes>();
-
-    let posicao = 0;
-    for (const ex of exerciciosOrdenados) {
-      const musculosEx = ex.exercicio?.musculos ?? [];
-      for (let s = 0; s < ex.series.length; s++) {
-        posicao += 1;
-        const faixa = faixaPorPosicaoRelativa(posicao, totalSeries, parametrosDistribuicao);
-        for (const m of musculosEx) {
-          const atual = mapa.get(m.musculo_id) ?? partesVazias();
-          if (faixa === "a") atual.a += m.peso_contribuicao;
-          else if (faixa === "b") atual.b += m.peso_contribuicao;
-          else atual.c += m.peso_contribuicao;
-          mapa.set(m.musculo_id, atual);
-        }
-      }
-    }
-    return mapa;
+    return contarSeriesPorFaixaDePosicaoBase(treino, parametrosDistribuicao);
   }
 
   /** Mesmo loop de posição de contarSeriesPorFaixaDePosicao, só que somando o fator de
@@ -795,13 +742,7 @@
    * Mesma regra 20/30/50 das barras de cada rotina, agora funcionando com rotinas diferentes
    * porque a soma acontece DEPOIS de cada rotina já ter feito sua própria classificação. */
   function partesFadigaSemanal(treinosLista: TreinoComExercicios[] = treinosEfetivos): Map<string, Partes> {
-    const mapa = new Map<string, Partes>();
-    for (const t of treinosLista) {
-      for (const [musculoId, partes] of contarSeriesPorFaixaDePosicao(t)) {
-        mapa.set(musculoId, somarPartes(mapa.get(musculoId) ?? partesVazias(), partes));
-      }
-    }
-    return mapa;
+    return partesFadigaSemanalBase(treinosLista, parametrosDistribuicao);
   }
 
   /** Peso gradual (fatorPerformanceGradual) de cada músculo, somado entre TODAS as rotinas da
