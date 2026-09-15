@@ -12,6 +12,7 @@
     getRefeicaoDia,
     getItensDaRefeicao,
     getReceita,
+    getAlimento,
     adicionarItemReceita,
     type Alimento,
     type ReceitaResumo,
@@ -28,6 +29,11 @@
 
   const modoAdicionar = untrack(() => refeicaoId != null);
   const refeicaoIdFixo = untrack(() => refeicaoId);
+  /** Mesma seção "Refeições" (adicionar de uma vez os itens de outra receita/refeição salva)
+   * vale tanto pra adicionar no diário quanto pra montar/editar uma receita — sem isso, só
+   * aparecia vindo da Home, dando a impressão de que aqui (Gerenciar Refeições/receita) era um
+   * catálogo mais limitado. */
+  const mostrarReceitasRapidas = untrack(() => refeicaoId != null || modoReceita === true);
   /** Essa tela é reaberta a partir de mais de uma origem com a MESMA URL de resto (ex: uma receita
    * salva de verdade, OU a lista de alimentos privada de uma refeição do catálogo) — quem navega
    * pra cá pode informar o pai real via ?origem=, usado só como fallback (deep link/recarregar);
@@ -50,6 +56,8 @@
 
   let alimentos = $state<Alimento[]>([]);
   let resultadosReceitas = $state<ReceitaResumo[]>([]);
+  /** Nunca mostra a própria receita sendo editada como opção de "importar itens dela mesma". */
+  const receitasParaMostrar = $derived(resultadosReceitas.filter((r) => r.id !== receitaIdExistente));
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let busca = $state(untrack(() => lerBuscaDaUrl()));
@@ -77,12 +85,12 @@
       if (query.trim()) {
         const [alRes, recRes] = await Promise.all([
           buscarAlimentos(query),
-          modoAdicionar ? buscarReceitas(query) : Promise.resolve([]),
+          mostrarReceitasRapidas ? buscarReceitas(query) : Promise.resolve([]),
         ]);
         alimentos = alRes;
         resultadosReceitas = recRes;
       } else {
-        const [alRes, recRes] = await Promise.all([listAlimentos(), modoAdicionar ? listReceitas() : Promise.resolve([])]);
+        const [alRes, recRes] = await Promise.all([listAlimentos(), mostrarReceitasRapidas ? listReceitas() : Promise.resolve([])]);
         alimentos = alRes;
         resultadosReceitas = recRes;
       }
@@ -230,6 +238,40 @@
     }
   }
 
+  /** Mesma ideia de selecionarReceita, mas pra dentro de outra receita/lista de alimentos sendo
+   * montada aqui (Gerenciar Refeições, receita salva ou "Nova Refeição") em vez do diário — copia
+   * cada item da receita escolhida, pulando os que já estão na lista atual. */
+  async function selecionarReceitaParaReceita(receita: ReceitaResumo) {
+    if (adicionadosIds.has(receita.id)) return;
+    adicionandoId = receita.id;
+    try {
+      const origem = await getReceita(receita.id);
+      if (!origem) return;
+      if (receitaIdExistente) {
+        for (const item of origem.itens) {
+          if (adicionadosIds.has(item.alimentoId)) continue;
+          await adicionarItemReceita(receitaIdExistente, item.alimentoId, item.quantidade);
+          adicionadosIds = new Set(adicionadosIds).add(item.alimentoId);
+        }
+      } else {
+        definirContexto("nova");
+        for (const item of origem.itens) {
+          if (adicionadosIds.has(item.alimentoId)) continue;
+          const alimento = await getAlimento(item.alimentoId);
+          if (!alimento) continue;
+          adicionarAoRascunho(alimento, item.quantidade);
+          adicionadosIds = new Set(adicionadosIds).add(item.alimentoId);
+        }
+      }
+      adicionadosIds = new Set(adicionadosIds).add(receita.id);
+      mostrarMensagem(`Itens de "${receita.nome}" adicionados`);
+    } catch (err) {
+      alert("Erro ao adicionar refeição: " + (err as Error).message);
+    } finally {
+      adicionandoId = null;
+    }
+  }
+
   function abrirDetalheReceita(receita: ReceitaResumo) {
     navigate(`/dieta/receitas/ver/${receita.id}`);
   }
@@ -280,10 +322,10 @@
     <p class="erro">Erro ao buscar alimentos: {erro}</p>
   {:else}
     <div class="resultados" class:carregando={loading}>
-    {#if modoAdicionar && resultadosReceitas.length}
+    {#if mostrarReceitasRapidas && receitasParaMostrar.length}
       <p class="secao-titulo">Refeições</p>
       <ul class="lista">
-        {#each resultadosReceitas as receita (receita.id)}
+        {#each receitasParaMostrar as receita (receita.id)}
           <li class="linha">
             <button class="info-btn" onclick={() => abrirDetalheReceita(receita)}>
               <span class="avatar">{iniciais(receita.nome)}</span>
@@ -295,7 +337,7 @@
             <button
               class="add-btn"
               class:adicionado={adicionadosIds.has(receita.id)}
-              onclick={() => selecionarReceita(receita)}
+              onclick={() => (modoReceita ? selecionarReceitaParaReceita(receita) : selecionarReceita(receita))}
               disabled={adicionandoId === receita.id || adicionadosIds.has(receita.id)}
               aria-label="Adicionar"
             >
