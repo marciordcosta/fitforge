@@ -174,8 +174,9 @@
   async function adicionarRapido(ex: Exercicio) {
     adicionandoId = ex.id;
     try {
-      const novaLinha = await construirLinha(ex);
+      const [novaLinha, obs] = await Promise.all([construirLinha(ex), getObservacoesAtuais([ex.id])]);
       linhas = [...linhas, novaLinha];
+      observacoesPorExercicio = new Map(observacoesPorExercicio).set(ex.id, obs.get(ex.id) ?? "");
     } finally {
       adicionandoId = null;
     }
@@ -226,7 +227,7 @@
     if (substituindoIdx == null) return;
     const idx = substituindoIdx;
     const linha = linhas[idx];
-    const anterior = await getAnteriorCached(novoEx.id);
+    const [anterior, obs] = await Promise.all([getAnteriorCached(novoEx.id), getObservacoesAtuais([novoEx.id])]);
     const series: LinhaSerie[] = Array.from({ length: linha.series.length }, (_, i) => {
       const ant = anterior.find((a) => a.serie === i + 1);
       return {
@@ -237,6 +238,7 @@
       };
     });
     linhas[idx] = { ...linha, exercicio_id: novoEx.id, nome: novoEx.nome, series };
+    observacoesPorExercicio = new Map(observacoesPorExercicio).set(novoEx.id, obs.get(novoEx.id) ?? "");
     fecharSubstituir();
   }
   let descansoEditandoIdx = $state<number | null>(null);
