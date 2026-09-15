@@ -33,13 +33,20 @@ export function navigate(to: string): void {
 }
 
 /** Volta pra tela anterior de verdade quando houve navegação dentro do
- * app; se a tela foi aberta direto (deep link, recarregar a página),
- * não há histórico pra voltar e usa o destino padrão informado. */
+ * app; se a tela foi aberta direto (deep link, recarregar a página, PWA
+ * retomada numa rota funda), não há histórico REAL pra voltar — mas o
+ * navegador pode muito bem ter uma entrada antiga (de antes desse reload)
+ * logo abaixo da atual. Usar navigate() (pushState) aqui empilhava o
+ * destino padrão POR CIMA dessa entrada antiga em vez de substituí-la:
+ * o próximo voltar físico ou de outra tela caía de volta nela, gerando um
+ * loop entre as duas telas que nunca chega no verdadeiro destino anterior.
+ * replaceState troca a URL sem crescer a pilha, então isso não acontece. */
 export function voltar(padrao: string): void {
   if (profundidade > 0) {
     window.history.back();
-  } else {
-    navigate(padrao);
+  } else if (padrao !== window.location.pathname) {
+    window.history.replaceState({}, "", padrao);
+    path = window.location.pathname;
   }
 }
 
