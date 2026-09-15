@@ -396,20 +396,46 @@
       const rm = calcular1RM(serieItem.peso, serieItem.repeticoes);
       const volume = serieItem.peso * serieItem.repeticoes;
       const novosRecordes: string[] = [];
+      // Atualiza ex.recordes na hora (não só no fim da sessão): sem isso, duas séries desse
+      // mesmo exercício que batessem o MESMO recorde antigo (ex: 100kg na 1ª série, 95kg na 2ª,
+      // ambas acima do recorde anterior de 90kg) disparavam toast de recorde nas duas, mesmo só
+      // uma sobrevivendo como troféu de verdade no histórico. Também tira o troféu de séries
+      // anteriores dessa sessão que acabaram de ser superadas — só a mais alta do dia acumula.
       if (serieItem.peso > ex.recordes.maiorPeso) {
         serieItem.prPeso = true;
         serieItem.prPesoDelta = serieItem.peso - ex.recordes.maiorPeso;
         novosRecordes.push("peso");
+        for (const s of ex.sets) {
+          if (s !== serieItem) {
+            s.prPeso = false;
+            s.prPesoDelta = null;
+          }
+        }
+        ex.recordes = { ...ex.recordes, maiorPeso: serieItem.peso };
       }
       if (rm > ex.recordes.melhor1rm) {
         serieItem.pr1rm = true;
         serieItem.pr1rmDelta = rm - ex.recordes.melhor1rm;
         novosRecordes.push("1RM");
+        for (const s of ex.sets) {
+          if (s !== serieItem) {
+            s.pr1rm = false;
+            s.pr1rmDelta = null;
+          }
+        }
+        ex.recordes = { ...ex.recordes, melhor1rm: rm };
       }
       if (volume > ex.recordes.melhorVolumeSerie) {
         serieItem.prVolume = true;
         serieItem.prVolumeDelta = volume - ex.recordes.melhorVolumeSerie;
         novosRecordes.push("volume");
+        for (const s of ex.sets) {
+          if (s !== serieItem) {
+            s.prVolume = false;
+            s.prVolumeDelta = null;
+          }
+        }
+        ex.recordes = { ...ex.recordes, melhorVolumeSerie: volume };
       }
       if (novosRecordes.length) {
         mostrarToast(`🏆 Recorde de ${novosRecordes.join(" e ")}!`);
@@ -600,6 +626,14 @@
       : [],
   );
 
+  /** Exercícios da rotina de destino que ainda não estão na sessão de hoje — escolher um que já
+   * está aqui (de outro exercício da mesma sessão) duplicaria o exercicio_id em `sessao`. */
+  const exerciciosParaTrocar = $derived(
+    rotinaDestinoTroca
+      ? rotinaDestinoTroca.exercicios.filter((te) => !sessao.some((ex) => ex.exercicio_id === te.exercicio_id))
+      : [],
+  );
+
   function abrirTrocarDeRotina(exIdx: number): void {
     trocandoExIdx = exIdx;
     rotinaDestinoTroca = null;
@@ -612,24 +646,45 @@
 
   /** Troca os dois exercícios de rotina entre si: o que sai daqui entra na rotina de destino, na
    * mesma posição e com o mesmo número de séries de quem foi escolhido lá — nenhuma das duas fica
-   * com um exercício a mais ou a menos. Ao contrário de "Mover"/"Trocar" na tela de Distribuição
-   * (que ficam num rascunho até Salvar), aqui grava na rotina de destino na hora — só a estrutura
-   * DESSA rotina (a que está em log agora) continua dependendo da escolha "Rotina ajustada" ao
-   * concluir o treino. */
+   * com um exercício a mais ou a menos. Grava as DUAS rotinas na hora (não fica dependendo da
+   * escolha "Rotina ajustada" ao concluir o treino) — se dependesse só dela, escolher "rotina
+   * padrão" no fim deixava a rotina de destino já trocada de verdade, mas esta ainda com o
+   * exercício antigo: o que entrou ficava duplicado (aqui E lá) e o que saiu sumia das duas. Um
+   * exercício avulso dessa sessão (id sintético, ainda não existe na rotina salva) não tem o que
+   * persistir aqui — nesse caso só a rotina de destino muda na hora, e o lado de cá continua
+   * dependendo do fim do treino, como qualquer outro exercício avulso. */
   async function trocarExercicioDeRotina(destinoItem: TreinoExercicio): Promise<void> {
     if (trocandoExIdx == null || !rotinaDestinoTroca) return;
     const exIdx = trocandoExIdx;
     const ex = sessao[exIdx];
     const exercicioIdSai = ex.exercicio_id;
+    const treinoExercicioIdOrigem = ex.treino_exercicio_id;
     const nomeSai = ex.nome;
     const numSeriesDestino = destinoItem.series.length;
     const ordemDestino = destinoItem.ordem;
+    const numSeriesOrigem = ex.sets.length;
+    const ordemOrigem = treino?.exercicios.find((te) => te.id === treinoExercicioIdOrigem)?.ordem ?? 0;
+    const ehSlotPersistido = !treinoExercicioIdOrigem.startsWith("novo-");
     processandoTroca = true;
     try {
-      const anteriorSai = await getUltimoRegistro(exercicioIdSai);
+      const [anteriorSai, anteriorEntra] = await Promise.all([
+        getUltimoRegistro(exercicioIdSai),
+        ehSlotPersistido ? getUltimoRegistro(destinoItem.exercicio_id) : Promise.resolve([]),
+      ]);
       await aplicarSubstituicaoNaSessao(exIdx, destinoItem.exercicio_id, destinoItem.exercicio?.nome ?? "");
       await adicionarTreinoExercicio(rotinaDestinoTroca.id, exercicioIdSai, numSeriesDestino, anteriorSai, ordemDestino);
       await removerTreinoExercicio(destinoItem.id);
+      if (ehSlotPersistido) {
+        const novoTreinoExercicioId = await adicionarTreinoExercicio(
+          treinoId,
+          destinoItem.exercicio_id,
+          numSeriesOrigem,
+          anteriorEntra,
+          ordemOrigem,
+        );
+        await removerTreinoExercicio(treinoExercicioIdOrigem);
+        ex.treino_exercicio_id = novoTreinoExercicioId;
+      }
       fecharTrocarDeRotina();
     } catch (e) {
       alert(`Erro ao trocar "${nomeSai}" de rotina: ` + (e as Error).message);
@@ -1242,16 +1297,20 @@
           <span class="header-spacer"></span>
         </div>
         <p class="muted">"{sessao[idxTroca]?.nome}" vai pra "{rotinaDestinoTroca.nome_treino}" — escolha quem troca de lugar com ele.</p>
-        <ul class="troca-lista">
-          {#each rotinaDestinoTroca.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te (te.id)}
-            <li>
-              <button class="troca-item" disabled={processandoTroca} onclick={() => trocarExercicioDeRotina(te)}>
-                <span class="troca-item-nome">{te.exercicio?.nome ?? ""}</span>
-                <span class="troca-item-sub">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
-              </button>
-            </li>
-          {/each}
-        </ul>
+        {#if !exerciciosParaTrocar.length}
+          <p class="muted">Nenhum exercício disponível — todos já estão na sessão de hoje.</p>
+        {:else}
+          <ul class="troca-lista">
+            {#each exerciciosParaTrocar.slice().sort((a, b) => a.ordem - b.ordem) as te (te.id)}
+              <li>
+                <button class="troca-item" disabled={processandoTroca} onclick={() => trocarExercicioDeRotina(te)}>
+                  <span class="troca-item-nome">{te.exercicio?.nome ?? ""}</span>
+                  <span class="troca-item-sub">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       {/if}
     </div>
   </div>
@@ -1414,6 +1473,8 @@
       mostrarPicker = false;
       mostrarCriarAvulso = false;
       substituindoExIdx = null;
+      trocandoExIdx = null;
+      rotinaDestinoTroca = null;
       reordenando = false;
     }}
   />
