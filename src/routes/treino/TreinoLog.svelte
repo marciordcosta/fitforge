@@ -5,6 +5,7 @@
   import { formatMinSeg } from "../../lib/tempo";
   import {
     getTreino,
+    listTreinos,
     getUltimoRegistro,
     getHistoricoFonte,
     getRecordesExercicio,
@@ -15,10 +16,13 @@
     getObservacoesAtuais,
     salvarObservacaoExercicio,
     createExercicioAvulso,
+    adicionarTreinoExercicio,
+    removerTreinoExercicio,
     construirMusculosInput,
     getExercicio,
     salvarMarcadorExercicio,
     type TreinoComExercicios,
+    type TreinoExercicio,
     type Exercicio,
     type LinhaMusculoInput,
   } from "../../lib/treinoApi";
@@ -41,6 +45,7 @@
   const origemPadrao = new URLSearchParams(window.location.search).get("origem") ?? "/treino";
 
   let treino = $state<TreinoComExercicios | null>(null);
+  let outrasRotinas = $state<TreinoComExercicios[]>([]);
   let nomeTreino = $state("");
   let sessao = $state<ExercicioSessao[]>([]);
   let loading = $state(true);
@@ -154,6 +159,14 @@
   }
 
   void carregar();
+
+  /** Candidatas pra "Substituir Exercício → Ir para Rotinas" — carregado à parte (não bloqueia a
+   * tela) e independente de restaurar sessão salva, já que não faz parte do estado da sessão. */
+  async function carregarOutrasRotinas() {
+    outrasRotinas = (await listTreinos()).filter((t) => t.id !== treinoId);
+  }
+
+  void carregarOutrasRotinas();
 
   $effect(() => {
     if (loading || naoEncontrada) return;
@@ -486,6 +499,7 @@
   // ---------------- Substituir / reordenar exercícios da sessão ----------------
 
   let menuExercicioAberto = $state<number | null>(null);
+  let submenuSubstituirIdx = $state<number | null>(null);
   let substituindoExIdx = $state<number | null>(null);
   let reordenando = $state(false);
   let buscaSubstituir = $state("");
@@ -525,18 +539,20 @@
     buscaSubstituir = "";
   }
 
-  async function substituirExercicio(novoEx: Exercicio) {
-    if (substituindoExIdx == null) return;
-    const ex = sessao[substituindoExIdx];
+  /** Aplica a troca de exercício na sessão ao vivo, preservando a quantidade de séries do slot e
+   * pré-preenchendo com o histórico do exercício que está entrando — usado tanto por "Ir para
+   * Lista" quanto por "Ir para Rotinas". */
+  async function aplicarSubstituicaoNaSessao(exIdx: number, novoExercicioId: string, novoNome: string): Promise<void> {
+    const ex = sessao[exIdx];
     const fonte = await getHistoricoFonte();
     const [anterior, recordes, observacoesNovoEx] = await Promise.all([
-      getUltimoRegistro(novoEx.id, fonte === "ultima_rotina" ? treinoId : undefined),
-      getRecordesExercicio(novoEx.id),
-      getObservacoesAtuais([novoEx.id]),
+      getUltimoRegistro(novoExercicioId, fonte === "ultima_rotina" ? treinoId : undefined),
+      getRecordesExercicio(novoExercicioId),
+      getObservacoesAtuais([novoExercicioId]),
     ]);
-    ex.exercicio_id = novoEx.id;
-    ex.nome = novoEx.nome;
-    ex.observacao = observacoesNovoEx.get(novoEx.id) ?? null;
+    ex.exercicio_id = novoExercicioId;
+    ex.nome = novoNome;
+    ex.observacao = observacoesNovoEx.get(novoExercicioId) ?? null;
     ex.recordes = recordes;
     ex.sets = Array.from({ length: ex.sets.length }, (_, i) => {
       const ant = anterior.find((a) => a.serie === i + 1);
@@ -559,8 +575,67 @@
       };
     });
     houveAlteracaoEstrutura = true;
+  }
+
+  async function substituirExercicio(novoEx: Exercicio) {
+    if (substituindoExIdx == null) return;
+    await aplicarSubstituicaoNaSessao(substituindoExIdx, novoEx.id, novoEx.nome);
     substituindoExIdx = null;
     buscaSubstituir = "";
+  }
+
+  // ---------------- Substituir puxando de outra rotina (troca os dois de lugar) ----------------
+
+  let trocandoExIdx = $state<number | null>(null);
+  let rotinaDestinoTroca = $state<TreinoComExercicios | null>(null);
+  let processandoTroca = $state(false);
+
+  /** Rotinas candidatas: precisam ter pelo menos 1 exercício (precisa de alguém pra trocar de
+   * lugar) e ainda não ter o exercício que está saindo — senão ficaria duplicado nela. */
+  const rotinasParaTrocar = $derived(
+    trocandoExIdx != null
+      ? outrasRotinas.filter(
+          (t) => t.exercicios.length > 0 && !t.exercicios.some((te) => te.exercicio_id === sessao[trocandoExIdx!].exercicio_id),
+        )
+      : [],
+  );
+
+  function abrirTrocarDeRotina(exIdx: number): void {
+    trocandoExIdx = exIdx;
+    rotinaDestinoTroca = null;
+  }
+
+  function fecharTrocarDeRotina(): void {
+    trocandoExIdx = null;
+    rotinaDestinoTroca = null;
+  }
+
+  /** Troca os dois exercícios de rotina entre si: o que sai daqui entra na rotina de destino, na
+   * mesma posição e com o mesmo número de séries de quem foi escolhido lá — nenhuma das duas fica
+   * com um exercício a mais ou a menos. Ao contrário de "Mover"/"Trocar" na tela de Distribuição
+   * (que ficam num rascunho até Salvar), aqui grava na rotina de destino na hora — só a estrutura
+   * DESSA rotina (a que está em log agora) continua dependendo da escolha "Rotina ajustada" ao
+   * concluir o treino. */
+  async function trocarExercicioDeRotina(destinoItem: TreinoExercicio): Promise<void> {
+    if (trocandoExIdx == null || !rotinaDestinoTroca) return;
+    const exIdx = trocandoExIdx;
+    const ex = sessao[exIdx];
+    const exercicioIdSai = ex.exercicio_id;
+    const nomeSai = ex.nome;
+    const numSeriesDestino = destinoItem.series.length;
+    const ordemDestino = destinoItem.ordem;
+    processandoTroca = true;
+    try {
+      const anteriorSai = await getUltimoRegistro(exercicioIdSai);
+      await aplicarSubstituicaoNaSessao(exIdx, destinoItem.exercicio_id, destinoItem.exercicio?.nome ?? "");
+      await adicionarTreinoExercicio(rotinaDestinoTroca.id, exercicioIdSai, numSeriesDestino, anteriorSai, ordemDestino);
+      await removerTreinoExercicio(destinoItem.id);
+      fecharTrocarDeRotina();
+    } catch (e) {
+      alert(`Erro ao trocar "${nomeSai}" de rotina: ` + (e as Error).message);
+    } finally {
+      processandoTroca = false;
+    }
   }
 
   function removerExercicio(exIdx: number) {
@@ -798,7 +873,7 @@
    * mostrarEscolhaAdicionar (o ActionSheet rápido de Lista/Avulso) — é pequeno e fica perto do
    * rodapé, então a barra tampava as opções em vez de ficar por cima sem atrapalhar. */
   const subtelaAberta = $derived(
-    mostrarPicker || mostrarCriarAvulso || substituindoExIdx !== null || reordenando,
+    mostrarPicker || mostrarCriarAvulso || substituindoExIdx !== null || trocandoExIdx !== null || reordenando,
   );
 </script>
 
@@ -970,6 +1045,11 @@
     <polyline points="4 12 10 18 20 6" />
   </svg>
 {/snippet}
+{#snippet iconVoltar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="15 6 9 12 15 18" />
+  </svg>
+{/snippet}
 {#snippet iconReordenar()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8 7l-4 4 4 4M16 7l4 4-4 4" />
@@ -1026,9 +1106,35 @@
     onFechar={() => (menuExercicioAberto = null)}
     opcoes={[
       { label: "Reordenar Exercícios", icon: iconReordenar, onSelect: () => (reordenando = true) },
-      { label: "Substituir Exercício", icon: iconSubstituir, onSelect: () => abrirSubstituir(exIdxMenu) },
+      { label: "Substituir Exercício", icon: iconSubstituir, onSelect: () => (submenuSubstituirIdx = exIdxMenu) },
       { label: "Marcar Exercício", icon: iconMarcador, onSelect: () => abrirMarcarExercicio(exIdxMenu) },
       { label: "Remover Exercício", icon: iconRemover, destructive: true, onSelect: () => removerExercicio(exIdxMenu) },
+    ]}
+  />
+{/if}
+
+{#if submenuSubstituirIdx !== null}
+  {@const idxSub = submenuSubstituirIdx}
+  <ActionSheet
+    titulo="Substituir Exercício"
+    onFechar={() => (submenuSubstituirIdx = null)}
+    opcoes={[
+      {
+        label: "Ir para Lista",
+        icon: iconLista,
+        onSelect: () => {
+          submenuSubstituirIdx = null;
+          abrirSubstituir(idxSub);
+        },
+      },
+      {
+        label: "Ir para Rotinas",
+        icon: iconSubstituir,
+        onSelect: () => {
+          submenuSubstituirIdx = null;
+          abrirTrocarDeRotina(idxSub);
+        },
+      },
     ]}
   />
 {/if}
@@ -1102,6 +1208,55 @@
   />
 {/if}
 
+{#if trocandoExIdx !== null}
+  {@const idxTroca = trocandoExIdx}
+  <div class="tela-avulso">
+    <div class="tela-avulso-conteudo">
+      {#if !rotinaDestinoTroca}
+        <div class="picker-header">
+          <button class="voltar-icon" onclick={fecharTrocarDeRotina} aria-label="Cancelar">←</button>
+          <h1>Substituir "{sessao[idxTroca]?.nome}"</h1>
+          <span class="header-spacer"></span>
+        </div>
+        <p class="muted">Escolha a rotina de destino.</p>
+        {#if !rotinasParaTrocar.length}
+          <p class="muted">Nenhuma rotina disponível pra troca — as outras estão vazias ou já têm esse exercício.</p>
+        {:else}
+          <ul class="troca-lista">
+            {#each rotinasParaTrocar as treinoOpcao (treinoOpcao.id)}
+              <li>
+                <button class="troca-item" onclick={() => (rotinaDestinoTroca = treinoOpcao)}>
+                  <span class="troca-item-nome">{treinoOpcao.nome_treino}</span>
+                  <span class="troca-item-sub"
+                    >{treinoOpcao.exercicios.length} {treinoOpcao.exercicios.length === 1 ? "exercício" : "exercícios"}</span
+                  >
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {:else}
+        <div class="picker-header">
+          <button class="voltar-icon" onclick={() => (rotinaDestinoTroca = null)} aria-label="Voltar">←</button>
+          <h1>Trocar por qual exercício?</h1>
+          <span class="header-spacer"></span>
+        </div>
+        <p class="muted">"{sessao[idxTroca]?.nome}" vai pra "{rotinaDestinoTroca.nome_treino}" — escolha quem troca de lugar com ele.</p>
+        <ul class="troca-lista">
+          {#each rotinaDestinoTroca.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te (te.id)}
+            <li>
+              <button class="troca-item" disabled={processandoTroca} onclick={() => trocarExercicioDeRotina(te)}>
+                <span class="troca-item-nome">{te.exercicio?.nome ?? ""}</span>
+                <span class="troca-item-sub">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  </div>
+{/if}
+
 {#if mostrarPicker}
   <Exercicios
     modoSelecao
@@ -1134,9 +1289,9 @@
   <div class="tela-reordenar">
     <div class="reordenar-conteudo">
       <div class="picker-header">
-        <button class="voltar-icon" onclick={() => (reordenando = false)} aria-label="Voltar">←</button>
+        <button class="back" onclick={() => (reordenando = false)} aria-label="Voltar">{@render iconVoltar()}</button>
         <h1>Reordenar</h1>
-        <span class="header-spacer"></span>
+        <button class="criar" onclick={() => (reordenando = false)} aria-label="Concluir">{@render iconCheck()}</button>
       </div>
       <div class="reordenar-lista">
         {#each sessao as ex, idx (ex.exercicio_id)}
@@ -1157,7 +1312,6 @@
           </div>
         {/each}
       </div>
-      <button class="feito-btn" onclick={() => (reordenando = false)}>Feito</button>
     </div>
   </div>
 {/if}
@@ -1824,18 +1978,23 @@
     touch-action: none;
     padding: var(--space-2);
   }
-  .feito-btn {
+  .back {
     flex-shrink: 0;
-    margin-top: var(--space-3);
-    width: 100%;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-card);
     border: none;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    font-size: var(--font-size-base);
-    font-weight: 600;
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
+    padding: 0;
+  }
+  .back svg {
+    width: 18px;
+    height: 18px;
   }
   .picker-header {
     display: flex;
@@ -1854,6 +2013,38 @@
   .header-spacer {
     width: 56px;
     flex-shrink: 0;
+  }
+  .troca-lista {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+  }
+  .troca-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: var(--space-3);
+    margin-bottom: var(--space-2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .troca-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .troca-item-nome {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+  }
+  .troca-item-sub {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .descartar {
     width: 100%;
