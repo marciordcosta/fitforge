@@ -48,7 +48,20 @@
   let mostrarCriarRefeicao = $state(false);
   let mostrarMenuMais = $state(false);
   let mostrarData = $state(false);
-  let modoRestante = $state(true);
+  type ModoExibicaoMacro = "restante" | "absoluto" | "porPeso";
+  let modoExibicao = $state<ModoExibicaoMacro>("restante");
+
+  function proximoModoExibicao(atual: ModoExibicaoMacro): ModoExibicaoMacro {
+    if (atual === "restante") return "absoluto";
+    if (atual === "absoluto") return "porPeso";
+    return "restante";
+  }
+
+  /** Consumido por kg de peso corporal — mesma métrica usada em DietaResumoModal.svelte, mas ali
+   * pra meta; aqui pro que já foi de fato consumido no dia. */
+  function gPorKg(valor: number): string {
+    return pesoAtual > 0 ? (valor / pesoAtual).toFixed(1).replace(".", ",") : "—";
+  }
   let rotinaHoje = $state<Treino | null>(null);
   let mostrarResumo = $state(false);
   /** Status de aderência à dieta (ritmo real de peso vs. ritmo esperado pela meta) — mesmo chip
@@ -307,9 +320,12 @@
   }
 
   /** Mesmo texto do anel de macros do topo: no modo restante, mostra o quanto falta (ou "acima" se
-   * já passou da meta) em vez de "consumido/meta" — aplicado também nos cards de cada refeição. */
+   * já passou da meta) em vez de "consumido/meta"; no modo por peso, mostra o consumido em g/kg
+   * (ou kcal/kg pras calorias, quando unidade vem vazia) — aplicado também nos cards de cada
+   * refeição. */
   function labelMeta(valor: number, meta: number, unidade: string): string {
-    if (!modoRestante) return labelAbsoluto(valor, meta, unidade);
+    if (modoExibicao === "porPeso") return `${gPorKg(valor)}${unidade || "kcal"}/kg`;
+    if (modoExibicao === "absoluto") return labelAbsoluto(valor, meta, unidade);
     if (passouMeta(valor, meta)) return `${(valor - meta).toFixed(0)}${unidade} acima`;
     return `${restante(valor, meta).toFixed(0)}${unidade} rest.`;
   }
@@ -318,7 +334,7 @@
    * nenhum alimento — nesse caso o valor mostrado É a própria meta (nada foi consumido ainda), não
    * faz sentido chamar de "restante". Com algum item já lançado, continua "rest." normalmente. */
   function labelMetaCard(valor: number, meta: number, unidade: string, temItens: boolean): string {
-    if (modoRestante && !temItens && !passouMeta(valor, meta)) {
+    if (modoExibicao === "restante" && !temItens && !passouMeta(valor, meta)) {
       return `${restante(valor, meta).toFixed(0)}${unidade}`;
     }
     return labelMeta(valor, meta, unidade);
@@ -339,6 +355,21 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="6 9 12 15 18 9" />
   </svg>
+{/snippet}
+{#snippet anelCentroMacro(valor: number, meta: number)}
+  {#if modoExibicao === "restante" && passouMeta(valor, meta)}
+    <strong>{(valor - meta).toFixed(0)}g</strong>
+    <span class="macro-meta">acima</span>
+  {:else if modoExibicao === "restante"}
+    <strong>{restante(valor, meta).toFixed(0)}g</strong>
+    <span class="macro-meta">rest.</span>
+  {:else if modoExibicao === "absoluto"}
+    <strong>{valor.toFixed(0)}g</strong>
+    <span class="macro-meta">/{meta.toFixed(0)}</span>
+  {:else}
+    <strong>{gPorKg(valor)}</strong>
+    <span class="macro-meta">g/kg</span>
+  {/if}
 {/snippet}
 {#snippet iconToggle()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -458,7 +489,7 @@
       <div class="card-calorias">
         <p class="card-titulo">Calorias</p>
         <div class="calorias-linha">
-          {#if modoRestante}
+          {#if modoExibicao === "restante"}
             <span class="calorias-valor">
               {#if passouMeta(totalCalorias, metas.calorias)}
                 <strong>{(totalCalorias - metas.calorias).toFixed(0)}</strong> acima
@@ -467,7 +498,7 @@
               {/if}
             </span>
             <span class="calorias-restantes">{totalCalorias.toFixed(0)} cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
-          {:else}
+          {:else if modoExibicao === "absoluto"}
             <span class="calorias-valor"><strong>{totalCalorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
             <span class="calorias-restantes">
               {#if passouMeta(totalCalorias, metas.calorias)}
@@ -476,6 +507,9 @@
                 <strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes
               {/if}
             </span>
+          {:else}
+            <span class="calorias-valor"><strong>{gPorKg(totalCalorias)}</strong> kcal/kg</span>
+            <span class="calorias-restantes">{totalCalorias.toFixed(0)} cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
           {/if}
         </div>
         <div class="barra-wrap-grande">
@@ -484,7 +518,7 @@
       </div>
 
       <div class="card-macros">
-        <button class="toggle-btn" onclick={() => (modoRestante = !modoRestante)} aria-label="Alternar exibição">
+        <button class="toggle-btn" onclick={() => (modoExibicao = proximoModoExibicao(modoExibicao))} aria-label="Alternar exibição">
           {@render iconToggle()}
         </button>
         <div class="macros-grid">
@@ -492,16 +526,7 @@
             <p class="macro-nome">Carb</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante && passouMeta(totalCarboidrato, metas.carboidratoG)}
-                  <strong>{(totalCarboidrato - metas.carboidratoG).toFixed(0)}g</strong>
-                  <span class="macro-meta">acima</span>
-                {:else if modoRestante}
-                  <strong>{restante(totalCarboidrato, metas.carboidratoG).toFixed(0)}g</strong>
-                  <span class="macro-meta">rest.</span>
-                {:else}
-                  <strong>{totalCarboidrato.toFixed(0)}g</strong>
-                  <span class="macro-meta">/{metas.carboidratoG.toFixed(0)}</span>
-                {/if}
+                {@render anelCentroMacro(totalCarboidrato, metas.carboidratoG)}
               </div>
             </div>
           </div>
@@ -509,16 +534,7 @@
             <p class="macro-nome">Gorduras</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante && passouMeta(totalGordura, metas.gorduraG)}
-                  <strong>{(totalGordura - metas.gorduraG).toFixed(0)}g</strong>
-                  <span class="macro-meta">acima</span>
-                {:else if modoRestante}
-                  <strong>{restante(totalGordura, metas.gorduraG).toFixed(0)}g</strong>
-                  <span class="macro-meta">rest.</span>
-                {:else}
-                  <strong>{totalGordura.toFixed(0)}g</strong>
-                  <span class="macro-meta">/{metas.gorduraG.toFixed(0)}</span>
-                {/if}
+                {@render anelCentroMacro(totalGordura, metas.gorduraG)}
               </div>
             </div>
           </div>
@@ -526,16 +542,7 @@
             <p class="macro-nome">Proteínas</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante && passouMeta(totalProteina, metas.proteinaG)}
-                  <strong>{(totalProteina - metas.proteinaG).toFixed(0)}g</strong>
-                  <span class="macro-meta">acima</span>
-                {:else if modoRestante}
-                  <strong>{restante(totalProteina, metas.proteinaG).toFixed(0)}g</strong>
-                  <span class="macro-meta">rest.</span>
-                {:else}
-                  <strong>{totalProteina.toFixed(0)}g</strong>
-                  <span class="macro-meta">/{metas.proteinaG.toFixed(0)}</span>
-                {/if}
+                {@render anelCentroMacro(totalProteina, metas.proteinaG)}
               </div>
             </div>
           </div>
@@ -543,16 +550,7 @@
             <p class="macro-nome">Gordura Sat.</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante && passouMeta(totalGorduraSaturada, gorduraSaturadaMaxG)}
-                  <strong>{(totalGorduraSaturada - gorduraSaturadaMaxG).toFixed(0)}g</strong>
-                  <span class="macro-meta">acima</span>
-                {:else if modoRestante}
-                  <strong>{restante(totalGorduraSaturada, gorduraSaturadaMaxG).toFixed(0)}g</strong>
-                  <span class="macro-meta">rest.</span>
-                {:else}
-                  <strong>{totalGorduraSaturada.toFixed(0)}g</strong>
-                  <span class="macro-meta">/{gorduraSaturadaMaxG.toFixed(0)}</span>
-                {/if}
+                {@render anelCentroMacro(totalGorduraSaturada, gorduraSaturadaMaxG)}
               </div>
             </div>
           </div>
@@ -560,16 +558,7 @@
             <p class="macro-nome">Fibras</p>
             <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}% 100%);`}>
               <div class="macro-anel-centro">
-                {#if modoRestante && passouMeta(totalFibras, fibrasMaxG)}
-                  <strong>{(totalFibras - fibrasMaxG).toFixed(0)}g</strong>
-                  <span class="macro-meta">acima</span>
-                {:else if modoRestante}
-                  <strong>{restante(totalFibras, fibrasMaxG).toFixed(0)}g</strong>
-                  <span class="macro-meta">rest.</span>
-                {:else}
-                  <strong>{totalFibras.toFixed(0)}g</strong>
-                  <span class="macro-meta">/{fibrasMaxG.toFixed(0)}</span>
-                {/if}
+                {@render anelCentroMacro(totalFibras, fibrasMaxG)}
               </div>
             </div>
           </div>
