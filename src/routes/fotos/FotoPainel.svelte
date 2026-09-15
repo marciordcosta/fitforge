@@ -25,9 +25,6 @@
   let indice = $state(untrack(() => indiceInicial));
   let containerEl: HTMLDivElement | undefined;
 
-  const fotoAtual = $derived(fotos[indice]);
-  const urlAtual = $derived(fotoAtual ? urls.get(fotoAtual.path) : undefined);
-
   function formatarDataCurta(iso: string): string {
     const [, m, d] = iso.split("-");
     return `${d}/${m}`;
@@ -44,11 +41,13 @@
     if (indice > 0) indice -= 1;
   }
 
-  // ---- Zoom (duplo toque) + arrastar (pan quando ampliado, trocar de foto quando não) ----
+  // ---- Zoom (duplo toque) + arrastar (pan quando ampliado, trocar de foto num trilho quando não) ----
   const ZOOM_AMPLIADO = 2.5;
   const LIMIAR_TROCA_PX = 60;
   const TOLERANCIA_TOQUE_PX = 12;
   const JANELA_DUPLO_TOQUE_MS = 300;
+  /** Resistência ao arrastar além da primeira/última foto — não trava, só fica "pesado". */
+  const FATOR_RESISTENCIA_BORDA = 0.35;
 
   let scale = $state(1);
   let panX = $state(0);
@@ -70,6 +69,16 @@
     panY = 0;
     onIndiceChange?.(indice);
   });
+
+  /** Desloca o trilho inteiro (um "filme" com todas as fotos lado a lado) em vez de trocar o
+   * conteúdo de uma única <img> no meio do gesto — evita o salto/estranheza de trocar a foto
+   * exibida enquanto ainda está animando de volta pra posição, já que agora cada foto é um
+   * elemento próprio e a transição é só a posição do trilho. */
+  function offsetTrilho(): number {
+    if (indice === 0 && deltaArrastoX > 0) return deltaArrastoX * FATOR_RESISTENCIA_BORDA;
+    if (indice === fotos.length - 1 && deltaArrastoX < 0) return deltaArrastoX * FATOR_RESISTENCIA_BORDA;
+    return deltaArrastoX;
+  }
 
   function limitarPan() {
     if (!containerEl) return;
@@ -96,7 +105,7 @@
     limitarPan();
   }
 
-  function aoPointerDownImagem(e: PointerEvent) {
+  function aoPointerDown(e: PointerEvent) {
     arrastando = true;
     inicioX = e.clientX;
     inicioY = e.clientY;
@@ -106,7 +115,7 @@
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
 
-  function aoPointerMoveImagem(e: PointerEvent) {
+  function aoPointerMove(e: PointerEvent) {
     if (!arrastando) return;
     const dx = e.clientX - inicioX;
     const dy = e.clientY - inicioY;
@@ -129,7 +138,7 @@
     deltaArrastoX = 0;
   }
 
-  function aoPointerUpImagem(e: PointerEvent) {
+  function aoPointerUp(e: PointerEvent) {
     const moveuPouco = Math.hypot(e.clientX - inicioX, e.clientY - inicioY) < TOLERANCIA_TOQUE_PX;
     finalizarArrasto();
     if (!moveuPouco) return;
@@ -140,25 +149,45 @@
   }
 </script>
 
-<div class="foto-painel" bind:this={containerEl}>
-  {#if urlAtual}
-    <img
-      src={urlAtual}
-      alt=""
-      draggable="false"
-      class:sem-transicao={arrastando}
-      style={`transform: translate(${scale > 1 ? panX : deltaArrastoX}px, ${scale > 1 ? panY : 0}px) scale(${scale});`}
-      onpointerdown={aoPointerDownImagem}
-      onpointermove={aoPointerMoveImagem}
-      onpointerup={aoPointerUpImagem}
-      onpointercancel={finalizarArrasto}
-    />
-  {/if}
+<div
+  class="foto-painel"
+  role="presentation"
+  bind:this={containerEl}
+  onpointerdown={aoPointerDown}
+  onpointermove={aoPointerMove}
+  onpointerup={aoPointerUp}
+  onpointercancel={finalizarArrasto}
+>
+  <div
+    class="trilho"
+    class:sem-transicao={arrastando}
+    style={`transform: translateX(calc(${-indice * 100}% + ${scale > 1 ? 0 : offsetTrilho()}px));`}
+  >
+    {#each fotos as foto, i (foto.id)}
+      <div class="slide">
+        {#if urls.get(foto.path)}
+          <img
+            src={urls.get(foto.path)}
+            alt=""
+            draggable="false"
+            class:sem-transicao={arrastando}
+            style={i === indice ? `transform: translate(${panX}px, ${panY}px) scale(${scale});` : ""}
+          />
+        {/if}
+      </div>
+    {/each}
+  </div>
 
-  <div class="foto-info-canto">
-    <strong>{formatarDataCurta(data)}</strong>
-    <span>{formatarPeso(pesoDia)}</span>
-    <span class="foto-info-media">méd. sem. {formatarPeso(mediaSemana)}</span>
+  <div class="foto-topo">
+    <div class="foto-info">
+      <strong class="foto-info-data">{formatarDataCurta(data)}</strong>
+      {#if pesoDia != null || mediaSemana != null}
+        <span class="foto-info-peso">{formatarPeso(pesoDia)}{mediaSemana != null ? ` · méd. ${formatarPeso(mediaSemana)}` : ""}</span>
+      {/if}
+    </div>
+    {#if fotos.length > 1}
+      <span class="foto-contador">{indice + 1}/{fotos.length}</span>
+    {/if}
   </div>
 
   {#if fotos.length > 1}
@@ -186,6 +215,23 @@
     background: #000;
     touch-action: none;
   }
+  .trilho {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .trilho.sem-transicao {
+    transition: none;
+  }
+  .slide {
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   .foto-painel img {
     width: 100%;
     height: 100%;
@@ -197,23 +243,43 @@
   .foto-painel img.sem-transicao {
     transition: none;
   }
-  .foto-info-canto {
+  .foto-topo {
     position: absolute;
-    top: var(--space-2);
-    left: var(--space-2);
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) var(--space-6);
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
+    pointer-events: none;
+  }
+  .foto-info {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    background: rgba(0, 0, 0, 0.55);
     color: #fff;
-    font-size: 11px;
-    line-height: 1.3;
-    pointer-events: none;
+    min-width: 0;
   }
-  .foto-info-media {
+  .foto-info-data {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .foto-info-peso {
+    font-size: 12px;
     color: rgba(255, 255, 255, 0.75);
+  }
+  .foto-contador {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 3px 10px;
+    border-radius: 999px;
   }
   .foto-pontos {
     position: absolute;

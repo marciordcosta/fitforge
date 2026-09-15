@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
+  import { scale } from "svelte/transition";
   import { parseISODate, hojeISO, somarDias } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
@@ -48,6 +49,10 @@
   let indiceAtualAberta = $state(0);
   let mostrarPickerComparar = $state(false);
   let confirmandoExcluirUnica = $state(false);
+  /** Data "estacionada" esperando a segunda escolha pra comparar — clicar no título de uma data
+   * (não numa foto) na lista principal. O bloco daquela data encolhe pro rodapé (fica visível ali
+   * num chip com as miniaturas) e some da lista; clicar em outra data já abre a comparação. */
+  let dataComparando = $state<FotoGrupoData | null>(null);
 
   /** Todas as outras datas (excluindo a que já está aberta) — base do grid de "escolher pra
    * comparar" dentro da visualização em tela cheia. */
@@ -133,11 +138,23 @@
     modoSelecao = false;
   }
 
-  function abrirComparacao() {
-    if (selecionadas.length !== 2) return;
-    navigate(`/fotos/comparar/${selecionadas[0]}/${selecionadas[1]}`);
-    selecionadas = [];
-    modoSelecao = false;
+  /** Gatilho de comparação na lista principal: clicar no título de uma data seleciona-a, clicar no
+   * título de outra já abre a comparação (primeira foto de cada uma) — em vez de escolher fotos
+   * uma a uma. Clicar de novo na mesma data cancela. */
+  function aoClicarData(grupo: FotoGrupoData): void {
+    if (modoSelecao) return;
+    if (dataComparando?.data === grupo.data) {
+      dataComparando = null;
+      return;
+    }
+    if (!dataComparando) {
+      dataComparando = grupo;
+      return;
+    }
+    const foto1 = dataComparando.fotos[0];
+    const foto2 = grupo.fotos[0];
+    dataComparando = null;
+    navigate(`/fotos/comparar/${foto1.id}/${foto2.id}`);
   }
 
   async function excluirSelecionadas() {
@@ -171,6 +188,7 @@
   let pressionouLongo = false;
 
   function aoPointerDownFoto(e: PointerEvent, id: string) {
+    if (dataComparando) return;
     pressionarX = e.clientX;
     pressionarY = e.clientY;
     pressionouLongo = false;
@@ -327,6 +345,20 @@
     <line x1="18" y1="6" x2="6" y2="18" />
   </svg>
 {/snippet}
+{#snippet iconLixeira()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+{/snippet}
+{#snippet iconComparar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="8" height="16" rx="1.5" />
+    <rect x="13" y="4" width="8" height="16" rx="1.5" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -354,32 +386,43 @@
     <p class="muted">Nenhuma foto registrada ainda — toque no "+" pra adicionar a primeira.</p>
   {:else}
     {#each grupos as grupo (grupo.data)}
-      <p class="data-titulo">{formatarData(grupo.data)}</p>
-      {#if pesoPorData.has(grupo.data) || mediaPorData.has(grupo.data)}
-        <p class="data-peso">
-          {formatarPeso(pesoPorData.get(grupo.data))}
-          <span class="data-peso-media">· méd. sem. {formatarPeso(mediaPorData.get(grupo.data))}</span>
-        </p>
-      {/if}
-      <div class="grade-fotos">
-        {#each grupo.fotos as foto (foto.id)}
+      <div class="grupo-data-wrap" class:saindo={dataComparando?.data === grupo.data}>
+        <div class="grupo-data-inner">
           <button
             type="button"
-            class="foto-item"
-            class:selecionada={selecionadas.includes(foto.id)}
-            onpointerdown={(e) => aoPointerDownFoto(e, foto.id)}
-            oncontextmenu={(e) => e.preventDefault()}
-            onclick={() => aoClickFoto(foto)}
-            aria-label="Abrir foto"
+            class="data-titulo-btn"
+            class:aguardando={dataComparando != null && dataComparando.data !== grupo.data}
+            onclick={() => aoClicarData(grupo)}
           >
-            {#if urls.get(foto.path)}
-              <img src={urls.get(foto.path)} alt="" loading="lazy" class:embacada={!mostrarNormal} />
-            {/if}
-            {#if selecionadas.includes(foto.id)}
-              <span class="foto-check">{@render iconCheck()}</span>
-            {/if}
+            {formatarData(grupo.data)}
           </button>
-        {/each}
+          {#if pesoPorData.has(grupo.data) || mediaPorData.has(grupo.data)}
+            <p class="data-peso">
+              {formatarPeso(pesoPorData.get(grupo.data))}
+              <span class="data-peso-media">· méd. sem. {formatarPeso(mediaPorData.get(grupo.data))}</span>
+            </p>
+          {/if}
+          <div class="grade-fotos">
+            {#each grupo.fotos as foto (foto.id)}
+              <button
+                type="button"
+                class="foto-item"
+                class:selecionada={selecionadas.includes(foto.id)}
+                onpointerdown={(e) => aoPointerDownFoto(e, foto.id)}
+                oncontextmenu={(e) => e.preventDefault()}
+                onclick={() => aoClickFoto(foto)}
+                aria-label="Abrir foto"
+              >
+                {#if urls.get(foto.path)}
+                  <img src={urls.get(foto.path)} alt="" loading="lazy" class:embacada={!mostrarNormal} />
+                {/if}
+                {#if selecionadas.includes(foto.id)}
+                  <span class="foto-check">{@render iconCheck()}</span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        </div>
       </div>
     {/each}
   {/if}
@@ -387,10 +430,31 @@
 
 {#if selecionadas.length}
   <div class="barra-acoes">
-    <button type="button" class="acao-btn excluir-btn" disabled={excluindo} onclick={() => (confirmandoExcluir = true)}>Excluir</button>
-    {#if selecionadas.length === 2}
-      <button type="button" class="acao-btn comparar-btn" onclick={abrirComparacao}>Comparar</button>
-    {/if}
+    <button type="button" class="acao-icon-btn excluir" disabled={excluindo} onclick={() => (confirmandoExcluir = true)} aria-label="Excluir selecionadas">
+      {@render iconLixeira()}
+    </button>
+  </div>
+{/if}
+
+{#if dataComparando}
+  <div class="chip-comparando" in:scale={{ duration: 300, start: 0.55 }}>
+    <div class="chip-thumbs">
+      {#each dataComparando.fotos.slice(0, 3) as foto (foto.id)}
+        {#if urls.get(foto.path)}
+          <img src={urls.get(foto.path)} alt="" class="chip-thumb" />
+        {/if}
+      {/each}
+      {#if dataComparando.fotos.length > 3}
+        <span class="chip-mais">+{dataComparando.fotos.length - 3}</span>
+      {/if}
+    </div>
+    <div class="chip-texto">
+      <strong>{formatarData(dataComparando.data)}</strong>
+      <span>Toque em outra data pra comparar</span>
+    </div>
+    <button type="button" class="chip-cancelar" onclick={() => (dataComparando = null)} aria-label="Cancelar comparação">
+      {@render iconFechar()}
+    </button>
   </div>
 {/if}
 
@@ -444,8 +508,12 @@
       <button type="button" class="picker-cancelar" onclick={() => (mostrarPickerComparar = false)}>Cancelar</button>
     {:else}
       <div class="visualizar-acoes">
-        <button type="button" class="acao-btn comparar-btn" onclick={() => (mostrarPickerComparar = true)}>Comparar</button>
-        <button type="button" class="acao-btn excluir-btn" disabled={excluindo} onclick={() => (confirmandoExcluirUnica = true)}>Excluir</button>
+        <button type="button" class="visualizar-acao-btn comparar" onclick={() => (mostrarPickerComparar = true)} aria-label="Comparar">
+          {@render iconComparar()}
+        </button>
+        <button type="button" class="visualizar-acao-btn excluir" disabled={excluindo} onclick={() => (confirmandoExcluirUnica = true)} aria-label="Excluir">
+          {@render iconLixeira()}
+        </button>
       </div>
     {/if}
   </div>
@@ -561,6 +629,46 @@
   .data-titulo:first-of-type {
     margin-top: 0;
   }
+  /** Grupo de uma data na lista principal — encolhe suavemente (grid-rows) quando escolhido pra
+   * comparar, em vez de sumir com um salto no resto da lista (transform sozinho não afeta layout). */
+  .grupo-data-wrap {
+    display: grid;
+    grid-template-rows: 1fr;
+    transform-origin: center bottom;
+    transition:
+      grid-template-rows 0.38s cubic-bezier(0.22, 0.61, 0.36, 1),
+      opacity 0.38s ease,
+      transform 0.38s ease;
+  }
+  .grupo-data-wrap.saindo {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  .grupo-data-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+  .data-titulo-btn {
+    display: block;
+    width: 100%;
+    margin: var(--space-4) 0 var(--space-1);
+    padding: 0;
+    border: none;
+    background: none;
+    text-align: left;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--surface-muted);
+    cursor: pointer;
+  }
+  .grupo-data-wrap:first-of-type .data-titulo-btn {
+    margin-top: 0;
+  }
+  .data-titulo-btn.aguardando {
+    color: var(--color-secondary);
+  }
   .data-peso {
     margin: 0 0 var(--space-2);
     font-size: 12px;
@@ -624,26 +732,108 @@
     gap: var(--space-3);
     z-index: 50;
   }
-  .acao-btn {
-    padding: var(--space-3) var(--space-6);
-    border-radius: 999px;
+  .acao-icon-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
     border: none;
-    font-size: var(--font-size-base);
-    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     box-shadow: var(--shadow-float);
     cursor: pointer;
   }
-  .acao-btn:disabled {
+  .acao-icon-btn svg {
+    width: 22px;
+    height: 22px;
+  }
+  .acao-icon-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
-  .comparar-btn {
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-  }
-  .excluir-btn {
+  .acao-icon-btn.excluir {
     background: var(--color-danger);
     color: #fff;
+  }
+  .chip-comparando {
+    position: fixed;
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-3));
+    max-width: 448px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-float);
+    padding: var(--space-2) var(--space-3);
+    z-index: 60;
+  }
+  .chip-thumbs {
+    display: flex;
+    flex-shrink: 0;
+  }
+  .chip-thumb {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    border: 2px solid var(--surface-card);
+    margin-left: -10px;
+  }
+  .chip-thumb:first-child {
+    margin-left: 0;
+  }
+  .chip-mais {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: -10px;
+    flex-shrink: 0;
+  }
+  .chip-texto {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .chip-texto strong {
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chip-texto span {
+    font-size: 11px;
+    color: var(--surface-muted);
+  }
+  .chip-cancelar {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .chip-cancelar svg {
+    width: 14px;
+    height: 14px;
   }
   .visualizar-container {
     position: fixed;
@@ -691,8 +881,33 @@
   .visualizar-acoes {
     display: flex;
     justify-content: center;
-    gap: var(--space-3);
+    gap: var(--space-4);
     padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  }
+  .visualizar-acao-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .visualizar-acao-btn svg {
+    width: 22px;
+    height: 22px;
+  }
+  .visualizar-acao-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .visualizar-acao-btn.comparar {
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .visualizar-acao-btn.excluir {
+    background: rgba(220, 38, 38, 0.85);
   }
   .picker-cancelar {
     width: 100%;
