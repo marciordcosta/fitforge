@@ -699,6 +699,16 @@ export function observacaoNaData(lista: ObservacaoExercicio[], data: string): st
   return atual;
 }
 
+/** Mesma resolução de observacaoNaData, mas cai pra versão mais recente (mesmo que registrada
+ * depois da sessão) quando nenhuma existia ainda naquela data — pra uma nota adicionada hoje não
+ * ficar invisível nas sessões antigas do histórico só por ter sido escrita depois delas. Sessões
+ * anteriores a uma edição real (nota trocada por outra) continuam mostrando a versão certa. */
+export function observacaoParaHistorico(lista: ObservacaoExercicio[], data: string): string | null {
+  const naData = observacaoNaData(lista, data);
+  if (naData) return naData;
+  return lista.length ? lista[lista.length - 1].observacao : null;
+}
+
 // ---------------- Rotinas (treinos) ----------------
 
 const TREINO_EXERCICIO_SELECT =
@@ -1043,11 +1053,19 @@ export async function salvarRegistrosDoDia(
     const volumeDia = Math.max(0, ...validos.map((s) => s.peso! * s.repeticoes!));
     const bate1rm = rmDia > melhor1rm;
     const bateVolume = volumeDia > melhorVolume;
+    // Empate no mesmo dia (duas séries idênticas batendo o mesmo máximo): só a primeira conta como
+    // recorde — a segunda apenas igualou, não superou a anterior.
+    let marcou1rm = false;
+    let marcouVolume = false;
 
     for (const s of sets) {
       if (s.peso == null && s.repeticoes == null) continue;
       const rm = s.peso != null && s.repeticoes != null ? calcular1RM(s.peso, s.repeticoes) : null;
       const vol = s.peso != null && s.repeticoes != null ? s.peso * s.repeticoes : null;
+      const eh1rm = bate1rm && !marcou1rm && rm === rmDia;
+      const ehVolume = bateVolume && !marcouVolume && vol === volumeDia;
+      if (eh1rm) marcou1rm = true;
+      if (ehVolume) marcouVolume = true;
       linhas.push({
         user_id: uid(),
         treino_id: treinoId,
@@ -1057,8 +1075,8 @@ export async function salvarRegistrosDoDia(
         peso: s.peso,
         repeticoes: s.repeticoes,
         ordem,
-        recorde_1rm: bate1rm && rm === rmDia,
-        recorde_volume: bateVolume && vol === volumeDia,
+        recorde_1rm: eh1rm,
+        recorde_volume: ehVolume,
       });
     }
     ordem++;

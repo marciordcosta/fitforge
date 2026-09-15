@@ -1,11 +1,7 @@
-alter table treino_registros
-  add column recorde_1rm boolean not null default false,
-  add column recorde_volume boolean not null default false;
-
--- Backfill: por exercício, cada DIA cujo máximo (1RM estimado / volume de uma série)
--- supera o máximo de TODOS os dias anteriores marca a série daquele dia que atingiu
--- esse máximo primeiro (por número de série) — empate exato no mesmo dia (duas séries
--- iguais) só conta a primeira como recorde, a segunda apenas igualou.
+-- Corrige dados já gravados pela migration 0054 (rodada antes desse ajuste): em caso de duas
+-- séries idênticas batendo o mesmo recorde no mesmo dia, as duas ficavam marcadas com troféu.
+-- Agora só a primeira (menor número de série) conta como recorde de verdade — a segunda apenas
+-- igualou, não superou a anterior. Mesma lógica de 0054, com desempate por row_number().
 with sets_calc as (
   select id, exercicio_id, data, serie,
     (peso * (1 + repeticoes::numeric / 30)) as rm,
