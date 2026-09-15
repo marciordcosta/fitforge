@@ -441,10 +441,18 @@
   }
 
   /** Texto do card de refeição sem meta cadastrada — sem meta pra comparar, "restante"/"absoluto"
-   * não fazem sentido (sempre mostra "consumo"), mas o modo por peso ainda se aplica aos macros. */
+   * não fazem sentido (sempre mostra só o valor), mas o modo por peso ainda se aplica aos macros. */
   function labelSemMeta(valor: number, unidade: string): string {
     if (modoExibicao === "porPeso" && unidade) return `${gPorKg(valor)}${unidade}/kg`;
-    return `${valor.toFixed(0)}${unidade} consumo`;
+    return `${valor.toFixed(0)}${unidade}`;
+  }
+
+  /** Barra de uma refeição sem meta própria: sem denominador seu, usa a meta DIÁRIA do macro pra
+   * calcular a % preenchida — mesma fórmula das refeições com meta (pctMeta + larguraBarra), só
+   * que sempre contra o total do dia (não faz sentido esse toggle de Parametrização aqui, já que
+   * não existe "meta da refeição" nenhuma pra escolher). */
+  function larguraSemMeta(valor: number, metaDiaria: number | undefined): number {
+    return larguraBarra(pctMeta(valor, metaDiaria ?? 0));
   }
 
   /** Só pra exibição — arredonda a meta de calorias pra dezena mais próxima (ex: 653 vira 650), sem alterar o valor real usado nos cálculos. */
@@ -771,10 +779,10 @@
           {:else if temItens}
             <p class="pct-titulo">Refeição sem meta</p>
             <div class="pct-grid">
-              {@render pctColuna("Calorias", "var(--color-secondary)", totais.calorias > 0 ? 100 : 0, labelSemMeta(totais.calorias, ""))}
-              {@render pctColuna("Carb", COR_CARBO, totais.carboidratoG > 0 ? 100 : 0, labelSemMeta(totais.carboidratoG, "g"))}
-              {@render pctColuna("Gorduras", COR_GORDURA, totais.gorduraG > 0 ? 100 : 0, labelSemMeta(totais.gorduraG, "g"))}
-              {@render pctColuna("Proteínas", COR_PROTEINA, totais.proteinaG > 0 ? 100 : 0, labelSemMeta(totais.proteinaG, "g"))}
+              {@render pctColuna("Calorias", "var(--color-secondary)", larguraSemMeta(totais.calorias, metas?.calorias), labelSemMeta(totais.calorias, ""))}
+              {@render pctColuna("Carb", COR_CARBO, larguraSemMeta(totais.carboidratoG, metas?.carboidratoG), labelSemMeta(totais.carboidratoG, "g"))}
+              {@render pctColuna("Gorduras", COR_GORDURA, larguraSemMeta(totais.gorduraG, metas?.gorduraG), labelSemMeta(totais.gorduraG, "g"))}
+              {@render pctColuna("Proteínas", COR_PROTEINA, larguraSemMeta(totais.proteinaG, metas?.proteinaG), labelSemMeta(totais.proteinaG, "g"))}
             </div>
           {:else}
             <p class="preview">{preview(refeicao.id)}</p>
