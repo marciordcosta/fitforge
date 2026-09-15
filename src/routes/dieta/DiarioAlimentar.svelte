@@ -320,11 +320,11 @@
   }
 
   /** Mesmo texto do anel de macros do topo: no modo restante, mostra o quanto falta (ou "acima" se
-   * já passou da meta) em vez de "consumido/meta"; no modo por peso, mostra o consumido em g/kg
-   * (ou kcal/kg pras calorias, quando unidade vem vazia) — aplicado também nos cards de cada
-   * refeição. */
+   * já passou da meta) em vez de "consumido/meta"; no modo por peso, mostra o consumido em g/kg —
+   * não se aplica a calorias (unidade vazia), que não tem uma métrica por peso equivalente e fica
+   * na visualização padrão (restante) mesmo nesse modo. Aplicado também nos cards de cada refeição. */
   function labelMeta(valor: number, meta: number, unidade: string): string {
-    if (modoExibicao === "porPeso") return `${gPorKg(valor)}${unidade || "kcal"}/kg`;
+    if (modoExibicao === "porPeso" && unidade) return `${gPorKg(valor)}${unidade}/kg`;
     if (modoExibicao === "absoluto") return labelAbsoluto(valor, meta, unidade);
     if (passouMeta(valor, meta)) return `${(valor - meta).toFixed(0)}${unidade} acima`;
     return `${restante(valor, meta).toFixed(0)}${unidade} rest.`;
@@ -489,16 +489,7 @@
       <div class="card-calorias">
         <p class="card-titulo">Calorias</p>
         <div class="calorias-linha">
-          {#if modoExibicao === "restante"}
-            <span class="calorias-valor">
-              {#if passouMeta(totalCalorias, metas.calorias)}
-                <strong>{(totalCalorias - metas.calorias).toFixed(0)}</strong> acima
-              {:else}
-                <strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes
-              {/if}
-            </span>
-            <span class="calorias-restantes">{totalCalorias.toFixed(0)} cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
-          {:else if modoExibicao === "absoluto"}
+          {#if modoExibicao === "absoluto"}
             <span class="calorias-valor"><strong>{totalCalorias.toFixed(0)}</strong> cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
             <span class="calorias-restantes">
               {#if passouMeta(totalCalorias, metas.calorias)}
@@ -508,7 +499,16 @@
               {/if}
             </span>
           {:else}
-            <span class="calorias-valor"><strong>{gPorKg(totalCalorias)}</strong> kcal/kg</span>
+            <!-- "porPeso" não se aplica a calorias (kcal/kg não é uma métrica que faz sentido
+                 aqui como faz pros macros em g/kg) — o card de calorias fica na visualização
+                 padrão (restante) nesse modo, só os macros abaixo mudam. -->
+            <span class="calorias-valor">
+              {#if passouMeta(totalCalorias, metas.calorias)}
+                <strong>{(totalCalorias - metas.calorias).toFixed(0)}</strong> acima
+              {:else}
+                <strong>{restante(totalCalorias, metas.calorias).toFixed(0)}</strong> restantes
+              {/if}
+            </span>
             <span class="calorias-restantes">{totalCalorias.toFixed(0)} cal <span class="calorias-meta">/ {metas.calorias.toFixed(0)}</span></span>
           {/if}
         </div>
