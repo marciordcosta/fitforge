@@ -559,14 +559,14 @@ export interface SessaoHistorico {
   treinoId: string | null;
   treinoNome: string;
   data: string;
-  sets: { serie: number; peso: number | null; repeticoes: number | null }[];
+  sets: { serie: number; peso: number | null; repeticoes: number | null; recorde1rm: boolean; recordeVolume: boolean }[];
 }
 
 /** Histórico detalhado do exercício, agrupado por sessão (rotina + data), mais recente primeiro. */
 export async function getHistoricoDetalhadoExercicio(exercicioId: string): Promise<SessaoHistorico[]> {
   const { data, error } = await supabase
     .from("treino_registros")
-    .select("data, serie, peso, repeticoes, treino_id, treinos(nome_treino)")
+    .select("data, serie, peso, repeticoes, recorde_1rm, recorde_volume, treino_id, treinos(nome_treino)")
     .eq("exercicio_id", exercicioId)
     .order("data", { ascending: false })
     .order("serie", { ascending: true });
@@ -585,7 +585,13 @@ export async function getHistoricoDetalhadoExercicio(exercicioId: string): Promi
       };
       grupos.set(chave, grupo);
     }
-    grupo.sets.push({ serie: r.serie, peso: r.peso, repeticoes: r.repeticoes });
+    grupo.sets.push({
+      serie: r.serie,
+      peso: r.peso,
+      repeticoes: r.repeticoes,
+      recorde1rm: r.recorde_1rm,
+      recordeVolume: r.recorde_volume,
+    });
   }
   return Array.from(grupos.values());
 }
@@ -927,6 +933,10 @@ export interface SetRegistro {
   serie: number;
   peso: number | null;
   repeticoes: number | null;
+  /** Só preenchido na leitura do histórico (marcado no momento em que a série foi salva,
+   * nunca recalculado depois) — ausente/undefined em sets ainda não persistidos. */
+  recorde1rm?: boolean;
+  recordeVolume?: boolean;
 }
 
 export async function getRegistrosDoDia(treinoId: string, data: string): Promise<TreinoRegistro[]> {
@@ -939,7 +949,32 @@ export async function getRegistrosDoDia(treinoId: string, data: string): Promise
   return rows ?? [];
 }
 
-/** Salva todos os registros de uma sessão (substitui o que existir para essa data+rotina). */
+/** Melhores marcas do exercício ESTRITAMENTE antes de uma data — usado pra decidir se uma
+ * série sendo salva bate recorde, sem contar o próprio dia sendo salvo/reeditado. */
+async function getMelhoresAntesDe(exercicioId: string, data: string): Promise<{ melhor1rm: number; melhorVolume: number }> {
+  const { data: rows, error } = await supabase
+    .from("treino_registros")
+    .select("peso, repeticoes")
+    .eq("exercicio_id", exercicioId)
+    .lt("data", data)
+    .not("peso", "is", null);
+  if (error) throw error;
+  let melhor1rm = 0;
+  let melhorVolume = 0;
+  for (const r of rows ?? []) {
+    if (r.peso == null) continue;
+    const peso = Number(r.peso);
+    const reps = Number(r.repeticoes ?? 0);
+    melhor1rm = Math.max(melhor1rm, calcular1RM(peso, reps));
+    melhorVolume = Math.max(melhorVolume, peso * reps);
+  }
+  return { melhor1rm, melhorVolume };
+}
+
+/** Salva todos os registros de uma sessão (substitui o que existir para essa data+rotina).
+ * Também marca recorde_1rm/recorde_volume na série que bateu o maior 1RM/volume DESSE DIA,
+ * quando ele supera tudo que já existia antes dessa data — a marca fica congelada no
+ * histórico (nunca é recalculada depois, mesmo que um treino futuro bata um recorde maior). */
 export async function salvarRegistrosDoDia(
   treinoId: string | null,
   data: string,
@@ -950,11 +985,25 @@ export async function salvarRegistrosDoDia(
   const { error: delError } = await delQuery;
   if (delError) throw delError;
 
+  const exercicioIds = Array.from(porExercicio.keys());
+  const anteriores = new Map(
+    await Promise.all(exercicioIds.map(async (id) => [id, await getMelhoresAntesDe(id, data)] as const)),
+  );
+
   const linhas: Record<string, unknown>[] = [];
   let ordem = 0;
   for (const [exercicioId, sets] of porExercicio.entries()) {
+    const validos = sets.filter((s) => s.peso != null && s.repeticoes != null);
+    const { melhor1rm, melhorVolume } = anteriores.get(exercicioId) ?? { melhor1rm: 0, melhorVolume: 0 };
+    const rmDia = Math.max(0, ...validos.map((s) => calcular1RM(s.peso!, s.repeticoes!)));
+    const volumeDia = Math.max(0, ...validos.map((s) => s.peso! * s.repeticoes!));
+    const bate1rm = rmDia > melhor1rm;
+    const bateVolume = volumeDia > melhorVolume;
+
     for (const s of sets) {
       if (s.peso == null && s.repeticoes == null) continue;
+      const rm = s.peso != null && s.repeticoes != null ? calcular1RM(s.peso, s.repeticoes) : null;
+      const vol = s.peso != null && s.repeticoes != null ? s.peso * s.repeticoes : null;
       linhas.push({
         user_id: uid(),
         treino_id: treinoId,
@@ -964,6 +1013,8 @@ export async function salvarRegistrosDoDia(
         peso: s.peso,
         repeticoes: s.repeticoes,
         ordem,
+        recorde_1rm: bate1rm && rm === rmDia,
+        recorde_volume: bateVolume && vol === volumeDia,
       });
     }
     ordem++;
@@ -1020,7 +1071,7 @@ export interface HistoricoDia {
 export async function getHistoricoDia(treinoId: string | null, data: string): Promise<HistoricoDia> {
   let query = supabase
     .from("treino_registros")
-    .select("exercicio_id, serie, peso, repeticoes, exercicios(nome)")
+    .select("exercicio_id, serie, peso, repeticoes, recorde_1rm, recorde_volume, exercicios(nome)")
     .eq("data", data)
     .order("ordem", { ascending: true })
     .order("serie", { ascending: true });
@@ -1040,7 +1091,13 @@ export async function getHistoricoDia(treinoId: string | null, data: string): Pr
       };
       porExercicio.set(r.exercicio_id, grupo);
     }
-    grupo.sets.push({ serie: r.serie, peso: r.peso, repeticoes: r.repeticoes });
+    grupo.sets.push({
+      serie: r.serie,
+      peso: r.peso,
+      repeticoes: r.repeticoes,
+      recorde1rm: r.recorde_1rm,
+      recordeVolume: r.recorde_volume,
+    });
   }
 
   return {

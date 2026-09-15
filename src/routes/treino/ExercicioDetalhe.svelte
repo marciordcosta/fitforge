@@ -248,7 +248,11 @@
             {#each sessao.sets as s (s.serie)}
               <div class="sessao-linha">
                 <span class="sessao-serie">{s.serie}</span>
-                <span>{s.peso != null && s.repeticoes != null ? `${s.peso} kg x ${s.repeticoes}` : "—"}</span>
+                <span>
+                  {s.peso != null && s.repeticoes != null ? `${s.peso} kg x ${s.repeticoes}` : "—"}
+                  {#if s.recorde1rm}<span class="sessao-recorde" title="Recorde de 1RM">🏆</span>{/if}
+                  {#if s.recordeVolume}<span class="sessao-recorde" title="Recorde de volume">🔥</span>{/if}
+                </span>
               </div>
             {/each}
           </div>
@@ -437,6 +441,10 @@
     margin: 0 0 var(--space-2);
     font-size: var(--font-size-sm);
     color: var(--color-warning, #fbbf24);
+  }
+  .sessao-recorde {
+    margin-left: var(--space-1);
+    font-size: 12px;
   }
   .sessao-excluir {
     flex-shrink: 0;
