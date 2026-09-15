@@ -76,11 +76,33 @@
     if (metrica === "todos") return;
     comparando = !comparando;
     if (comparando) void carregarComparaveis();
+    else mostrarMedia = false;
   }
 
   function escolherMetrica(nova: typeof metrica) {
     metrica = nova;
-    if (nova === "todos") comparando = false;
+    if (nova === "todos") {
+      comparando = false;
+      mostrarMedia = false;
+    }
+  }
+
+  /** Linha branca com a média das curvas normalizadas (principal + comparáveis) — só faz
+   * sentido dentro da comparação, onde tudo já está na mesma escala 0-1. Quando ativa, as
+   * linhas individuais ficam esmaecidas no fundo pra não competir com ela. */
+  let mostrarMedia = $state(false);
+
+  function alternarMedia(): void {
+    if (!comparando) return;
+    mostrarMedia = !mostrarMedia;
+  }
+
+  function comOpacidade(hex: string, alpha: number): string {
+    const h = hex.replace("#", "");
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   /** Comparação entre 1RM, Peso e Volume do próprio exercício, cada um numa linha (também
@@ -107,6 +129,10 @@
   /** Nos modos "Todos" e comparação, os pontos do gráfico são normalizados (0 a 1, só a forma
    * da curva) — sem isso o tooltip mostraria "0.42" em vez do valor real (1RM/peso/volume). */
   function tooltipValorReal(ctx: { dataset: { rawData?: (number | null)[]; label?: string }; dataIndex: number; parsed: { y: number | null } }): string {
+    if (ctx.dataset.label === "Média") {
+      const v = ctx.parsed.y;
+      return `Média: ${v == null ? "-" : Math.round(v * 100) + "%"}`;
+    }
     const bruto = ctx.dataset.rawData?.[ctx.dataIndex];
     const valor = bruto ?? ctx.parsed.y;
     return `${ctx.dataset.label}: ${valor == null ? "-" : formatNumero(valor)}`;
@@ -216,30 +242,38 @@
     }
 
     const ajustar = (s: (number | null)[]) => (comparando ? normalizar(s) : s);
+    // Com a Média ativa, as linhas individuais ficam esmaecidas no fundo — só a média (branca,
+    // adicionada depois, por cima) fica em destaque.
+    const opacidadeLinha = mostrarMedia ? 0.25 : 1;
 
     const brutoPrincipal = serie(historicoFiltrado);
+    const principalAjustado = ajustar(brutoPrincipal);
+    const comparaveisAjustados = comparaveisNaJanela.map((c) => {
+      const bruto = serie(c.historico);
+      return { c, bruto, ajustado: ajustar(bruto) };
+    });
+
     const datasets: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[] })[] = [
       {
         label: exercicio.nome,
-        data: ajustar(brutoPrincipal),
+        data: principalAjustado,
         rawData: brutoPrincipal,
-        borderColor: COR_PRINCIPAL,
-        backgroundColor: COR_PRINCIPAL,
+        borderColor: comOpacidade(COR_PRINCIPAL, opacidadeLinha),
+        backgroundColor: comOpacidade(COR_PRINCIPAL, opacidadeLinha),
         tension: 0.3,
         pointRadius: datas.map((d) => (marcadores.some((m) => m.data === d) ? 6 : 3)),
-        pointBackgroundColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#fbbf24" : COR_PRINCIPAL)),
-        pointBorderColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#d97706" : COR_PRINCIPAL)),
+        pointBackgroundColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#fbbf24" : comOpacidade(COR_PRINCIPAL, opacidadeLinha))),
+        pointBorderColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#d97706" : comOpacidade(COR_PRINCIPAL, opacidadeLinha))),
         spanGaps: true,
       },
-      ...comparaveisNaJanela.map((c, i) => {
+      ...comparaveisAjustados.map(({ c, bruto, ajustado }, i) => {
         const cor = PALETA[i % PALETA.length];
-        const brutoComparavel = serie(c.historico);
         return {
           label: c.exercicio.nome,
-          data: ajustar(brutoComparavel),
-          rawData: brutoComparavel,
-          borderColor: cor,
-          backgroundColor: cor,
+          data: ajustado,
+          rawData: bruto,
+          borderColor: comOpacidade(cor, opacidadeLinha),
+          backgroundColor: comOpacidade(cor, opacidadeLinha),
           tension: 0.3,
           pointRadius: 2,
           borderDash: [4, 3],
@@ -247,6 +281,24 @@
         };
       }),
     ];
+
+    if (mostrarMedia) {
+      const todasSeries = [principalAjustado, ...comparaveisAjustados.map((x) => x.ajustado)];
+      const media = datas.map((_, i) => {
+        const valores = todasSeries.map((s) => s[i]).filter((v): v is number => v != null);
+        return valores.length ? valores.reduce((a, b) => a + b, 0) / valores.length : null;
+      });
+      datasets.push({
+        label: "Média",
+        data: media,
+        borderColor: "#ffffff",
+        backgroundColor: "#ffffff",
+        tension: 0.3,
+        borderWidth: 3,
+        pointRadius: 0,
+        spanGaps: true,
+      });
+    }
 
     chart = new Chart(canvas, {
       type: "line",
@@ -299,6 +351,12 @@
     <circle cx="15" cy="12" r="7" />
   </svg>
 {/snippet}
+{#snippet iconMedia()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 17c3-8 6-8 9 0s6 8 9 0" />
+    <line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2.5 2.5" />
+  </svg>
+{/snippet}
 
 <div class="tela-cheia">
   <div class="topo-esquerda">
@@ -313,6 +371,15 @@
       aria-label="Comparar com outros exercícios"
     >
       {@render iconComparar()}
+    </button>
+    <button
+      class="icone-topo"
+      class:ativo={mostrarMedia}
+      onclick={alternarMedia}
+      disabled={!comparando}
+      aria-label="Mostrar linha de média"
+    >
+      {@render iconMedia()}
     </button>
   </div>
   <button class="fechar" onclick={onFechar} aria-label="Fechar">✕</button>
