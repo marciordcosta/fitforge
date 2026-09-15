@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
-  import { getHistoricoExercicio, type HistoricoPonto, type Exercicio, type MarcadorExercicio } from "../../lib/treinoApi";
+  import { getHistoricoExercicio, calcular1RM, type HistoricoPonto, type Exercicio, type MarcadorExercicio } from "../../lib/treinoApi";
+  import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
+  import { hojeISO } from "../../lib/dates";
   import ExercicioChartTelaCheia from "./ExercicioChartTelaCheia.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
@@ -56,7 +58,40 @@
 
   void carregar();
 
-  const historicoFiltrado = $derived(filtroQtd == null ? historico : historico.slice(-filtroQtd));
+  /** Sessão ao vivo desse exercício, se houver um treino em andamento nele agora. */
+  const sessaoAoVivo = $derived(treinoLogSessao.atual?.sessao.find((e) => e.exercicio_id === exercicio.id) ?? null);
+
+  /** Ponto sintético de "hoje", calculado só com as séries já concluídas na sessão ao vivo —
+   * mesma fórmula de getHistoricoExercicio, sem esperar o treino ser salvo pra aparecer aqui. */
+  const pontoAoVivo = $derived.by((): HistoricoPonto | null => {
+    if (!sessaoAoVivo) return null;
+    const validos = sessaoAoVivo.sets.filter((s) => s.concluida && s.peso != null && s.repeticoes != null);
+    if (!validos.length) return null;
+    let maiorPeso = 0;
+    let melhor1rm = 0;
+    let melhorVolumeSerie = { peso: 0, reps: 0, volume: 0 };
+    let volumeTotal = 0;
+    for (const s of validos) {
+      const peso = s.peso!;
+      const reps = s.repeticoes!;
+      if (peso > maiorPeso) maiorPeso = peso;
+      const rm = calcular1RM(peso, reps);
+      if (rm > melhor1rm) melhor1rm = rm;
+      const vol = peso * reps;
+      if (vol > melhorVolumeSerie.volume) melhorVolumeSerie = { peso, reps, volume: vol };
+      volumeTotal += vol;
+    }
+    return { data: hojeISO(), maiorPeso, melhor1rm, melhorVolumeSerie, volumeTotal };
+  });
+
+  /** Substitui/injeta o ponto de hoje — mesmo espírito do treinosEfetivos de
+   * DistribuicaoMusculos.svelte, só que pra um único ponto extra no fim da série. */
+  const historicoComAoVivo = $derived.by(() => {
+    if (!pontoAoVivo) return historico;
+    return [...historico.filter((h) => h.data !== pontoAoVivo.data), pontoAoVivo];
+  });
+
+  const historicoFiltrado = $derived(filtroQtd == null ? historicoComAoVivo : historicoComAoVivo.slice(-filtroQtd));
 
   /** Datas com marcador (ex: troca de equipamento) que caem dentro do período exibido no gráfico —
    * comparações de peso/1RM/volume antes e depois dessas datas podem não refletir progresso real. */
@@ -79,6 +114,25 @@
     return `${ctx.dataset.label ?? ""}${ctx.dataset.label ? ": " : ""}${valor == null ? "-" : formatNumero(valor)}`;
   }
 
+  /** Posição em pixel do ponto ao vivo (último ponto, quando é "hoje" ao vivo) — atualizada a
+   * cada desenho do gráfico (resize, dados novos) via plugin, pra sobrepor a bolinha pulsando
+   * exatamente em cima do ponto real do Chart.js. */
+  let pontoAoVivoPos = $state<{ x: number; y: number } | null>(null);
+
+  function pluginPontoAoVivo(temPontoAoVivo: boolean) {
+    return {
+      id: "pontoAoVivo",
+      afterDraw(c: Chart) {
+        if (!temPontoAoVivo) {
+          pontoAoVivoPos = null;
+          return;
+        }
+        const pt = c.getDatasetMeta(0).data[historicoFiltrado.length - 1];
+        pontoAoVivoPos = pt ? { x: pt.x, y: pt.y } : null;
+      },
+    };
+  }
+
   function desenharGrafico() {
     if (!canvas || !historicoFiltrado.length) return;
     chart?.destroy();
@@ -86,9 +140,11 @@
     const modoTodos = metrica === "todos";
     const metricaAtual = metrica;
     const valores = metricaAtual === "todos" ? [] : historicoFiltrado.map((h) => valorPorChave(h, metricaAtual));
+    const temPontoAoVivo = pontoAoVivo != null && !modoTodos;
 
     chart = new Chart(canvas, {
       type: "line",
+      plugins: [pluginPontoAoVivo(temPontoAoVivo)],
       data: {
         labels: historicoFiltrado.map((h) => formatData(h.data)),
         datasets: modoTodos
@@ -167,7 +223,7 @@
 
 {#if loading}
   <p class="muted">Carregando histórico…</p>
-{:else if !historico.length}
+{:else if !historicoComAoVivo.length}
   <p class="muted">Nenhum registro ainda. O gráfico aparece depois do primeiro treino logado.</p>
 {:else}
   <div class="chart-toolbar">
@@ -187,6 +243,9 @@
   {/if}
   <div class="chart-wrap">
     <canvas bind:this={canvas}></canvas>
+    {#if pontoAoVivoPos}
+      <div class="ponto-ao-vivo" style={`left:${pontoAoVivoPos.x}px; top:${pontoAoVivoPos.y}px;`} title="Em execução agora"></div>
+    {/if}
   </div>
   <div class="toggle">
     <button class:active={metrica === "1rm"} onclick={() => (metrica = "1rm")}>Máximo 1RM</button>
@@ -250,9 +309,32 @@
     margin-top: var(--space-1);
   }
   .chart-wrap {
+    position: relative;
     width: 100%;
     height: 220px;
     margin-bottom: var(--space-3);
+  }
+  .ponto-ao-vivo {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    margin-top: -5px;
+    border-radius: 50%;
+    background: #34d399;
+    pointer-events: none;
+    animation: pulso-ao-vivo 1.5s ease-out infinite;
+  }
+  @keyframes pulso-ao-vivo {
+    0% {
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6);
+    }
+    70% {
+      box-shadow: 0 0 0 12px rgba(52, 211, 153, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+    }
   }
   .toggle {
     display: flex;
