@@ -432,9 +432,9 @@
     cursor: pointer;
   }
   .tipo-dieta-opcoes button.ativo {
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    border-color: var(--color-primary);
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
   }
   .param-linha-topo {
     display: flex;
