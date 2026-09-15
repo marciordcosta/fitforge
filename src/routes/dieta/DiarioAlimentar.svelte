@@ -356,6 +356,13 @@
     return labelMeta(valor, meta, unidade);
   }
 
+  /** Texto do card de refeição sem meta cadastrada — sem meta pra comparar, "restante"/"absoluto"
+   * não fazem sentido (sempre mostra "consumo"), mas o modo por peso ainda se aplica aos macros. */
+  function labelSemMeta(valor: number, unidade: string): string {
+    if (modoExibicao === "porPeso" && unidade) return `${gPorKg(valor)}${unidade}/kg`;
+    return `${valor.toFixed(0)}${unidade} consumo`;
+  }
+
   /** Só pra exibição — arredonda a meta de calorias pra dezena mais próxima (ex: 653 vira 650), sem alterar o valor real usado nos cálculos. */
   function arredondarDezena(valor: number): number {
     return Math.round(valor / 10) * 10;
@@ -653,10 +660,10 @@
           {:else if temItens}
             <p class="pct-titulo">Refeição sem meta</p>
             <div class="pct-grid">
-              {@render pctColuna("Calorias", "var(--color-secondary)", 0, `${totais.calorias.toFixed(0)} consumo`)}
-              {@render pctColuna("Carb", COR_CARBO, 0, `${totais.carboidratoG.toFixed(0)}g consumo`)}
-              {@render pctColuna("Gorduras", COR_GORDURA, 0, `${totais.gorduraG.toFixed(0)}g consumo`)}
-              {@render pctColuna("Proteínas", COR_PROTEINA, 0, `${totais.proteinaG.toFixed(0)}g consumo`)}
+              {@render pctColuna("Calorias", "var(--color-secondary)", totais.calorias > 0 ? 100 : 0, labelSemMeta(totais.calorias, ""))}
+              {@render pctColuna("Carb", COR_CARBO, totais.carboidratoG > 0 ? 100 : 0, labelSemMeta(totais.carboidratoG, "g"))}
+              {@render pctColuna("Gorduras", COR_GORDURA, totais.gorduraG > 0 ? 100 : 0, labelSemMeta(totais.gorduraG, "g"))}
+              {@render pctColuna("Proteínas", COR_PROTEINA, totais.proteinaG > 0 ? 100 : 0, labelSemMeta(totais.proteinaG, "g"))}
             </div>
           {:else}
             <p class="preview">{preview(refeicao.id)}</p>
