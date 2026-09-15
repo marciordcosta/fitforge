@@ -1,6 +1,6 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
-  import { parseISODate, hojeISO } from "../../lib/dates";
+  import { parseISODate, hojeISO, somarDias } from "../../lib/dates";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
@@ -13,6 +13,7 @@
     excluirFotoDoDia,
     getPesoDoDia,
     getPesoMedioNaData,
+    getPesosDoPeriodo,
     type FotoGrupoData,
     type FotoItem,
   } from "../../lib/pesoApi";
@@ -26,6 +27,11 @@
 
   let grupos = $state<FotoGrupoData[]>([]);
   let urls = $state<Map<string, string>>(new Map());
+  /** Peso do dia e média móvel de 7 dias terminando nele, por data de foto — mostrados na lista
+   * (embaixo do título da data), mesma info já usada na visualização em tela cheia. Buscados numa
+   * janela só (do dia mais antigo -6 até o mais recente) pra não fazer 2 consultas por data. */
+  let pesoPorData = $state<Map<string, number>>(new Map());
+  let mediaPorData = $state<Map<string, number>>(new Map());
   let loading = $state(true);
   let erro = $state<string | null>(null);
   /** Ids selecionados — sem limite (a barra de ações mostra Excluir sempre que há 1+; Comparar
@@ -58,13 +64,42 @@
   let inputCamera = $state<HTMLInputElement | undefined>();
   let inputGaleria = $state<HTMLInputElement | undefined>();
 
+  async function carregarPesosPorData(datas: string[]): Promise<void> {
+    if (!datas.length) {
+      pesoPorData = new Map();
+      mediaPorData = new Map();
+      return;
+    }
+    const ordenadas = [...datas].sort();
+    const registros = await getPesosDoPeriodo(somarDias(ordenadas[0], -6), ordenadas[ordenadas.length - 1]);
+    const pesoMap = new Map<string, number>();
+    const mediaMap = new Map<string, number>();
+    for (const data of datas) {
+      const doDia = registros.find((r) => r.data === data);
+      if (doDia) pesoMap.set(data, doDia.peso);
+      const inicioJanela = somarDias(data, -6);
+      const janela = registros.filter((r) => r.data >= inicioJanela && r.data <= data);
+      if (janela.length) mediaMap.set(data, janela.reduce((acc, r) => acc + r.peso, 0) / janela.length);
+    }
+    pesoPorData = pesoMap;
+    mediaPorData = mediaMap;
+  }
+
+  function formatarPeso(v: number | undefined): string {
+    return v == null ? "—" : `${v.toFixed(1).replace(".", ",")} kg`;
+  }
+
   async function carregar() {
     loading = true;
     erro = null;
     try {
       const lista = await listFotosAgrupadas();
       grupos = lista;
-      urls = await getUrlsAssinadas(lista.flatMap((g) => g.fotos.map((f) => f.path)));
+      const [urlsRes] = await Promise.all([
+        getUrlsAssinadas(lista.flatMap((g) => g.fotos.map((f) => f.path))),
+        carregarPesosPorData(lista.map((g) => g.data)),
+      ]);
+      urls = urlsRes;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -320,6 +355,12 @@
   {:else}
     {#each grupos as grupo (grupo.data)}
       <p class="data-titulo">{formatarData(grupo.data)}</p>
+      {#if pesoPorData.has(grupo.data) || mediaPorData.has(grupo.data)}
+        <p class="data-peso">
+          {formatarPeso(pesoPorData.get(grupo.data))}
+          <span class="data-peso-media">· méd. sem. {formatarPeso(mediaPorData.get(grupo.data))}</span>
+        </p>
+      {/if}
       <div class="grade-fotos">
         {#each grupo.fotos as foto (foto.id)}
           <button
@@ -512,13 +553,21 @@
     color: var(--color-danger);
   }
   .data-titulo {
-    margin: var(--space-4) 0 var(--space-2);
+    margin: var(--space-4) 0 var(--space-1);
     font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--surface-muted);
   }
   .data-titulo:first-of-type {
     margin-top: 0;
+  }
+  .data-peso {
+    margin: 0 0 var(--space-2);
+    font-size: 12px;
+    color: var(--surface-muted);
+  }
+  .data-peso-media {
+    opacity: 0.75;
   }
   .grade-fotos {
     display: grid;
