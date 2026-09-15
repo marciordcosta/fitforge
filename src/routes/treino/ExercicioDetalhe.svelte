@@ -13,7 +13,7 @@
     distribuicaoMusculosExercicio,
     listMarcadoresExercicio,
     listObservacoesExercicio,
-    observacaoNaData,
+    observacaoParaHistorico,
     type Exercicio,
     type SessaoHistorico,
     type LinhaMusculoInput,
@@ -46,7 +46,7 @@
   /** Observação vigente NA DATA de cada sessão do histórico — não a atual: sessões antigas
    * continuam mostrando o que valia então, mesmo que a observação já tenha sido editada depois. */
   function observacaoDaSessao(data: string): string | null {
-    return observacaoNaData(observacoes, data);
+    return observacaoParaHistorico(observacoes, data);
   }
 
   /** Compartilhado com o gráfico (ExercicioChart) — o mesmo filtro por quantidade de
