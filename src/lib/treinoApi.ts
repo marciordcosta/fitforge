@@ -516,6 +516,8 @@ export interface HistoricoPonto {
   melhorVolumeSerie: { peso: number; reps: number; volume: number };
   /** Volume total do dia: soma de peso × repetições de todas as séries do exercício. */
   volumeTotal: number;
+  /** Quantidade de séries válidas (com peso) feitas nesse dia — mostrado no tooltip do gráfico. */
+  numSeries: number;
 }
 
 export function calcular1RM(peso: number, reps: number): number {
@@ -551,7 +553,7 @@ export async function getHistoricoExercicio(exercicioId: string): Promise<Histor
       if (vol > melhorVolumeSerie.volume) melhorVolumeSerie = { peso: s.peso, reps: s.repeticoes, volume: vol };
       volumeTotal += vol;
     }
-    return { data, maiorPeso, melhor1rm, melhorVolumeSerie, volumeTotal };
+    return { data, maiorPeso, melhor1rm, melhorVolumeSerie, volumeTotal, numSeries: sets.length };
   });
 }
 

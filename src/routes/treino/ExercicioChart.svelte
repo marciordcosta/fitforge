@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Chart } from "chart.js/auto";
+  import { Chart, type ChartDataset } from "chart.js/auto";
   import { getHistoricoExercicio, calcular1RM, type HistoricoPonto, type Exercicio, type MarcadorExercicio } from "../../lib/treinoApi";
   import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import { hojeISO } from "../../lib/dates";
@@ -81,7 +81,7 @@
       if (vol > melhorVolumeSerie.volume) melhorVolumeSerie = { peso, reps, volume: vol };
       volumeTotal += vol;
     }
-    return { data: hojeISO(), maiorPeso, melhor1rm, melhorVolumeSerie, volumeTotal };
+    return { data: hojeISO(), maiorPeso, melhor1rm, melhorVolumeSerie, volumeTotal, numSeries: validos.length };
   });
 
   /** Substitui/injeta o ponto de hoje — mesmo espírito do treinosEfetivos de
@@ -114,6 +114,13 @@
     return `${ctx.dataset.label ?? ""}${ctx.dataset.label ? ": " : ""}${valor == null ? "-" : formatNumero(valor)}`;
   }
 
+  /** Linha extra do tooltip, embaixo do valor — quantas séries entraram nesse ponto. */
+  function tooltipSeries(ctx: { dataset: { label?: string; seriesData?: (number | null)[] }; dataIndex: number }): string {
+    const n = ctx.dataset.seriesData?.[ctx.dataIndex];
+    if (n == null) return "";
+    return `${n} ${n === 1 ? "série" : "séries"}`;
+  }
+
   /** Posição em pixel do ponto ao vivo (último ponto, quando é "hoje" ao vivo) — atualizada a
    * cada desenho do gráfico (resize, dados novos) via plugin, pra sobrepor a bolinha pulsando
    * exatamente em cima do ponto real do Chart.js. */
@@ -142,37 +149,41 @@
     const valores = metricaAtual === "todos" ? [] : historicoFiltrado.map((h) => valorPorChave(h, metricaAtual));
     const temPontoAoVivo = pontoAoVivo != null && !modoTodos;
 
+    const datasets: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[]; seriesData?: (number | null)[] })[] = modoTodos
+      ? METRICAS_TODOS.map((m) => {
+          const bruto = historicoFiltrado.map((h) => valorPorChave(h, m.chave));
+          return {
+            label: m.label,
+            data: normalizar(bruto),
+            rawData: bruto,
+            seriesData: historicoFiltrado.map((h) => h.numSeries),
+            borderColor: m.cor,
+            backgroundColor: m.cor,
+            tension: 0.3,
+            pointRadius: 2,
+            // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
+            hidden: m.chave === "peso",
+          };
+        })
+      : [
+          {
+            data: valores,
+            seriesData: historicoFiltrado.map((h) => h.numSeries),
+            borderColor: "#5eead4",
+            backgroundColor: "#5eead4",
+            tension: 0.3,
+            pointRadius: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? 6 : 3)),
+            pointBackgroundColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#fbbf24" : "#5eead4")),
+            pointBorderColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#d97706" : "#5eead4")),
+          },
+        ];
+
     chart = new Chart(canvas, {
       type: "line",
       plugins: [pluginPontoAoVivo(temPontoAoVivo)],
       data: {
         labels: historicoFiltrado.map((h) => formatData(h.data)),
-        datasets: modoTodos
-          ? METRICAS_TODOS.map((m) => {
-              const bruto = historicoFiltrado.map((h) => valorPorChave(h, m.chave));
-              return {
-                label: m.label,
-                data: normalizar(bruto),
-                rawData: bruto,
-                borderColor: m.cor,
-                backgroundColor: m.cor,
-                tension: 0.3,
-                pointRadius: 2,
-                // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
-                hidden: m.chave === "peso",
-              };
-            })
-          : [
-              {
-                data: valores,
-                borderColor: "#5eead4",
-                backgroundColor: "#5eead4",
-                tension: 0.3,
-                pointRadius: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? 6 : 3)),
-                pointBackgroundColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#fbbf24" : "#5eead4")),
-                pointBorderColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#d97706" : "#5eead4")),
-              },
-            ],
+        datasets,
       },
       options: {
         responsive: true,
@@ -181,7 +192,7 @@
           legend: modoTodos
             ? { display: true, position: "bottom", labels: { color: "#9aa0ab", boxWidth: 10, font: { size: 9 } } }
             : { display: false },
-          tooltip: modoTodos ? { callbacks: { label: tooltipValorReal } } : {},
+          tooltip: { callbacks: modoTodos ? { label: tooltipValorReal, afterLabel: tooltipSeries } : { afterLabel: tooltipSeries } },
         },
         scales: {
           x: {
@@ -227,7 +238,7 @@
   <p class="muted">Nenhum registro ainda. O gráfico aparece depois do primeiro treino logado.</p>
 {:else}
   <div class="chart-toolbar">
-    <button class="icone-topo" onclick={() => (mostrarFiltro = true)} aria-label="Filtrar registros">
+    <button class="icone-topo" class:ativo={filtroQtd !== 6} onclick={() => (mostrarFiltro = true)} aria-label="Filtrar registros">
       {@render iconFiltro()}
     </button>
     <button class="icone-topo" onclick={() => (mostrarTelaCheia = true)} aria-label="Ver gráfico em tela cheia">
@@ -292,6 +303,10 @@
   .icone-topo svg {
     width: 15px;
     height: 15px;
+  }
+  .icone-topo.ativo {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
   }
   .marcador-alerta {
     background: rgba(251, 191, 36, 0.12);

@@ -138,6 +138,15 @@
     return `${ctx.dataset.label}: ${valor == null ? "-" : formatNumero(valor)}`;
   }
 
+  /** Linha extra do tooltip, embaixo do valor — quantas séries entraram nesse ponto (não se
+   * aplica à linha de Média, que agrega vários exercícios). */
+  function tooltipSeries(ctx: { dataset: { label?: string; seriesData?: (number | null)[] }; dataIndex: number }): string {
+    if (ctx.dataset.label === "Média") return "";
+    const n = ctx.dataset.seriesData?.[ctx.dataIndex];
+    if (n == null) return "";
+    return `${n} ${n === 1 ? "série" : "séries"}`;
+  }
+
   function valorMetrica(h: HistoricoPonto): number {
     return metrica === "peso" ? h.maiorPeso : metrica === "1rm" ? Math.round(h.melhor1rm * 10) / 10 : h.volumeTotal;
   }
@@ -173,30 +182,65 @@
   let canvas = $state<HTMLCanvasElement | undefined>(undefined);
   let chart: Chart | null = null;
 
+  /** Recalcula a linha de Média a partir de quais linhas estão visíveis na legenda no momento —
+   * esconder um exercício (clicando nele na legenda) tira ele da média também, em vez dela
+   * continuar fixa considerando todo mundo. */
+  function recalcularMedia(c: Chart): void {
+    const idxMedia = c.data.datasets.findIndex((d) => d.label === "Média");
+    if (idxMedia === -1) return;
+    const seriesVisiveis = c.data.datasets
+      .map((d, i) => ({ dados: d.data as (number | null)[], visivel: c.isDatasetVisible(i) }))
+      .filter((_, i) => i !== idxMedia)
+      .filter((s) => s.visivel)
+      .map((s) => s.dados);
+    const media = (c.data.labels ?? []).map((_, i) => {
+      const valores = seriesVisiveis.map((s) => s[i]).filter((v): v is number => v != null);
+      return valores.length ? valores.reduce((a, b) => a + b, 0) / valores.length : null;
+    });
+    (c.data.datasets[idxMedia].data as (number | null)[]) = media;
+  }
+
+  function aoClicarLegenda(_e: unknown, legendItem: { datasetIndex?: number }, legend: { chart: Chart }): void {
+    const index = legendItem.datasetIndex;
+    if (index == null) return;
+    const ci = legend.chart;
+    if (ci.data.datasets[index]?.label === "Média") return;
+    if (ci.isDatasetVisible(index)) {
+      ci.hide(index);
+    } else {
+      ci.show(index);
+    }
+    recalcularMedia(ci);
+    ci.update();
+  }
+
   function desenharGrafico() {
     if (!canvas || !historicoFiltrado.length) return;
     chart?.destroy();
 
     if (metrica === "todos") {
+      const datasetsTodos: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[]; seriesData?: (number | null)[] })[] =
+        METRICAS_TODOS.map((m) => {
+          const bruto = historicoFiltrado.map((h) => valorPorChave(h, m.chave));
+          return {
+            label: m.label,
+            data: normalizar(bruto),
+            rawData: bruto,
+            seriesData: historicoFiltrado.map((h) => h.numSeries),
+            borderColor: m.cor,
+            backgroundColor: m.cor,
+            tension: 0.3,
+            pointRadius: 3,
+            spanGaps: true,
+            // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
+            hidden: m.chave === "peso",
+          };
+        });
       chart = new Chart(canvas, {
         type: "line",
         data: {
           labels: historicoFiltrado.map((h) => formatData(h.data)),
-          datasets: METRICAS_TODOS.map((m) => {
-            const bruto = historicoFiltrado.map((h) => valorPorChave(h, m.chave));
-            return {
-              label: m.label,
-              data: normalizar(bruto),
-              rawData: bruto,
-              borderColor: m.cor,
-              backgroundColor: m.cor,
-              tension: 0.3,
-              pointRadius: 3,
-              spanGaps: true,
-              // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
-              hidden: m.chave === "peso",
-            };
-          }),
+          datasets: datasetsTodos,
         },
         options: {
           responsive: true,
@@ -204,7 +248,7 @@
           layout: { padding: { top: 20 } },
           plugins: {
             legend: { display: true, position: "bottom", labels: { color: "#9aa0ab", boxWidth: 12, font: { size: 11 } } },
-            tooltip: { callbacks: { label: tooltipValorReal } },
+            tooltip: { callbacks: { label: tooltipValorReal, afterLabel: tooltipSeries } },
           },
           scales: {
             x: {
@@ -241,6 +285,15 @@
       return arr;
     }
 
+    function serieNumSeries(hist: HistoricoPonto[]): (number | null)[] {
+      const arr = new Array<number | null>(datas.length).fill(null);
+      for (const h of hist) {
+        const idx = indicePorData.get(h.data);
+        if (idx != null) arr[idx] = h.numSeries;
+      }
+      return arr;
+    }
+
     const ajustar = (s: (number | null)[]) => (comparando ? normalizar(s) : s);
     // Com a Média ativa, as linhas individuais ficam esmaecidas no fundo — só a média (branca,
     // adicionada depois, por cima) fica em destaque.
@@ -253,11 +306,12 @@
       return { c, bruto, ajustado: ajustar(bruto) };
     });
 
-    const datasets: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[] })[] = [
+    const datasets: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[]; seriesData?: (number | null)[] })[] = [
       {
         label: exercicio.nome,
         data: principalAjustado,
         rawData: brutoPrincipal,
+        seriesData: serieNumSeries(historicoFiltrado),
         borderColor: comOpacidade(COR_PRINCIPAL, opacidadeLinha),
         backgroundColor: comOpacidade(COR_PRINCIPAL, opacidadeLinha),
         tension: 0.3,
@@ -272,6 +326,7 @@
           label: c.exercicio.nome,
           data: ajustado,
           rawData: bruto,
+          seriesData: serieNumSeries(c.historico),
           borderColor: comOpacidade(cor, opacidadeLinha),
           backgroundColor: comOpacidade(cor, opacidadeLinha),
           tension: 0.3,
@@ -312,8 +367,9 @@
             display: comparando,
             position: "bottom",
             labels: { color: "#9aa0ab", boxWidth: 12, font: { size: 11 } },
+            onClick: mostrarMedia ? aoClicarLegenda : Chart.defaults.plugins.legend.onClick,
           },
-          tooltip: { callbacks: { label: tooltipValorReal } },
+          tooltip: { callbacks: { label: tooltipValorReal, afterLabel: tooltipSeries } },
         },
         scales: {
           x: {
@@ -360,7 +416,7 @@
 
 <div class="tela-cheia">
   <div class="topo-esquerda">
-    <button class="icone-topo" onclick={() => (mostrarFiltro = true)} aria-label="Filtrar registros">
+    <button class="icone-topo" class:ativo={filtroQtd !== 6} onclick={() => (mostrarFiltro = true)} aria-label="Filtrar registros">
       {@render iconFiltro()}
     </button>
     <button
