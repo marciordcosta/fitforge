@@ -15,6 +15,8 @@
     mediaSemana,
     data,
     dataCentralizada = false,
+    ocultarTopo = false,
+    ocultarRodape = false,
     onIndiceChange,
   }: {
     fotos: FotoItem[];
@@ -26,6 +28,11 @@
     /** Tela cheia (uma foto por vez): data centralizada no topo, por extenso com o ano. Na
      * comparação (dois painéis curtos lado a lado) fica compacta no canto, como antes. */
     dataCentralizada?: boolean;
+    /** Na comparação, a data/peso dos dois painéis que ficam na junção (o de baixo do painel de
+     * cima, o de cima do painel de baixo) somem daqui — quem os mostra é um selo único compartilhado
+     * desenhado pela tela de comparação bem na linha da junção, pra não duplicar/empilhar infos. */
+    ocultarTopo?: boolean;
+    ocultarRodape?: boolean;
     /** Avisa o pai qual foto do carrossel está em exibição agora — usado por quem precisa saber
      * a foto "atual" mesmo depois do usuário arrastar pra outra do mesmo dia (ex: pra comparar). */
     onIndiceChange?: (indice: number) => void;
@@ -33,6 +40,13 @@
 
   let indice = $state(untrack(() => indiceInicial));
   let containerEl: HTMLDivElement | undefined;
+
+  /** Se o pai trocar qual dia este painel mostra (ex: botão de trocar posição na comparação), o
+   * índice interno precisa realinhar com o novo indiceInicial — sem isso continuaria mostrando o
+   * índice antigo, possivelmente fora do tamanho do novo array de fotos daquele dia. */
+  $effect(() => {
+    indice = indiceInicial;
+  });
 
   function formatarDataCurta(iso: string): string {
     const [, m, d] = iso.split("-");
@@ -55,8 +69,11 @@
     if (indice > 0) indice -= 1;
   }
 
-  // ---- Zoom (duplo toque) + arrastar (pan quando ampliado, trocar de foto num trilho quando não) ----
+  // ---- Zoom (duplo toque ou pinça com 2 dedos) + arrastar (pan quando ampliado, trocar de foto
+  // num trilho quando não) ----
   const ZOOM_AMPLIADO = 2.5;
+  const ESCALA_MIN = 1;
+  const ESCALA_MAX = 4;
   const LIMIAR_TROCA_PX = 60;
   const TOLERANCIA_TOQUE_PX = 12;
   const JANELA_DUPLO_TOQUE_MS = 300;
@@ -74,6 +91,17 @@
   let panInicialX = 0;
   let panInicialY = 0;
   let ultimoToqueTempo = 0;
+
+  /** Dedos na tela agora (pointerId -> posição), pra detectar a pinça de 2 dedos — não precisa
+   * ser $state porque só é usado nos cálculos dos handlers, nunca lido no template. */
+  const ponteirosAtivos = new Map<number, { x: number; y: number }>();
+  let pinchDistanciaInicial = 0;
+  let pinchEscalaInicial = 1;
+  /** Ponto da imagem (em pixels "não escalados", relativo ao centro do painel) que estava sob o
+   * meio dos 2 dedos ao iniciar a pinça — mantém esse ponto fixo sob os dedos enquanto o usuário
+   * afasta/aproxima, em vez de sempre ampliar a partir do centro da tela. */
+  let pinchOrigemLocalX = 0;
+  let pinchOrigemLocalY = 0;
 
   /** Sempre que muda de foto no carrossel, não faz sentido carregar o zoom/posição da anterior. */
   $effect(() => {
@@ -102,6 +130,12 @@
     panY = Math.max(-limiteY, Math.min(limiteY, panY));
   }
 
+  function pontoRelativoAoCentro(x: number, y: number): { x: number; y: number } {
+    if (!containerEl) return { x: 0, y: 0 };
+    const rect = containerEl.getBoundingClientRect();
+    return { x: x - rect.left - rect.width / 2, y: y - rect.top - rect.height / 2 };
+  }
+
   function alternarZoom(e: PointerEvent) {
     if (scale > 1) {
       scale = 1;
@@ -119,17 +153,55 @@
     limitarPan();
   }
 
+  function iniciarPinca(): void {
+    const [p1, p2] = [...ponteirosAtivos.values()];
+    pinchDistanciaInicial = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+    pinchEscalaInicial = scale;
+    const centro = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+    const centroRel = pontoRelativoAoCentro(centro.x, centro.y);
+    pinchOrigemLocalX = (centroRel.x - panX) / scale;
+    pinchOrigemLocalY = (centroRel.y - panY) / scale;
+  }
+
   function aoPointerDown(e: PointerEvent) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    ponteirosAtivos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (ponteirosAtivos.size === 2) {
+      // 2º dedo pousou — cancela um possível arrasto de troca de foto e começa a pinça.
+      arrastando = false;
+      deltaArrastoX = 0;
+      iniciarPinca();
+      return;
+    }
+    if (ponteirosAtivos.size > 2) return; // ignora um 3º dedo
+
     arrastando = true;
     inicioX = e.clientX;
     inicioY = e.clientY;
     panInicialX = panX;
     panInicialY = panY;
     deltaArrastoX = 0;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
 
   function aoPointerMove(e: PointerEvent) {
+    if (!ponteirosAtivos.has(e.pointerId)) return;
+    ponteirosAtivos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (ponteirosAtivos.size === 2) {
+      if (pinchDistanciaInicial <= 0) return;
+      const [p1, p2] = [...ponteirosAtivos.values()];
+      const distancia = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      const novaEscala = Math.max(ESCALA_MIN, Math.min(ESCALA_MAX, pinchEscalaInicial * (distancia / pinchDistanciaInicial)));
+      const centro = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      const centroRel = pontoRelativoAoCentro(centro.x, centro.y);
+      scale = novaEscala;
+      panX = centroRel.x - pinchOrigemLocalX * novaEscala;
+      panY = centroRel.y - pinchOrigemLocalY * novaEscala;
+      limitarPan();
+      return;
+    }
+
     if (!arrastando) return;
     const dx = e.clientX - inicioX;
     const dy = e.clientY - inicioY;
@@ -153,6 +225,33 @@
   }
 
   function aoPointerUp(e: PointerEvent) {
+    const tinhaDoisDedos = ponteirosAtivos.size === 2;
+    ponteirosAtivos.delete(e.pointerId);
+
+    if (tinhaDoisDedos) {
+      if (scale <= 1.02) {
+        scale = 1;
+        panX = 0;
+        panY = 0;
+      } else {
+        limitarPan();
+      }
+      // sobrou 1 dedo na tela: continua o gesto como um arrastar normal (pan), sem soltar e
+      // precisar tocar de novo — é o padrão de qualquer app de fotos.
+      const restante = [...ponteirosAtivos.values()][0];
+      if (restante && scale > 1) {
+        arrastando = true;
+        inicioX = restante.x;
+        inicioY = restante.y;
+        panInicialX = panX;
+        panInicialY = panY;
+        deltaArrastoX = 0;
+      }
+      return;
+    }
+
+    if (ponteirosAtivos.size >= 1) return; // ainda tem outro dedo apoiado, gesto não acabou
+
     const moveuPouco = Math.hypot(e.clientX - inicioX, e.clientY - inicioY) < TOLERANCIA_TOQUE_PX;
     finalizarArrasto();
     if (!moveuPouco) return;
@@ -160,6 +259,11 @@
     const duploToque = agora - ultimoToqueTempo < JANELA_DUPLO_TOQUE_MS;
     ultimoToqueTempo = duploToque ? 0 : agora;
     if (duploToque) alternarZoom(e);
+  }
+
+  function aoPointerCancel(e: PointerEvent) {
+    ponteirosAtivos.delete(e.pointerId);
+    finalizarArrasto();
   }
 </script>
 
@@ -170,7 +274,7 @@
   onpointerdown={aoPointerDown}
   onpointermove={aoPointerMove}
   onpointerup={aoPointerUp}
-  onpointercancel={finalizarArrasto}
+  onpointercancel={aoPointerCancel}
 >
   <div
     class="trilho"
@@ -192,25 +296,25 @@
     {/each}
   </div>
 
-  {#if dataCentralizada}
-    <div class="foto-topo foto-topo-centralizada">
-      <span class="foto-info-central">{formatarDataCompleta(data)}</span>
-      {#if fotos.length > 1}
-        <span class="foto-contador foto-contador-central">{indice + 1}/{fotos.length}</span>
-      {/if}
-    </div>
-  {:else}
-    <div class="foto-topo">
-      <div class="foto-info">
-        <strong class="foto-info-data">{formatarDataCurta(data)}</strong>
+  {#if !ocultarTopo}
+    {#if dataCentralizada}
+      <div class="foto-topo foto-topo-centralizada">
+        <span class="foto-info-central">{formatarDataCompleta(data)}</span>
       </div>
-      {#if fotos.length > 1}
-        <span class="foto-contador">{indice + 1}/{fotos.length}</span>
-      {/if}
-    </div>
+    {:else}
+      <div class="foto-topo">
+        <div class="foto-info">
+          <strong class="foto-info-data">{formatarDataCurta(data)}</strong>
+        </div>
+      </div>
+    {/if}
   {/if}
 
-  {#if pesoDia != null || mediaSemana != null}
+  {#if fotos.length > 1}
+    <span class="foto-contador">{indice + 1}/{fotos.length}</span>
+  {/if}
+
+  {#if !ocultarRodape && (pesoDia != null || mediaSemana != null)}
     <div class="foto-rodape">
       <span class="foto-rodape-peso">{formatarPeso(pesoDia)}{mediaSemana != null ? ` · méd. ${formatarPeso(mediaSemana)}` : ""}</span>
     </div>
@@ -275,9 +379,6 @@
     left: 0;
     right: 0;
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-3);
     /* padding-left maior que o padrão: deixa espaço pro botão de fechar/voltar (36px + margem)
        que a tela que usa este painel desenha por cima, no mesmo canto — evitava sobrepor a data. */
     padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) 0 52px;
@@ -312,11 +413,6 @@
     padding: 5px 14px;
     border-radius: var(--radius-sm);
   }
-  .foto-contador-central {
-    position: absolute;
-    top: max(var(--space-3), env(safe-area-inset-top, 0px));
-    right: var(--space-3);
-  }
   .foto-rodape {
     position: absolute;
     left: 0;
@@ -333,13 +429,16 @@
     border-radius: var(--radius-sm);
   }
   .foto-contador {
-    flex-shrink: 0;
+    position: absolute;
+    top: max(var(--space-3), env(safe-area-inset-top, 0px));
+    right: var(--space-3);
     font-size: 12px;
     font-weight: 600;
     color: #fff;
     background: rgba(0, 0, 0, 0.45);
     padding: 3px 10px;
     border-radius: 999px;
+    pointer-events: none;
   }
   .foto-pontos {
     position: absolute;
