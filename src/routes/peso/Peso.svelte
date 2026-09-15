@@ -281,59 +281,24 @@
   const pesoAlvoTexto = $derived(meta?.pesoAlvo != null ? `${formatPeso(meta.pesoAlvo)} kg` : "Sem meta");
 
   /**
-   * Peso esperado pela meta em cada dia plotado, usando a meta que estava REALMENTE valendo naquele
-   * dia (metaHistorico/metaNaData) — não a meta atual projetada pra trás. Parte do peso real do
-   * primeiro dia visível e, a cada dia seguinte, compõe o ritmo semanal (%) da meta vigente naquele
-   * dia; se a meta era "manutenção" num trecho, o valor esperado nesse trecho é o próprio peso-alvo
-   * (sem ritmo). Isso faz a linha ter "quebras" nos dias em que a meta foi alterada — reflete o
-   * histórico real, não uma reta idealizada.
-   *
-   * Sem histórico real (nenhuma troca de meta registrada ainda — só a meta atual, semeada com
-   * `vigente_desde` no passado) não dá pra compor uma trajetória de verdade: nesse caso a linha
-   * fica reta, no valor da meta atual (mesmo ritmo do card "Meta semanal"), em vez de "inventar"
-   * uma composição diária que nunca foi realmente decidida assim.
+   * Peso esperado pela meta em cada dia plotado — a meta "percentual" é automática e recalculada
+   * todo dia em cima do peso real daquele dia (mediaDoDia * (1 + ritmo/100)), exatamente como o
+   * card "Meta semanal" faz pra hoje; não é uma trajetória composta a partir de um ponto de
+   * partida. Um ajuste manual (trocar o percentual, o peso-alvo, ou virar "manutenção") não muda a
+   * meta em si — só muda o ritmo/alvo que essa conta automática usa dali pra frente — por isso cada
+   * dia usa a meta que estava REALMENTE valendo naquele dia (metaHistorico/metaNaData), fazendo a
+   * linha "quebrar" nos dias em que houve ajuste, mas seguindo o peso real (sem ritmo) nos dias de
+   * meta "manutenção".
    */
   const metaAlvoPorPonto = $derived.by(() => {
-    if (!meta || !mediaMovelGrafico.length) return null;
-
-    if (metaHistorico.length <= 1) {
-      if (meta.tipo === "manutencao") {
-        if (meta.pesoAlvo == null) return null;
-        const alvo = meta.pesoAlvo;
-        return mediaMovelGrafico.map(() => alvo);
-      }
-      if (meta.percentual == null) return null;
-      const mediaAtual = mediaMovelGrafico[mediaMovelGrafico.length - 1].peso;
-      const alvoAtual = mediaAtual * (1 + meta.percentual / 100);
-      return mediaMovelGrafico.map(() => alvoAtual);
-    }
-
-    const primeiro = mediaMovelGrafico[0];
-    const metaInicial = metaNaData(metaHistorico, primeiro.data);
-    if (!metaInicial) return null;
-
-    const resultado: (number | null)[] = [];
-    let valorAnterior = metaInicial.tipo === "manutencao" ? (metaInicial.pesoAlvo ?? primeiro.peso) : primeiro.peso;
-    resultado.push(valorAnterior);
-
-    for (let i = 1; i < mediaMovelGrafico.length; i++) {
-      const dataAtual = mediaMovelGrafico[i].data;
-      const dataAnterior = mediaMovelGrafico[i - 1].data;
-      const metaDoDia = metaNaData(metaHistorico, dataAtual);
-      if (!metaDoDia) {
-        resultado.push(null);
-        continue;
-      }
-      if (metaDoDia.tipo === "manutencao") {
-        valorAnterior = metaDoDia.pesoAlvo ?? valorAnterior;
-      } else if (metaDoDia.percentual != null) {
-        const diasPassados =
-          Math.round((parseISODate(dataAtual).getTime() - parseISODate(dataAnterior).getTime()) / 86400000) || 1;
-        valorAnterior = valorAnterior * Math.pow(1 + metaDoDia.percentual / 100, diasPassados / 7);
-      }
-      resultado.push(valorAnterior);
-    }
-    return resultado;
+    if (!metaHistorico.length || !mediaMovelGrafico.length) return null;
+    return mediaMovelGrafico.map((p) => {
+      const metaDoDia = metaNaData(metaHistorico, p.data);
+      if (!metaDoDia) return null;
+      if (metaDoDia.tipo === "manutencao") return metaDoDia.pesoAlvo;
+      if (metaDoDia.percentual == null) return null;
+      return p.peso * (1 + metaDoDia.percentual / 100);
+    });
   });
 
   /** Linha da meta no gráfico: o histórico real ponto a ponto (metaAlvoPorPonto), sem simplificar
