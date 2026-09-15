@@ -5,7 +5,24 @@
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
-  import { listFotosAgrupadas, getUrlsAssinadas, adicionarFoto, excluirFotoDoDia, type FotoGrupoData, type FotoItem } from "../../lib/pesoApi";
+  import FotoPainel from "./FotoPainel.svelte";
+  import {
+    listFotosAgrupadas,
+    getUrlsAssinadas,
+    adicionarFoto,
+    excluirFotoDoDia,
+    getPesoDoDia,
+    getPesoMedioNaData,
+    type FotoGrupoData,
+    type FotoItem,
+  } from "../../lib/pesoApi";
+
+  interface FotoAbertaState {
+    grupo: FotoGrupoData;
+    indiceInicial: number;
+    pesoDia: number | null;
+    mediaSemana: number | null;
+  }
 
   let grupos = $state<FotoGrupoData[]>([]);
   let urls = $state<Map<string, string>>(new Map());
@@ -19,7 +36,16 @@
   /** Entra ao pressionar uma foto (seleciona a pressionada); enquanto ativo, tocar em qualquer
    * foto alterna seleção em vez de abrir em tela cheia — igual às galerias do sistema. */
   let modoSelecao = $state(false);
-  let fotoAberta = $state<FotoItem | null>(null);
+  let fotoAberta = $state<FotoAbertaState | null>(null);
+  /** Foto do carrossel realmente em exibição agora, no dia de fotoAberta — pode ter mudado do
+   * indiceInicial se o usuário arrastou pra outra foto do mesmo dia antes de comparar/excluir. */
+  let indiceAtualAberta = $state(0);
+  let mostrarPickerComparar = $state(false);
+  let confirmandoExcluirUnica = $state(false);
+
+  /** Todas as outras datas (excluindo a que já está aberta) — base do grid de "escolher pra
+   * comparar" dentro da visualização em tela cheia. */
+  const outrosGrupos = $derived(fotoAberta ? grupos.filter((g) => g.data !== fotoAberta!.grupo.data) : []);
 
   /** Miniaturas embaçadas por padrão (fotos pessoais) — só o "olho" no topo revela sem filtro;
    * a tela de comparação (ao abrir uma foto de fato) sempre mostra sem embaçar. */
@@ -150,7 +176,54 @@
       alternarSelecao(foto.id);
       return;
     }
-    fotoAberta = foto;
+    void abrirFoto(foto);
+  }
+
+  /** Abre a foto em tela cheia com o carrossel já posicionado nela, dentro das fotos DAQUELE dia
+   * — peso/média são buscados à parte (mesma info mostrada em FotoComparar) sem travar a abertura. */
+  async function abrirFoto(foto: FotoItem): Promise<void> {
+    const grupo = grupos.find((g) => g.fotos.some((f) => f.id === foto.id));
+    if (!grupo) return;
+    const indiceInicial = Math.max(0, grupo.fotos.findIndex((f) => f.id === foto.id));
+    indiceAtualAberta = indiceInicial;
+    mostrarPickerComparar = false;
+    fotoAberta = { grupo, indiceInicial, pesoDia: null, mediaSemana: null };
+    try {
+      const [pesoDia, mediaSemana] = await Promise.all([getPesoDoDia(grupo.data), getPesoMedioNaData(grupo.data)]);
+      if (fotoAberta?.grupo.data === grupo.data) fotoAberta = { ...fotoAberta, pesoDia, mediaSemana };
+    } catch {
+      // peso/média são só informativos aqui — a foto continua visível mesmo se isso falhar
+    }
+  }
+
+  function fecharFotoAberta(): void {
+    fotoAberta = null;
+    mostrarPickerComparar = false;
+  }
+
+  /** Compara a foto REALMENTE em exibição (pode ter mudado do indiceInicial arrastando o
+   * carrossel) com a escolhida no grid — reaproveita a tela de comparação já existente. */
+  function selecionarParaComparar(foto: FotoItem): void {
+    if (!fotoAberta) return;
+    const fotoAtual = fotoAberta.grupo.fotos[indiceAtualAberta] ?? fotoAberta.grupo.fotos[fotoAberta.indiceInicial];
+    navigate(`/fotos/comparar/${fotoAtual.id}/${foto.id}`);
+    fecharFotoAberta();
+  }
+
+  async function excluirFotoAberta(): Promise<void> {
+    confirmandoExcluirUnica = false;
+    if (!fotoAberta) return;
+    const foto = fotoAberta.grupo.fotos[indiceAtualAberta] ?? fotoAberta.grupo.fotos[fotoAberta.indiceInicial];
+    excluindo = true;
+    try {
+      await excluirFotoDoDia(foto);
+      fecharFotoAberta();
+      await carregar();
+    } catch (err) {
+      alert("Erro ao excluir foto: " + (err as Error).message);
+    } finally {
+      excluindo = false;
+    }
   }
 
   function abrirAdicionar() {
@@ -291,11 +364,59 @@
 
 {#if fotoAberta}
   <div class="visualizar-container">
-    <button class="visualizar-fechar" onclick={() => (fotoAberta = null)} aria-label="Fechar">{@render iconFechar()}</button>
-    {#if urls.get(fotoAberta.path)}
-      <img src={urls.get(fotoAberta.path)} alt="" class="visualizar-img" />
+    <button class="visualizar-fechar" onclick={fecharFotoAberta} aria-label="Fechar">{@render iconFechar()}</button>
+    <div class="visualizar-split" class:comparando={mostrarPickerComparar}>
+      <div class="visualizar-topo">
+        <FotoPainel
+          fotos={fotoAberta.grupo.fotos}
+          indiceInicial={fotoAberta.indiceInicial}
+          {urls}
+          pesoDia={fotoAberta.pesoDia}
+          mediaSemana={fotoAberta.mediaSemana}
+          data={fotoAberta.grupo.data}
+          onIndiceChange={(i) => (indiceAtualAberta = i)}
+        />
+      </div>
+      {#if mostrarPickerComparar}
+        <div class="visualizar-picker">
+          <p class="picker-titulo">Escolha a foto pra comparar</p>
+          {#if !outrosGrupos.length}
+            <p class="picker-vazio">Nenhuma outra data com fotos pra comparar.</p>
+          {:else}
+            {#each outrosGrupos as grupo (grupo.data)}
+              <p class="data-titulo">{formatarData(grupo.data)}</p>
+              <div class="grade-fotos">
+                {#each grupo.fotos as foto (foto.id)}
+                  <button type="button" class="foto-item" onclick={() => selecionarParaComparar(foto)} aria-label="Comparar com esta foto">
+                    {#if urls.get(foto.path)}
+                      <img src={urls.get(foto.path)} alt="" loading="lazy" />
+                    {/if}
+                  </button>
+                {/each}
+              </div>
+            {/each}
+          {/if}
+        </div>
+      {/if}
+    </div>
+    {#if mostrarPickerComparar}
+      <button type="button" class="picker-cancelar" onclick={() => (mostrarPickerComparar = false)}>Cancelar</button>
+    {:else}
+      <div class="visualizar-acoes">
+        <button type="button" class="acao-btn comparar-btn" onclick={() => (mostrarPickerComparar = true)}>Comparar</button>
+        <button type="button" class="acao-btn excluir-btn" disabled={excluindo} onclick={() => (confirmandoExcluirUnica = true)}>Excluir</button>
+      </div>
     {/if}
   </div>
+{/if}
+
+{#if confirmandoExcluirUnica}
+  <ConfirmDialog
+    titulo="Excluir esta foto?"
+    textoConfirmar="Excluir"
+    onConfirmar={excluirFotoAberta}
+    onCancelar={() => (confirmandoExcluirUnica = false)}
+  />
 {/if}
 
 {#if mostrarAdicionar}
@@ -481,13 +602,59 @@
     background: #000;
     z-index: 300;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
   }
-  .visualizar-img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
+  .visualizar-split {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .visualizar-topo {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+  .visualizar-split.comparando .visualizar-topo {
+    flex: 0 0 42%;
+  }
+  .visualizar-picker {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 var(--space-4) var(--space-4);
+    background: var(--surface-bg);
+  }
+  .picker-titulo {
+    position: sticky;
+    top: 0;
+    margin: 0;
+    padding: var(--space-3) 0;
+    background: var(--surface-bg);
+    font-weight: 600;
+    text-align: center;
+  }
+  .picker-vazio {
+    color: var(--surface-muted);
+    text-align: center;
+    padding: var(--space-4) 0;
+  }
+  .visualizar-acoes {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  }
+  .picker-cancelar {
+    width: 100%;
+    padding: var(--space-3);
+    border: none;
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+    padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
   }
   .visualizar-fechar {
     position: absolute;

@@ -9,6 +9,7 @@
     pesoDia,
     mediaSemana,
     data,
+    onIndiceChange,
   }: {
     fotos: FotoItem[];
     indiceInicial: number;
@@ -16,6 +17,9 @@
     pesoDia: number | null;
     mediaSemana: number | null;
     data: string;
+    /** Avisa o pai qual foto do carrossel está em exibição agora — usado por quem precisa saber
+     * a foto "atual" mesmo depois do usuário arrastar pra outra do mesmo dia (ex: pra comparar). */
+    onIndiceChange?: (indice: number) => void;
   } = $props();
 
   let indice = $state(untrack(() => indiceInicial));
@@ -64,6 +68,7 @@
     scale = 1;
     panX = 0;
     panY = 0;
+    onIndiceChange?.(indice);
   });
 
   function limitarPan() {
