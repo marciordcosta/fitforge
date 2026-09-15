@@ -213,33 +213,43 @@
     });
   }
 
-  /** Recalcula a linha de Média a partir de quais linhas estão visíveis na legenda no momento —
-   * esconder um exercício (clicando nele na legenda) tira ele da média também, em vez dela
-   * continuar fixa considerando todo mundo. */
+  /** Recalcula a linha de Média a partir de quais exercícios NÃO estão marcados como excluídos —
+   * clicar num exercício na legenda (com a Média ativa) só tira ele da conta da média, sem
+   * esconder a própria linha dele (continua visível pra comparar a forma da curva). */
   function recalcularMedia(c: Chart): void {
     const idxMedia = c.data.datasets.findIndex((d) => d.label === "Média");
     if (idxMedia === -1) return;
-    const seriesVisiveis = c.data.datasets
-      .map((d, i) => ({ dados: d.data as (number | null)[], visivel: c.isDatasetVisible(i) }))
-      .filter((_, i) => i !== idxMedia)
-      .filter((s) => s.visivel)
-      .map((s) => s.dados);
+    const seriesConsideradas = c.data.datasets
+      .filter((d, i) => i !== idxMedia && !(d as { excluidoDaMedia?: boolean }).excluidoDaMedia)
+      .map((d) => d.data as (number | null)[]);
     const tamanho = (c.data.labels ?? []).length;
-    (c.data.datasets[idxMedia].data as (number | null)[]) = calcularMedia(seriesVisiveis, tamanho);
+    (c.data.datasets[idxMedia].data as (number | null)[]) = calcularMedia(seriesConsideradas, tamanho);
   }
 
+  /** Com a Média ativa, clicar na legenda não usa o hide/show padrão do Chart.js (que some com a
+   * linha) — só alterna se aquele exercício entra ou não na conta da média, mantendo a linha
+   * visível pra continuar comparando a forma da curva. O tachado na legenda passa a indicar
+   * "fora da média", não "escondido". */
   function aoClicarLegenda(_e: unknown, legendItem: { datasetIndex?: number }, legend: { chart: Chart }): void {
     const index = legendItem.datasetIndex;
     if (index == null) return;
     const ci = legend.chart;
-    if (ci.data.datasets[index]?.label === "Média") return;
-    if (ci.isDatasetVisible(index)) {
-      ci.hide(index);
-    } else {
-      ci.show(index);
-    }
+    const dataset = ci.data.datasets[index] as { label?: string; excluidoDaMedia?: boolean };
+    if (dataset.label === "Média") return;
+    dataset.excluidoDaMedia = !dataset.excluidoDaMedia;
     recalcularMedia(ci);
     ci.update();
+  }
+
+  function gerarLegendaComExclusao(c: Chart) {
+    return c.data.datasets.map((d, i) => ({
+      text: d.label ?? "",
+      fillStyle: d.backgroundColor as string,
+      strokeStyle: d.borderColor as string,
+      lineWidth: 2,
+      hidden: (d as { excluidoDaMedia?: boolean }).excluidoDaMedia === true,
+      datasetIndex: i,
+    }));
   }
 
   function desenharGrafico() {
@@ -334,7 +344,11 @@
       return { c, bruto, ajustado: ajustar(bruto) };
     });
 
-    const datasets: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[]; seriesData?: (number | null)[] })[] = [
+    const datasets: (ChartDataset<"line", (number | null)[]> & {
+      rawData?: (number | null)[];
+      seriesData?: (number | null)[];
+      excluidoDaMedia?: boolean;
+    })[] = [
       {
         label: exercicio.nome,
         data: principalAjustado,
@@ -391,7 +405,12 @@
           legend: {
             display: comparando,
             position: "bottom",
-            labels: { color: "#9aa0ab", boxWidth: 12, font: { size: 11 } },
+            labels: {
+              color: "#9aa0ab",
+              boxWidth: 12,
+              font: { size: 11 },
+              generateLabels: mostrarMedia ? gerarLegendaComExclusao : undefined,
+            },
             onClick: mostrarMedia ? aoClicarLegenda : Chart.defaults.plugins.legend.onClick,
           },
           tooltip: { callbacks: { label: tooltipValorReal, afterLabel: tooltipSeries } },
