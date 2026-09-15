@@ -182,6 +182,37 @@
   let canvas = $state<HTMLCanvasElement | undefined>(undefined);
   let chart: Chart | null = null;
 
+  /** Preenche os buracos ENTRE dois pontos conhecidos de uma série com interpolação linear —
+   * sem isso, num dia em que só um exercício tem sessão registrada, a "média" daquele dia vira
+   * o valor desse exercício sozinho (os outros contribuem null e saem da conta), fazendo a linha
+   * pular de acordo com qual exercício foi treinado em cada dia em vez de refletir uma tendência
+   * combinada de verdade. Não extrapola antes do primeiro nem depois do último ponto conhecido —
+   * ali a série realmente não existe ainda/mais, ela fica de fora da média nesse trecho. */
+  function interpolarSerie(serie: (number | null)[]): (number | null)[] {
+    const resultado = serie.slice();
+    let idxAnterior = -1;
+    for (let i = 0; i < resultado.length; i++) {
+      if (resultado[i] == null) continue;
+      if (idxAnterior !== -1 && i - idxAnterior > 1) {
+        const valorAnterior = resultado[idxAnterior]!;
+        const passo = (resultado[i]! - valorAnterior) / (i - idxAnterior);
+        for (let j = idxAnterior + 1; j < i; j++) {
+          resultado[j] = valorAnterior + passo * (j - idxAnterior);
+        }
+      }
+      idxAnterior = i;
+    }
+    return resultado;
+  }
+
+  function calcularMedia(series: (number | null)[][], tamanho: number): (number | null)[] {
+    const interpoladas = series.map(interpolarSerie);
+    return Array.from({ length: tamanho }, (_, i) => {
+      const valores = interpoladas.map((s) => s[i]).filter((v): v is number => v != null);
+      return valores.length ? valores.reduce((a, b) => a + b, 0) / valores.length : null;
+    });
+  }
+
   /** Recalcula a linha de Média a partir de quais linhas estão visíveis na legenda no momento —
    * esconder um exercício (clicando nele na legenda) tira ele da média também, em vez dela
    * continuar fixa considerando todo mundo. */
@@ -193,11 +224,8 @@
       .filter((_, i) => i !== idxMedia)
       .filter((s) => s.visivel)
       .map((s) => s.dados);
-    const media = (c.data.labels ?? []).map((_, i) => {
-      const valores = seriesVisiveis.map((s) => s[i]).filter((v): v is number => v != null);
-      return valores.length ? valores.reduce((a, b) => a + b, 0) / valores.length : null;
-    });
-    (c.data.datasets[idxMedia].data as (number | null)[]) = media;
+    const tamanho = (c.data.labels ?? []).length;
+    (c.data.datasets[idxMedia].data as (number | null)[]) = calcularMedia(seriesVisiveis, tamanho);
   }
 
   function aoClicarLegenda(_e: unknown, legendItem: { datasetIndex?: number }, legend: { chart: Chart }): void {
@@ -339,10 +367,7 @@
 
     if (mostrarMedia) {
       const todasSeries = [principalAjustado, ...comparaveisAjustados.map((x) => x.ajustado)];
-      const media = datas.map((_, i) => {
-        const valores = todasSeries.map((s) => s[i]).filter((v): v is number => v != null);
-        return valores.length ? valores.reduce((a, b) => a + b, 0) / valores.length : null;
-      });
+      const media = calcularMedia(todasSeries, datas.length);
       datasets.push({
         label: "Média",
         data: media,
