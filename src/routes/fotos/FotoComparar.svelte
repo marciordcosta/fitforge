@@ -18,6 +18,10 @@
   let urls = $state<Map<string, string>>(new Map());
   let loading = $state(true);
   let erro = $state<string | null>(null);
+  /** Foto realmente em exibição em cada painel agora (pode ter mudado do indiceInicial se o
+   * usuário arrastou pro carrossel do mesmo dia) — usado pro contador no topbar/rodapé. */
+  let indiceAtual1 = $state(0);
+  let indiceAtual2 = $state(0);
 
   function formatarDataCurta(iso: string): string {
     const [, m, d] = iso.split("-");
@@ -82,13 +86,28 @@
 {/snippet}
 
 <div class="comparar-container">
-  <button class="voltar-btn" onclick={() => voltar("/fotos")} aria-label="Fechar">{@render iconFechar()}</button>
-
   {#if loading}
+    <button class="voltar-btn voltar-btn-solto" onclick={() => voltar("/fotos")} aria-label="Fechar">{@render iconFechar()}</button>
     <p class="comparar-status">Carregando…</p>
   {:else if erro || !lado1 || !lado2}
+    <button class="voltar-btn voltar-btn-solto" onclick={() => voltar("/fotos")} aria-label="Fechar">{@render iconFechar()}</button>
     <p class="comparar-status">Erro ao carregar as fotos{erro ? `: ${erro}` : "."}</p>
   {:else}
+    <!-- Topbar mostra a data/peso do painel de CIMA, rodapé a do painel de BAIXO — cada bar
+         "pertence" ao painel mais perto dela, em vez de infos soltas por cima das fotos. -->
+    <div class="comparar-topbar">
+      <button class="voltar-btn" onclick={() => voltar("/fotos")} aria-label="Fechar">{@render iconFechar()}</button>
+      <div class="comparar-info">
+        <strong>{formatarDataCurta(lado1.data)}</strong>
+        {#if lado1.pesoDia != null || lado1.mediaSemana != null}
+          <span>{formatarPeso(lado1.pesoDia)}{lado1.mediaSemana != null ? ` · méd. ${formatarPeso(lado1.mediaSemana)}` : ""}</span>
+        {/if}
+      </div>
+      {#if lado1.fotos.length > 1}
+        <span class="comparar-contador">{indiceAtual1 + 1}/{lado1.fotos.length}</span>
+      {/if}
+    </div>
+
     <div class="comparar-painel">
       <FotoPainel
         fotos={lado1.fotos}
@@ -97,7 +116,10 @@
         pesoDia={lado1.pesoDia}
         mediaSemana={lado1.mediaSemana}
         data={lado1.data}
+        ocultarTopo
         ocultarRodape
+        ocultarContador
+        onIndiceChange={(i) => (indiceAtual1 = i)}
       />
       <FotoPainel
         fotos={lado2.fotos}
@@ -107,18 +129,26 @@
         mediaSemana={lado2.mediaSemana}
         data={lado2.data}
         ocultarTopo
+        ocultarRodape
+        ocultarContador
+        onIndiceChange={(i) => (indiceAtual2 = i)}
       />
+      <button type="button" class="trocar-btn" onclick={trocarLados} aria-label="Trocar posição das fotos">
+        {@render iconTrocar()}
+      </button>
     </div>
 
-    <!-- Selo único na junção das duas fotos: peso do painel de cima de um lado, data do painel de
-         baixo do outro — em vez de duas linhas separadas e redundantes bem coladas uma na outra. -->
-    <div class="comparar-juncao">
-      <span class="juncao-badge">{formatarPeso(lado1.pesoDia)}{lado1.mediaSemana != null ? ` · méd. ${formatarPeso(lado1.mediaSemana)}` : ""}</span>
-      <span class="juncao-badge">{formatarDataCurta(lado2.data)}</span>
+    <div class="comparar-rodape">
+      <div class="comparar-info">
+        <strong>{formatarDataCurta(lado2.data)}</strong>
+        {#if lado2.pesoDia != null || lado2.mediaSemana != null}
+          <span>{formatarPeso(lado2.pesoDia)}{lado2.mediaSemana != null ? ` · méd. ${formatarPeso(lado2.mediaSemana)}` : ""}</span>
+        {/if}
+      </div>
+      {#if lado2.fotos.length > 1}
+        <span class="comparar-contador">{indiceAtual2 + 1}/{lado2.fotos.length}</span>
+      {/if}
     </div>
-    <button type="button" class="trocar-btn" onclick={trocarLados} aria-label="Trocar posição das fotos">
-      {@render iconTrocar()}
-    </button>
   {/if}
 </div>
 
@@ -128,22 +158,70 @@
     inset: 0;
     background: #000;
     z-index: 300;
+    display: flex;
+    flex-direction: column;
+  }
+  .comparar-topbar,
+  .comparar-rodape {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  .comparar-topbar {
+    padding-top: max(var(--space-3), env(safe-area-inset-top, 0px));
+    padding-bottom: var(--space-2);
+  }
+  .comparar-rodape {
+    padding-top: var(--space-2);
+    padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px));
+  }
+  .comparar-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    color: #fff;
+  }
+  .comparar-info strong {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .comparar-info span {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .comparar-contador {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 4px 10px;
+    border-radius: 999px;
   }
   .voltar-btn {
-    position: absolute;
-    top: max(var(--space-3), env(safe-area-inset-top, 0px));
-    left: var(--space-3);
-    z-index: 10;
+    flex-shrink: 0;
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(255, 255, 255, 0.15);
     border: none;
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+  }
+  .voltar-btn-solto {
+    position: absolute;
+    top: max(var(--space-3), env(safe-area-inset-top, 0px));
+    left: var(--space-3);
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.5);
   }
   .voltar-btn svg {
     width: 18px;
@@ -155,30 +233,11 @@
     padding-top: var(--space-6);
   }
   .comparar-painel {
-    position: absolute;
-    inset: 0;
+    position: relative;
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-  }
-  .comparar-juncao {
-    position: absolute;
-    left: var(--space-3);
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    z-index: 10;
-    pointer-events: none;
-  }
-  .juncao-badge {
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-    background: rgba(0, 0, 0, 0.45);
-    padding: 4px 10px;
-    border-radius: var(--radius-sm);
-    white-space: nowrap;
   }
   .trocar-btn {
     position: absolute;
@@ -204,11 +263,6 @@
   @media (orientation: landscape) {
     .comparar-painel {
       flex-direction: row;
-    }
-    .comparar-juncao {
-      left: 50%;
-      top: var(--space-3);
-      transform: translateX(-50%);
     }
     .trocar-btn {
       left: 50%;
