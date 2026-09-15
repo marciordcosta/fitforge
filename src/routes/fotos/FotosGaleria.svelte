@@ -4,14 +4,18 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
-  import { listFotosAgrupadas, getUrlsAssinadas, adicionarFoto, type FotoGrupoData, type FotoItem } from "../../lib/pesoApi";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import { listFotosAgrupadas, getUrlsAssinadas, adicionarFoto, excluirFotoDoDia, type FotoGrupoData, type FotoItem } from "../../lib/pesoApi";
 
   let grupos = $state<FotoGrupoData[]>([]);
   let urls = $state<Map<string, string>>(new Map());
   let loading = $state(true);
   let erro = $state<string | null>(null);
-  /** Até 2 ids de foto — tocar numa terceira enquanto já há 2 selecionadas não faz nada. */
+  /** Ids selecionados — sem limite (a barra de ações mostra Excluir sempre que há 1+; Comparar
+   * só aparece junto quando são exatamente 2, já que a comparação é sempre entre um par). */
   let selecionadas = $state<string[]>([]);
+  let confirmandoExcluir = $state(false);
+  let excluindo = $state(false);
   /** Entra ao pressionar uma foto (seleciona a pressionada); enquanto ativo, tocar em qualquer
    * foto alterna seleção em vez de abrir em tela cheia — igual às galerias do sistema. */
   let modoSelecao = $state(false);
@@ -58,7 +62,7 @@
     if (selecionadas.includes(id)) {
       selecionadas = selecionadas.filter((x) => x !== id);
       if (!selecionadas.length) modoSelecao = false;
-    } else if (selecionadas.length < 2) {
+    } else {
       selecionadas = [...selecionadas, id];
     }
   }
@@ -73,6 +77,27 @@
     navigate(`/fotos/comparar/${selecionadas[0]}/${selecionadas[1]}`);
     selecionadas = [];
     modoSelecao = false;
+  }
+
+  async function excluirSelecionadas() {
+    confirmandoExcluir = false;
+    const fotosPorId = new Map(grupos.flatMap((g) => g.fotos).map((f) => [f.id, f]));
+    excluindo = true;
+    try {
+      await Promise.all(
+        selecionadas.map((id) => {
+          const foto = fotosPorId.get(id);
+          return foto ? excluirFotoDoDia(foto) : Promise.resolve();
+        }),
+      );
+      selecionadas = [];
+      modoSelecao = false;
+      await carregar();
+    } catch (err) {
+      alert("Erro ao excluir foto(s): " + (err as Error).message);
+    } finally {
+      excluindo = false;
+    }
   }
 
   /** Tempo segurando a foto parada antes do toque virar "pressionar" (entra no modo de seleção) —
@@ -246,10 +271,22 @@
   {/if}
 </div>
 
-{#if selecionadas.length === 2}
-  <div class="barra-comparar">
-    <button type="button" class="comparar-btn" onclick={abrirComparacao}>Comparar</button>
+{#if selecionadas.length}
+  <div class="barra-acoes">
+    <button type="button" class="acao-btn excluir-btn" disabled={excluindo} onclick={() => (confirmandoExcluir = true)}>Excluir</button>
+    {#if selecionadas.length === 2}
+      <button type="button" class="acao-btn comparar-btn" onclick={abrirComparacao}>Comparar</button>
+    {/if}
   </div>
+{/if}
+
+{#if confirmandoExcluir}
+  <ConfirmDialog
+    titulo={`Excluir ${selecionadas.length} foto${selecionadas.length === 1 ? "" : "s"}?`}
+    textoConfirmar="Excluir"
+    onConfirmar={excluirSelecionadas}
+    onCancelar={() => (confirmandoExcluir = false)}
+  />
 {/if}
 
 {#if fotoAberta}
@@ -407,25 +444,36 @@
     width: 14px;
     height: 14px;
   }
-  .barra-comparar {
+  .barra-acoes {
     position: fixed;
     left: 0;
     right: 0;
     bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-3));
     display: flex;
     justify-content: center;
+    gap: var(--space-3);
     z-index: 50;
   }
-  .comparar-btn {
+  .acao-btn {
     padding: var(--space-3) var(--space-6);
     border-radius: 999px;
     border: none;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
     font-size: var(--font-size-base);
     font-weight: 600;
     box-shadow: var(--shadow-float);
     cursor: pointer;
+  }
+  .acao-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .comparar-btn {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+  }
+  .excluir-btn {
+    background: var(--color-danger);
+    color: #fff;
   }
   .visualizar-container {
     position: fixed;
