@@ -2110,7 +2110,9 @@
   $effect(() => {
     if (!musculoUrlContexto) {
       if (urlAbertaChave?.startsWith("musculo:")) urlAbertaChave = null;
-      if (modalMusculoRotina) modalMusculoRotina = null;
+      // Modal multiRotina (aberto direto pela Distribuição Semanal, via abrirExercicios) não é
+      // amarrado a essa URL — fechar aqui de novo assim que ele abre, já que a URL nunca mudou.
+      if (modalMusculoRotina && !modalMusculoRotina.multiRotina) modalMusculoRotina = null;
       return;
     }
     const chave = `musculo:${musculoUrlContexto.treino.id}:${musculoUrlContexto.musculo.id}`;
