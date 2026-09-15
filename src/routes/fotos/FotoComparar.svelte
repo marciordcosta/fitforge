@@ -23,9 +23,14 @@
   let indiceAtual1 = $state(0);
   let indiceAtual2 = $state(0);
 
-  function formatarDataCurta(iso: string): string {
-    const [, m, d] = iso.split("-");
-    return `${d}/${m}`;
+  const MESES = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  ];
+
+  function formatarDataCompleta(iso: string): string {
+    const [ano, mes, dia] = iso.split("-");
+    return `${dia} de ${MESES[Number(mes) - 1]} de ${ano}`;
   }
 
   function formatarPeso(v: number | null): string {
@@ -98,7 +103,7 @@
     <div class="comparar-topbar">
       <button class="voltar-btn" onclick={() => voltar("/fotos")} aria-label="Fechar">{@render iconFechar()}</button>
       <div class="comparar-info">
-        <strong>{formatarDataCurta(lado1.data)}</strong>
+        <strong>{formatarDataCompleta(lado1.data)}</strong>
         {#if lado1.pesoDia != null || lado1.mediaSemana != null}
           <span>{formatarPeso(lado1.pesoDia)}{lado1.mediaSemana != null ? ` · méd. ${formatarPeso(lado1.mediaSemana)}` : ""}</span>
         {/if}
@@ -140,7 +145,7 @@
 
     <div class="comparar-rodape">
       <div class="comparar-info">
-        <strong>{formatarDataCurta(lado2.data)}</strong>
+        <strong>{formatarDataCompleta(lado2.data)}</strong>
         {#if lado2.pesoDia != null || lado2.mediaSemana != null}
           <span>{formatarPeso(lado2.pesoDia)}{lado2.mediaSemana != null ? ` · méd. ${formatarPeso(lado2.mediaSemana)}` : ""}</span>
         {/if}
