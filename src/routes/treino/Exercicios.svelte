@@ -155,13 +155,11 @@
       const itens: ItemRotina[] = treino.exercicios.map((e) => ({
         exercicio_id: e.exercicio_id,
         descanso_seg: e.descanso_seg,
-        observacao: e.observacao,
         series: e.series.map((s) => ({ serie: s.serie, peso_alvo: s.peso_alvo, rep_min: s.rep_min, rep_max: s.rep_max })),
       }));
       itens.push({
         exercicio_id: ex.id,
         descanso_seg: ex.descanso_padrao_seg ?? 180,
-        observacao: null,
         series: await construirSeriesPadrao(ex.id, 3),
       });
       await salvarExerciciosRotina(treino.id, itens);

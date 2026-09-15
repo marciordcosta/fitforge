@@ -18,7 +18,6 @@ export interface Linha {
   exercicio_id: string;
   nome: string;
   descanso_seg: number | null;
-  observacao: string | null;
   series: LinhaSerie[];
 }
 

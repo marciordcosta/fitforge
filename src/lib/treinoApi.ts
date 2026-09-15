@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
+import { hojeISO } from "./dates";
 
 export const PESOS_CONTRIBUICAO_PRESET = [1, 0.75, 0.5, 0.25] as const;
 
@@ -102,7 +103,6 @@ export interface TreinoExercicio {
   treino_id: string;
   exercicio_id: string;
   descanso_seg: number | null;
-  observacao: string | null;
   ordem: number;
   exercicio?: Exercicio;
   series: SerieAlvo[];
@@ -644,10 +644,65 @@ export async function removerMarcadorExercicio(exercicioId: string, data: string
   if (error) throw error;
 }
 
+/** Observação do exercício (não da rotina): aparece em toda rotina que o usa, sempre editável,
+ * mas versionada por data — cada edição vale a partir de quando foi feita pra frente, sem
+ * reescrever o que já valia antes (mesmo padrão de treino_marcadores). */
+export async function salvarObservacaoExercicio(exercicioId: string, observacao: string, data: string): Promise<void> {
+  const { error } = await supabase.from("treino_observacoes").upsert(
+    { user_id: uid(), exercicio_id: exercicioId, data, observacao },
+    { onConflict: "user_id,exercicio_id,data" },
+  );
+  if (error) throw error;
+}
+
+/** Observação atual (mais recente com data <= hoje) de cada exercício, em lote — evita N+1 nas
+ * telas com lista de exercícios (rotina inteira, log de treino etc). */
+export async function getObservacoesAtuais(exercicioIds: string[]): Promise<Map<string, string>> {
+  if (!exercicioIds.length) return new Map();
+  const { data, error } = await supabase
+    .from("treino_observacoes")
+    .select("exercicio_id, data, observacao")
+    .in("exercicio_id", exercicioIds)
+    .lte("data", hojeISO())
+    .order("data", { ascending: true });
+  if (error) throw error;
+  const mapa = new Map<string, string>();
+  for (const r of data ?? []) mapa.set(r.exercicio_id, r.observacao);
+  return mapa;
+}
+
+export interface ObservacaoExercicio {
+  data: string;
+  observacao: string;
+}
+
+/** Todas as versões da observação do exercício, ascendente por data — usado no histórico pra
+ * resolver "qual observação valia" numa sessão passada (última com data <= a da sessão). */
+export async function listObservacoesExercicio(exercicioId: string): Promise<ObservacaoExercicio[]> {
+  const { data, error } = await supabase
+    .from("treino_observacoes")
+    .select("data, observacao")
+    .eq("exercicio_id", exercicioId)
+    .order("data", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Resolve, numa lista ascendente de versões, qual observação valia numa data (última versão
+ * com data <= a informada) — null se nenhuma versão existia ainda naquela data. */
+export function observacaoNaData(lista: ObservacaoExercicio[], data: string): string | null {
+  let atual: string | null = null;
+  for (const o of lista) {
+    if (o.data > data) break;
+    atual = o.observacao;
+  }
+  return atual;
+}
+
 // ---------------- Rotinas (treinos) ----------------
 
 const TREINO_EXERCICIO_SELECT =
-  "id, treino_id, exercicio_id, descanso_seg, observacao, ordem, exercicio:exercicios(id, padrao_id, nome, descanso_padrao_seg, ordem, padrao:padroes_movimento(id, nome, cor_fundo, cor_fonte, ordem), musculos:exercicio_musculos(musculo_id, papel, peso_contribuicao)), series:treino_exercicio_series(id, serie, peso_alvo, rep_min, rep_max)";
+  "id, treino_id, exercicio_id, descanso_seg, ordem, exercicio:exercicios(id, padrao_id, nome, descanso_padrao_seg, ordem, padrao:padroes_movimento(id, nome, cor_fundo, cor_fonte, ordem), musculos:exercicio_musculos(musculo_id, papel, peso_contribuicao)), series:treino_exercicio_series(id, serie, peso_alvo, rep_min, rep_max)";
 
 export interface TreinoComExercicios extends Treino {
   exercicios: TreinoExercicio[];
@@ -724,7 +779,6 @@ export async function duplicateTreino(id: string): Promise<string> {
       original.exercicios.map((e) => ({
         exercicio_id: e.exercicio_id,
         descanso_seg: e.descanso_seg,
-        observacao: e.observacao,
         series: e.series.map((s) => ({
           serie: s.serie,
           peso_alvo: s.peso_alvo,
@@ -747,7 +801,6 @@ export interface ItemSerieRotina {
 export interface ItemRotina {
   exercicio_id: string;
   descanso_seg: number | null;
-  observacao: string | null;
   series: ItemSerieRotina[];
 }
 
@@ -766,7 +819,6 @@ export async function salvarExerciciosRotina(treinoId: string, itens: ItemRotina
         treino_id: treinoId,
         exercicio_id: item.exercicio_id,
         descanso_seg: item.descanso_seg,
-        observacao: item.observacao,
         ordem: idx,
       })
       .select("id")
@@ -796,14 +848,6 @@ export async function updateDescansoTreinoExercicio(
   const { error } = await supabase
     .from("treino_exercicios")
     .update({ descanso_seg: descansoSeg })
-    .eq("id", treinoExercicioId);
-  if (error) throw error;
-}
-
-export async function updateObservacaoTreinoExercicio(treinoExercicioId: string, observacao: string | null): Promise<void> {
-  const { error } = await supabase
-    .from("treino_exercicios")
-    .update({ observacao })
     .eq("id", treinoExercicioId);
   if (error) throw error;
 }
@@ -1135,7 +1179,6 @@ export async function criarRotinaAPartirDeSessao(
   const itens: ItemRotina[] = exercicios.map((ex) => ({
     exercicio_id: ex.exercicioId,
     descanso_seg: null,
-    observacao: null,
     series: ex.sets
       .filter((s) => s.peso != null || s.repeticoes != null)
       .map((s) => ({ serie: s.serie, peso_alvo: s.peso, rep_min: s.repeticoes, rep_max: s.repeticoes })),

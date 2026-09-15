@@ -1549,7 +1549,6 @@
       treino_id: modalEditorRotina.id,
       exercicio_id: destinoItem.exercicioId,
       descanso_seg: null,
-      observacao: null,
       ordem: ordemOrigem,
       exercicio: destino.exercicios.find((te) => te.id === destinoItem.treinoExercicioId)?.exercicio,
       series: Array.from({ length: origem.series }, (_, i) => {
@@ -1914,7 +1913,6 @@
           .map((te) => ({
             exercicio_id: te.exercicio_id,
             descanso_seg: te.descanso_seg,
-            observacao: te.observacao,
             series: te.series.map((s) => ({ serie: s.serie, peso_alvo: s.peso_alvo, rep_min: s.rep_min, rep_max: s.rep_max })),
           })),
       );
@@ -2028,7 +2026,6 @@
         treino_id: modalEditorRotina.id,
         exercicio_id: ex.id,
         descanso_seg: null,
-        observacao: null,
         ordem: proximaOrdem,
         exercicio: ex,
         series: Array.from({ length: 3 }, (_, i) => {

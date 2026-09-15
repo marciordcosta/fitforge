@@ -14,11 +14,14 @@
     salvarExerciciosRotina,
     limparMetasMusculoRotina,
     getUltimoRegistro,
+    getObservacoesAtuais,
+    salvarObservacaoExercicio,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
     type Exercicio,
     type SetRegistro,
   } from "../../lib/treinoApi";
+  import { hojeISO } from "../../lib/dates";
   import { rotinaEditorSessao, type Linha, type LinhaSerie } from "../../lib/rotinaEditorSessao.svelte";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
 
@@ -27,6 +30,10 @@
   let nomeTreino = $state("");
   let diaSemana = $state<number | null>(null);
   let linhas = $state<Linha[]>([]);
+  /** Observação atual de cada exercício (por exercicio_id, não por slot da rotina) — fora do
+   * dirty-check de `linhas`: salva instantâneo ao editar, igual ao descanso, em vez de disputar
+   * com o "Salvar rotina" (era a causa da nota some/reaparecer sozinha). */
+  let observacoesPorExercicio = $state<Map<string, string>>(new Map());
   let loading = $state(true);
   let salvando = $state(false);
   let mostrarPicker = $state(false);
@@ -70,6 +77,7 @@
           substituindoIdx = salva.picker.idx;
           buscaPicker = salva.picker.busca;
         }
+        observacoesPorExercicio = await getObservacoesAtuais(linhas.map((l) => l.exercicio_id));
         loading = false;
         return;
       }
@@ -83,7 +91,6 @@
             exercicio_id: e.exercicio_id,
             nome: e.exercicio?.nome ?? "",
             descanso_seg: e.descanso_seg,
-            observacao: e.observacao,
             series: e.series.map((s) => ({
               serie: s.serie,
               peso_alvo: s.peso_alvo,
@@ -93,6 +100,7 @@
           }));
         }
       }
+      observacoesPorExercicio = await getObservacoesAtuais(linhas.map((l) => l.exercicio_id));
       rotinaEditorSessao.definirOriginal(JSON.stringify({ nomeTreino, diaSemana, linhas }));
     } catch (e) {
       erroCarregar = (e as Error).message;
@@ -149,9 +157,18 @@
       exercicio_id: ex.id,
       nome: ex.nome,
       descanso_seg: ex.descanso_padrao_seg ?? 180,
-      observacao: null,
       series,
     };
+  }
+
+  async function salvarObservacao(exercicioId: string, valor: string): Promise<void> {
+    const texto = valor.trim();
+    observacoesPorExercicio = new Map(observacoesPorExercicio).set(exercicioId, texto);
+    try {
+      await salvarObservacaoExercicio(exercicioId, texto, hojeISO());
+    } catch (e) {
+      alert("Erro ao salvar observação: " + (e as Error).message);
+    }
   }
 
   async function adicionarRapido(ex: Exercicio) {
@@ -219,7 +236,7 @@
         rep_max: ant?.repeticoes ?? null,
       };
     });
-    linhas[idx] = { ...linha, exercicio_id: novoEx.id, nome: novoEx.nome, observacao: null, series };
+    linhas[idx] = { ...linha, exercicio_id: novoEx.id, nome: novoEx.nome, series };
     fecharSubstituir();
   }
   let descansoEditandoIdx = $state<number | null>(null);
@@ -284,7 +301,6 @@
         linhas.map((l) => ({
           exercicio_id: l.exercicio_id,
           descanso_seg: l.descanso_seg,
-          observacao: l.observacao,
           series: l.series,
         })),
       );
@@ -373,8 +389,9 @@
         <input
           class="observacao-input"
           type="text"
-          placeholder="Adicionar notas de rotina aqui"
-          bind:value={linha.observacao}
+          placeholder="Adicionar notas do exercício aqui"
+          value={observacoesPorExercicio.get(linha.exercicio_id) ?? ""}
+          onchange={(e) => salvarObservacao(linha.exercicio_id, (e.target as HTMLInputElement).value)}
         />
         <button class="descanso-select" onclick={() => (descansoEditandoIdx = idx)}>
           ⏱ Descanso: {linha.descanso_seg != null ? formatMinSeg(linha.descanso_seg) : "Desativado"}

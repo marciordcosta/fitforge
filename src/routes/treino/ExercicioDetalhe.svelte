@@ -12,10 +12,13 @@
     getHistoricoDetalhadoExercicio,
     distribuicaoMusculosExercicio,
     listMarcadoresExercicio,
+    listObservacoesExercicio,
+    observacaoNaData,
     type Exercicio,
     type SessaoHistorico,
     type LinhaMusculoInput,
     type MarcadorExercicio,
+    type ObservacaoExercicio,
   } from "../../lib/treinoApi";
   import ExercicioChart from "./ExercicioChart.svelte";
   import ExercicioCampos from "./ExercicioCampos.svelte";
@@ -34,10 +37,17 @@
   let exercicio = $state<Exercicio | null>(null);
   let historico = $state<SessaoHistorico[]>([]);
   let marcadores = $state<MarcadorExercicio[]>([]);
+  let observacoes = $state<ObservacaoExercicio[]>([]);
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
 
   const marcadoresPorData = $derived(new Map(marcadores.map((m) => [m.data, m.observacao])));
+
+  /** Observação vigente NA DATA de cada sessão do histórico — não a atual: sessões antigas
+   * continuam mostrando o que valia então, mesmo que a observação já tenha sido editada depois. */
+  function observacaoDaSessao(data: string): string | null {
+    return observacaoNaData(observacoes, data);
+  }
 
   /** Compartilhado com o gráfico (ExercicioChart) — o mesmo filtro por quantidade de
    * registros usado no gráfico também restringe a lista de sessões abaixo dele.
@@ -55,14 +65,16 @@
 
   async function carregar() {
     loading = true;
-    const [ex, hist, marc] = await Promise.all([
+    const [ex, hist, marc, obs] = await Promise.all([
       getExercicio(exercicioId),
       getHistoricoDetalhadoExercicio(exercicioId),
       listMarcadoresExercicio(exercicioId),
+      listObservacoesExercicio(exercicioId),
     ]);
     exercicio = ex;
     historico = hist;
     marcadores = marc;
+    observacoes = obs;
     if (exercicio) {
       nome = exercicio.nome;
       padraoId = exercicio.padrao_id ?? "";
@@ -239,6 +251,9 @@
           </div>
           {#if marcadoresPorData.has(sessao.data)}
             <p class="sessao-marcador">🚩 {marcadoresPorData.get(sessao.data)}</p>
+          {/if}
+          {#if observacaoDaSessao(sessao.data)}
+            <p class="sessao-observacao">📝 {observacaoDaSessao(sessao.data)}</p>
           {/if}
           <div class="sessao-tabela">
             <div class="sessao-linha sessao-cabecalho">
@@ -441,6 +456,11 @@
     margin: 0 0 var(--space-2);
     font-size: var(--font-size-sm);
     color: var(--color-warning, #fbbf24);
+  }
+  .sessao-observacao {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .sessao-recorde {
     margin-left: var(--space-1);

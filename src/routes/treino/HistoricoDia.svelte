@@ -12,6 +12,8 @@
     excluirRegistrosDoDia,
     criarRotinaAPartirDeSessao,
     getRecordesExercicio,
+    listObservacoesExercicio,
+    observacaoNaData,
     type SetRegistro,
   } from "../../lib/treinoApi";
 
@@ -29,6 +31,9 @@
 
   let treinoNome = $state("");
   let sessao = $state<ExercicioSessaoHistorico[]>([]);
+  /** Observação vigente NA DATA dessa sessão (não a atual) — resolvida por exercício a partir
+   * de todas as versões salvas, igual ExercicioDetalhe.svelte faz por sessão do histórico. */
+  let observacoesPorExercicio = $state<Map<string, string | null>>(new Map());
   let loading = $state(true);
   let salvando = $state(false);
   let salvo = $state(false);
@@ -55,6 +60,10 @@
       exercicioNome: ex.exercicioNome,
       sets: ex.sets.map((s) => ({ ...s })),
     }));
+    const pares = await Promise.all(
+      sessao.map(async (ex) => [ex.exercicioId, observacaoNaData(await listObservacoesExercicio(ex.exercicioId), data)] as const),
+    );
+    observacoesPorExercicio = new Map(pares);
     loading = false;
   }
 
@@ -274,6 +283,9 @@
     {#each sessao as ex (ex.exercicioId)}
       <div class="sessao-card">
         <h2 class="sessao-nome" class:destaque={ex.exercicioId === destaqueExercicioId}>{ex.exercicioNome}</h2>
+        {#if observacoesPorExercicio.get(ex.exercicioId)}
+          <p class="sessao-observacao">📝 {observacoesPorExercicio.get(ex.exercicioId)}</p>
+        {/if}
         <div class="sessao-tabela">
           <div class="sessao-linha sessao-cabecalho">
             <span>Série</span>
@@ -528,6 +540,11 @@
   .sessao-recorde {
     margin-left: var(--space-1);
     font-size: 12px;
+  }
+  .sessao-observacao {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .nome-input {
     box-sizing: border-box;

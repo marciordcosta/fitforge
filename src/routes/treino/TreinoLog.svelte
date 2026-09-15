@@ -12,7 +12,8 @@
     salvarRegistrosDoDia,
     salvarExerciciosRotina,
     updateDescansoTreinoExercicio,
-    updateObservacaoTreinoExercicio,
+    getObservacoesAtuais,
+    salvarObservacaoExercicio,
     createExercicioAvulso,
     construirMusculosInput,
     getExercicio,
@@ -105,6 +106,7 @@
     nomeTreino = treino.nome_treino;
     const fonte = await getHistoricoFonte();
     const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
+    const observacoesAtuais = await getObservacoesAtuais(exerciciosOrdenados.map((te) => te.exercicio_id));
 
     sessao = await Promise.all(
       exerciciosOrdenados.map(async (te) => {
@@ -139,7 +141,7 @@
           exercicio_id: te.exercicio_id,
           nome: te.exercicio?.nome ?? "",
           descanso_seg: te.descanso_seg,
-          observacao: te.observacao,
+          observacao: observacoesAtuais.get(te.exercicio_id) ?? null,
           sets,
           descansoAte: null,
           descansoInicioEm: null,
@@ -465,12 +467,10 @@
     }
   }
 
-  /** Exercícios adicionados nessa sessão ainda não existem na rotina salva (id sintético), não há o que persistir ainda. */
   async function salvarObservacao(exIdx: number) {
     const ex = sessao[exIdx];
-    if (ex.treino_exercicio_id.startsWith("novo-")) return;
     try {
-      await updateObservacaoTreinoExercicio(ex.treino_exercicio_id, ex.observacao);
+      await salvarObservacaoExercicio(ex.exercicio_id, ex.observacao?.trim() ?? "", hojeISO());
     } catch (e) {
       mostrarAlerta("Erro ao salvar observação: " + (e as Error).message);
     }
@@ -522,13 +522,14 @@
     if (substituindoExIdx == null) return;
     const ex = sessao[substituindoExIdx];
     const fonte = await getHistoricoFonte();
-    const [anterior, recordes] = await Promise.all([
+    const [anterior, recordes, observacoesNovoEx] = await Promise.all([
       getUltimoRegistro(novoEx.id, fonte === "ultima_rotina" ? treinoId : undefined),
       getRecordesExercicio(novoEx.id),
+      getObservacoesAtuais([novoEx.id]),
     ]);
     ex.exercicio_id = novoEx.id;
     ex.nome = novoEx.nome;
-    ex.observacao = null;
+    ex.observacao = observacoesNovoEx.get(novoEx.id) ?? null;
     ex.recordes = recordes;
     ex.sets = Array.from({ length: ex.sets.length }, (_, i) => {
       const ant = anterior.find((a) => a.serie === i + 1);
@@ -756,7 +757,6 @@
           sessao.map((ex) => ({
             exercicio_id: ex.exercicio_id,
             descanso_seg: ex.descanso_seg,
-            observacao: ex.observacao,
             series: ex.sets.map((s) => ({
               serie: s.serie,
               peso_alvo: s.pesoAlvo,

@@ -7,6 +7,7 @@
     getTreino,
     duplicateTreino,
     deleteTreino,
+    getObservacoesAtuais,
     DIAS_SEMANA_COMPLETO,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
@@ -14,6 +15,7 @@
   let { treinoId }: { treinoId: string } = $props();
 
   let treino = $state<TreinoComExercicios | null>(null);
+  let observacoesPorExercicio = $state<Map<string, string>>(new Map());
   let loading = $state(true);
   let erroCarregar = $state<string | null>(null);
   let processando = $state(false);
@@ -25,6 +27,7 @@
     erroCarregar = null;
     try {
       treino = await getTreino(treinoId);
+      observacoesPorExercicio = await getObservacoesAtuais(treino?.exercicios.map((e) => e.exercicio_id) ?? []);
     } catch (e) {
       erroCarregar = (e as Error).message;
     } finally {
@@ -129,8 +132,8 @@
       {#each treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te (te.id)}
         <div class="exercicio-card">
           <h2>{te.exercicio?.nome ?? ""}</h2>
-          {#if te.observacao}
-            <p class="observacao">{te.observacao}</p>
+          {#if observacoesPorExercicio.get(te.exercicio_id)}
+            <p class="observacao">{observacoesPorExercicio.get(te.exercicio_id)}</p>
           {/if}
           {#if te.descanso_seg != null}
             <p class="descanso">⏱ Descanso: {formatMinSeg(te.descanso_seg)}</p>
