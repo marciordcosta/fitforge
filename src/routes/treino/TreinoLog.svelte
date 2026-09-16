@@ -1,6 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { mostrarToast, toast } from "../../lib/toast.svelte";
+  import { mostrarToast } from "../../lib/toast.svelte";
   import { hojeISO } from "../../lib/dates";
   import { formatMinSeg } from "../../lib/tempo";
   import {
@@ -410,16 +410,17 @@
     if (serieItem.peso != null && serieItem.repeticoes != null) {
       const rm = calcular1RM(serieItem.peso, serieItem.repeticoes);
       const volume = serieItem.peso * serieItem.repeticoes;
-      const novosRecordes: string[] = [];
       // Atualiza ex.recordes na hora (não só no fim da sessão): sem isso, duas séries desse
       // mesmo exercício que batessem o MESMO recorde antigo (ex: 100kg na 1ª série, 95kg na 2ª,
-      // ambas acima do recorde anterior de 90kg) disparavam toast de recorde nas duas, mesmo só
-      // uma sobrevivendo como troféu de verdade no histórico. Também tira o troféu de séries
+      // ambas acima do recorde anterior de 90kg) marcavam o troféu nas duas, mesmo só uma
+      // sobrevivendo como troféu de verdade no histórico. Também tira o troféu de séries
       // anteriores dessa sessão que acabaram de ser superadas — só a mais alta do dia acumula.
+      // Sem toast/mensagem aqui de propósito: o aviso é só a medalha no número da série
+      // (renderizada com base em prPeso/pr1rm/prVolume), que fica visível o treino inteiro em vez
+      // de sumir em poucos segundos.
       if (serieItem.peso > ex.recordes.maiorPeso) {
         serieItem.prPeso = true;
         serieItem.prPesoDelta = serieItem.peso - ex.recordes.maiorPeso;
-        novosRecordes.push("peso");
         for (const s of ex.sets) {
           if (s !== serieItem) {
             s.prPeso = false;
@@ -431,7 +432,6 @@
       if (rm > ex.recordes.melhor1rm) {
         serieItem.pr1rm = true;
         serieItem.pr1rmDelta = rm - ex.recordes.melhor1rm;
-        novosRecordes.push("1RM");
         for (const s of ex.sets) {
           if (s !== serieItem) {
             s.pr1rm = false;
@@ -443,7 +443,6 @@
       if (volume > ex.recordes.melhorVolumeSerie) {
         serieItem.prVolume = true;
         serieItem.prVolumeDelta = volume - ex.recordes.melhorVolumeSerie;
-        novosRecordes.push("volume");
         for (const s of ex.sets) {
           if (s !== serieItem) {
             s.prVolume = false;
@@ -451,13 +450,6 @@
           }
         }
         ex.recordes = { ...ex.recordes, melhorVolumeSerie: volume };
-      }
-      if (novosRecordes.length) {
-        // Duração maior que o padrão: é comum bater um recorde bem na última série do treino e,
-        // em seguida, tocar em "Concluir" quase na hora — o toast de "Salvo" (mesmo slot global)
-        // cortava esse aviso antes de dar tempo de ler. Ver também o guard em
-        // confirmarConcluirTreino/finalizarComEscolha, que evita substituir esse toast.
-        mostrarToast(`🏆 Recorde de ${novosRecordes.join(" e ")}!`, 4000);
       }
     }
   }
@@ -895,7 +887,7 @@
       await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
       finalizado = true;
       treinoLogSessao.limpar();
-      if (!toast.mensagem?.startsWith("🏆")) mostrarToast("Salvo");
+      mostrarToast("Salvo");
       voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);
@@ -925,7 +917,7 @@
       }
       finalizado = true;
       treinoLogSessao.limpar();
-      if (!toast.mensagem?.startsWith("🏆")) mostrarToast("Salvo");
+      mostrarToast("Salvo");
       voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);
