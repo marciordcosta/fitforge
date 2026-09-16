@@ -773,7 +773,7 @@
               gorduraG: metaCardPara("gorduraG", metaAtual, prefsRefeicoes.barraBase),
               proteinaG: metaCardPara("proteinaG", metaAtual, prefsRefeicoes.barraBase),
             }}
-            <p class="pct-titulo">Meta de {refeicao.nome} ({prefsRefeicoes.barraBase === "diaria" ? "meta diária" : "meta refeição"})</p>
+            <p class="pct-titulo">{prefsRefeicoes.barraBase === "diaria" ? "Meta diária" : "Meta refeição"}</p>
             <div class="pct-grid">
               {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, metaBarra.calorias)), labelValorRefeicao(totais.calorias, arredondarDezena(metaAtual.calorias), arredondarDezena(metas?.calorias ?? 0), "", temItens))}
               {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaBarra.carboidratoG)), labelValorRefeicao(totais.carboidratoG, metaAtual.carboidratoG, metas?.carboidratoG ?? 0, "g", temItens))}
