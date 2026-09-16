@@ -45,10 +45,22 @@
    * de cada uma — capturadas ao carregar a <img> (aoCarregarImagem), não dá pra saber antes disso. */
   let dimensoesPorPath = $state(new Map<string, { w: number; h: number }>());
 
-  function aoCarregarImagem(path: string, e: Event): void {
-    const img = e.currentTarget as HTMLImageElement;
+  function registrarDimensao(path: string, img: HTMLImageElement): void {
     if (!img.naturalWidth || !img.naturalHeight) return;
     dimensoesPorPath.set(path, { w: img.naturalWidth, h: img.naturalHeight });
+  }
+
+  function aoCarregarImagem(path: string, e: Event): void {
+    registrarDimensao(path, e.currentTarget as HTMLImageElement);
+  }
+
+  /** A foto quase sempre já está no cache do navegador (mesma URL assinada já exibida como
+   * miniatura na galeria) — nesse caso `complete`/`naturalWidth` já vêm prontos assim que o
+   * elemento é inserido no DOM, bem antes do evento `load` disparar. Checar isso já na montagem
+   * (ação, roda logo após o elemento entrar no DOM) evita o "pulo" de abrir pequena e só ajustar
+   * o zoom um instante depois — o onload continua como reforço pra quando não está em cache. */
+  function medirAoMontar(node: HTMLImageElement, path: string) {
+    if (node.complete) registrarDimensao(path, node);
   }
 
   /** Zoom com que a foto ATUAL abre: o suficiente pra preencher a largura do painel sem sobrar
@@ -323,6 +335,7 @@
             draggable="false"
             class:sem-transicao={arrastando}
             style={i === indice ? `transform: translate(${panX}px, ${panY}px) scale(${scale});` : ""}
+            use:medirAoMontar={foto.path}
             onload={(e) => aoCarregarImagem(foto.path, e)}
           />
         {/if}
