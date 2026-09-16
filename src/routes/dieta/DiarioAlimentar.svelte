@@ -435,11 +435,11 @@
     switch (prefsRefeicoes.valoresFormato) {
       case "percentual_refeicao": {
         const pct = metaRefeicao > 0 ? (valor / metaRefeicao) * 100 : 0;
-        return { principal: `${valor.toFixed(0)}${unidade}`, secundario: `${pct.toFixed(0)}%` };
+        return { principal: `${valor.toFixed(0)}${unidade}`, secundario: `${pct.toFixed(0)}% da meta` };
       }
       case "percentual_diario": {
         const pct = metaDiaria > 0 ? (valor / metaDiaria) * 100 : 0;
-        return { principal: `${valor.toFixed(0)}${unidade}`, secundario: `${pct.toFixed(0)}%` };
+        return { principal: `${valor.toFixed(0)}${unidade}`, secundario: `${pct.toFixed(0)}% da meta` };
       }
       case "meta_refeicao":
         return { principal: `${valor.toFixed(0)}/${metaRefeicao.toFixed(0)}${unidade}`, secundario: "" };
