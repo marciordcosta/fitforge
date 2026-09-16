@@ -158,12 +158,9 @@
     ];
   }
 
-  /** Rodapé do modal: calorias que essa refeição vai "consumir" da meta do dia com a escolha
-   * atual, e quanto restaria pra bater a meta (a última refeição automática absorve isso). */
+  /** Rodapé do modal: calorias que essa refeição vai "consumir" da meta do dia com a escolha atual. */
   function formatarRodapeCalorias(caloriasEscolhidas: number): string {
-    if (!contexto) return `≈ ${caloriasEscolhidas} kcal`;
-    const restante = Math.max(0, Math.round(contexto.disponivel.calorias - caloriasEscolhidas));
-    return `${caloriasEscolhidas}/${restante} restantes`;
+    return `${caloriasEscolhidas} cal`;
   }
 
   async function confirmarMacros(valores: Record<string, number>): Promise<void> {

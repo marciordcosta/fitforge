@@ -1103,9 +1103,7 @@
   }
 
   function formatarRodapeMacrosRefeicao(caloriasEscolhidas: number): string {
-    if (!modeloMacrosEditando) return `≈ ${caloriasEscolhidas} kcal`;
-    const restante = Math.max(0, Math.round(modeloMacrosEditando.contexto.disponivel.calorias - caloriasEscolhidas));
-    return `${caloriasEscolhidas}/${restante} restantes`;
+    return `${caloriasEscolhidas} cal`;
   }
 
   async function confirmarMacrosRefeicao(valores: Record<string, number>): Promise<void> {
