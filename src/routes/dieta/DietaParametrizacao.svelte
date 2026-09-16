@@ -19,6 +19,7 @@
     type DefinicaoParametro,
     type TipoDieta,
     type BaseReferenciaRefeicao,
+    type FormatoValorRefeicao,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
 
@@ -31,7 +32,7 @@
   let categoriasAbertas = $state<Set<string>>(new Set());
   let tipoDieta = $state<TipoDieta>("manutencao");
   let barraBase = $state<BaseReferenciaRefeicao>("refeicao");
-  let valoresBase = $state<BaseReferenciaRefeicao>("refeicao");
+  let valoresFormato = $state<FormatoValorRefeicao>("restante_acima");
   let abertaExibicao = $state(false);
   let confirmandoDescartar = $state(false);
   let original = "";
@@ -45,6 +46,13 @@
   const OPCOES_BASE_REFEICAO: { valor: BaseReferenciaRefeicao; label: string }[] = [
     { valor: "refeicao", label: "Meta da refeição" },
     { valor: "diaria", label: "Meta diária" },
+  ];
+
+  const OPCOES_FORMATO_VALOR: { valor: FormatoValorRefeicao; label: string }[] = [
+    { valor: "percentual_refeicao", label: "Consumido (g) / % da refeição" },
+    { valor: "percentual_diario", label: "Consumido (g) / % do dia" },
+    { valor: "restante_acima", label: "Consumido (g) / rest. ou acima (g)" },
+    { valor: "meta_refeicao", label: "Consumido (g) / meta da refeição (g)" },
   ];
 
   const categorias = [...new Set(DEFINICOES_PARAMETROS.map((d) => d.categoria))];
@@ -88,8 +96,8 @@
       valores = novo;
       tipoDieta = tipo;
       barraBase = prefsRefeicoes.barraBase;
-      valoresBase = prefsRefeicoes.valoresBase;
-      original = JSON.stringify({ valores, tipoDieta, barraBase, valoresBase });
+      valoresFormato = prefsRefeicoes.valoresFormato;
+      original = JSON.stringify({ valores, tipoDieta, barraBase, valoresFormato });
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -100,7 +108,7 @@
   void carregar();
 
   function sujo(): boolean {
-    return !carregando && JSON.stringify({ valores, tipoDieta, barraBase, valoresBase }) !== original;
+    return !carregando && JSON.stringify({ valores, tipoDieta, barraBase, valoresFormato }) !== original;
   }
 
   const guardaSaida = criarGuardaSaida(sujo);
@@ -129,7 +137,7 @@
         }),
       );
       await salvarTipoDieta(tipoDieta);
-      await salvarPreferenciasRefeicoesHome({ barraBase, valoresBase });
+      await salvarPreferenciasRefeicoesHome({ barraBase, valoresFormato });
       mostrarToast("Salvo");
       guardaSaida.resolverSaida(() => voltar("/dieta"));
     } catch (err) {
@@ -275,10 +283,10 @@
             </div>
           </div>
           <div class="param-linha param-tipo-dieta">
-            <p class="param-nome">Valores das refeições (home) correspondem a</p>
-            <div class="tipo-dieta-opcoes">
-              {#each OPCOES_BASE_REFEICAO as opcao (opcao.valor)}
-                <button type="button" class:ativo={valoresBase === opcao.valor} onclick={() => (valoresBase = opcao.valor)}>{opcao.label}</button>
+            <p class="param-nome">Valores das refeições (home)</p>
+            <div class="formato-valor-opcoes">
+              {#each OPCOES_FORMATO_VALOR as opcao (opcao.valor)}
+                <button type="button" class:ativo={valoresFormato === opcao.valor} onclick={() => (valoresFormato = opcao.valor)}>{opcao.label}</button>
               {/each}
             </div>
           </div>
@@ -432,6 +440,28 @@
     cursor: pointer;
   }
   .tipo-dieta-opcoes button.ativo {
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
+  }
+  .formato-valor-opcoes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .formato-valor-opcoes button {
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    cursor: pointer;
+  }
+  .formato-valor-opcoes button.ativo {
     background: var(--color-secondary);
     color: var(--surface-bg);
     border-color: var(--color-secondary);

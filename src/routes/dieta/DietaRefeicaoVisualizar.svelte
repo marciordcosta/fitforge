@@ -45,7 +45,7 @@
   let itens = $state<ItemDiario[]>([]);
   let metaRefeicao = $state<MetasDiarias | null>(null);
   let metaDiaria = $state<MetasDiarias | null>(null);
-  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresBase: "refeicao" });
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima" });
   let modeloRefeicao = $state<RefeicaoModelo | null>(null);
   /** Só mostra o botão "Refeição Padrão" quando a lista de alimentos efetiva desse dia (override do
    * dia se houver, senão a global) realmente tem algum item — senão o botão aparece sem ter nada
@@ -139,11 +139,25 @@
     return metaRef[campo];
   }
 
-  /** Mesmo texto usado no Diário: quanto falta pra bater a meta ("rest."), ou "X acima" se já
-   * passou — em vez de "consumido de meta". */
-  function metaValorTexto(consumido: number, meta: number, unidade: string): string {
-    if (consumido > meta) return `${(consumido - meta).toFixed(0)}${unidade} acima`;
-    return `${Math.max(0, meta - consumido).toFixed(0)}${unidade} rest.`;
+  /** Mesma regra do Diário (Exibição das Refeições, em Parametrização) — percentual tem variante
+   * refeição/diária; resto-ou-acima e a meta em gramas são sempre contra a meta DESSA refeição. */
+  function metaValorTexto(consumido: number, metaRefeicaoValor: number, metaDiariaValor: number, unidade: string): string {
+    switch (prefsRefeicoes.valoresFormato) {
+      case "percentual_refeicao": {
+        const pct = metaRefeicaoValor > 0 ? (consumido / metaRefeicaoValor) * 100 : 0;
+        return `${consumido.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+      }
+      case "percentual_diario": {
+        const pct = metaDiariaValor > 0 ? (consumido / metaDiariaValor) * 100 : 0;
+        return `${consumido.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+      }
+      case "meta_refeicao":
+        return `${consumido.toFixed(0)}/${metaRefeicaoValor.toFixed(0)}${unidade}`;
+      case "restante_acima":
+      default:
+        if (consumido > metaRefeicaoValor) return `${consumido.toFixed(0)}${unidade} (${(consumido - metaRefeicaoValor).toFixed(0)}${unidade} acima)`;
+        return `${consumido.toFixed(0)}${unidade} (${Math.max(0, metaRefeicaoValor - consumido).toFixed(0)}${unidade} rest.)`;
+    }
   }
 
   async function abrirItem(item: ItemDiario) {
@@ -423,33 +437,27 @@
         gorduraG: metaPara("gorduraG", metaRefeicao, prefsRefeicoes.barraBase),
         proteinaG: metaPara("proteinaG", metaRefeicao, prefsRefeicoes.barraBase),
       }}
-      {@const metaValor = {
-        calorias: metaPara("calorias", metaRefeicao, prefsRefeicoes.valoresBase),
-        carboidratoG: metaPara("carboidratoG", metaRefeicao, prefsRefeicoes.valoresBase),
-        gorduraG: metaPara("gorduraG", metaRefeicao, prefsRefeicoes.valoresBase),
-        proteinaG: metaPara("proteinaG", metaRefeicao, prefsRefeicoes.valoresBase),
-      }}
       <p class="metas-titulo">Meta de {refeicao?.nome}</p>
       <div class="metas-grid">
         <div class="meta-col">
           <span class="meta-label">Calorias</span>
           <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metaBarra.calorias))}%; background:var(--color-secondary);`}></div></div>
-          <span class="meta-valor">{metaValorTexto(totalCalorias, metaValor.calorias, "")}</span>
+          <span class="meta-valor">{metaValorTexto(totalCalorias, metaRefeicao.calorias, metaDiaria?.calorias ?? 0, "")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Carb</span>
           <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metaBarra.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(totalCarboidrato, metaValor.carboidratoG, "g")}</span>
+          <span class="meta-valor">{metaValorTexto(totalCarboidrato, metaRefeicao.carboidratoG, metaDiaria?.carboidratoG ?? 0, "g")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Gorduras</span>
           <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metaBarra.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(totalGordura, metaValor.gorduraG, "g")}</span>
+          <span class="meta-valor">{metaValorTexto(totalGordura, metaRefeicao.gorduraG, metaDiaria?.gorduraG ?? 0, "g")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Proteínas</span>
           <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metaBarra.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(totalProteina, metaValor.proteinaG, "g")}</span>
+          <span class="meta-valor">{metaValorTexto(totalProteina, metaRefeicao.proteinaG, metaDiaria?.proteinaG ?? 0, "g")}</span>
         </div>
       </div>
     {:else if itens.length}

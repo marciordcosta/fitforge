@@ -144,7 +144,7 @@
   let metasRefeicaoPorNome = $state<Map<string, RefeicaoModelo>>(new Map());
   let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
   let pesoAtual = $state(76);
-  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresBase: "refeicao" });
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima" });
   const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
 
   function parametro(chave: string): LimiteParametro {
@@ -415,40 +415,32 @@
     return valor > meta;
   }
 
-  function labelAbsoluto(valor: number, meta: number, unidade: string): string {
-    return `${valor.toFixed(0)}/${meta.toFixed(0)}${unidade}`;
-  }
-
-  /** Mesmo texto do anel de macros do topo: no modo restante, mostra o quanto falta (ou "acima" se
-   * já passou da meta) em vez de "consumido/meta"; no modo por peso, mostra o consumido em g/kg —
-   * não se aplica a calorias (unidade vazia), que não tem uma métrica por peso equivalente e fica
-   * na visualização padrão (restante) mesmo nesse modo. Aplicado também nos cards de cada refeição,
-   * onde o consumido vem antes, entre parênteses (ex: "25g (6g rest.)") — nos cards não faz sentido
-   * mostrar só o restante sem saber quanto já foi de fato consumido. */
-  function labelMeta(valor: number, meta: number, unidade: string): string {
-    if (modoExibicao === "porPeso" && unidade) return `${gPorKg(valor)}${unidade}/kg`;
-    if (modoExibicao === "absoluto") return labelAbsoluto(valor, meta, unidade);
-    if (passouMeta(valor, meta)) return `${(valor - meta).toFixed(0)}${unidade} acima`;
-    return `${restante(valor, meta).toFixed(0)}${unidade} rest.`;
-  }
-
-  /** Mesma regra de labelMeta, mas com o valor consumido antes, entre parênteses — usado só nos
-   * cards de refeição (labelMetaCard), onde ver quanto já foi consumido é mais útil que só o
-   * restante/quanto passou. */
-  function labelMetaComConsumido(valor: number, meta: number, unidade: string): string {
-    if (modoExibicao === "porPeso" && unidade) return labelMeta(valor, meta, unidade);
-    if (modoExibicao === "absoluto") return labelMeta(valor, meta, unidade);
-    return `${valor.toFixed(0)}${unidade} (${labelMeta(valor, meta, unidade)})`;
-  }
-
-  /** Mesma lógica de labelMeta, mas sem o "rest." quando a refeição tem meta e ainda não recebeu
-   * nenhum alimento — nesse caso o valor mostrado É a própria meta (nada foi consumido ainda), não
-   * faz sentido chamar de "restante". Com algum item já lançado, continua "rest." normalmente. */
-  function labelMetaCard(valor: number, meta: number, unidade: string, temItens: boolean): string {
-    if (modoExibicao === "restante" && !temItens && !passouMeta(valor, meta)) {
-      return `${restante(valor, meta).toFixed(0)}${unidade}`;
+  /** Valor mostrado nos cards de refeição da home — formato definido em Parametrização > Exibição
+   * das Refeições (independente do toggle restante/absoluto/por peso do topo, que só afeta os
+   * anéis de macro do topo do Diário). Percentual tem variante refeição/diária; resto-ou-acima e
+   * a meta em gramas são sempre contra a meta DAQUELA refeição (não têm variante diária). Sem
+   * nenhum item lançado ainda, mostra só a própria meta (nada pra chamar de "restante"). */
+  function labelValorRefeicao(valor: number, metaRefeicao: number, metaDiaria: number, unidade: string, temItens: boolean): string {
+    if (!temItens && !passouMeta(valor, metaRefeicao)) {
+      if (prefsRefeicoes.valoresFormato === "meta_refeicao") return `${valor.toFixed(0)}/${metaRefeicao.toFixed(0)}${unidade}`;
+      return `${restante(valor, metaRefeicao).toFixed(0)}${unidade}`;
     }
-    return labelMetaComConsumido(valor, meta, unidade);
+    switch (prefsRefeicoes.valoresFormato) {
+      case "percentual_refeicao": {
+        const pct = metaRefeicao > 0 ? (valor / metaRefeicao) * 100 : 0;
+        return `${valor.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+      }
+      case "percentual_diario": {
+        const pct = metaDiaria > 0 ? (valor / metaDiaria) * 100 : 0;
+        return `${valor.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+      }
+      case "meta_refeicao":
+        return `${valor.toFixed(0)}/${metaRefeicao.toFixed(0)}${unidade}`;
+      case "restante_acima":
+      default:
+        if (passouMeta(valor, metaRefeicao)) return `${valor.toFixed(0)}${unidade} (${(valor - metaRefeicao).toFixed(0)}${unidade} acima)`;
+        return `${valor.toFixed(0)}${unidade} (${restante(valor, metaRefeicao).toFixed(0)}${unidade} rest.)`;
+    }
   }
 
   /** Texto do card de refeição sem meta cadastrada — sem meta pra comparar, "restante"/"absoluto"
@@ -774,18 +766,12 @@
               gorduraG: metaCardPara("gorduraG", metaAtual, prefsRefeicoes.barraBase),
               proteinaG: metaCardPara("proteinaG", metaAtual, prefsRefeicoes.barraBase),
             }}
-            {@const metaValor = {
-              calorias: arredondarDezena(metaCardPara("calorias", metaAtual, prefsRefeicoes.valoresBase)),
-              carboidratoG: metaCardPara("carboidratoG", metaAtual, prefsRefeicoes.valoresBase),
-              gorduraG: metaCardPara("gorduraG", metaAtual, prefsRefeicoes.valoresBase),
-              proteinaG: metaCardPara("proteinaG", metaAtual, prefsRefeicoes.valoresBase),
-            }}
             <p class="pct-titulo">Meta de {refeicao.nome}</p>
             <div class="pct-grid">
-              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, metaBarra.calorias)), labelMetaCard(totais.calorias, metaValor.calorias, "", temItens))}
-              {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaBarra.carboidratoG)), labelMetaCard(totais.carboidratoG, metaValor.carboidratoG, "g", temItens))}
-              {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaBarra.gorduraG)), labelMetaCard(totais.gorduraG, metaValor.gorduraG, "g", temItens))}
-              {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaBarra.proteinaG)), labelMetaCard(totais.proteinaG, metaValor.proteinaG, "g", temItens))}
+              {@render pctColuna("Calorias", "var(--color-secondary)", larguraBarra(pctMeta(totais.calorias, metaBarra.calorias)), labelValorRefeicao(totais.calorias, arredondarDezena(metaAtual.calorias), arredondarDezena(metas?.calorias ?? 0), "", temItens))}
+              {@render pctColuna("Carb", COR_CARBO, larguraBarra(pctMeta(totais.carboidratoG, metaBarra.carboidratoG)), labelValorRefeicao(totais.carboidratoG, metaAtual.carboidratoG, metas?.carboidratoG ?? 0, "g", temItens))}
+              {@render pctColuna("Gorduras", COR_GORDURA, larguraBarra(pctMeta(totais.gorduraG, metaBarra.gorduraG)), labelValorRefeicao(totais.gorduraG, metaAtual.gorduraG, metas?.gorduraG ?? 0, "g", temItens))}
+              {@render pctColuna("Proteínas", COR_PROTEINA, larguraBarra(pctMeta(totais.proteinaG, metaBarra.proteinaG)), labelValorRefeicao(totais.proteinaG, metaAtual.proteinaG, metas?.proteinaG ?? 0, "g", temItens))}
             </div>
           {:else if temItens}
             <p class="pct-titulo">Refeição sem meta</p>

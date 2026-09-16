@@ -1317,16 +1317,21 @@ export async function salvarTipoDieta(tipo: TipoDieta): Promise<void> {
   if (error) throw error;
 }
 
-/** A que a barra/o valor exibidos nos cards de refeição (home e detalhe da refeição) correspondem
- * como "100%": a meta daquela refeição (redistribuída) ou a meta diária inteira. */
+/** A que a barra dos cards de refeição (home e detalhe da refeição) corresponde como "100%": a
+ * meta daquela refeição (redistribuída) ou a meta diária inteira. */
 export type BaseReferenciaRefeicao = "refeicao" | "diaria";
+
+/** Formato do valor mostrado nos cards de refeição da home — cada opção já define sozinha contra
+ * qual meta comparar (só o percentual tem variante refeição/diária; resto/acima e a meta em
+ * gramas são sempre contra a meta DAQUELA refeição, não têm variante diária). */
+export type FormatoValorRefeicao = "percentual_refeicao" | "percentual_diario" | "restante_acima" | "meta_refeicao";
 
 export interface PreferenciasRefeicoesHome {
   barraBase: BaseReferenciaRefeicao;
-  valoresBase: BaseReferenciaRefeicao;
+  valoresFormato: FormatoValorRefeicao;
 }
 
-const PREFERENCIAS_REFEICOES_PADRAO: PreferenciasRefeicoesHome = { barraBase: "refeicao", valoresBase: "refeicao" };
+const PREFERENCIAS_REFEICOES_PADRAO: PreferenciasRefeicoesHome = { barraBase: "refeicao", valoresFormato: "restante_acima" };
 
 export async function getPreferenciasRefeicoesHome(): Promise<PreferenciasRefeicoesHome> {
   const { data, error } = await supabase.from("dieta_perfil").select("refeicoes_barra_base, refeicoes_valores_base").maybeSingle();
@@ -1334,7 +1339,7 @@ export async function getPreferenciasRefeicoesHome(): Promise<PreferenciasRefeic
   if (!data) return PREFERENCIAS_REFEICOES_PADRAO;
   return {
     barraBase: (data.refeicoes_barra_base as BaseReferenciaRefeicao | null) ?? "refeicao",
-    valoresBase: (data.refeicoes_valores_base as BaseReferenciaRefeicao | null) ?? "refeicao",
+    valoresFormato: (data.refeicoes_valores_base as FormatoValorRefeicao | null) ?? "restante_acima",
   };
 }
 
@@ -1343,7 +1348,7 @@ export async function salvarPreferenciasRefeicoesHome(prefs: PreferenciasRefeico
     {
       user_id: uid(),
       refeicoes_barra_base: prefs.barraBase,
-      refeicoes_valores_base: prefs.valoresBase,
+      refeicoes_valores_base: prefs.valoresFormato,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },
