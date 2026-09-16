@@ -9,10 +9,12 @@
     getRefeicaoDia,
     getItensDaRefeicao,
     removerItemDiario,
+    moverItemDiario,
     removerRefeicaoDia,
     getMetaRefeicaoPorNome,
     getAlimento,
     atualizarItemDiario,
+    getRefeicoesDoDia,
     listRefeicoesModelo,
     listMetasDiaModelo,
     getMetasDoDia,
@@ -61,6 +63,12 @@
   let itemEditando = $state<ItemDiario | null>(null);
   let alimentoEditando = $state<Alimento | null>(null);
   let itemParaRemover = $state<ItemDiario | null>(null);
+  /** Menu aberto ao segurar um item (Mover/Excluir) — a exclusão em si continua passando pelo
+   * ConfirmDialog de itemParaRemover, só a abertura desse menu que muda. */
+  let itemMenu = $state<ItemDiario | null>(null);
+  /** Quando não-nulo, o ActionSheet "Mover para" está aberto pra este item. */
+  let itemParaMover = $state<ItemDiario | null>(null);
+  let opcoesMoverPara = $state<RefeicaoDia[]>([]);
 
   async function carregar() {
     loading = true;
@@ -207,7 +215,7 @@
       pressionouLongo = true;
       cancelarPressionar();
       if (navigator.vibrate) navigator.vibrate(10);
-      itemParaRemover = item;
+      itemMenu = item;
     }, ATRASO_PRESSIONAR_MS);
   }
 
@@ -215,7 +223,7 @@
     e.preventDefault();
     cancelarPressionar();
     pressionouLongo = false;
-    itemParaRemover = item;
+    itemMenu = item;
   }
 
   function cancelarPressionar() {
@@ -254,6 +262,38 @@
       alert("Erro ao excluir alimento: " + (err as Error).message);
     } finally {
       processando = false;
+    }
+  }
+
+  /** Refeições do MESMO dia pra mover o item — busca na hora (não fica em cache), já que o
+   * usuário pode ter criado uma refeição avulsa nova desde que essa tela abriu. */
+  async function abrirMoverItem(item: ItemDiario): Promise<void> {
+    itemMenu = null;
+    if (!refeicao) return;
+    try {
+      const todas = await getRefeicoesDoDia(refeicao.data);
+      const opcoes = todas.filter((r) => r.id !== refeicaoId);
+      if (!opcoes.length) {
+        alert("Não há outra refeição hoje pra mover.");
+        return;
+      }
+      opcoesMoverPara = opcoes;
+      itemParaMover = item;
+    } catch (err) {
+      alert("Erro ao carregar refeições: " + (err as Error).message);
+    }
+  }
+
+  async function moverItemPara(destinoId: string): Promise<void> {
+    if (!itemParaMover) return;
+    const item = itemParaMover;
+    itemParaMover = null;
+    try {
+      await moverItemDiario(item.id, destinoId);
+      await carregar();
+      mostrarToast("Movido");
+    } catch (err) {
+      alert("Erro ao mover alimento: " + (err as Error).message);
     }
   }
 
@@ -361,6 +401,13 @@
     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
     <path d="M10 11v6M14 11v6" />
     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+{/snippet}
+
+{#snippet iconMover()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    <path d="M9 13h6M12 10l3 3-3 3" />
   </svg>
 {/snippet}
 
@@ -593,6 +640,25 @@
     textoConfirmar="Excluir"
     onConfirmar={remover}
     onCancelar={() => (itemParaRemover = null)}
+  />
+{/if}
+
+{#if itemMenu}
+  <ActionSheet
+    titulo={itemMenu.nome}
+    onFechar={() => (itemMenu = null)}
+    opcoes={[
+      { label: "Mover", icon: iconMover, onSelect: () => abrirMoverItem(itemMenu!) },
+      { label: "Excluir", icon: iconLixeira, destructive: true, onSelect: () => { itemParaRemover = itemMenu; itemMenu = null; } },
+    ]}
+  />
+{/if}
+
+{#if itemParaMover}
+  <ActionSheet
+    titulo="Mover para"
+    onFechar={() => (itemParaMover = null)}
+    opcoes={opcoesMoverPara.map((r) => ({ label: r.nome, onSelect: () => moverItemPara(r.id) }))}
   />
 {/if}
 

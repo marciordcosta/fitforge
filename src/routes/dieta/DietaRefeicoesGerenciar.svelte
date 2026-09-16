@@ -695,6 +695,13 @@
     const cal = caloriasListaRefeicao.get(receitaId) ?? 0;
     return `refeição com ${Math.round(cal)} cal`;
   }
+
+  /** Nome efetivo dessa refeição pro grupo de dias — só difere de m.nome quando o usuário renomeou
+   * especificamente esse grupo (Ondulatória), mesma regra de override de textoListaAlimentos. */
+  function nomeEfetivo(m: RefeicaoModelo, diaSemana?: number): string {
+    const override = diaSemana != null ? metaDiaMap.get(`${m.id}:${diaSemana}`) : undefined;
+    return override?.nome ?? m.nome;
+  }
   let metasDiaModelo = $state<MetaDiaModelo[]>([]);
   /** Meta diária completa (calorias/macros) — usada só pra mostrar o "% do dia" no modal de
    * Ajustar Macros, embaixo do % da meta da refeição que o próprio WheelPickerMacros já calcula. */
@@ -1652,7 +1659,7 @@
             <li class="linha">
               {#if reordenando}
                 <div class="reordenar-card">
-                  <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
+                  <span class="reordenar-nome">{nomeEfetivo(m, grupo.dias[0])}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
                   {#if !ultima}
                     <div class="reordenar-setas">
                       <button disabled={i === 0} onclick={() => moverRefeicaoGrupo(grupo, i, -1)} aria-label="Mover pra cima">▲</button>
@@ -1672,7 +1679,7 @@
                     oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
                   >
                     <div class="card-header">
-                      <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
+                      <h2 class="refeicao-nome">{nomeEfetivo(m, grupo.dias[0])}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
                       <span class="card-header-direita">
                         <span class="lista-alimentos-badge">{textoListaAlimentos(m, grupo.dias[0])}</span>
                         <span

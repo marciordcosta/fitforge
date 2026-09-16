@@ -5,6 +5,7 @@
   import { hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import ActionSheet from "../../components/ActionSheet.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
   import WheelPickerMacros from "../../components/WheelPickerMacros.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
@@ -19,9 +20,12 @@
     desvincularMetaReceita,
     removerMetaReceitaDias,
     excluirReceita,
+    receitaEhMetaDeRefeicao,
     atualizarItemReceita,
     removerItemReceita,
+    adicionarItemReceita,
     atualizarRefeicaoModelo,
+    salvarNomeRefeicaoDias,
     getMetasDiarias,
     getPreferenciasRefeicoesHome,
     type RefeicaoModelo,
@@ -57,14 +61,20 @@
   }
 
   /** Disponível pra qualquer refeição, inclusive a "automática" (a última, cuja meta numérica é
-   * calculada sozinha) — o nome é só um rótulo, não tem relação com esse cálculo. */
+   * calculada sozinha) — o nome é só um rótulo, não tem relação com esse cálculo. Quando a tela
+   * está aberta pra um grupo de dias específico (Ondulatória), o nome vira um override só desse
+   * grupo — outros grupos e o catálogo global não mudam, igual já funciona pra meta/receita. */
   async function confirmarRenomear(): Promise<void> {
     nomeEditando = false;
     const novoNome = nomeEditavel.trim();
     if (!novoNome || novoNome === nomeAtual) return;
     salvandoNome = true;
     try {
-      await atualizarRefeicaoModelo(modeloId, novoNome);
+      if (diasSemana?.length) {
+        await salvarNomeRefeicaoDias(modeloId, diasSemana, novoNome);
+      } else {
+        await atualizarRefeicaoModelo(modeloId, novoNome);
+      }
       nomeAtual = novoNome;
       mostrarToast("Salvo");
     } catch (err) {
@@ -75,6 +85,10 @@
   }
 
   let modelo = $state<RefeicaoModelo | null>(null);
+  /** Catálogo inteiro e overrides de todas as refeições — só usados pra montar a lista de
+   * destinos do "Mover" (outras refeições) e resolver a receita efetiva de cada uma. */
+  let modelosCatalogo = $state<RefeicaoModelo[]>([]);
+  let metasDiaModeloTodos = $state<MetaDiaModelo[]>([]);
   let overrideDia = $state<MetaDiaModelo | null>(null);
   let receita = $state<Receita | null>(null);
   let contexto = $state<ContextoMetaCatalogo | null>(null);
@@ -119,7 +133,13 @@
         getPreferenciasRefeicoesHome(),
       ]);
       modelo = modelos.find((m) => m.id === modeloId) ?? null;
+      modelosCatalogo = modelos;
+      metasDiaModeloTodos = metasDiaModelo;
       overrideDia = diasSemana?.length ? (metasDiaModelo.find((m) => m.modeloId === modeloId && m.diaSemana === diasSemana![0]) ?? null) : null;
+      // A prop `nome` vem da URL e pode estar desatualizada (ex: um link antigo, ou o nome global
+      // quando na verdade esse grupo de dias tem um override) — corrige com o valor efetivo assim
+      // que carrega, sem pisar numa edição em andamento.
+      if (!nomeEditando) nomeAtual = overrideDia?.nome ?? modelo?.nome ?? nomeAtual;
       contexto = contextoRes;
       metasDia = metasDiaRes;
       prefsRefeicoes = prefs;
@@ -280,6 +300,46 @@
 
   let itemEditando = $state<ReceitaItem | null>(null);
   let itemParaRemover = $state<ReceitaItem | null>(null);
+  /** Menu aberto ao segurar um item (Mover/Excluir) — a exclusão em si continua passando pelo
+   * ConfirmDialog de itemParaRemover, só a abertura desse menu que muda. */
+  let itemMenu = $state<ReceitaItem | null>(null);
+  /** Quando não-nulo, o ActionSheet "Mover para" está aberto pra este item. */
+  let itemParaMover = $state<ReceitaItem | null>(null);
+  let movendoItem = $state(false);
+
+  /** Nome efetivo de outra refeição do catálogo pro mesmo contexto de dias desta tela — usado só
+   * pra montar a lista de destinos do "Mover" (mesma regra de override já usada pro resto da tela). */
+  function nomeEfetivoModelo(m: RefeicaoModelo): string {
+    const override = diasSemana?.length ? metasDiaModeloTodos.find((md) => md.modeloId === m.id && md.diaSemana === diasSemana![0]) : null;
+    return override?.nome ?? m.nome;
+  }
+
+  function receitaIdEfetivaModelo(m: RefeicaoModelo): string | null {
+    const override = diasSemana?.length ? metasDiaModeloTodos.find((md) => md.modeloId === m.id && md.diaSemana === diasSemana![0]) : null;
+    return override?.metaReceitaId ?? m.metaReceitaId ?? null;
+  }
+
+  /** Opções de destino pro "Mover" — as outras refeições do catálogo, mesmo contexto de dias desta
+   * tela (Ondulatória). */
+  const opcoesMoverPara = $derived(modelosCatalogo.filter((m) => m.id !== modeloId));
+
+  async function moverItemPara(destino: RefeicaoModelo): Promise<void> {
+    if (!itemParaMover) return;
+    const item = itemParaMover;
+    itemParaMover = null;
+    movendoItem = true;
+    try {
+      const destinoReceitaId = await garantirReceitaPrivadaRefeicao(destino.id, nomeEfetivoModelo(destino), receitaIdEfetivaModelo(destino), diasSemana);
+      await adicionarItemReceita(destinoReceitaId, item.alimentoId, item.quantidade);
+      await removerItemReceita(item.id);
+      await carregar();
+      mostrarToast("Movido");
+    } catch (err) {
+      alert("Erro ao mover alimento: " + (err as Error).message);
+    } finally {
+      movendoItem = false;
+    }
+  }
 
   async function aoSalvarQuantidadeItem(novaQuantidade: number): Promise<void> {
     if (!itemEditando) return;
@@ -344,7 +404,7 @@
       pressionouLongo = true;
       cancelarPressionar();
       if (navigator.vibrate) navigator.vibrate(10);
-      itemParaRemover = item;
+      itemMenu = item;
     }, ATRASO_PRESSIONAR_MS);
   }
 
@@ -352,7 +412,16 @@
     e.preventDefault();
     cancelarPressionar();
     pressionouLongo = false;
-    itemParaRemover = item;
+    itemMenu = item;
+  }
+
+  function abrirMoverItem(item: ReceitaItem): void {
+    itemMenu = null;
+    if (!opcoesMoverPara.length) {
+      alert("Não há outra refeição no catálogo pra mover.");
+      return;
+    }
+    itemParaMover = item;
   }
 
   function cancelarPressionar(): void {
@@ -390,7 +459,13 @@
         await salvarMetaNumericaRefeicao(modeloId, null, null, null);
         await desvincularMetaReceita(modeloId);
       }
-      if (receita?.oculta) await excluirReceita(receita.id);
+      // A mesma lista de alimentos oculta pode ser compartilhada por outro grupo de dias (ou pelo
+      // modelo global) — só apaga de vez se, depois de desvincular ESTE contexto, mais ninguém
+      // mais aponta pra ela. Excluir sem checar isso apagava a meta de outros dias juntos (o
+      // "meta_receita_id" deles tem ON DELETE CASCADE pra essa tabela).
+      if (receita?.oculta && !(await receitaEhMetaDeRefeicao(receita.id))) {
+        await excluirReceita(receita.id);
+      }
       voltar("/dieta/refeicoes/gerenciar?aba=refeicoes");
     } catch (err) {
       alert("Erro ao remover meta: " + (err as Error).message);
@@ -409,6 +484,20 @@
     <circle cx="12" cy="12" r="9" />
     <line x1="12" y1="11" x2="12" y2="16" />
     <circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+{/snippet}
+{#snippet iconLixeira()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+{/snippet}
+{#snippet iconMover()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    <path d="M9 13h6M12 10l3 3-3 3" />
   </svg>
 {/snippet}
 
@@ -572,6 +661,25 @@
     porcaoPadraoUnidade={itemEditando.unidade}
     onSalvar={aoSalvarQuantidadeItem}
     onFechar={() => (itemEditando = null)}
+  />
+{/if}
+
+{#if itemMenu}
+  <ActionSheet
+    titulo={itemMenu.nome}
+    onFechar={() => (itemMenu = null)}
+    opcoes={[
+      { label: "Mover", icon: iconMover, onSelect: () => abrirMoverItem(itemMenu!) },
+      { label: "Excluir", icon: iconLixeira, destructive: true, onSelect: () => { itemParaRemover = itemMenu; itemMenu = null; } },
+    ]}
+  />
+{/if}
+
+{#if itemParaMover}
+  <ActionSheet
+    titulo="Mover para"
+    onFechar={() => (itemParaMover = null)}
+    opcoes={opcoesMoverPara.map((m) => ({ label: nomeEfetivoModelo(m), onSelect: () => moverItemPara(m) }))}
   />
 {/if}
 

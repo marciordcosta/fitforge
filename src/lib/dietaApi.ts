@@ -446,6 +446,9 @@ export async function receitaEhMetaDeRefeicao(receitaId: string): Promise<boolea
 export interface MetaDiaModelo {
   modeloId: string;
   diaSemana: number;
+  /** Nulo = esse grupo de dias usa o nome global do modelo (dieta_refeicoes_modelo.nome) — só
+   * preenchido quando o usuário renomeia a refeição especificamente pra esses dias. */
+  nome: string | null;
   metaReceitaId: string | null;
   metaReceitaOculta: boolean;
   metaCalorias: number | null;
@@ -455,9 +458,9 @@ export interface MetaDiaModelo {
 }
 
 const META_DIA_MODELO_SELECT =
-  "modelo_id, dia_semana, meta_receita_id, meta_proteina_g, meta_gordura_g, meta_carboidrato_g, meta_receita:dieta_receitas!meta_receita_id(oculta)";
+  "modelo_id, dia_semana, nome, meta_receita_id, meta_proteina_g, meta_gordura_g, meta_carboidrato_g, meta_receita:dieta_receitas!meta_receita_id(oculta)";
 
-/** Todas as metas por dia já configuradas (qualquer refeição, qualquer dia) — ausência de linha pra um (modelo, dia) usa o meta_receita_id/meta numérica global como fallback. */
+/** Todas as metas por dia já configuradas (qualquer refeição, qualquer dia) — ausência de linha pra um (modelo, dia) usa o meta_receita_id/meta numérica/nome global como fallback. */
 export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
   const { data, error } = await supabase.from("dieta_refeicoes_modelo_meta_dia").select(META_DIA_MODELO_SELECT);
   if (error) throw error;
@@ -470,6 +473,7 @@ export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
     return {
       modeloId: linha.modelo_id as string,
       diaSemana: linha.dia_semana as number,
+      nome: linha.nome as string | null,
       metaReceitaId: linha.meta_receita_id as string | null,
       metaReceitaOculta: metaReceita?.oculta ?? false,
       metaCalorias: calcularMetaCalorias(proteinaG, gorduraG, carboidratoG),
@@ -478,6 +482,24 @@ export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
       metaCarboidratoG: carboidratoG,
     };
   });
+}
+
+/** Renomeia a refeição só pra esses dias (Ondulatória) — o modelo global e outros grupos de dias
+ * não são afetados. `nome` vazio/null volta a usar o nome global (remove o override, não grava
+ * string vazia). */
+export async function salvarNomeRefeicaoDias(modeloId: string, diasSemana: number[], nome: string): Promise<void> {
+  const nomeTrim = nome.trim();
+  const { error } = await supabase.from("dieta_refeicoes_modelo_meta_dia").upsert(
+    diasSemana.map((diaSemana) => ({
+      user_id: uid(),
+      modelo_id: modeloId,
+      dia_semana: diaSemana,
+      nome: nomeTrim || null,
+      updated_at: new Date().toISOString(),
+    })),
+    { onConflict: "user_id,modelo_id,dia_semana" },
+  );
+  if (error) throw error;
 }
 
 /** Vincula o mesmo prato como meta pra todos os dias informados de uma vez — um grupo de dias com a mesma meta de calorias sempre compartilha a mesma composição de refeições. */
