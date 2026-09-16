@@ -375,6 +375,15 @@
     {#if modoSelecao}
       <button class="icon-btn" onclick={cancelarSelecao} aria-label="Cancelar seleção">{@render iconFechar()}</button>
       <h1>{selecionadas.length} selecionada{selecionadas.length === 1 ? "" : "s"}</h1>
+      <button
+        type="button"
+        class="icon-btn excluir"
+        disabled={excluindo}
+        onclick={() => (confirmandoExcluir = true)}
+        aria-label="Excluir selecionadas"
+      >
+        {@render iconLixeira()}
+      </button>
     {:else}
       <h1>Fotos</h1>
       <button
@@ -437,14 +446,6 @@
     {/each}
   {/if}
 </div>
-
-{#if selecionadas.length}
-  <div class="barra-acoes">
-    <button type="button" class="acao-icon-btn excluir" disabled={excluindo} onclick={() => (confirmandoExcluir = true)} aria-label="Excluir selecionadas">
-      {@render iconLixeira()}
-    </button>
-  </div>
-{/if}
 
 {#if dataComparando}
   <div class="chip-comparando" in:scale={{ duration: 300, start: 0.55 }}>
@@ -595,10 +596,17 @@
     padding-right: var(--space-4);
   }
   .header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin-bottom: var(--space-4);
+    padding-top: var(--space-2);
+    margin-top: calc(var(--space-2) * -1);
+    padding-bottom: var(--space-2);
+    margin-bottom: var(--space-2);
+    background: var(--surface-bg);
   }
   .header h1 {
     flex: 1;
@@ -622,6 +630,14 @@
   .icon-btn svg {
     width: 18px;
     height: 18px;
+  }
+  .icon-btn.excluir {
+    background: var(--color-danger);
+    color: #fff;
+  }
+  .icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .campo-data {
     display: flex;
@@ -756,39 +772,6 @@
   .foto-check svg {
     width: 14px;
     height: 14px;
-  }
-  .barra-acoes {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--space-3));
-    display: flex;
-    justify-content: center;
-    gap: var(--space-3);
-    z-index: 50;
-  }
-  .acao-icon-btn {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow-float);
-    cursor: pointer;
-  }
-  .acao-icon-btn svg {
-    width: 22px;
-    height: 22px;
-  }
-  .acao-icon-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  .acao-icon-btn.excluir {
-    background: var(--color-danger);
-    color: #fff;
   }
   .chip-comparando {
     position: fixed;
