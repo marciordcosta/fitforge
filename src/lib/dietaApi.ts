@@ -1556,6 +1556,18 @@ export async function definirModoCalorias(modo: "fixa" | "ondulatoria"): Promise
   if (error) throw error;
 }
 
+/** Zera a meta numérica (macros) de TODAS as refeições do catálogo — usado ao trocar pra modo
+ * Fixa: nesse modo a lista vira uma só (todo o catálogo junto, sem filtro por dia), então metas
+ * pensadas pra dias/grupos diferentes da Ondulatória se somariam incorretamente se mantidas. A
+ * lista de alimentos (meta_receita_id) não é tocada, só as metas numéricas. */
+export async function zerarMetasCatalogo(): Promise<void> {
+  const { error } = await supabase
+    .from("dieta_refeicoes_modelo")
+    .update({ meta_proteina_g: null, meta_gordura_g: null, meta_carboidrato_g: null })
+    .eq("user_id", uid());
+  if (error) throw error;
+}
+
 /** Carboidrato do dia: mesma fórmula usada pra fechar a meta de calorias, só trocando a meta pela calorias daquele dia. */
 export function carboidratoGDoDia(caloriasDoDia: number, proteinaG: number, gorduraG: number): number {
   return Math.max(0, Math.round((caloriasDoDia - 4 * proteinaG - 9 * gorduraG) / 4));

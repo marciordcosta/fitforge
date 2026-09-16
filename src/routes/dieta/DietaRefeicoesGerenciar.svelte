@@ -24,6 +24,7 @@
     resolverDistribuicao,
     distribuirValorPorDia,
     definirModoCalorias,
+    zerarMetasCatalogo,
     definirCaloriasDias,
     removerCaloriasDia,
     reiniciarCalibracaoDieta,
@@ -628,6 +629,34 @@
         aoEditarCalorias();
       },
     };
+  }
+
+  /** Trocar Ondulatória → Fixa junta o catálogo inteiro numa lista só (sem filtro por dia) — metas
+   * pensadas pra dias/grupos diferentes passam a se somar juntas, o que não fecha com a meta
+   * diária. Zerar a meta numérica de tudo evita essa inconsistência, mas é destrutivo (o usuário
+   * reconfigura do zero), então confirma antes em vez de fazer direto ao salvar. */
+  let confirmandoTrocaFixa = $state(false);
+
+  function aoClicarSalvarCalorias() {
+    if (modoCalorias === "fixa" && modoCaloriasOriginal === "ondulatoria") {
+      confirmandoTrocaFixa = true;
+      return;
+    }
+    void salvarCalorias();
+  }
+
+  async function confirmarTrocaParaFixa() {
+    confirmandoTrocaFixa = false;
+    salvandoCalorias = true;
+    try {
+      await zerarMetasCatalogo();
+      await carregar();
+    } catch (err) {
+      alert("Erro ao zerar metas: " + (err as Error).message);
+      salvandoCalorias = false;
+      return;
+    }
+    await salvarCalorias();
   }
 
   async function salvarCalorias() {
@@ -1623,7 +1652,7 @@
         </div>
       {/if}
 
-      <Button onclick={salvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
+      <Button onclick={aoClicarSalvarCalorias} disabled={salvandoCalorias}>Salvar</Button>
       <button type="button" class="reiniciar-calibracao-btn" onclick={aoReiniciarCalibracao} disabled={statusCalibracao === "salvando"}>
         {statusCalibracao === "feito" ? "Calibração reiniciada ✓" : "Reiniciar calibração da dieta"}
       </button>
@@ -1800,6 +1829,18 @@
     textoConfirmar="Excluir"
     onConfirmar={excluir}
     onCancelar={() => (paraExcluir = null)}
+  />
+{/if}
+
+{#if confirmandoTrocaFixa}
+  <ConfirmDialog
+    titulo="Trocar pra Fixa junta todas as refeições numa lista só, sem separar por dia. Pra evitar
+      que metas pensadas pra dias diferentes se somem incorretamente, a meta numérica (calorias e
+      macros) de TODAS as refeições vai ser zerada — você reconfigura do zero. As listas de
+      alimentos não são afetadas."
+    textoConfirmar="Trocar e zerar metas"
+    onConfirmar={confirmarTrocaParaFixa}
+    onCancelar={() => (confirmandoTrocaFixa = false)}
   />
 {/if}
 
