@@ -1217,7 +1217,9 @@
     color: var(--surface-muted);
   }
   .pct-valor-sec {
-    margin: 0;
+    margin: var(--space-1) 0 0;
+    padding-top: var(--space-1);
+    border-top: 1px solid var(--surface-border);
     font-size: 11px;
     color: var(--surface-muted);
   }
