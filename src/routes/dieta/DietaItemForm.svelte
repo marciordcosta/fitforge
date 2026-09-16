@@ -15,6 +15,7 @@
     getRefeicoesDoDia,
     getMetasDiarias,
     getMetaRefeicaoPorNome,
+    getPreferenciasRefeicoesHome,
     adicionarItemDiario,
     atualizarItemDiario,
     adicionarItemReceita,
@@ -24,6 +25,8 @@
     type Alimento,
     type MetasDiarias,
     type RefeicaoDia,
+    type PreferenciasRefeicoesHome,
+    type BaseReferenciaRefeicao,
   } from "../../lib/dietaApi";
   import { receitaRascunho, adicionarAoRascunho, definirContexto, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
 
@@ -62,6 +65,7 @@
   let alimento = $state<Alimento | null>(null);
   let metas = $state<MetasDiarias | null>(null);
   let metaRefeicao = $state<MetasDiarias | null>(null);
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima" });
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let dataResolvida = $state(untrack(() => data ?? ""));
@@ -88,27 +92,31 @@
       if (editandoItem) {
         const item = await getItemDiario(itemDiarioId!);
         if (!item) return;
-        const [alimentoRes, refeicaoRes, metasRes] = await Promise.all([
+        const [alimentoRes, refeicaoRes, metasRes, prefs] = await Promise.all([
           getAlimento(item.alimentoId),
           getRefeicaoDia(item.refeicaoId),
           getMetasDiarias(),
+          getPreferenciasRefeicoesHome(),
         ]);
         alimento = alimentoRes;
         refeicao = refeicaoRes;
         metas = metasRes;
+        prefsRefeicoes = prefs;
         dataResolvida = refeicaoRes?.data ?? "";
         quantidade = item.quantidade;
         quantidadeOriginal = item.quantidade;
         refeicaoOriginalId = item.refeicaoId;
       } else {
-        const [alimentoRes, metasRes, refeicaoRes] = await Promise.all([
+        const [alimentoRes, metasRes, refeicaoRes, prefs] = await Promise.all([
           getAlimento(alimentoId!),
           getMetasDiarias(),
           refeicaoIdInicial ? getRefeicaoDia(refeicaoIdInicial) : Promise.resolve(null),
+          getPreferenciasRefeicoesHome(),
         ]);
         alimento = alimentoRes;
         metas = metasRes;
         refeicao = refeicaoRes;
+        prefsRefeicoes = prefs;
         quantidade = alimentoRes ? alimentoRes.porcaoPadraoQtd : 0;
         quantidadeOriginal = quantidade;
         refeicaoOriginalId = refeicaoRes?.id ?? null;
@@ -184,11 +192,32 @@
     return Math.min(100, pct);
   }
 
-  /** Mesmo texto usado no Diário: quanto falta pra bater a meta ("rest."), ou "X acima" se já
-   * passou — em vez de "consumido de meta". */
-  function metaValorTexto(consumido: number, meta: number, unidade: string): string {
-    if (consumido > meta) return `${(consumido - meta).toFixed(0)}${unidade} acima`;
-    return `${Math.max(0, meta - consumido).toFixed(0)}${unidade} rest.`;
+  /** Mesma regra do Diário (Exibição das Refeições, em Parametrização): a barra pode corresponder
+   * à meta DESSA refeição (padrão) ou à meta diária inteira. */
+  function metaPara(campo: keyof MetasDiarias, metaRef: MetasDiarias, base: BaseReferenciaRefeicao): number {
+    if (base === "diaria" && metas) return metas[campo];
+    return metaRef[campo];
+  }
+
+  /** Mesma regra do Diário — percentual tem variante refeição/diária; resto-ou-acima e a meta em
+   * gramas são sempre contra a meta DESSA refeição. */
+  function metaValorTexto(consumido: number, metaRefeicaoValor: number, metaDiariaValor: number, unidade: string): string {
+    switch (prefsRefeicoes.valoresFormato) {
+      case "percentual_refeicao": {
+        const pct = metaRefeicaoValor > 0 ? (consumido / metaRefeicaoValor) * 100 : 0;
+        return `${consumido.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+      }
+      case "percentual_diario": {
+        const pct = metaDiariaValor > 0 ? (consumido / metaDiariaValor) * 100 : 0;
+        return `${consumido.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+      }
+      case "meta_refeicao":
+        return `${consumido.toFixed(0)}/${metaRefeicaoValor.toFixed(0)}${unidade}`;
+      case "restante_acima":
+      default:
+        if (consumido > metaRefeicaoValor) return `${consumido.toFixed(0)}${unidade} (${(consumido - metaRefeicaoValor).toFixed(0)}${unidade} acima)`;
+        return `${consumido.toFixed(0)}${unidade} (${Math.max(0, metaRefeicaoValor - consumido).toFixed(0)}${unidade} rest.)`;
+    }
   }
 
   function sufixoRota(): string {
@@ -438,27 +467,33 @@
     </div>
 
     {#if metaRefeicao}
+      {@const metaBarra = {
+        calorias: metaPara("calorias", metaRefeicao, prefsRefeicoes.barraBase),
+        carboidratoG: metaPara("carboidratoG", metaRefeicao, prefsRefeicoes.barraBase),
+        gorduraG: metaPara("gorduraG", metaRefeicao, prefsRefeicoes.barraBase),
+        proteinaG: metaPara("proteinaG", metaRefeicao, prefsRefeicoes.barraBase),
+      }}
       <p class="metas-titulo">Meta de {refeicao?.nome}</p>
       <div class="metas-grid">
         <div class="meta-col">
           <span class="meta-label">Calorias</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(calorias, metaRefeicao.calorias))}%; background:var(--color-secondary);`}></div></div>
-          <span class="meta-valor">{metaValorTexto(calorias, metaRefeicao.calorias, "")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(calorias, metaBarra.calorias))}%; background:var(--color-secondary);`}></div></div>
+          <span class="meta-valor">{metaValorTexto(calorias, metaRefeicao.calorias, metas?.calorias ?? 0, "")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Carb</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(carboidratoG, metaRefeicao.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(carboidratoG, metaRefeicao.carboidratoG, "g")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(carboidratoG, metaBarra.carboidratoG))}%; background:${COR_CARBO};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(carboidratoG, metaRefeicao.carboidratoG, metas?.carboidratoG ?? 0, "g")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Gorduras</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(gorduraG, metaRefeicao.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(gorduraG, metaRefeicao.gorduraG, "g")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(gorduraG, metaBarra.gorduraG))}%; background:${COR_GORDURA};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(gorduraG, metaRefeicao.gorduraG, metas?.gorduraG ?? 0, "g")}</span>
         </div>
         <div class="meta-col">
           <span class="meta-label">Proteínas</span>
-          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(proteinaG, metaRefeicao.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
-          <span class="meta-valor">{metaValorTexto(proteinaG, metaRefeicao.proteinaG, "g")}</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(proteinaG, metaBarra.proteinaG))}%; background:${COR_PROTEINA};`}></div></div>
+          <span class="meta-valor">{metaValorTexto(proteinaG, metaRefeicao.proteinaG, metas?.proteinaG ?? 0, "g")}</span>
         </div>
       </div>
     {:else}

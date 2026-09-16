@@ -12,6 +12,7 @@
     garantirRefeicoesPadraoDoDia,
     getRefeicoesDoDia,
     getMetasDiarias,
+    getPreferenciasRefeicoesHome,
     receitaEhMetaDeRefeicao,
     adicionarReceitaAoDiario,
     atualizarReceita,
@@ -23,6 +24,7 @@
     type ReceitaItem,
     type RefeicaoDia,
     type MetasDiarias,
+    type PreferenciasRefeicoesHome,
   } from "../../lib/dietaApi";
   import { receitaRascunho, limparRascunho } from "../../lib/receitaRascunho.svelte";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
@@ -37,6 +39,7 @@
 
   let receita = $state<Receita | null>(null);
   let metas = $state<MetasDiarias | null>(null);
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima" });
   let ehMetaPadrao = $state(false);
   let refeicao = $state<RefeicaoDia | null>(null);
   let opcoesRefeicao = $state<RefeicaoDia[]>([]);
@@ -67,7 +70,7 @@
     loading = true;
     erro = null;
     try {
-      const [receitaRes, metasRes, , ehMeta] = await Promise.all([
+      const [receitaRes, metasRes, , ehMeta, prefs] = await Promise.all([
         getReceita(receitaId),
         getMetasDiarias(),
         // Garante que as refeições padrão de hoje existam (pro picker "Adicionar à refeição"
@@ -75,9 +78,11 @@
         // dava a falsa impressão de que a receita já ia entrar numa refeição específica.
         garantirRefeicoesPadraoDoDia(hojeISO()),
         receitaEhMetaDeRefeicao(receitaId),
+        getPreferenciasRefeicoesHome(),
       ]);
       receita = receitaRes;
       metas = metasRes;
+      prefsRefeicoes = prefs;
       refeicao = null;
       ehMetaPadrao = ehMeta;
       nomeEditavel = receitaRes?.nome ?? "";
@@ -196,11 +201,23 @@
     return Math.min(100, pct);
   }
 
-  /** Mesmo texto usado no Diário: quanto falta da meta diária pra bater ("rest."), ou "X acima" se
-   * essa receita sozinha já passa da meta. */
+  /** Mesma regra do Diário (Exibição das Refeições) — aqui só existe meta diária (uma receita
+   * avulsa não tem "meta da refeição" própria), então percentual_refeicao/percentual_diario dão
+   * o mesmo resultado. */
   function metaValorTexto(consumido: number, meta: number, unidade: string): string {
-    if (consumido > meta) return `${(consumido - meta).toFixed(0)}${unidade} acima`;
-    return `${Math.max(0, meta - consumido).toFixed(0)}${unidade} rest.`;
+    switch (prefsRefeicoes.valoresFormato) {
+      case "percentual_refeicao":
+      case "percentual_diario": {
+        const pct = meta > 0 ? (consumido / meta) * 100 : 0;
+        return `${consumido.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+      }
+      case "meta_refeicao":
+        return `${consumido.toFixed(0)}/${meta.toFixed(0)}${unidade}`;
+      case "restante_acima":
+      default:
+        if (consumido > meta) return `${consumido.toFixed(0)}${unidade} (${(consumido - meta).toFixed(0)}${unidade} acima)`;
+        return `${consumido.toFixed(0)}${unidade} (${Math.max(0, meta - consumido).toFixed(0)}${unidade} rest.)`;
+    }
   }
 
   async function adicionarNaRefeicao(refeicaoIdAlvo: string) {

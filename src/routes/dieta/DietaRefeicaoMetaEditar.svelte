@@ -20,11 +20,15 @@
     excluirReceita,
     atualizarItemReceita,
     removerItemReceita,
+    getMetasDiarias,
+    getPreferenciasRefeicoesHome,
     type RefeicaoModelo,
     type MetaDiaModelo,
     type Receita,
     type ReceitaItem,
     type ContextoMetaCatalogo,
+    type MetasDiarias,
+    type PreferenciasRefeicoesHome,
   } from "../../lib/dietaApi";
 
   let { modeloId, nome, diasSemana }: { modeloId: string; nome: string; diasSemana?: number[] } = $props();
@@ -37,6 +41,8 @@
   let overrideDia = $state<MetaDiaModelo | null>(null);
   let receita = $state<Receita | null>(null);
   let contexto = $state<ContextoMetaCatalogo | null>(null);
+  let metasDia = $state<MetasDiarias | null>(null);
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima" });
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);
@@ -68,14 +74,18 @@
     loading = true;
     erro = null;
     try {
-      const [modelos, metasDia, contextoRes] = await Promise.all([
+      const [modelos, metasDiaModelo, contextoRes, metasDiaRes, prefs] = await Promise.all([
         listRefeicoesModelo(),
         listMetasDiaModelo(),
         getContextoMetaCatalogo(modeloId, diasSemana),
+        getMetasDiarias(),
+        getPreferenciasRefeicoesHome(),
       ]);
       modelo = modelos.find((m) => m.id === modeloId) ?? null;
-      overrideDia = diasSemana?.length ? (metasDia.find((m) => m.modeloId === modeloId && m.diaSemana === diasSemana![0]) ?? null) : null;
+      overrideDia = diasSemana?.length ? (metasDiaModelo.find((m) => m.modeloId === modeloId && m.diaSemana === diasSemana![0]) ?? null) : null;
       contexto = contextoRes;
+      metasDia = metasDiaRes;
+      prefsRefeicoes = prefs;
       const receitaId = overrideDia?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
       receita = receitaId ? await getReceita(receitaId) : null;
     } catch (err) {
@@ -117,13 +127,42 @@
   const pctGordura = $derived(caloriasCalc > 0 ? (caloriasGordura / caloriasCalc) * 100 : 0);
   const pctProteina = $derived(caloriasCalc > 0 ? (caloriasProteina / caloriasCalc) * 100 : 0);
 
+  /** Mesma regra do Diário (Exibição das Refeições, em Parametrização): a barra pode corresponder
+   * à meta DESSA refeição (padrão, a roda tripla acima) ou à meta diária inteira. */
+  function metaBarraPara(metaRefeicaoValor: number, campo: keyof MetasDiarias): number {
+    if (prefsRefeicoes.barraBase === "diaria" && metasDia) return metasDia[campo];
+    return metaRefeicaoValor;
+  }
+
   /** Total dos alimentos da lista abaixo — só informativo (barras, não anel), independente da
    * meta definida na roda tripla acima; não altera nem é alterado por ela. A barra vai de 0 até a
    * meta manual (100% = meta), preenchida com o quanto os alimentos inseridos já somam dela. */
-  const pctCaloriasItens = $derived(totaisItens ? pctMeta(totaisItens.calorias, caloriasCalc) : 0);
-  const pctCarboItens = $derived(totaisItens ? pctMeta(totaisItens.carboidratoG, carboidratoG ?? 0) : 0);
-  const pctGorduraItens = $derived(totaisItens ? pctMeta(totaisItens.gorduraG, gorduraG ?? 0) : 0);
-  const pctProteinaItens = $derived(totaisItens ? pctMeta(totaisItens.proteinaG, proteinaG ?? 0) : 0);
+  const pctCaloriasItens = $derived(totaisItens ? pctMeta(totaisItens.calorias, metaBarraPara(caloriasCalc, "calorias")) : 0);
+  const pctCarboItens = $derived(totaisItens ? pctMeta(totaisItens.carboidratoG, metaBarraPara(carboidratoG ?? 0, "carboidratoG")) : 0);
+  const pctGorduraItens = $derived(totaisItens ? pctMeta(totaisItens.gorduraG, metaBarraPara(gorduraG ?? 0, "gorduraG")) : 0);
+  const pctProteinaItens = $derived(totaisItens ? pctMeta(totaisItens.proteinaG, metaBarraPara(proteinaG ?? 0, "proteinaG")) : 0);
+
+  /** Mesma regra do Diário — percentual tem variante refeição/diária; resto-ou-acima e a meta em
+   * gramas são sempre contra a meta DESSA refeição (a roda tripla acima). */
+  function valorItensTexto(consumido: number, metaRefeicaoValor: number, campo: keyof MetasDiarias, unidade: string): string {
+    const metaDiariaValor = metasDia ? metasDia[campo] : 0;
+    switch (prefsRefeicoes.valoresFormato) {
+      case "percentual_refeicao": {
+        const pct = metaRefeicaoValor > 0 ? (consumido / metaRefeicaoValor) * 100 : 0;
+        return `${consumido.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+      }
+      case "percentual_diario": {
+        const pct = metaDiariaValor > 0 ? (consumido / metaDiariaValor) * 100 : 0;
+        return `${consumido.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+      }
+      case "meta_refeicao":
+        return `${consumido.toFixed(0)}/${metaRefeicaoValor.toFixed(0)}${unidade}`;
+      case "restante_acima":
+      default:
+        if (consumido > metaRefeicaoValor) return `${consumido.toFixed(0)}${unidade} (${(consumido - metaRefeicaoValor).toFixed(0)}${unidade} acima)`;
+        return `${consumido.toFixed(0)}${unidade} (${Math.max(0, metaRefeicaoValor - consumido).toFixed(0)}${unidade} rest.)`;
+    }
+  }
 
   const donutStyle = $derived(
     `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
@@ -382,28 +421,28 @@
             <div class="pct-barra-wrap">
               <div class="pct-barra" style={`width:${larguraBarra(pctCaloriasItens)}%; background:var(--color-secondary);`}></div>
             </div>
-            <p class="pct-valor">{totaisItens.calorias.toFixed(0)}/{caloriasCalc.toFixed(0)}</p>
+            <p class="pct-valor">{valorItensTexto(totaisItens.calorias, caloriasCalc, "calorias", "")}</p>
           </div>
           <div class="pct-col">
             <p class="pct-nome">Carb</p>
             <div class="pct-barra-wrap">
               <div class="pct-barra" style={`width:${larguraBarra(pctCarboItens)}%; background:${COR_CARBO};`}></div>
             </div>
-            <p class="pct-valor">{totaisItens.carboidratoG.toFixed(0)}/{(carboidratoG ?? 0).toFixed(0)}g</p>
+            <p class="pct-valor">{valorItensTexto(totaisItens.carboidratoG, carboidratoG ?? 0, "carboidratoG", "g")}</p>
           </div>
           <div class="pct-col">
             <p class="pct-nome">Gorduras</p>
             <div class="pct-barra-wrap">
               <div class="pct-barra" style={`width:${larguraBarra(pctGorduraItens)}%; background:${COR_GORDURA};`}></div>
             </div>
-            <p class="pct-valor">{totaisItens.gorduraG.toFixed(0)}/{(gorduraG ?? 0).toFixed(0)}g</p>
+            <p class="pct-valor">{valorItensTexto(totaisItens.gorduraG, gorduraG ?? 0, "gorduraG", "g")}</p>
           </div>
           <div class="pct-col">
             <p class="pct-nome">Proteínas</p>
             <div class="pct-barra-wrap">
               <div class="pct-barra" style={`width:${larguraBarra(pctProteinaItens)}%; background:${COR_PROTEINA};`}></div>
             </div>
-            <p class="pct-valor">{totaisItens.proteinaG.toFixed(0)}/{(proteinaG ?? 0).toFixed(0)}g</p>
+            <p class="pct-valor">{valorItensTexto(totaisItens.proteinaG, proteinaG ?? 0, "proteinaG", "g")}</p>
           </div>
         </div>
       {/if}
