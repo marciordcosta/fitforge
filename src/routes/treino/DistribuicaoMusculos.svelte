@@ -4320,6 +4320,10 @@
     font-family: inherit;
     color: var(--surface-fg);
     cursor: pointer;
+    /* Segurar pra reordenar não pode abrir o menu de copiar/selecionar do Android. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .editor-exercicio-conteudo:disabled {
     cursor: default;

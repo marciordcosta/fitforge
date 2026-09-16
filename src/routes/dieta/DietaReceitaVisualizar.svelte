@@ -719,6 +719,10 @@
     cursor: pointer;
     text-align: left;
     font-family: inherit;
+    /* Segurar pra excluir não pode abrir o menu de copiar/selecionar do Android. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .item-info {
     flex: 1;

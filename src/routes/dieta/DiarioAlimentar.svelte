@@ -1111,6 +1111,10 @@
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
     -webkit-tap-highlight-color: transparent;
+    /* Segurar pra reordenar não pode abrir o menu de copiar/selecionar do Android. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .card-header {
     display: flex;

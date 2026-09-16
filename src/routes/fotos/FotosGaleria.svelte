@@ -769,6 +769,10 @@
     overflow: hidden;
     background: var(--surface-card);
     cursor: pointer;
+    /* Segurar pra selecionar/comparar não pode abrir o menu de copiar/selecionar do Android. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .foto-item img {
     width: 100%;

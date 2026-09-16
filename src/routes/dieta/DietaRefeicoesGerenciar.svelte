@@ -2182,6 +2182,10 @@
     color: inherit;
     cursor: pointer;
     font-family: inherit;
+    /* Segurar pra abrir o menu de Reordenar/Excluir não pode abrir o menu de copiar do Android. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
   }
   .refeicao-card {
     flex: 1;
