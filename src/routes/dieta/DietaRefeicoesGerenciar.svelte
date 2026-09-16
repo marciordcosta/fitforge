@@ -1346,7 +1346,7 @@
     const grupo = grupoParaAdicionar;
     salvandoNovaRefeicaoGrupo = true;
     try {
-      const novoId = await criarRefeicaoModelo(nomeNovaRefeicaoGrupo.trim());
+      const novoId = await criarRefeicaoModelo(nomeNovaRefeicaoGrupo.trim(), grupo.dias);
       const ids = grupo.modelos.length
         ? [...grupo.modelos.slice(0, -1).map((x) => x.id), novoId, grupo.modelos[grupo.modelos.length - 1].id]
         : [novoId];

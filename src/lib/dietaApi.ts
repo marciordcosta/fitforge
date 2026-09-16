@@ -650,7 +650,20 @@ export async function getContextoMetaCatalogo(modeloId: string, diasSemana?: num
 /** Nome duplicado no catálogo quebra buscas por nome (getMetaRefeicaoPorNome e afins, usadas
  * pra achar a meta de uma refeição do dia) — sem esse checagem, criar/renomear pra um nome já
  * existente gera duas refeições indistinguíveis por nome no catálogo. */
-async function existeNomeRefeicaoModelo(nome: string, idParaIgnorar?: string): Promise<boolean> {
+/** Sem `diasSemana`: nome único em todo o catálogo (usado ao criar/renomear pro modo Fixa, ou uma
+ * refeição nova que entra em TODOS os grupos da Ondulatória de uma vez). Com `diasSemana`: só
+ * bloqueia se algum desses dias específicos já tem uma refeição com esse nome na lista efetiva
+ * dele — permite reaproveitar o mesmo nome em dias/grupos diferentes (ex: "Lanche" em Lower1 e
+ * outro "Lanche", independente, em Upper1). */
+async function existeNomeRefeicaoModelo(nome: string, idParaIgnorar?: string, diasSemana?: number[]): Promise<boolean> {
+  if (diasSemana?.length) {
+    const [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
+    return diasSemana.some((dia) =>
+      resolverCatalogoEfetivoDoDia(dia, catalogo, modelosPorDia).some(
+        (m) => m.id !== idParaIgnorar && m.nome.toLowerCase() === nome.toLowerCase(),
+      ),
+    );
+  }
   let query = supabase.from("dieta_refeicoes_modelo").select("id").eq("user_id", uid()).ilike("nome", nome).limit(1);
   if (idParaIgnorar) query = query.neq("id", idParaIgnorar);
   const { data, error } = await query;
@@ -658,9 +671,11 @@ async function existeNomeRefeicaoModelo(nome: string, idParaIgnorar?: string): P
   return (data?.length ?? 0) > 0;
 }
 
-export async function criarRefeicaoModelo(nome: string): Promise<string> {
+export async function criarRefeicaoModelo(nome: string, diasSemana?: number[]): Promise<string> {
   const nomeTrim = nome.trim();
-  if (await existeNomeRefeicaoModelo(nomeTrim)) throw new Error(`Já existe uma refeição chamada "${nomeTrim}".`);
+  if (await existeNomeRefeicaoModelo(nomeTrim, undefined, diasSemana)) {
+    throw new Error(`Já existe uma refeição chamada "${nomeTrim}"${diasSemana?.length ? " nesse dia" : ""}.`);
+  }
   const { count, error: erroCount } = await supabase
     .from("dieta_refeicoes_modelo")
     .select("id", { count: "exact", head: true });
