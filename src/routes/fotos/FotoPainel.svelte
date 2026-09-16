@@ -34,16 +34,30 @@
   let indice = $state(untrack(() => indiceInicial));
   let containerEl: HTMLDivElement | undefined;
 
-  /** Se o pai trocar qual dia este painel mostra (ex: botão de trocar posição na comparação), o
-   * índice interno precisa realinhar com o novo indiceInicial — sem isso continuaria mostrando o
-   * índice antigo, possivelmente fora do tamanho do novo array de fotos daquele dia. */
+  /** Se o pai trocar qual dia este painel mostra (ex: botão de trocar posição/substituir na
+   * comparação), o índice interno precisa realinhar com o novo indiceInicial. Depende também de
+   * `fotos` (não só do valor de indiceInicial): se os dois dias trocados começam no mesmo índice
+   * (ex: ambos 0, o caso mais comum), o valor de indiceInicial não muda e esse efeito não rodaria,
+   * deixando `indice` desalinhado (ex: usuário tinha arrastado pra indice=2 no dia antigo, que não
+   * existe no array do dia novo) — lendo `fotos` aqui garante que qualquer troca de dia realinha.
+   */
   $effect(() => {
+    fotos;
     indice = indiceInicial;
   });
 
   /** Dimensões reais (naturalWidth/Height) de cada foto já carregada, pra calcular o zoom padrão
-   * de cada uma — capturadas ao carregar a <img> (aoCarregarImagem), não dá pra saber antes disso. */
+   * de cada uma — capturadas ao carregar a <img> (aoCarregarImagem), não dá pra saber antes disso.
+   * Podada sempre que o dia muda, senão cresce sem limite num painel reaproveitado entre trocas
+   * (comparação: trocar posição/substituir usa a mesma instância de FotoPainel indefinidamente). */
   let dimensoesPorPath = $state(new Map<string, { w: number; h: number }>());
+
+  $effect(() => {
+    const pathsValidos = new Set(fotos.map((f) => f.path));
+    for (const path of dimensoesPorPath.keys()) {
+      if (!pathsValidos.has(path)) dimensoesPorPath.delete(path);
+    }
+  });
 
   function registrarDimensao(path: string, img: HTMLImageElement): void {
     if (!img.naturalWidth || !img.naturalHeight) return;
@@ -63,19 +77,35 @@
     if (node.complete) registrarDimensao(path, node);
   }
 
+  /** Muda toda vez que o painel é redimensionado (ex: encolhe pra 42% de altura ao abrir o picker
+   * de comparar/substituir) — só existe pra escalaPadrao reagir a isso, já que ler
+   * containerEl.clientWidth/Height direto num $derived não é rastreado pelo Svelte. */
+  let containerVersao = $state(0);
+
+  $effect(() => {
+    if (!containerEl) return;
+    const observador = new ResizeObserver(() => {
+      containerVersao++;
+    });
+    observador.observe(containerEl);
+    return () => observador.disconnect();
+  });
+
   /** Zoom com que a foto ATUAL abre: o suficiente pra preencher a largura do painel sem sobrar
    * espaço nas laterais (recorta topo/rodapé em vez disso) — nunca corta de verdade, o usuário
    * sempre pode diminuir até ESCALA_MIN (foto inteira, sem cortes) se quiser ver uma borda que
    * ficou fora. Sem a dimensão real ainda (foto acabou de aparecer, não carregou), fica em 1
-   * (foto inteira) até a imagem carregar e o zoom "assentar". */
+   * (foto inteira) até a imagem carregar e o zoom "assentar". Nunca passa de ESCALA_MAX, senão uma
+   * foto de proporção muito extrema abriria acima do teto que a pinça/duplo-toque respeitam. */
   const escalaPadrao = $derived.by(() => {
+    containerVersao;
     const foto = fotos[indice];
     if (!foto || !containerEl) return 1;
     const dim = dimensoesPorPath.get(foto.path);
     if (!dim) return 1;
     const aspectoPainel = containerEl.clientWidth / containerEl.clientHeight;
     const aspectoFoto = dim.w / dim.h;
-    return Math.max(1, aspectoPainel / aspectoFoto);
+    return Math.min(ESCALA_MAX, Math.max(1, aspectoPainel / aspectoFoto));
   });
 
   function formatarDataCurta(iso: string): string {
@@ -190,7 +220,7 @@
     // em vez de assumir que sempre começa "sem zoom nenhum".
     const origemLocalX = (toqueX - panX) / scale;
     const origemLocalY = (toqueY - panY) / scale;
-    const novaEscala = Math.max(ZOOM_AMPLIADO, escalaPadrao + 1);
+    const novaEscala = Math.min(ESCALA_MAX, Math.max(ZOOM_AMPLIADO, escalaPadrao + 1));
     scale = novaEscala;
     panX = toqueX - origemLocalX * novaEscala;
     panY = toqueY - origemLocalY * novaEscala;

@@ -82,8 +82,14 @@ export async function excluirFotoDoDia(foto: FotoRegistro): Promise<void> {
 
 /** Adiciona uma foto a um dia SEM substituir as que já existem — diferente de salvarFotoDoDia
  * (usado pelo registro de peso do dia, que mantém só uma foto "canônica" por dia). Usado pelo
- * "+" da tela de Fotos, que aceita várias fotos por data (carrossel na comparação). */
-export async function adicionarFoto(data: string, arquivo: File): Promise<FotoItem> {
+ * "+" da tela de Fotos, que aceita várias fotos por data (carrossel na comparação).
+ *
+ * `ordem` é opcional: se omitido, é calculado a partir da contagem atual — mas isso RACES quando
+ * várias fotos da mesma data são adicionadas em paralelo (cada chamada lê a contagem antes de
+ * qualquer INSERT anterior confirmar, gerando `ordem` duplicado). Quem for adicionar várias de
+ * uma vez (ex: seleção múltipla na galeria) deve calcular a base uma única vez e passar `ordem`
+ * explícito por arquivo. */
+export async function adicionarFoto(data: string, arquivo: File, ordem?: number): Promise<FotoItem> {
   const userId = uid();
   const extensao = arquivo.name.split(".").pop() || "jpg";
   const path = `${userId}/${data}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extensao}`;
@@ -91,15 +97,19 @@ export async function adicionarFoto(data: string, arquivo: File): Promise<FotoIt
   const { error: uploadError } = await supabase.storage.from("fotos").upload(path, arquivo);
   if (uploadError) throw uploadError;
 
-  const { count } = await supabase
-    .from("fotos")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("data_foto", data);
+  let ordemFinal = ordem;
+  if (ordemFinal == null) {
+    const { count } = await supabase
+      .from("fotos")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("data_foto", data);
+    ordemFinal = count ?? 0;
+  }
 
   const { data: linha, error } = await supabase
     .from("fotos")
-    .insert({ user_id: userId, data_foto: data, url: path, ordem: count ?? 0 })
+    .insert({ user_id: userId, data_foto: data, url: path, ordem: ordemFinal })
     .select("id, url, data_foto")
     .single();
   if (error) throw error;

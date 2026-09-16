@@ -75,8 +75,23 @@
       mediaPorData = new Map();
       return;
     }
-    const ordenadas = [...datas].sort();
-    const registros = await getPesosDoPeriodo(somarDias(ordenadas[0], -6), ordenadas[ordenadas.length - 1]);
+    const ordenadas = [...new Set(datas)].sort();
+    // Junta em janelas (cada uma -6 dias até a data) só quando ficam próximas/se sobrepõem — evita
+    // buscar o período inteiro entre a foto mais antiga e a mais recente quando elas estão
+    // espalhadas ao longo de meses/anos (comum com histórico importado), mas ainda faz 1 query só
+    // por trecho denso de fotos, não uma por data.
+    const janelas: { inicio: string; fim: string }[] = [];
+    for (const data of ordenadas) {
+      const inicio = somarDias(data, -6);
+      const ultima = janelas[janelas.length - 1];
+      if (ultima && inicio <= somarDias(ultima.fim, 1)) {
+        ultima.fim = data;
+      } else {
+        janelas.push({ inicio, fim: data });
+      }
+    }
+    const resultados = await Promise.all(janelas.map((j) => getPesosDoPeriodo(j.inicio, j.fim)));
+    const registros = resultados.flat();
     const pesoMap = new Map<string, number>();
     const mediaMap = new Map<string, number>();
     for (const data of datas) {
@@ -204,6 +219,7 @@
     pressionouLongo = false;
     window.addEventListener("pointermove", aoPointerMovePressionar);
     window.addEventListener("pointerup", aoPointerUpPressionar);
+    window.addEventListener("pointercancel", aoPointerUpPressionar);
     timeoutPressionar = setTimeout(() => {
       pressionouLongo = true;
       cancelarPressionar();
@@ -218,6 +234,7 @@
     timeoutPressionar = undefined;
     window.removeEventListener("pointermove", aoPointerMovePressionar);
     window.removeEventListener("pointerup", aoPointerUpPressionar);
+    window.removeEventListener("pointercancel", aoPointerUpPressionar);
   }
 
   function aoPointerMovePressionar(e: PointerEvent) {
@@ -242,18 +259,25 @@
     void abrirFoto(foto);
   }
 
+  /** Token da abertura em andamento — evita que a resposta de um abrirFoto() antigo (ainda em voo)
+   * sobrescreva peso/média de uma abertura mais nova da MESMA data (fechar e reabrir rápido antes
+   * do primeiro fetch terminar); comparar só a data não bastava, já que duas aberturas seguidas da
+   * mesma data passariam nesse teste igual. */
+  let tokenAbrirFoto = 0;
+
   /** Abre a foto em tela cheia com o carrossel já posicionado nela, dentro das fotos DAQUELE dia
    * — peso/média são buscados à parte (mesma info mostrada em FotoComparar) sem travar a abertura. */
   async function abrirFoto(foto: FotoItem): Promise<void> {
     const grupo = grupos.find((g) => g.fotos.some((f) => f.id === foto.id));
     if (!grupo) return;
+    const meuToken = ++tokenAbrirFoto;
     const indiceInicial = Math.max(0, grupo.fotos.findIndex((f) => f.id === foto.id));
     indiceAtualAberta = indiceInicial;
     mostrarPickerComparar = false;
     fotoAberta = { grupo, indiceInicial, pesoDia: null, mediaSemana: null };
     try {
       const [pesoDia, mediaSemana] = await Promise.all([getPesoDoDia(grupo.data), getPesoMedioNaData(grupo.data)]);
-      if (fotoAberta?.grupo.data === grupo.data) fotoAberta = { ...fotoAberta, pesoDia, mediaSemana };
+      if (tokenAbrirFoto === meuToken && fotoAberta) fotoAberta = { ...fotoAberta, pesoDia, mediaSemana };
     } catch {
       // peso/média são só informativos aqui — a foto continua visível mesmo se isso falhar
     }
@@ -300,7 +324,10 @@
     if (!arquivos.length) return;
     enviando = true;
     try {
-      await Promise.all(arquivos.map((arquivo) => adicionarFoto(dataNovaFoto, arquivo)));
+      // Base calculada uma vez só, fora do map — passar `ordem` explícito evita que os uploads em
+      // paralelo leiam a mesma contagem antes de qualquer um confirmar (ordem duplicada).
+      const baseOrdem = grupos.find((g) => g.data === dataNovaFoto)?.fotos.length ?? 0;
+      await Promise.all(arquivos.map((arquivo, i) => adicionarFoto(dataNovaFoto, arquivo, baseOrdem + i)));
       mostrarAdicionar = false;
       await carregar();
     } catch (err) {
