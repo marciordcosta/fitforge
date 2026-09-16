@@ -422,12 +422,23 @@
   /** Mesmo texto do anel de macros do topo: no modo restante, mostra o quanto falta (ou "acima" se
    * já passou da meta) em vez de "consumido/meta"; no modo por peso, mostra o consumido em g/kg —
    * não se aplica a calorias (unidade vazia), que não tem uma métrica por peso equivalente e fica
-   * na visualização padrão (restante) mesmo nesse modo. Aplicado também nos cards de cada refeição. */
+   * na visualização padrão (restante) mesmo nesse modo. Aplicado também nos cards de cada refeição,
+   * onde o consumido vem antes, entre parênteses (ex: "25g (6g rest.)") — nos cards não faz sentido
+   * mostrar só o restante sem saber quanto já foi de fato consumido. */
   function labelMeta(valor: number, meta: number, unidade: string): string {
     if (modoExibicao === "porPeso" && unidade) return `${gPorKg(valor)}${unidade}/kg`;
     if (modoExibicao === "absoluto") return labelAbsoluto(valor, meta, unidade);
     if (passouMeta(valor, meta)) return `${(valor - meta).toFixed(0)}${unidade} acima`;
     return `${restante(valor, meta).toFixed(0)}${unidade} rest.`;
+  }
+
+  /** Mesma regra de labelMeta, mas com o valor consumido antes, entre parênteses — usado só nos
+   * cards de refeição (labelMetaCard), onde ver quanto já foi consumido é mais útil que só o
+   * restante/quanto passou. */
+  function labelMetaComConsumido(valor: number, meta: number, unidade: string): string {
+    if (modoExibicao === "porPeso" && unidade) return labelMeta(valor, meta, unidade);
+    if (modoExibicao === "absoluto") return labelMeta(valor, meta, unidade);
+    return `${valor.toFixed(0)}${unidade} (${labelMeta(valor, meta, unidade)})`;
   }
 
   /** Mesma lógica de labelMeta, mas sem o "rest." quando a refeição tem meta e ainda não recebeu
@@ -437,7 +448,7 @@
     if (modoExibicao === "restante" && !temItens && !passouMeta(valor, meta)) {
       return `${restante(valor, meta).toFixed(0)}${unidade}`;
     }
-    return labelMeta(valor, meta, unidade);
+    return labelMetaComConsumido(valor, meta, unidade);
   }
 
   /** Texto do card de refeição sem meta cadastrada — sem meta pra comparar, "restante"/"absoluto"
