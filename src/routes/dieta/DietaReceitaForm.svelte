@@ -66,8 +66,12 @@
   const pctGordura = $derived(caloriasMacros > 0 ? (caloriasGordura / caloriasMacros) * 100 : 0);
   const pctProteina = $derived(caloriasMacros > 0 ? (caloriasProteina / caloriasMacros) * 100 : 0);
 
+  // Com 0 kcal (rascunho ainda sem itens/macros), o último stop do conic-gradient (aberto até
+  // 100%) preenchia o anel inteiro com a cor da proteína por engano — mostra uma cor neutra.
   const donutStyle = $derived(
-    `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
+    caloriasMacros > 0
+      ? `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`
+      : `background: var(--surface-border);`,
   );
 
   const valido = $derived(receitaRascunho.nome.trim().length > 0 && receitaRascunho.itens.length > 0);

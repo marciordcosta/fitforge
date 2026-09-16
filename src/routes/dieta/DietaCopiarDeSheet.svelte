@@ -36,8 +36,14 @@
   let salvando = $state(false);
   let carregandoRefeicao = $state(false);
   let carregandoAlimento = $state(false);
+  /** Trocar rápido de dia/refeição no wheel picker pode fazer uma resposta mais antiga (mais
+   * lenta) chegar depois de uma mais nova e sobrescrever a seleção — essas travas garantem que só
+   * a chamada mais recente de cada uma aplica o resultado. */
+  let tokenAlimento = 0;
+  let tokenRefeicao = 0;
 
   async function carregarAlimentos(refeicaoId: string) {
+    const meuToken = ++tokenAlimento;
     if (!refeicaoId) {
       opcoesAlimento = [];
       alimentoSelecionado = "";
@@ -47,25 +53,28 @@
     opcoesAlimento = [];
     try {
       const itens = await getItensDaRefeicao(refeicaoId);
+      if (meuToken !== tokenAlimento) return;
       opcoesAlimento = [{ valor: "TUDO", label: "Tudo" }, ...itens.map((it) => ({ valor: it.id, label: it.nome }))];
       alimentoSelecionado = "TUDO";
     } finally {
-      carregandoAlimento = false;
+      if (meuToken === tokenAlimento) carregandoAlimento = false;
     }
   }
 
   async function carregarRefeicoes(dia: string) {
+    const meuToken = ++tokenRefeicao;
     carregandoRefeicao = true;
     opcoesRefeicao = [];
     refeicaoSelecionada = "";
     try {
       const todas = await getRefeicoesDoDia(dia);
+      if (meuToken !== tokenRefeicao) return;
       opcoesRefeicao = todas.filter((r) => r.id !== refeicaoDestinoId).map((r) => ({ valor: r.id, label: r.nome }));
       refeicaoSelecionada = opcoesRefeicao[0]?.valor ?? "";
     } finally {
-      carregandoRefeicao = false;
+      if (meuToken === tokenRefeicao) carregandoRefeicao = false;
     }
-    await carregarAlimentos(refeicaoSelecionada);
+    if (meuToken === tokenRefeicao) await carregarAlimentos(refeicaoSelecionada);
   }
 
   void carregarRefeicoes(untrack(() => diaSelecionado));

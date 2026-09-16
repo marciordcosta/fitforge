@@ -113,11 +113,15 @@
    * do sheet; só essa data muda, o catálogo/padrão configurado nunca é tocado. */
   function fecharReordenar(): void {
     reordenando = false;
+    const ordemAnterior = refeicoes;
     const idsFinal = refeicoesReordenando.map((r) => r.id);
     refeicoes = refeicoesReordenando;
     void reordenarRefeicoesDoDia(idsFinal)
       .then(() => mostrarToast("Salvo"))
-      .catch((err) => alert("Erro ao reordenar: " + (err as Error).message));
+      .catch((err) => {
+        refeicoes = ordemAnterior;
+        alert("Erro ao reordenar: " + (err as Error).message);
+      });
   }
 
   function proximoModoExibicao(atual: ModoExibicaoMacro): ModoExibicaoMacro {
@@ -171,7 +175,7 @@
    * Resolve tudo numa passada só (em vez de chamar getContextoMetaCatalogo por refeição, que
    * refaria as mesmas 3 consultas do catálogo várias vezes) — soma uma vez só as refeições que não
    * são a última do dia, e a partir dela deriva o "disponível" de cada uma. */
-  async function carregarMetasRefeicoes(data: string) {
+  async function carregarMetasRefeicoes(data: string): Promise<{ mapa: Map<string, RefeicaoModelo>; ultimaNome: string | null } | null> {
     try {
       const [modelos, metasDia, modelosPorDia] = await Promise.all([
         listRefeicoesModelo(),
@@ -239,10 +243,10 @@
         }
         if (efetivo.metaCalorias !== null) mapa.set(m.nome, efetivo);
       }
-      metasRefeicaoPorNome = mapa;
-      refeicaoAutomaticaNome = ultima?.nome ?? null;
+      return { mapa, ultimaNome: ultima?.nome ?? null };
     } catch {
       // opcional — sem meta cadastrada, os cards seguem mostrando só o percentual da meta diária
+      return null;
     }
   }
 
@@ -277,23 +281,39 @@
 
   void carregarInfoTopo();
 
+  /** Contador de chamadas — trocar de data rapidamente (setas/seletor) dispara um novo carregar()
+   * antes do anterior terminar; sem isso, a resposta mais lenta podia chegar por último e
+   * sobrescrever a tela com os dados do dia errado. Cada carregar() só aplica o resultado se
+   * ninguém mais novo começou entretanto. */
+  let tokenCarregar = 0;
+
   async function carregar() {
+    const meuToken = ++tokenCarregar;
+    const dataAlvo = dataAtual;
     loading = true;
     erro = null;
     try {
-      refeicoes = await garantirRefeicoesPadraoDoDia(dataAtual);
-      const [itensRes, metasRes] = await Promise.all([
-        getDiarioDoDia(dataAtual),
-        getMetasDoDia(dataAtual),
-        carregarMetasRefeicoes(dataAtual),
+      const refeicoesRes = await garantirRefeicoesPadraoDoDia(dataAlvo);
+      const [itensRes, metasRes, metasRefeicoesRes] = await Promise.all([
+        getDiarioDoDia(dataAlvo),
+        getMetasDoDia(dataAlvo),
+        carregarMetasRefeicoes(dataAlvo),
       ]);
+      if (meuToken !== tokenCarregar) return;
+      refeicoes = refeicoesRes;
       itens = itensRes;
       metas = metasRes;
+      if (metasRefeicoesRes) {
+        metasRefeicaoPorNome = metasRefeicoesRes.mapa;
+        refeicaoAutomaticaNome = metasRefeicoesRes.ultimaNome;
+      }
     } catch (err) {
-      erro = (err as Error).message;
+      if (meuToken === tokenCarregar) erro = (err as Error).message;
     } finally {
-      loading = false;
-      carregouAlgumaVez = true;
+      if (meuToken === tokenCarregar) {
+        loading = false;
+        carregouAlgumaVez = true;
+      }
     }
   }
 
@@ -309,12 +329,6 @@
     dataAtual = iso;
     mostrarData = false;
     void carregar();
-  }
-
-  function preview(refeicaoId: string): string {
-    const nomes = itens.filter((i) => i.refeicaoId === refeicaoId).map((i) => i.nome);
-    if (!nomes.length) return "Nenhum alimento ainda";
-    return nomes.join(", ");
   }
 
   function totaisRefeicao(refeicaoId: string) {
@@ -789,7 +803,13 @@
               {@render pctColuna("Proteínas", COR_PROTEINA, larguraSemMeta(totais.proteinaG, metas?.proteinaG), labelSemMeta(totais.proteinaG, "g"))}
             </div>
           {:else}
-            <p class="preview">{preview(refeicao.id)}</p>
+            <p class="pct-titulo">Refeição sem meta</p>
+            <div class="pct-grid">
+              {@render pctColuna("Calorias", "var(--color-secondary)", 0, { principal: "0", secundario: "" })}
+              {@render pctColuna("Carb", COR_CARBO, 0, { principal: "0g", secundario: "" })}
+              {@render pctColuna("Gorduras", COR_GORDURA, 0, { principal: "0g", secundario: "" })}
+              {@render pctColuna("Proteínas", COR_PROTEINA, 0, { principal: "0g", secundario: "" })}
+            </div>
           {/if}
           <button
             type="button"
@@ -1156,17 +1176,6 @@
   .diario-titulo {
     font-weight: 600;
     margin: 0 0 var(--space-3);
-  }
-  .preview {
-    color: var(--surface-muted);
-    font-size: var(--font-size-base);
-    margin: 0 0 var(--space-3);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
   }
   .acao-adicionar {
     width: 100%;

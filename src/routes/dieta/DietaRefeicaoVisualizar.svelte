@@ -128,8 +128,12 @@
   const pctGordura = $derived(caloriasMacros > 0 ? (caloriasGordura / caloriasMacros) * 100 : 0);
   const pctProteina = $derived(caloriasMacros > 0 ? (caloriasProteina / caloriasMacros) * 100 : 0);
 
+  // Com 0 kcal (refeição sem itens ainda), o último stop do conic-gradient (aberto até 100%)
+  // preenchia o anel inteiro com a cor da proteína por engano — mostra uma cor neutra em vez disso.
   const donutStyle = $derived(
-    `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
+    caloriasMacros > 0
+      ? `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`
+      : `background: var(--surface-border);`,
   );
 
   function pctMeta(valor: number, meta: number): number {
@@ -185,7 +189,7 @@
     if (!itemEditando || !alimentoEditando) return;
     processando = true;
     try {
-      await atualizarItemDiario(itemEditando.id, alimentoEditando, quantidade, refeicaoId);
+      await atualizarItemDiario(itemEditando.id, alimentoEditando, quantidade, refeicaoId, quantidade !== itemEditando.quantidade);
       itemEditando = null;
       alimentoEditando = null;
       await carregar();
@@ -380,10 +384,13 @@
     processando = true;
     try {
       await Promise.all(itens.map((item) => removerItemDiario(item.id)));
-      await carregar();
     } catch (err) {
       alert("Erro ao excluir alimentos: " + (err as Error).message);
     } finally {
+      // Mesmo se algum item falhou no meio do Promise.all, outros já podem ter sido removidos de
+      // verdade no servidor — recarrega sempre pra tela nunca ficar mostrando uma lista "cheia"
+      // que não bate mais com o banco.
+      await carregar();
       processando = false;
     }
   }
@@ -507,8 +514,30 @@
           <span class="meta-valor">{metaValorTexto(totalProteina, metaRefeicao.proteinaG, metaDiaria?.proteinaG ?? 0, "g")}</span>
         </div>
       </div>
-    {:else if itens.length}
+    {:else}
       <p class="metas-titulo">Refeição sem meta</p>
+      <div class="metas-grid">
+        <div class="meta-col">
+          <span class="meta-label">Calorias</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCalorias, metaDiaria?.calorias ?? 0))}%; background:var(--color-secondary);`}></div></div>
+          <span class="meta-valor">{totalCalorias.toFixed(0)}</span>
+        </div>
+        <div class="meta-col">
+          <span class="meta-label">Carb</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalCarboidrato, metaDiaria?.carboidratoG ?? 0))}%; background:${COR_CARBO};`}></div></div>
+          <span class="meta-valor">{totalCarboidrato.toFixed(0)}g</span>
+        </div>
+        <div class="meta-col">
+          <span class="meta-label">Gorduras</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalGordura, metaDiaria?.gorduraG ?? 0))}%; background:${COR_GORDURA};`}></div></div>
+          <span class="meta-valor">{totalGordura.toFixed(0)}g</span>
+        </div>
+        <div class="meta-col">
+          <span class="meta-label">Proteínas</span>
+          <div class="meta-barra"><div class="meta-barra-fill" style={`width:${larguraBarra(pctMeta(totalProteina, metaDiaria?.proteinaG ?? 0))}%; background:${COR_PROTEINA};`}></div></div>
+          <span class="meta-valor">{totalProteina.toFixed(0)}g</span>
+        </div>
+      </div>
     {/if}
 
     {#if !itens.length}

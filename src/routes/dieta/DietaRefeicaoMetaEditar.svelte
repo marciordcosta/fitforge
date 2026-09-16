@@ -223,8 +223,13 @@
     }
   }
 
+  // Com 0 kcal (nenhum macro definido ainda), o conic-gradient sem essa checagem preenchia o anel
+  // inteiro com a cor da proteína por engano (o último stop, aberto até 100%, "herda" tudo quando
+  // os stops anteriores têm largura zero) — mostrando um anel sólido amarelo pra uma meta vazia.
   const donutStyle = $derived(
-    `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
+    caloriasCalc > 0
+      ? `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`
+      : `background: var(--surface-border);`,
   );
 
   let mostrarMacros = $state(false);
@@ -330,14 +335,24 @@
     const item = itemParaMover;
     itemParaMover = null;
     movendoItem = true;
+    let adicionadoNoDestino = false;
     try {
       const destinoReceitaId = await garantirReceitaPrivadaRefeicao(destino.id, nomeEfetivoModelo(destino), receitaIdEfetivaModelo(destino), diasSemana);
       await adicionarItemReceita(destinoReceitaId, item.alimentoId, item.quantidade);
+      adicionadoNoDestino = true;
       await removerItemReceita(item.id);
       await carregar();
       mostrarToast("Movido");
     } catch (err) {
-      alert("Erro ao mover alimento: " + (err as Error).message);
+      // Sem transação real: se já adicionou no destino mas falhou ao remover da origem, o alimento
+      // fica duplicado nas duas — avisa explicitamente em vez de um erro genérico, pra não passar
+      // despercebido contando calorias em dobro.
+      if (adicionadoNoDestino) {
+        alert(`O alimento foi adicionado em "${destino.nome}" mas não foi possível removê-lo daqui — confira as duas refeições pra não ficar duplicado. Erro: ${(err as Error).message}`);
+        await carregar();
+      } else {
+        alert("Erro ao mover alimento: " + (err as Error).message);
+      }
     } finally {
       movendoItem = false;
     }

@@ -10,6 +10,8 @@
   let busca = $state("");
 
   let timeoutBusca: ReturnType<typeof setTimeout> | undefined;
+  /** Evita que uma busca antiga (mais lenta) sobrescreva o resultado de uma busca mais nova. */
+  let tokenBusca = 0;
 
   function criarNova() {
     limparRascunho();
@@ -39,15 +41,20 @@
   function aoDigitar() {
     clearTimeout(timeoutBusca);
     timeoutBusca = setTimeout(async () => {
+      const meuToken = ++tokenBusca;
       loading = true;
       erro = null;
       try {
-        receitas = busca.trim() ? await buscarReceitas(busca) : await listReceitas();
+        const res = busca.trim() ? await buscarReceitas(busca) : await listReceitas();
+        if (meuToken !== tokenBusca) return;
+        receitas = res;
       } catch (err) {
-        erro = (err as Error).message;
+        if (meuToken === tokenBusca) erro = (err as Error).message;
       } finally {
-        loading = false;
-        carregouAlgumaVez = true;
+        if (meuToken === tokenBusca) {
+          loading = false;
+          carregouAlgumaVez = true;
+        }
       }
     }, 300);
   }

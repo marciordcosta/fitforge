@@ -138,7 +138,7 @@
   async function salvarEdicoes() {
     if (!receita) return;
     const nome = nomeEditavel.trim();
-    if (!nome) return;
+    if (!nome || !itensLocais.length) return;
     salvandoEdicoes = true;
     try {
       if (nome !== receita.nome) {
@@ -189,8 +189,12 @@
   const pctGordura = $derived(caloriasMacros > 0 ? (caloriasGordura / caloriasMacros) * 100 : 0);
   const pctProteina = $derived(caloriasMacros > 0 ? (caloriasProteina / caloriasMacros) * 100 : 0);
 
+  // Com 0 kcal (receita sem itens/macros), o último stop do conic-gradient (aberto até 100%)
+  // preenchia o anel inteiro com a cor da proteína por engano — mostra uma cor neutra em vez disso.
   const donutStyle = $derived(
-    `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`,
+    caloriasMacros > 0
+      ? `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`
+      : `background: var(--surface-border);`,
   );
 
   function pctMeta(valor: number, meta: number): number {
@@ -235,15 +239,18 @@
     const fatorAntigo = itemEditando.quantidade / itemEditando.porcaoPadraoQtd;
     const fatorNovo = novaQuantidade / itemEditando.porcaoPadraoQtd;
     const id = itemEditando.id;
+    // porcaoPadraoQtd=0 é dado malformado (alimento legado/manual sem porção padrão) — sem essa
+    // checagem, a divisão por zero virava NaN e corrompia os macros do item ao gravar.
+    const escala = Number.isFinite(fatorAntigo) && fatorAntigo > 0 ? fatorNovo / fatorAntigo : 1;
     itensLocais = itensLocais.map((it) =>
       it.id === id
         ? {
             ...it,
             quantidade: novaQuantidade,
-            calorias: round1((it.calorias / fatorAntigo) * fatorNovo),
-            proteinaG: round1((it.proteinaG / fatorAntigo) * fatorNovo),
-            gorduraG: round1((it.gorduraG / fatorAntigo) * fatorNovo),
-            carboidratoG: round1((it.carboidratoG / fatorAntigo) * fatorNovo),
+            calorias: round1(it.calorias * escala),
+            proteinaG: round1(it.proteinaG * escala),
+            gorduraG: round1(it.gorduraG * escala),
+            carboidratoG: round1(it.carboidratoG * escala),
           }
         : it,
     );
@@ -362,7 +369,7 @@
     {:else}
       <button class="nome-btn" onclick={() => (nomeEditando = true)}>{nomeEditavel}</button>
     {/if}
-    <button class="salvar" onclick={salvarEdicoes} disabled={salvandoEdicoes || loading || !nomeEditavel.trim()} aria-label="Salvar">
+    <button class="salvar" onclick={salvarEdicoes} disabled={salvandoEdicoes || loading || !nomeEditavel.trim() || !itensLocais.length} aria-label="Salvar">
       {@render iconCheck()}
     </button>
   </div>

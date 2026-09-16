@@ -23,6 +23,11 @@
   let fase = $state<"camera" | "buscando" | "erro">("camera");
   let mensagemErro = $state("");
   let controls: IScannerControls | null = null;
+  /** zxing pode entregar dois frames decodificados em sequência antes do ctrl.stop() surtir efeito
+   * — sem essa trava, os dois chamavam aoDetectar concorrentemente pro mesmo código e, pra um
+   * produto novo, uma das duas criações batia no unique constraint de codigo_barras e mostrava um
+   * erro cru de banco em vez de simplesmente ignorar a segunda detecção. */
+  let detectando = false;
   let mostrarManual = $state(false);
   let codigoManual = $state("");
   /** Produto novo (não achado localmente) achado na Open Food Facts, aguardando a escolha de
@@ -31,26 +36,38 @@
   let produtoPendente = $state<AlimentoOpenFoodFactsInput | null>(null);
   let mostrarEscolhaSalvar = $state(false);
 
-  async function iniciarCamera(el: HTMLVideoElement) {
+  /** `aindaValido` cobre o caso de o usuário sair da tela ANTES do getUserMedia/decodeFromConstraints
+   * resolver: nesse momento `controls` ainda é null, então o cleanup do $effect (controls?.stop())
+   * não tem nada pra parar; sem essa checagem, quando a promise resolvia depois do unmount, a
+   * câmera ficava ligada em segundo plano pra sempre (ninguém mais chamava stop() nela). */
+  async function iniciarCamera(el: HTMLVideoElement, aindaValido: () => boolean) {
     try {
       // Garante que uma câmera de uma visita anterior (ainda não totalmente liberada pelo navegador) não fique
       // disputando o dispositivo com essa nova tentativa — sem isso, às vezes o getUserMedia trava em silêncio.
       controls?.stop();
       controls = null;
+      detectando = false;
       const reader = new BrowserMultiFormatReader();
-      controls = await reader.decodeFromConstraints(
+      const novosControls = await reader.decodeFromConstraints(
         { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },
         el,
         (result, _err, ctrl) => {
-          if (result) {
+          if (result && !detectando) {
+            detectando = true;
             ctrl.stop();
             controls = null;
             void aoDetectar(result.getText());
           }
         },
       );
+      if (!aindaValido()) {
+        novosControls.stop();
+        return;
+      }
+      controls = novosControls;
       ajustarFoco(el);
     } catch (err) {
+      if (!aindaValido()) return;
       fase = "erro";
       mensagemErro = "Não foi possível acessar a câmera: " + (err as Error).message;
     }
@@ -74,8 +91,13 @@
   }
 
   $effect(() => {
-    if (videoEl) void iniciarCamera(videoEl);
-    return () => controls?.stop();
+    if (!videoEl) return;
+    let valido = true;
+    void iniciarCamera(videoEl, () => valido);
+    return () => {
+      valido = false;
+      controls?.stop();
+    };
   });
 
   function irParaItem(alimentoId: string) {

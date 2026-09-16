@@ -131,8 +131,12 @@
   const pctProteina = $derived(caloriasCalc > 0 ? (4 * (proteinaGInput ?? 0) * 100) / caloriasCalc : 0);
   const pctGordura = $derived(caloriasCalc > 0 ? (9 * (gorduraGInput ?? 0) * 100) / caloriasCalc : 0);
   const pctCarboidrato = $derived(caloriasCalc > 0 ? (4 * (carboidratoGInput ?? 0) * 100) / caloriasCalc : 0);
+  // Com 0 kcal, o último stop do conic-gradient (aberto até 100%) preenchia o anel inteiro com a
+  // cor da proteína por engano — mostra uma cor neutra em vez disso.
   const donutStyle = $derived(
-    `background: conic-gradient(${COR_CARBO} 0% ${pctCarboidrato}%, ${COR_GORDURA} ${pctCarboidrato}% ${pctCarboidrato + pctGordura}%, ${COR_PROTEINA} ${pctCarboidrato + pctGordura}% 100%);`,
+    caloriasCalc > 0
+      ? `background: conic-gradient(${COR_CARBO} 0% ${pctCarboidrato}%, ${COR_GORDURA} ${pctCarboidrato}% ${pctCarboidrato + pctGordura}%, ${COR_PROTEINA} ${pctCarboidrato + pctGordura}% 100%);`
+      : `background: var(--surface-border);`,
   );
 
   /** Metas de consumo puramente informativas — Fibras e Gordura Saturada vêm da faixa parametrizada em % das calorias do dia; Água continua por kg de peso. */
@@ -647,19 +651,16 @@
 
   async function confirmarTrocaParaFixa() {
     confirmandoTrocaFixa = false;
-    salvandoCalorias = true;
-    try {
-      await zerarMetasCatalogo();
-      await carregar();
-    } catch (err) {
-      alert("Erro ao zerar metas: " + (err as Error).message);
-      salvandoCalorias = false;
-      return;
-    }
-    await salvarCalorias();
+    await salvarCalorias(true);
   }
 
-  async function salvarCalorias() {
+  /** `zerarMetasAoTrocar` só quando o usuário confirmou o aviso da troca pra Fixa — fica DEPOIS de
+   * definirModoCalorias no mesmo try/catch: se a troca de modo falhar, a meta nunca chega a ser
+   * zerada, e se o zerar falhar depois, o erro cai no mesmo alerta honesto de "não salvou" (antes
+   * isso rodava numa função separada ANTES de salvar o resto, então uma falha logo em seguida
+   * deixava a meta zerada de verdade mas o usuário via uma mensagem de erro sugerindo que nada
+   * tinha acontecido). */
+  async function salvarCalorias(zerarMetasAoTrocar = false) {
     salvandoCalorias = true;
     try {
       await salvarPerfilDieta({
@@ -674,6 +675,10 @@
 
       if (modoCalorias !== modoCaloriasOriginal) {
         await definirModoCalorias(modoCalorias);
+        if (zerarMetasAoTrocar) {
+          await zerarMetasCatalogo();
+          await carregar();
+        }
       }
 
       const diasRemovidos = [...manuaisOriginal.keys()].filter((dia) => !manuaisCompletos.has(dia));
@@ -784,32 +789,45 @@
 
   /** Troca de posição dois itens de uma lista, sempre preservando a última (automática) no fim —
    * nunca deixa mover a própria última nem colocar outra na posição dela. */
+  /** Trava as setas ↑↓ enquanto uma reordenação está em voo — sem isso, um duplo-toque rápido lia
+   * o mesmo array `modelos`/`grupo.modelos` (ainda não atualizado pelo carregar() da primeira
+   * chamada) duas vezes, disparando duas gravações concorrentes que podiam se sobrepor. */
+  let reordenandoRequisicao = $state(false);
+
   async function moverRefeicaoGlobal(index: number, delta: number) {
+    if (reordenandoRequisicao) return;
     const novoIndex = index + delta;
     if (novoIndex < 0 || novoIndex >= modelos.length) return;
     if (index === modelos.length - 1 || novoIndex === modelos.length - 1) return;
     const nova = modelos.slice();
     [nova[index], nova[novoIndex]] = [nova[novoIndex], nova[index]];
+    reordenandoRequisicao = true;
     try {
       await reordenarRefeicoesModelo(nova.map((m) => m.id));
       await carregar();
     } catch (err) {
       alert("Erro ao reordenar: " + (err as Error).message);
+    } finally {
+      reordenandoRequisicao = false;
     }
   }
 
   async function moverRefeicaoGrupo(grupo: GrupoDias, index: number, delta: number) {
+    if (reordenandoRequisicao) return;
     const novoIndex = index + delta;
     if (novoIndex < 0 || novoIndex >= grupo.modelos.length) return;
     if (index === grupo.modelos.length - 1 || novoIndex === grupo.modelos.length - 1) return;
     const nova = grupo.modelos.slice();
     [nova[index], nova[novoIndex]] = [nova[novoIndex], nova[index]];
     const ids = nova.map((m) => m.id);
+    reordenandoRequisicao = true;
     try {
       await Promise.all(grupo.dias.map((dia) => definirRefeicoesDoDia(dia, ids)));
       await carregar();
     } catch (err) {
       alert("Erro ao reordenar: " + (err as Error).message);
+    } finally {
+      reordenandoRequisicao = false;
     }
   }
 
@@ -1437,7 +1455,10 @@
   {@const pctCarbo = calorias > 0 ? ((carboidratoG * 4) / calorias) * 100 : 0}
   {@const pctGordura = calorias > 0 ? ((gorduraG * 9) / calorias) * 100 : 0}
   {@const pctProteina = calorias > 0 ? ((proteinaG * 4) / calorias) * 100 : 0}
-  {@const estiloDonut = `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`}
+  {@const estiloDonut =
+    calorias > 0
+      ? `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`
+      : `background: var(--surface-border);`}
   <div class="meta-resumo">
     <button
       type="button"
@@ -1691,8 +1712,8 @@
                   <span class="reordenar-nome">{nomeEfetivo(m, grupo.dias[0])}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
                   {#if !ultima}
                     <div class="reordenar-setas">
-                      <button disabled={i === 0} onclick={() => moverRefeicaoGrupo(grupo, i, -1)} aria-label="Mover pra cima">▲</button>
-                      <button disabled={i === grupo.modelos.length - 2} onclick={() => moverRefeicaoGrupo(grupo, i, 1)} aria-label="Mover pra baixo">▼</button>
+                      <button disabled={i === 0 || reordenandoRequisicao} onclick={() => moverRefeicaoGrupo(grupo, i, -1)} aria-label="Mover pra cima">▲</button>
+                      <button disabled={i === grupo.modelos.length - 2 || reordenandoRequisicao} onclick={() => moverRefeicaoGrupo(grupo, i, 1)} aria-label="Mover pra baixo">▼</button>
                     </div>
                   {/if}
                 </div>
@@ -1723,11 +1744,7 @@
                         </span>
                       </span>
                     </div>
-                    {#if meta.calorias != null}
-                      {@render metaDonut(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias, () => abrirCaloriasRefeicao(m, grupo))}
-                    {:else}
-                      <p class="preview">Sem meta configurada</p>
-                    {/if}
+                    {@render metaDonut(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias ?? 0, () => abrirCaloriasRefeicao(m, grupo))}
                   </div>
                 </div>
               {/if}
@@ -1754,8 +1771,8 @@
                 <span class="reordenar-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</span>
                 {#if !ultima}
                   <div class="reordenar-setas">
-                    <button disabled={i === 0} onclick={() => moverRefeicaoGlobal(i, -1)} aria-label="Mover pra cima">▲</button>
-                    <button disabled={i === modelos.length - 2} onclick={() => moverRefeicaoGlobal(i, 1)} aria-label="Mover pra baixo">▼</button>
+                    <button disabled={i === 0 || reordenandoRequisicao} onclick={() => moverRefeicaoGlobal(i, -1)} aria-label="Mover pra cima">▲</button>
+                    <button disabled={i === modelos.length - 2 || reordenandoRequisicao} onclick={() => moverRefeicaoGlobal(i, 1)} aria-label="Mover pra baixo">▼</button>
                   </div>
                 {/if}
               </div>
@@ -1786,11 +1803,7 @@
                       </span>
                     </span>
                   </div>
-                  {#if ultima || m.metaCalorias != null}
-                    {@render metaDonut(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias, () => abrirCaloriasRefeicao(m))}
-                  {:else}
-                    <p class="preview">Sem meta configurada</p>
-                  {/if}
+                  {@render metaDonut(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias, () => abrirCaloriasRefeicao(m))}
                 </div>
               </div>
             {/if}
@@ -2309,11 +2322,6 @@
     font-weight: 400;
     color: var(--surface-muted);
     white-space: nowrap;
-  }
-  .preview {
-    color: var(--surface-muted);
-    font-size: var(--font-size-sm);
-    margin: 0;
   }
   .meta-resumo {
     display: flex;

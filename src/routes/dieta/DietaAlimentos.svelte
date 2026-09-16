@@ -78,27 +78,36 @@
     timeoutMensagem = setTimeout(() => (mensagem = null), 2000);
   }
 
+  /** Digitar rápido dispara uma busca debounced atrás da outra — sem essa trava, uma busca mais
+   * antiga (mais lenta) podia responder depois de uma mais nova e sobrescrever a lista com
+   * resultados de um termo que já não está mais na caixa de busca. */
+  let tokenBusca = 0;
+
   async function executarBusca(query: string) {
+    const meuToken = ++tokenBusca;
     loading = true;
     erro = null;
     try {
+      let alRes: Alimento[];
+      let recRes: ReceitaResumo[];
       if (query.trim()) {
-        const [alRes, recRes] = await Promise.all([
+        [alRes, recRes] = await Promise.all([
           buscarAlimentos(query),
           mostrarReceitasRapidas ? buscarReceitas(query) : Promise.resolve([]),
         ]);
-        alimentos = alRes;
-        resultadosReceitas = recRes;
       } else {
-        const [alRes, recRes] = await Promise.all([listAlimentos(), mostrarReceitasRapidas ? listReceitas() : Promise.resolve([])]);
-        alimentos = alRes;
-        resultadosReceitas = recRes;
+        [alRes, recRes] = await Promise.all([listAlimentos(), mostrarReceitasRapidas ? listReceitas() : Promise.resolve([])]);
       }
+      if (meuToken !== tokenBusca) return;
+      alimentos = alRes;
+      resultadosReceitas = recRes;
     } catch (err) {
-      erro = (err as Error).message;
+      if (meuToken === tokenBusca) erro = (err as Error).message;
     } finally {
-      loading = false;
-      carregouAlgumaVez = true;
+      if (meuToken === tokenBusca) {
+        loading = false;
+        carregouAlgumaVez = true;
+      }
     }
   }
 
