@@ -347,7 +347,10 @@
   .foto-painel img {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    /* cover (não contain): abre já preenchendo a largura toda, sem barra lateral — corta
+       topo/rodapé se sobrar, em vez de encolher a foto pra caber inteira com espaço nas laterais. */
+    object-fit: cover;
+    object-position: center;
     touch-action: none;
     user-select: none;
     transition: transform 0.15s ease;
