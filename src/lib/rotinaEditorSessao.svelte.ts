@@ -5,6 +5,8 @@
  * quando o usuário salva ou descarta explicitamente.
  */
 
+import type { PendenteMoverTrocar } from "./treinoEditorRascunho.svelte";
+
 const CHAVE_STORAGE = "fitforge_rotina_editor_ativo";
 
 export interface LinhaSerie {
@@ -32,6 +34,10 @@ export interface SessaoEdicaoRotina {
   diaSemana: number | null;
   linhas: Linha[];
   picker: PickerRotinaAberto;
+  /** "Ir para Rotinas" (mover/trocar exercício com outra rotina) pendente de aplicar — só grava
+   * de verdade ao Salvar, igual ao editor completo em DistribuicaoMusculos.svelte. Opcional pra
+   * não quebrar uma sessão já persistida no localStorage de antes desse campo existir. */
+  pendentes?: PendenteMoverTrocar[];
 }
 
 interface EstadoPersistido {

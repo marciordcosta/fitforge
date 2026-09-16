@@ -16,14 +16,20 @@
     getUltimoRegistro,
     getObservacoesAtuais,
     salvarObservacaoExercicio,
+    listTreinos,
+    adicionarTreinoExercicio,
+    removerTreinoExercicio,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
     type Exercicio,
     type SetRegistro,
+    type TreinoComExercicios,
+    type TreinoExercicio,
   } from "../../lib/treinoApi";
   import { hojeISO } from "../../lib/dates";
   import { rotinaEditorSessao, type Linha, type LinhaSerie } from "../../lib/rotinaEditorSessao.svelte";
   import { criarGuardaSaida } from "../../lib/guardaSaida.svelte";
+  import type { PendenteMoverTrocar } from "../../lib/treinoEditorRascunho.svelte";
 
   let { treinoId }: { treinoId: string | null } = $props();
 
@@ -41,6 +47,11 @@
    * com qual picker estava aberto) pra sobreviver a tocar no nome de um exercício pra ver o
    * detalhe e voltar, em vez de cair de volta na tela de rotina "pelada". */
   let buscaPicker = $state("");
+  /** "Ir para Rotinas" (mover/trocar exercício com outra rotina) ainda não salvo — igual ao
+   * editor completo em DistribuicaoMusculos.svelte, só grava de verdade ao Salvar. Declarado logo
+   * no topo (antes de `void carregar()`, mais abaixo) porque `carregar()` já atribui aqui na
+   * primeira execução síncrona, ao restaurar uma sessão salva. */
+  let pendentesMoverTrocar = $state<PendenteMoverTrocar[]>([]);
   let mostrarDiaPicker = $state(false);
 
   const opcoesDia = [
@@ -77,6 +88,7 @@
           substituindoIdx = salva.picker.idx;
           buscaPicker = salva.picker.busca;
         }
+        pendentesMoverTrocar = salva.pendentes ?? [];
         observacoesPorExercicio = await getObservacoesAtuais(linhas.map((l) => l.exercicio_id));
         loading = false;
         return;
@@ -135,7 +147,7 @@
       : substituindoIdx != null
         ? ({ modo: "substituir", idx: substituindoIdx, busca: buscaPicker } as const)
         : null;
-    rotinaEditorSessao.iniciar({ treinoId, nomeTreino, diaSemana, linhas, picker });
+    rotinaEditorSessao.iniciar({ treinoId, nomeTreino, diaSemana, linhas, picker, pendentes: pendentesMoverTrocar });
   });
 
   void carregar();
@@ -241,6 +253,94 @@
     observacoesPorExercicio = new Map(observacoesPorExercicio).set(novoEx.id, obs.get(novoEx.id) ?? "");
     fecharSubstituir();
   }
+
+  // ---------------- Substituir Exercício: submenu Ir para Lista / Ir para Rotinas ----------------
+
+  /** Item cujo submenu "Ir para Lista / Ir para Rotinas" (dentro de Substituir Exercício) está
+   * aberto — igual ao mesmo submenu já usado no treino ao vivo e em Distribuição Muscular. */
+  let submenuSubstituirIdx = $state<number | null>(null);
+
+  /** Candidatas pra "Ir para Rotinas" — carregado à parte, não bloqueia a tela. */
+  let outrasRotinas = $state<TreinoComExercicios[]>([]);
+
+  async function carregarOutrasRotinas() {
+    outrasRotinas = (await listTreinos()).filter((t) => t.id !== treinoId);
+  }
+
+  void carregarOutrasRotinas();
+
+  let trocandoIdx = $state<number | null>(null);
+  let rotinaDestinoTroca = $state<TreinoComExercicios | null>(null);
+  let processandoTroca = $state(false);
+
+  /** Rotinas candidatas: precisam ter pelo menos 1 exercício (precisa de alguém pra trocar de
+   * lugar) e ainda não ter o exercício que está saindo — senão ficaria duplicado nela. */
+  const rotinasParaTrocar = $derived(
+    trocandoIdx != null
+      ? outrasRotinas.filter(
+          (t) => t.exercicios.length > 0 && !t.exercicios.some((te) => te.exercicio_id === linhas[trocandoIdx!].exercicio_id),
+        )
+      : [],
+  );
+
+  function abrirTrocarDeRotina(idx: number): void {
+    trocandoIdx = idx;
+    rotinaDestinoTroca = null;
+  }
+
+  function fecharTrocarDeRotina(): void {
+    trocandoIdx = null;
+    rotinaDestinoTroca = null;
+  }
+
+  /** Troca os dois exercícios de rotina entre si: o que sai daqui entra na rotina de destino
+   * (registrado em `pendentesMoverTrocar`, só aplicado de verdade ao Salvar) e o escolhido lá
+   * entra aqui no lugar, com o mesmo número de séries que já tinha — igual ao editor completo em
+   * DistribuicaoMusculos.svelte. Diferente do treino ao vivo (que grava a rotina de destino na
+   * hora): aqui tudo é rascunho local até Salvar, então cancelar não deixa nenhuma das duas com um
+   * exercício a mais/a menos. */
+  async function trocarExercicioDeRotina(destinoItem: TreinoExercicio): Promise<void> {
+    if (trocandoIdx == null || !rotinaDestinoTroca) return;
+    const idx = trocandoIdx;
+    const linha = linhas[idx];
+    const destino = rotinaDestinoTroca;
+    processandoTroca = true;
+    try {
+      const [anterior, obs] = await Promise.all([
+        getAnteriorCached(destinoItem.exercicio_id),
+        getObservacoesAtuais([destinoItem.exercicio_id]),
+      ]);
+      const series: LinhaSerie[] = Array.from({ length: linha.series.length }, (_, i) => {
+        const ant = anterior.find((a) => a.serie === i + 1);
+        return {
+          serie: i + 1,
+          peso_alvo: ant?.peso ?? null,
+          rep_min: ant?.repeticoes ?? null,
+          rep_max: ant?.repeticoes ?? null,
+        };
+      });
+      linhas[idx] = { ...linha, exercicio_id: destinoItem.exercicio_id, nome: destinoItem.exercicio?.nome ?? "", series };
+      observacoesPorExercicio = new Map(observacoesPorExercicio).set(
+        destinoItem.exercicio_id,
+        obs.get(destinoItem.exercicio_id) ?? "",
+      );
+      pendentesMoverTrocar = [
+        ...pendentesMoverTrocar,
+        {
+          destinoTreinoId: destino.id,
+          destinoTreinoNome: destino.nome_treino,
+          exercicioEntraId: linha.exercicio_id,
+          exercicioEntraNumSeries: destinoItem.series.length,
+          exercicioSaiTreinoExercicioId: destinoItem.id,
+          destinoOrdem: destinoItem.ordem,
+        },
+      ];
+      fecharTrocarDeRotina();
+    } finally {
+      processandoTroca = false;
+    }
+  }
+
   let descansoEditandoIdx = $state<number | null>(null);
   let reordenando = $state(false);
   let arrastandoIdx = $state<number | null>(null);
@@ -306,10 +406,19 @@
           series: l.series,
         })),
       );
+      // "Ir para Rotinas" só é aplicado de verdade aqui — até agora mexeu só no rascunho local
+      // (linhas), igual ao editor completo em DistribuicaoMusculos.svelte. Cancelar antes daqui
+      // não afeta nenhuma das duas rotinas.
+      for (const p of pendentesMoverTrocar) {
+        const anterior = await getUltimoRegistro(p.exercicioEntraId);
+        await adicionarTreinoExercicio(p.destinoTreinoId, p.exercicioEntraId, p.exercicioEntraNumSeries, anterior, p.destinoOrdem);
+        if (p.exercicioSaiTreinoExercicioId) await removerTreinoExercicio(p.exercicioSaiTreinoExercicioId);
+      }
       // A meta é um alvo pra guiar o ajuste (grade "Distribuição na Semana") — uma vez salvo o
       // resultado, ela deixa de fazer sentido e some, até definir um novo alvo. Mesma regra que
       // já valia salvando pelo editor embutido em DistribuicaoMusculos.svelte.
       await limparMetasMusculoRotina(id);
+      pendentesMoverTrocar = [];
       rotinaEditorSessao.limpar();
       mostrarToast("Salvo");
       // Não usa window.history.back() direto: o guarda de saída (voltar físico) continuaria
@@ -351,6 +460,16 @@
     <path d="M3 11V9a4 4 0 0 1 4-4h14" />
     <path d="M7 22l-4-4 4-4" />
     <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+  </svg>
+{/snippet}
+{#snippet iconLista()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="8" y1="6" x2="21" y2="6" />
+    <line x1="8" y1="12" x2="21" y2="12" />
+    <line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="6" x2="3.01" y2="6" />
+    <line x1="3" y1="12" x2="3.01" y2="12" />
+    <line x1="3" y1="18" x2="3.01" y2="18" />
   </svg>
 {/snippet}
 {#snippet iconRemoverSerie()}
@@ -436,8 +555,20 @@
     onFechar={() => (menuExercicioAberto = null)}
     opcoes={[
       { label: "Reordenar Exercícios", icon: iconReordenar, onSelect: () => (reordenando = true) },
-      { label: "Substituir Exercício", icon: iconSubstituir, onSelect: () => abrirSubstituir(idxMenu) },
+      { label: "Substituir Exercício", icon: iconSubstituir, onSelect: () => (submenuSubstituirIdx = idxMenu) },
       { label: "Remover Exercício", icon: iconRemoverExercicio, destructive: true, onSelect: () => remover(idxMenu) },
+    ]}
+  />
+{/if}
+
+{#if submenuSubstituirIdx !== null}
+  {@const idxSub = submenuSubstituirIdx}
+  <ActionSheet
+    titulo="Substituir Exercício"
+    onFechar={() => (submenuSubstituirIdx = null)}
+    opcoes={[
+      { label: "Ir para Lista", icon: iconLista, onSelect: () => abrirSubstituir(idxSub) },
+      { label: "Ir para Rotinas", icon: iconSubstituir, onSelect: () => abrirTrocarDeRotina(idxSub) },
     ]}
   />
 {/if}
@@ -498,6 +629,55 @@
     onSelecionar={substituirExercicio}
     onFechar={fecharSubstituir}
   />
+{/if}
+
+{#if trocandoIdx !== null}
+  {@const idxTroca = trocandoIdx}
+  <div class="tela-avulso">
+    <div class="tela-avulso-conteudo">
+      {#if !rotinaDestinoTroca}
+        <div class="picker-header">
+          <button class="back" onclick={fecharTrocarDeRotina} aria-label="Cancelar">{@render iconVoltar()}</button>
+          <h1>Substituir "{linhas[idxTroca]?.nome}"</h1>
+          <span class="header-spacer"></span>
+        </div>
+        <p class="muted">Escolha a rotina de destino.</p>
+        {#if !rotinasParaTrocar.length}
+          <p class="muted">Nenhuma rotina disponível pra troca — as outras estão vazias ou já têm esse exercício.</p>
+        {:else}
+          <ul class="troca-lista">
+            {#each rotinasParaTrocar as treinoOpcao (treinoOpcao.id)}
+              <li>
+                <button class="troca-item" onclick={() => (rotinaDestinoTroca = treinoOpcao)}>
+                  <span class="troca-item-nome">{treinoOpcao.nome_treino}</span>
+                  <span class="troca-item-sub"
+                    >{treinoOpcao.exercicios.length} {treinoOpcao.exercicios.length === 1 ? "exercício" : "exercícios"}</span
+                  >
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {:else}
+        <div class="picker-header">
+          <button class="back" onclick={() => (rotinaDestinoTroca = null)} aria-label="Voltar">{@render iconVoltar()}</button>
+          <h1>{rotinaDestinoTroca.nome_treino}</h1>
+          <span class="header-spacer"></span>
+        </div>
+        <p class="muted">"{linhas[idxTroca]?.nome}" vai pra "{rotinaDestinoTroca.nome_treino}" — escolha quem troca de lugar com ele.</p>
+        <ul class="troca-lista">
+          {#each rotinaDestinoTroca.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te (te.id)}
+            <li>
+              <button class="troca-item" disabled={processandoTroca} onclick={() => trocarExercicioDeRotina(te)}>
+                <span class="troca-item-nome">{te.exercicio?.nome ?? ""}</span>
+                <span class="troca-item-sub">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  </div>
 {/if}
 
 {#if mostrarPicker}
@@ -816,6 +996,65 @@
   .back svg {
     width: 18px;
     height: 18px;
+  }
+  .tela-avulso {
+    position: fixed;
+    inset: 0;
+    background: var(--surface-bg);
+    z-index: 150;
+    overflow-y: auto;
+  }
+  .tela-avulso-conteudo {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: var(--space-4);
+    box-sizing: border-box;
+  }
+  .picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    flex-shrink: 0;
+  }
+  .picker-header h1 {
+    flex: 1;
+    font-size: var(--font-size-base);
+    margin: 0;
+    text-align: center;
+  }
+  .troca-lista {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+  }
+  .troca-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: var(--space-3);
+    margin-bottom: var(--space-2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .troca-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .troca-item-nome {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+  }
+  .troca-item-sub {
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
   }
   .reordenar-lista {
     overflow-y: auto;
