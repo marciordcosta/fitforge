@@ -353,16 +353,28 @@ export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
  * lista efetiva desse dia), a meta é AO VIVO: a diária menos o que já foi realmente consumido nas
  * OUTRAS refeições desse dia (consumo real, não a meta configurada delas) — mesmo cálculo do
  * Diário. Sem `data`, ignora overrides por dia e a automática (usa só a meta global do catálogo). */
+/** Nome sozinho não identifica uma refeição de forma única: desde que passou a ser permitido
+ * reaproveitar o mesmo nome em grupos de dias diferentes da Ondulatória (ex: "Lanche" em Lower1 e
+ * outro "Lanche" independente em Upper1), duas linhas de dieta_refeicoes_modelo podem ter o mesmo
+ * nome — por isso, quando `data` é informada, a busca é restrita à lista EFETIVA daquele dia da
+ * semana (resolverCatalogoEfetivoDoDia), não ao catálogo inteiro sem filtro. */
 export async function getMetaRefeicaoPorNome(nome: string, data?: string): Promise<MetasDiarias | null> {
-  const { data: linhas, error } = await supabase
-    .from("dieta_refeicoes_modelo")
-    .select(REFEICAO_MODELO_SELECT)
-    .eq("nome", nome)
-    .limit(1);
-  if (error) throw error;
-  const linha = linhas?.[0];
-  if (!linha) return null;
-  const modelo = mapRefeicaoModelo(linha as Record<string, unknown>);
+  let modelo: RefeicaoModelo | null;
+  if (data != null) {
+    const diaSemana = parseISODate(data).getDay();
+    const [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
+    modelo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia).find((m) => m.nome === nome) ?? null;
+  } else {
+    const { data: linhas, error } = await supabase
+      .from("dieta_refeicoes_modelo")
+      .select(REFEICAO_MODELO_SELECT)
+      .eq("nome", nome)
+      .limit(1);
+    if (error) throw error;
+    const linha = linhas?.[0];
+    modelo = linha ? mapRefeicaoModelo(linha as Record<string, unknown>) : null;
+  }
+  if (!modelo) return null;
 
   if (data != null) {
     const diaSemana = parseISODate(data).getDay();
@@ -804,9 +816,11 @@ export async function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
 /** Salva a nova ordem das refeições de um dia (arrastar/setas na Home) — só esse dia; nunca
  * reordena o catálogo/padrão configurado em Gerenciar Refeições. */
 export async function reordenarRefeicoesDoDia(idsOrdenados: string[]): Promise<void> {
-  await Promise.all(
+  const resultados = await Promise.all(
     idsOrdenados.map((id, i) => supabase.from("dieta_refeicoes_dia").update({ ordem: i }).eq("id", id)),
   );
+  const comErro = resultados.find((r) => r.error);
+  if (comErro?.error) throw comErro.error;
 }
 
 /** Se o dia ainda não tem nenhuma refeição, cria uma pra cada item do catálogo efetivo desse dia
@@ -1093,22 +1107,31 @@ export async function adicionarItemDiario(input: {
   if (error) throw error;
 }
 
-export async function atualizarItemDiario(id: string, alimento: Alimento, quantidade: number, refeicaoId: string): Promise<void> {
-  const fator = quantidade / alimento.porcaoPadraoQtd;
-  const { error } = await supabase
-    .from("diario_alimentos")
-    .update({
-      quantidade,
-      unidade: alimento.porcaoPadraoUnidade,
-      refeicao_id: refeicaoId,
-      calorias: round1(alimento.caloriasPorPorcao * fator),
-      proteina_g: round1(alimento.proteinaG * fator),
-      gordura_g: round1(alimento.gorduraG * fator),
-      carboidrato_g: round1(alimento.carboidratoG * fator),
-      fibra_g: round1((alimento.fibraG ?? 0) * fator),
-      gordura_saturada_g: round1((alimento.gorduraSaturadaG ?? 0) * fator),
-    })
-    .eq("id", id);
+/** `alimento` vem sempre com a nutrição ATUAL do catálogo, não a de quando o item foi lançado —
+ * recalcular calorias/macros a partir dela só faz sentido quando a quantidade de fato mudou (é a
+ * única forma de escalar sem guardar um "valor por grama" separado). Editar só a refeição/dia,
+ * mantendo a mesma quantidade, preserva os valores já gravados — senão, corrigir a nutrição de um
+ * alimento no catálogo reescrevia silenciosamente o histórico de todo item já logado dele ao ser
+ * apenas reaberto e salvo de novo, mesmo sem alterar quantidade nenhuma. */
+export async function atualizarItemDiario(
+  id: string,
+  alimento: Alimento,
+  quantidade: number,
+  refeicaoId: string,
+  quantidadeMudou: boolean,
+): Promise<void> {
+  const update: Record<string, unknown> = { quantidade, refeicao_id: refeicaoId };
+  if (quantidadeMudou) {
+    const fator = quantidade / alimento.porcaoPadraoQtd;
+    update.unidade = alimento.porcaoPadraoUnidade;
+    update.calorias = round1(alimento.caloriasPorPorcao * fator);
+    update.proteina_g = round1(alimento.proteinaG * fator);
+    update.gordura_g = round1(alimento.gorduraG * fator);
+    update.carboidrato_g = round1(alimento.carboidratoG * fator);
+    update.fibra_g = round1((alimento.fibraG ?? 0) * fator);
+    update.gordura_saturada_g = round1((alimento.gorduraSaturadaG ?? 0) * fator);
+  }
+  const { error } = await supabase.from("diario_alimentos").update(update).eq("id", id);
   if (error) throw error;
 }
 
@@ -1558,14 +1581,22 @@ export async function definirModoCalorias(modo: "fixa" | "ondulatoria"): Promise
 
 /** Zera a meta numérica (macros) de TODAS as refeições do catálogo — usado ao trocar pra modo
  * Fixa: nesse modo a lista vira uma só (todo o catálogo junto, sem filtro por dia), então metas
- * pensadas pra dias/grupos diferentes da Ondulatória se somariam incorretamente se mantidas. A
- * lista de alimentos (meta_receita_id) não é tocada, só as metas numéricas. */
+ * pensadas pra dias/grupos diferentes da Ondulatória se somariam incorretamente se mantidas. Zera
+ * tanto a meta global quanto os overrides por dia (senão eles "voltam" com valores antigos se o
+ * usuário retornar pra Ondulatória depois). A lista de alimentos (meta_receita_id) não é tocada. */
 export async function zerarMetasCatalogo(): Promise<void> {
-  const { error } = await supabase
-    .from("dieta_refeicoes_modelo")
-    .update({ meta_proteina_g: null, meta_gordura_g: null, meta_carboidrato_g: null })
-    .eq("user_id", uid());
-  if (error) throw error;
+  const [global, porDia] = await Promise.all([
+    supabase
+      .from("dieta_refeicoes_modelo")
+      .update({ meta_proteina_g: null, meta_gordura_g: null, meta_carboidrato_g: null })
+      .eq("user_id", uid()),
+    supabase
+      .from("dieta_refeicoes_modelo_meta_dia")
+      .update({ meta_proteina_g: null, meta_gordura_g: null, meta_carboidrato_g: null })
+      .eq("user_id", uid()),
+  ]);
+  if (global.error) throw global.error;
+  if (porDia.error) throw porDia.error;
 }
 
 /** Carboidrato do dia: mesma fórmula usada pra fechar a meta de calorias, só trocando a meta pela calorias daquele dia. */
