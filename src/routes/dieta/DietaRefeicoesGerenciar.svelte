@@ -921,7 +921,12 @@
     erro = null;
     try {
       [modelos, metasDiaModelo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo(), listRefeicoesModeloDia()]);
-      const receitaIds = modelos.map((m) => m.metaReceitaId).filter((id): id is string => id != null);
+      // Inclui tanto a receita do modelo base quanto as de eventuais overrides por dia (uma
+      // refeição pode ter uma lista de alimentos própria só pra um grupo de dias) — sem isso, o
+      // total dela ficava de fora do mapa e aparecia "0 cal" pra quem só tem receita no override.
+      const receitaIds = [...modelos.map((m) => m.metaReceitaId), ...metasDiaModelo.map((md) => md.metaReceitaId)].filter(
+        (id): id is string => id != null,
+      );
       void getCaloriasReceitas(receitaIds)
         .then((mapa) => (caloriasListaRefeicao = mapa))
         .catch(() => {});
