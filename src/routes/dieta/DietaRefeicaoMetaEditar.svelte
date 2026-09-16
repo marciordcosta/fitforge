@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
   import { hojeISO } from "../../lib/dates";
@@ -20,6 +21,7 @@
     excluirReceita,
     atualizarItemReceita,
     removerItemReceita,
+    atualizarRefeicaoModelo,
     getMetasDiarias,
     getPreferenciasRefeicoesHome,
     type RefeicaoModelo,
@@ -36,6 +38,41 @@
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
   const COR_PROTEINA = "#fbbf24";
+
+  /** Cópia local do nome (a prop vem da URL e não muda sozinha depois de renomear) — atualizada
+   * ao confirmar, pra o título já refletir sem precisar sair e voltar da tela. */
+  let nomeAtual = $state(untrack(() => nome));
+  let nomeEditando = $state(false);
+  let nomeEditavel = $state("");
+  let salvandoNome = $state(false);
+
+  function abrirRenomear(): void {
+    nomeEditavel = nomeAtual;
+    nomeEditando = true;
+  }
+
+  function focarAoMontar(el: HTMLInputElement): void {
+    el.focus();
+    el.select();
+  }
+
+  /** Disponível pra qualquer refeição, inclusive a "automática" (a última, cuja meta numérica é
+   * calculada sozinha) — o nome é só um rótulo, não tem relação com esse cálculo. */
+  async function confirmarRenomear(): Promise<void> {
+    nomeEditando = false;
+    const novoNome = nomeEditavel.trim();
+    if (!novoNome || novoNome === nomeAtual) return;
+    salvandoNome = true;
+    try {
+      await atualizarRefeicaoModelo(modeloId, novoNome);
+      nomeAtual = novoNome;
+      mostrarToast("Salvo");
+    } catch (err) {
+      alert("Erro ao renomear refeição: " + (err as Error).message);
+    } finally {
+      salvandoNome = false;
+    }
+  }
 
   let modelo = $state<RefeicaoModelo | null>(null);
   let overrideDia = $state<MetaDiaModelo | null>(null);
@@ -274,13 +311,13 @@
    * diferente) e não dá pra distinguir isso só pelo id da receita oculta do outro lado. */
   function caminhoProprio(): string {
     const diasSeg = diasSemana?.length ? `/${diasSemana.join(",")}` : "";
-    return `/dieta/refeicoes/meta/${modeloId}/${encodeURIComponent(nome)}${diasSeg}`;
+    return `/dieta/refeicoes/meta/${modeloId}/${encodeURIComponent(nomeAtual)}${diasSeg}`;
   }
 
   async function abrirAdicionarAlimento(): Promise<void> {
     preparandoAlimento = true;
     try {
-      const receitaId = await garantirReceitaPrivadaRefeicao(modeloId, nome, receitaIdAtual, diasSemana);
+      const receitaId = await garantirReceitaPrivadaRefeicao(modeloId, nomeAtual, receitaIdAtual, diasSemana);
       navigate(`/dieta/alimentos/receita/${receitaId}?origem=${encodeURIComponent(caminhoProprio())}`);
     } catch (err) {
       alert("Erro ao preparar lista de alimentos: " + (err as Error).message);
@@ -378,7 +415,18 @@
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/dieta/refeicoes/gerenciar?aba=refeicoes")} aria-label="Voltar">{@render iconVoltar()}</button>
-    <h1>{nome}</h1>
+    {#if nomeEditando}
+      <input
+        class="nome-titulo-input"
+        type="text"
+        bind:value={nomeEditavel}
+        onblur={confirmarRenomear}
+        onkeydown={(e) => e.key === "Enter" && confirmarRenomear()}
+        use:focarAoMontar
+      />
+    {:else}
+      <button type="button" class="nome-titulo-btn" onclick={abrirRenomear} disabled={salvandoNome}>{nomeAtual}</button>
+    {/if}
     <span class="header-spacer"></span>
   </div>
 
@@ -559,15 +607,38 @@
     gap: var(--space-2);
     margin-bottom: var(--space-3);
   }
-  .header h1 {
+  .nome-titulo-btn,
+  .nome-titulo-input {
     flex: 1;
     min-width: 0;
     font-size: var(--font-size-lg);
+    font-weight: 700;
     margin: 0;
     text-align: center;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: inherit;
+  }
+  .nome-titulo-btn {
+    border: none;
+    background: none;
+    color: var(--surface-fg);
+    cursor: pointer;
+    padding: var(--space-1) 0;
+  }
+  .nome-titulo-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .nome-titulo-input {
+    box-sizing: border-box;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    color-scheme: dark;
   }
   .back {
     flex-shrink: 0;
