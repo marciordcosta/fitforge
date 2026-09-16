@@ -211,10 +211,16 @@
   }
   document.addEventListener("visibilitychange", resincronizarAoVoltar);
   window.addEventListener("focus", resincronizarAoVoltar);
+  // "pageshow" cobre o caso do Android matar a aba em segundo plano (tela apagada por muito
+  // tempo) e restaurá-la do bfcache/memória ao voltar — visibilitychange sozinho às vezes não
+  // chega a disparar de novo nesse cenário específico, deixando "agora" preso no valor de antes
+  // de a tela apagar.
+  window.addEventListener("pageshow", resincronizarAoVoltar);
   $effect(() => () => {
     clearInterval(timerId);
     document.removeEventListener("visibilitychange", resincronizarAoVoltar);
     window.removeEventListener("focus", resincronizarAoVoltar);
+    window.removeEventListener("pageshow", resincronizarAoVoltar);
   });
 
   /** O cronômetro (anel ou barra) continua visível depois de zerar, contando o atraso em negativo,

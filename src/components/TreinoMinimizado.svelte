@@ -20,7 +20,21 @@
 
   let agora = $state(Date.now());
   const timerId = setInterval(() => (agora = Date.now()), 1000);
-  $effect(() => () => clearInterval(timerId));
+  /** setInterval fica suspenso com a tela apagada/app em segundo plano — sem isso, "agora" fica
+   * preso no valor de antes e o cronômetro/anel mostra um tempo errado por um tempo ao voltar,
+   * até o próximo tick corrigir sozinho (mesmo ajuste já feito em TreinoLog.svelte). */
+  function resincronizarAoVoltar(): void {
+    if (!document.hidden) agora = Date.now();
+  }
+  document.addEventListener("visibilitychange", resincronizarAoVoltar);
+  window.addEventListener("focus", resincronizarAoVoltar);
+  window.addEventListener("pageshow", resincronizarAoVoltar);
+  $effect(() => () => {
+    clearInterval(timerId);
+    document.removeEventListener("visibilitychange", resincronizarAoVoltar);
+    window.removeEventListener("focus", resincronizarAoVoltar);
+    window.removeEventListener("pageshow", resincronizarAoVoltar);
+  });
 
   function formatMMSS(segundos: number): string {
     const m = Math.floor(segundos / 60);
