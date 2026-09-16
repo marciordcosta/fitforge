@@ -444,12 +444,32 @@
     .comparar-painel {
       flex-direction: row;
     }
+    /* Lado a lado, "em cima" e "embaixo" deixam de corresponder a qual foto é qual — as duas
+       infos vão pro topo, cada uma ocupando só a metade alinhada com a própria foto (a mesma
+       proporção 1fr/1fr do .comparar-painel logo abaixo), em vez de uma barra por cima e outra
+       por baixo cobrindo as duas fotos ao mesmo tempo. */
+    .comparar-topbar,
+    .comparar-rodape {
+      position: absolute;
+      top: 0;
+      width: 50%;
+      padding-bottom: var(--space-2);
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
+      z-index: 15;
+    }
+    .comparar-topbar {
+      left: 0;
+    }
+    .comparar-rodape {
+      right: 0;
+      padding-top: max(var(--space-3), env(safe-area-inset-top, 0px));
+    }
     .trocar-btn {
       left: 50%;
       right: auto;
-      top: auto;
-      bottom: var(--space-3);
-      transform: translateX(-50%);
+      top: 50%;
+      bottom: auto;
+      transform: translate(-50%, -50%);
     }
   }
 </style>

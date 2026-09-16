@@ -227,6 +227,27 @@
     limitarPan();
   }
 
+  /** No PC não tem pinça nem toque duplo — a rodinha do mouse assume o zoom contínuo (duplo
+   * clique já funciona sozinho: mouse dispara pointerdown/up normalmente, mesmo caminho do duplo
+   * toque). Multiplicativo (não soma fixa) pra a sensibilidade ficar igual em qualquer nível de
+   * zoom, e mantém o ponto sob o cursor fixo, igual a pinça faz com o meio dos dois dedos. */
+  const SENSIBILIDADE_RODA = 0.0015;
+
+  function aoRolarRoda(e: WheelEvent): void {
+    e.preventDefault();
+    if (!containerEl) return;
+    usuarioAjustouZoom = true;
+    const fator = Math.exp(-e.deltaY * SENSIBILIDADE_RODA);
+    const novaEscala = Math.min(ESCALA_MAX, Math.max(ESCALA_MIN, scale * fator));
+    const ponto = pontoRelativoAoCentro(e.clientX, e.clientY);
+    const origemLocalX = (ponto.x - panX) / scale;
+    const origemLocalY = (ponto.y - panY) / scale;
+    scale = novaEscala;
+    panX = ponto.x - origemLocalX * novaEscala;
+    panY = ponto.y - origemLocalY * novaEscala;
+    limitarPan();
+  }
+
   function iniciarPinca(): void {
     usuarioAjustouZoom = true;
     const [p1, p2] = [...ponteirosAtivos.values()];
@@ -350,6 +371,7 @@
   onpointermove={aoPointerMove}
   onpointerup={aoPointerUp}
   onpointercancel={aoPointerCancel}
+  onwheel={aoRolarRoda}
 >
   <div
     class="trilho"
