@@ -684,10 +684,14 @@
 
   /** "sem refeição" quando a refeição não tem nenhum alimento inserido (nunca ganhou uma lista
    * própria); "refeição com X cal" quando tem, somando os itens dela — não é a META, é o que foi
-   * de fato cadastrado na lista (usada pro lançamento automático no diário). */
-  function textoListaAlimentos(m: RefeicaoModelo): string {
-    if (!m.metaReceitaId) return "sem refeição";
-    const cal = caloriasListaRefeicao.get(m.metaReceitaId) ?? 0;
+   * de fato cadastrado na lista (usada pro lançamento automático no diário). Quando o grupo de
+   * dias tem uma lista própria (override do dia), ela prevalece sobre a do modelo base — mesma
+   * regra de resolução usada em DietaRefeicaoMetaEditar (overrideDia ?? modelo). */
+  function textoListaAlimentos(m: RefeicaoModelo, diaSemana?: number): string {
+    const override = diaSemana != null ? metaDiaMap.get(`${m.id}:${diaSemana}`) : undefined;
+    const receitaId = override?.metaReceitaId ?? m.metaReceitaId;
+    if (!receitaId) return "sem refeição";
+    const cal = caloriasListaRefeicao.get(receitaId) ?? 0;
     return `refeição com ${Math.round(cal)} cal`;
   }
   let metasDiaModelo = $state<MetaDiaModelo[]>([]);
@@ -1653,7 +1657,7 @@
                     <div class="card-header">
                       <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
                       <span class="card-header-direita">
-                        <span class="lista-alimentos-badge">{textoListaAlimentos(m)}</span>
+                        <span class="lista-alimentos-badge">{textoListaAlimentos(m, grupo.dias[0])}</span>
                         <span
                           class="item-detalhe"
                           role="button"
