@@ -1,6 +1,6 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
-  import { mostrarToast } from "../../lib/toast.svelte";
+  import { mostrarToast, toast } from "../../lib/toast.svelte";
   import { hojeISO } from "../../lib/dates";
   import { formatMinSeg } from "../../lib/tempo";
   import {
@@ -168,8 +168,17 @@
 
   void carregarOutrasRotinas();
 
+  /** true assim que o usuário confirma concluir/descartar o treino — a partir daqui a sessão não
+   * deve mais ser reescrita no store global. Sem isso, qualquer mudança reativa (ex: `salvando`
+   * disparando outro re-render) podia rodar o `$effect` de sincronização de novo ANTES da tela
+   * terminar de navegar pra fora, ressuscitando `treinoLogSessao.atual` com os dados antigos logo
+   * depois de `treinoLogSessao.limpar()` — ao reabrir essa mesma rotina em seguida, `carregar()`
+   * achava essa sessão "ativa" de novo e reabria o treino do zero como se tivesse acabado de
+   * começar, dando a impressão de que "reiniciou sozinho". */
+  let finalizado = $state(false);
+
   $effect(() => {
-    if (loading || naoEncontrada) return;
+    if (loading || naoEncontrada || finalizado) return;
     treinoLogSessao.iniciar({ treinoId, nomeTreino, inicio, sessao, houveAlteracaoEstrutura });
   });
 
@@ -444,7 +453,11 @@
         ex.recordes = { ...ex.recordes, melhorVolumeSerie: volume };
       }
       if (novosRecordes.length) {
-        mostrarToast(`🏆 Recorde de ${novosRecordes.join(" e ")}!`);
+        // Duração maior que o padrão: é comum bater um recorde bem na última série do treino e,
+        // em seguida, tocar em "Concluir" quase na hora — o toast de "Salvo" (mesmo slot global)
+        // cortava esse aviso antes de dar tempo de ler. Ver também o guard em
+        // confirmarConcluirTreino/finalizarComEscolha, que evita substituir esse toast.
+        mostrarToast(`🏆 Recorde de ${novosRecordes.join(" e ")}!`, 4000);
       }
     }
   }
@@ -880,8 +893,9 @@
     salvando = true;
     try {
       await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
+      finalizado = true;
       treinoLogSessao.limpar();
-      mostrarToast("Salvo");
+      if (!toast.mensagem?.startsWith("🏆")) mostrarToast("Salvo");
       voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);
@@ -909,8 +923,9 @@
           })),
         );
       }
+      finalizado = true;
       treinoLogSessao.limpar();
-      mostrarToast("Salvo");
+      if (!toast.mensagem?.startsWith("🏆")) mostrarToast("Salvo");
       voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);
@@ -923,6 +938,7 @@
 
   function descartarTreino() {
     mostrarConfirmDescartar = false;
+    finalizado = true;
     treinoLogSessao.limpar();
     voltar(origemPadrao);
   }
