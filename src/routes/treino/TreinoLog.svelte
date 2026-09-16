@@ -1177,18 +1177,12 @@
       {
         label: "Ir para Lista",
         icon: iconLista,
-        onSelect: () => {
-          submenuSubstituirIdx = null;
-          abrirSubstituir(idxSub);
-        },
+        onSelect: () => abrirSubstituir(idxSub),
       },
       {
         label: "Ir para Rotinas",
         icon: iconSubstituir,
-        onSelect: () => {
-          submenuSubstituirIdx = null;
-          abrirTrocarDeRotina(idxSub);
-        },
+        onSelect: () => abrirTrocarDeRotina(idxSub),
       },
     ]}
   />

@@ -27,6 +27,7 @@
     type LinhaMusculoInput,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import Button from "../../components/Button.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
   import ExercicioCampos from "./ExercicioCampos.svelte";
   import ExercicioDetalhe from "./ExercicioDetalhe.svelte";
@@ -61,6 +62,7 @@
 
   let exercicios = $state<Exercicio[]>([]);
   let loading = $state(true);
+  let erro = $state<string | null>(null);
   let mostrarCriarMenu = $state(false);
   let selecionandoId = $state<string | null>(null);
   /** Ver detalhe de um exercício no modo seleção abre embutido (por cima da lista) em vez de
@@ -120,23 +122,32 @@
 
   async function carregar() {
     loading = true;
-    const [exs, treinosCarregados, parametros] = await Promise.all([listExercicios(), listTreinos(), getParametrosDistribuicao()]);
-    exercicios = exs;
-    treinos = treinosCarregados;
-    destacarSemRotina = parametros.destacarExerciciosSemRotina;
-    const mapa = new Map<string, { id: string; nome: string }>();
-    for (const t of treinosCarregados) {
-      for (const te of t.exercicios) {
-        if (!mapa.has(te.exercicio_id)) mapa.set(te.exercicio_id, { id: t.id, nome: t.nome_treino });
+    erro = null;
+    try {
+      const [exs, treinosCarregados, parametros] = await Promise.all([listExercicios(), listTreinos(), getParametrosDistribuicao()]);
+      exercicios = exs;
+      treinos = treinosCarregados;
+      destacarSemRotina = parametros.destacarExerciciosSemRotina;
+      const mapa = new Map<string, { id: string; nome: string }>();
+      for (const t of treinosCarregados) {
+        for (const te of t.exercicios) {
+          if (!mapa.has(te.exercicio_id)) mapa.set(te.exercicio_id, { id: t.id, nome: t.nome_treino });
+        }
       }
+      rotinaPorExercicio = mapa;
+      if (substituirExercicioId && !busca) {
+        const atual = exs.find((e) => e.id === substituirExercicioId);
+        const musculo = atual ? distribuicaoMusculosExercicio(atual)[0]?.nome : null;
+        if (musculo) busca = musculo;
+      }
+    } catch (e) {
+      // Sem essa checagem, uma falha aqui (rede instável no meio do treino, por exemplo) deixava
+      // "loading" travado em true pra sempre e sem nenhum aviso — a tela ficava presa em
+      // "Carregando…" indefinidamente, com o mesmo efeito prático de "não abrir nada".
+      erro = (e as Error).message;
+    } finally {
+      loading = false;
     }
-    rotinaPorExercicio = mapa;
-    if (substituirExercicioId && !busca) {
-      const atual = exs.find((e) => e.id === substituirExercicioId);
-      const musculo = atual ? distribuicaoMusculosExercicio(atual)[0]?.nome : null;
-      if (musculo) busca = musculo;
-    }
-    loading = false;
   }
 
   void carregar();
@@ -291,6 +302,9 @@
 
   {#if loading}
     <p class="muted">Carregando…</p>
+  {:else if erro}
+    <p class="muted">Erro ao carregar exercícios: {erro}</p>
+    <Button onclick={carregar}>Tentar de novo</Button>
   {:else if !filtrados.length}
     <p class="muted">Nenhum exercício encontrado.</p>
   {:else}
