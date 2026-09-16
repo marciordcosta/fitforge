@@ -695,6 +695,18 @@ export async function excluirRefeicaoModelo(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Remove essa refeição da lista de UM dia da semana específico (Ondulatória) — se esse dia ainda
+ * não tinha uma lista própria (usava o catálogo global inteiro por padrão), grava uma lista
+ * explícita agora, mesmo comportamento do botão "Excluir" já usado em Gerenciar Refeições. A
+ * refeição em si (linha de dieta_refeicoes_modelo) não é apagada, só deixa de aparecer nesse dia —
+ * outros dias que ainda a incluem não são afetados. */
+export async function removerRefeicaoDoDia(diaSemana: number, modeloId: string): Promise<void> {
+  const [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
+  const efetivo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia);
+  const novaLista = efetivo.filter((m) => m.id !== modeloId).map((m) => m.id);
+  await definirRefeicoesDoDia(diaSemana, novaLista);
+}
+
 /** Quais refeições do catálogo aparecem num dia da semana específico (modo Ondulatória), e em que ordem. */
 export interface RefeicaoModeloDia {
   modeloId: string;

@@ -20,6 +20,8 @@
     desvincularMetaReceita,
     removerMetaReceitaDias,
     excluirReceita,
+    excluirRefeicaoModelo,
+    removerRefeicaoDoDia,
     receitaEhMetaDeRefeicao,
     atualizarItemReceita,
     removerItemReceita,
@@ -449,6 +451,27 @@
 
   let confirmandoRemoverMeta = $state(false);
   let removendoMeta = $state(false);
+  let confirmandoExcluirRefeicao = $state(false);
+  let excluindoRefeicao = $state(false);
+
+  /** Diferente de "Remover Meta" (limpa a lista de alimentos/macros, o card continua existindo):
+   * isso apaga o card inteiro. Num grupo de dias (Ondulatória), só desse(s) dia(s) — a refeição
+   * continua existindo nos outros dias que ainda a incluem; sem grupo (Fixa), apaga o catálogo
+   * inteiro de vez (dieta_refeicoes_modelo), cascata cuida dos overrides dela. */
+  async function excluirRefeicaoCompleta(): Promise<void> {
+    excluindoRefeicao = true;
+    try {
+      if (diasSemana?.length) {
+        await Promise.all(diasSemana.map((dia) => removerRefeicaoDoDia(dia, modeloId)));
+      } else {
+        await excluirRefeicaoModelo(modeloId);
+      }
+      voltar("/dieta/refeicoes/gerenciar?aba=refeicoes");
+    } catch (err) {
+      alert("Erro ao excluir refeição: " + (err as Error).message);
+      excluindoRefeicao = false;
+    }
+  }
 
   async function removerMetaCompleta(): Promise<void> {
     removendoMeta = true;
@@ -627,6 +650,7 @@
       {#if !ehUltima}
         <div class="acao-excluir">
           <Button variant="danger" onclick={() => (confirmandoRemoverMeta = true)} disabled={removendoMeta}>Remover Meta</Button>
+          <Button variant="danger" onclick={() => (confirmandoExcluirRefeicao = true)} disabled={excluindoRefeicao}>Excluir Refeição</Button>
         </div>
       {/if}
     </div>
@@ -698,6 +722,17 @@
     textoConfirmar="Remover Meta"
     onConfirmar={removerMetaCompleta}
     onCancelar={() => (confirmandoRemoverMeta = false)}
+  />
+{/if}
+
+{#if confirmandoExcluirRefeicao}
+  <ConfirmDialog
+    titulo={diasSemana?.length
+      ? `Excluir "${nomeAtual}" desse(s) dia(s)? Ela continua existindo nos outros dias, se houver.`
+      : `Excluir "${nomeAtual}" do catálogo? Essa ação não pode ser desfeita.`}
+    textoConfirmar="Excluir Refeição"
+    onConfirmar={excluirRefeicaoCompleta}
+    onCancelar={() => (confirmandoExcluirRefeicao = false)}
   />
 {/if}
 
@@ -987,6 +1022,9 @@
   }
   .acao-excluir {
     margin-top: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
   }
   .conteudo {
     transition: opacity 0.15s;
