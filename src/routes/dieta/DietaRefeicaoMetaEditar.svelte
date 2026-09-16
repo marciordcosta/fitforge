@@ -179,9 +179,11 @@
     return opcoes;
   }
 
-  function secundarioRestante(v: number, disponivelG: number | null): string {
-    if (disponivelG == null) return `${v} g`;
-    return `${Math.max(0, Math.round(disponivelG - v))} g restante`;
+  /** % que o valor selecionado na roda representa da meta DIÁRIA inteira desse macro — o % da
+   * meta da refeição (linha de cima) já é mostrado pelo próprio WheelPickerMacros (mostrarPct). */
+  function secundarioPercentualDiario(v: number, metaDiariaG: number | null | undefined): string {
+    if (!metaDiariaG) return `${v} g`;
+    return `${((v / metaDiariaG) * 100).toFixed(0)}% do dia`;
   }
 
   /** Teto de cada macro pra essa refeição: não editar acima do que sobraria pra última (automática)
@@ -191,9 +193,9 @@
     const tetoGordura = contexto ? Math.max(Math.round(gorduraG ?? 0), Math.min(150, Math.round(contexto.disponivel.gorduraG))) : 150;
     const tetoProteina = contexto ? Math.max(Math.round(proteinaG ?? 0), Math.min(300, Math.round(contexto.disponivel.proteinaG))) : 300;
     return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(tetoCarbo), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => secundarioRestante(v, contexto?.disponivel.carboidratoG ?? null) },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(tetoGordura), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => secundarioRestante(v, contexto?.disponivel.gorduraG ?? null) },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(tetoProteina), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => secundarioRestante(v, contexto?.disponivel.proteinaG ?? null) },
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(tetoCarbo), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => secundarioPercentualDiario(v, metasDia?.carboidratoG) },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(tetoGordura), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => secundarioPercentualDiario(v, metasDia?.gorduraG) },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(tetoProteina), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => secundarioPercentualDiario(v, metasDia?.proteinaG) },
     ];
   }
 
@@ -501,7 +503,6 @@
     onSelecionar={confirmarMacros}
     onFechar={() => (mostrarMacros = false)}
     formatarRodape={formatarRodapeCalorias}
-    mostrarPct={false}
   />
 {/if}
 

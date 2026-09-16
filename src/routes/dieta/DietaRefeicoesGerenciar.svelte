@@ -34,6 +34,7 @@
     salvarMetaNumericaRefeicao,
     salvarMetaNumericaRefeicaoDias,
     getCaloriasReceitas,
+    getMetasDiarias,
     type RefeicaoModelo,
     type CaloriasPorDia,
     type CaloriasDiaManual,
@@ -695,6 +696,9 @@
     return `refeição com ${Math.round(cal)} cal`;
   }
   let metasDiaModelo = $state<MetaDiaModelo[]>([]);
+  /** Meta diária completa (calorias/macros) — usada só pra mostrar o "% do dia" no modal de
+   * Ajustar Macros, embaixo do % da meta da refeição que o próprio WheelPickerMacros já calcula. */
+  let metasDia = $state<MetasDiarias | null>(null);
   let modelosPorDia = $state<RefeicaoModeloDia[]>([]);
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
@@ -920,7 +924,12 @@
     loading = true;
     erro = null;
     try {
-      [modelos, metasDiaModelo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo(), listRefeicoesModeloDia()]);
+      [modelos, metasDiaModelo, modelosPorDia, metasDia] = await Promise.all([
+        listRefeicoesModelo(),
+        listMetasDiaModelo(),
+        listRefeicoesModeloDia(),
+        getMetasDiarias(),
+      ]);
       // Inclui tanto a receita do modelo base quanto as de eventuais overrides por dia (uma
       // refeição pode ter uma lista de alimentos própria só pra um grupo de dias) — sem isso, o
       // total dela ficava de fora do mapa e aparecia "0 cal" pra quem só tem receita no override.
@@ -1088,8 +1097,11 @@
     return opcoes;
   }
 
-  function secundarioRestanteRefeicao(v: number, disponivelG: number): string {
-    return `${Math.max(0, Math.round(disponivelG - v))} g restante`;
+  /** % que o valor selecionado na roda representa da meta DIÁRIA inteira desse macro — o % da
+   * meta da refeição (linha de cima) já é mostrado pelo próprio WheelPickerMacros (mostrarPct). */
+  function secundarioPercentualDiarioRefeicao(v: number, metaDiariaG: number | null | undefined): string {
+    if (!metaDiariaG) return `${v} g`;
+    return `${((v / metaDiariaG) * 100).toFixed(0)}% do dia`;
   }
 
   function colunasMacrosRefeicao() {
@@ -1105,9 +1117,9 @@
     const tetoGordura = Math.max(Math.round(gorduraG), Math.min(150, Math.round(contexto.disponivel.gorduraG)));
     const tetoProteina = Math.max(Math.round(proteinaG), Math.min(300, Math.round(contexto.disponivel.proteinaG)));
     return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramasRefeicao(tetoCarbo), valorAtual: Math.round(carboidratoG), kcalPorGrama: 4, secundario: (v: number) => secundarioRestanteRefeicao(v, contexto.disponivel.carboidratoG) },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramasRefeicao(tetoGordura), valorAtual: Math.round(gorduraG), kcalPorGrama: 9, secundario: (v: number) => secundarioRestanteRefeicao(v, contexto.disponivel.gorduraG) },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramasRefeicao(tetoProteina), valorAtual: Math.round(proteinaG), kcalPorGrama: 4, secundario: (v: number) => secundarioRestanteRefeicao(v, contexto.disponivel.proteinaG) },
+      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramasRefeicao(tetoCarbo), valorAtual: Math.round(carboidratoG), kcalPorGrama: 4, secundario: (v: number) => secundarioPercentualDiarioRefeicao(v, metasDia?.carboidratoG) },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramasRefeicao(tetoGordura), valorAtual: Math.round(gorduraG), kcalPorGrama: 9, secundario: (v: number) => secundarioPercentualDiarioRefeicao(v, metasDia?.gorduraG) },
+      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramasRefeicao(tetoProteina), valorAtual: Math.round(proteinaG), kcalPorGrama: 4, secundario: (v: number) => secundarioPercentualDiarioRefeicao(v, metasDia?.proteinaG) },
     ];
   }
 
@@ -1894,7 +1906,6 @@
     onSelecionar={confirmarMacrosRefeicao}
     onFechar={() => { mostrarMacrosRefeicao = false; modeloMacrosEditando = null; }}
     formatarRodape={formatarRodapeMacrosRefeicao}
-    mostrarPct={false}
   />
 {/if}
 
