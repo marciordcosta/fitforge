@@ -415,39 +415,46 @@
     return valor > meta;
   }
 
+  interface ValorRefeicaoTexto {
+    principal: string;
+    /** Linha de baixo (rest./acima/%) — fica embaixo do valor consumido pra não quebrar no meio
+     * do texto em telas estreitas; vazio quando o valor já é auto-suficiente numa linha só. */
+    secundario: string;
+  }
+
   /** Valor mostrado nos cards de refeição da home — formato definido em Parametrização > Exibição
    * das Refeições (independente do toggle restante/absoluto/por peso do topo, que só afeta os
    * anéis de macro do topo do Diário). Percentual tem variante refeição/diária; resto-ou-acima e
    * a meta em gramas são sempre contra a meta DAQUELA refeição (não têm variante diária). Sem
    * nenhum item lançado ainda, mostra só a própria meta (nada pra chamar de "restante"). */
-  function labelValorRefeicao(valor: number, metaRefeicao: number, metaDiaria: number, unidade: string, temItens: boolean): string {
+  function labelValorRefeicao(valor: number, metaRefeicao: number, metaDiaria: number, unidade: string, temItens: boolean): ValorRefeicaoTexto {
     if (!temItens && !passouMeta(valor, metaRefeicao)) {
-      if (prefsRefeicoes.valoresFormato === "meta_refeicao") return `${valor.toFixed(0)}/${metaRefeicao.toFixed(0)}${unidade}`;
-      return `${restante(valor, metaRefeicao).toFixed(0)}${unidade}`;
+      if (prefsRefeicoes.valoresFormato === "meta_refeicao") return { principal: `${valor.toFixed(0)}/${metaRefeicao.toFixed(0)}${unidade}`, secundario: "" };
+      return { principal: `${restante(valor, metaRefeicao).toFixed(0)}${unidade}`, secundario: "" };
     }
     switch (prefsRefeicoes.valoresFormato) {
       case "percentual_refeicao": {
         const pct = metaRefeicao > 0 ? (valor / metaRefeicao) * 100 : 0;
-        return `${valor.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+        return { principal: `${valor.toFixed(0)}${unidade}`, secundario: `${pct.toFixed(0)}%` };
       }
       case "percentual_diario": {
         const pct = metaDiaria > 0 ? (valor / metaDiaria) * 100 : 0;
-        return `${valor.toFixed(0)}${unidade} / ${pct.toFixed(0)}%`;
+        return { principal: `${valor.toFixed(0)}${unidade}`, secundario: `${pct.toFixed(0)}%` };
       }
       case "meta_refeicao":
-        return `${valor.toFixed(0)}/${metaRefeicao.toFixed(0)}${unidade}`;
+        return { principal: `${valor.toFixed(0)}/${metaRefeicao.toFixed(0)}${unidade}`, secundario: "" };
       case "restante_acima":
       default:
-        if (passouMeta(valor, metaRefeicao)) return `${valor.toFixed(0)}${unidade} (${(valor - metaRefeicao).toFixed(0)}${unidade} acima)`;
-        return `${valor.toFixed(0)}${unidade} (${restante(valor, metaRefeicao).toFixed(0)}${unidade} rest.)`;
+        if (passouMeta(valor, metaRefeicao)) return { principal: `${valor.toFixed(0)}${unidade}`, secundario: `${(valor - metaRefeicao).toFixed(0)}${unidade} acima` };
+        return { principal: `${valor.toFixed(0)}${unidade}`, secundario: `${restante(valor, metaRefeicao).toFixed(0)}${unidade} rest.` };
     }
   }
 
   /** Texto do card de refeição sem meta cadastrada — sem meta pra comparar, "restante"/"absoluto"
    * não fazem sentido (sempre mostra só o valor), mas o modo por peso ainda se aplica aos macros. */
-  function labelSemMeta(valor: number, unidade: string): string {
-    if (modoExibicao === "porPeso" && unidade) return `${gPorKg(valor)}${unidade}/kg`;
-    return `${valor.toFixed(0)}${unidade}`;
+  function labelSemMeta(valor: number, unidade: string): ValorRefeicaoTexto {
+    if (modoExibicao === "porPeso" && unidade) return { principal: `${gPorKg(valor)}${unidade}/kg`, secundario: "" };
+    return { principal: `${valor.toFixed(0)}${unidade}`, secundario: "" };
   }
 
   /** Barra de uma refeição sem meta própria: sem denominador seu, usa a meta DIÁRIA do macro pra
@@ -842,13 +849,14 @@
   />
 {/if}
 
-{#snippet pctColuna(nome: string, cor: string, largura: number, valorTexto: string)}
+{#snippet pctColuna(nome: string, cor: string, largura: number, valorTexto: ValorRefeicaoTexto)}
   <div class="pct-col">
     <p class="pct-nome">{nome}</p>
     <div class="pct-barra-wrap">
       <div class="pct-barra" style={`width:${largura}%; background:${cor};`}></div>
     </div>
-    <p class="pct-valor">{valorTexto}</p>
+    <p class="pct-valor">{valorTexto.principal}</p>
+    {#if valorTexto.secundario}<p class="pct-valor-sec">{valorTexto.secundario}</p>{/if}
   </div>
 {/snippet}
 
@@ -1204,6 +1212,11 @@
     border-radius: 4px;
   }
   .pct-valor {
+    margin: 0;
+    font-size: 11px;
+    color: var(--surface-muted);
+  }
+  .pct-valor-sec {
     margin: 0;
     font-size: 11px;
     color: var(--surface-muted);
