@@ -25,7 +25,7 @@
   <div class="barra-wrap-grande">
     <div class="barra-grande" style={`width:${largura}%; background:var(--color-secondary);`}></div>
   </div>
-  <Button onclick={(e) => { e.stopPropagation(); mostrarEscolherRefeicao = true; }}>Registrar Refeição</Button>
+  <Button variant="secondary" onclick={(e) => { e.stopPropagation(); mostrarEscolherRefeicao = true; }}>Registrar Refeição</Button>
 </div>
 
 {#if mostrarEscolherRefeicao}

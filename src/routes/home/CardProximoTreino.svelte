@@ -37,7 +37,7 @@
       </h2>
     </div>
     <p class="preview">{preview(treino)}</p>
-    <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+    <Button variant="secondary" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
   {:else}
     <p class="subtexto">Nenhum treino agendado pra hoje</p>
   {/if}
