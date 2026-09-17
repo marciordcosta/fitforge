@@ -252,6 +252,15 @@
     }, ATRASO_PRESSIONAR_MS);
   }
 
+  /** Botão direito do mouse (sem toque nem pressionar-e-segurar no PC) faz o mesmo que o
+   * pressionar longo no celular: entra no modo de seleção com essa foto já marcada. */
+  function aoContextMenuFoto(e: MouseEvent, id: string): void {
+    e.preventDefault();
+    if (dataComparando) return;
+    modoSelecao = true;
+    alternarSelecao(id);
+  }
+
   function cancelarPressionar() {
     clearTimeout(timeoutPressionar);
     timeoutPressionar = undefined;
@@ -488,7 +497,7 @@
                 class="foto-item"
                 class:selecionada={selecionadas.includes(foto.id)}
                 onpointerdown={(e) => aoPointerDownFoto(e, foto.id)}
-                oncontextmenu={(e) => e.preventDefault()}
+                oncontextmenu={(e) => aoContextMenuFoto(e, foto.id)}
                 onclick={() => aoClickFoto(foto)}
                 aria-label="Abrir foto"
               >

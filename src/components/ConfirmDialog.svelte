@@ -33,7 +33,9 @@
     align-items: center;
     justify-content: center;
     padding: var(--space-4);
-    z-index: 200;
+    /* Acima de qualquer tela cheia (fotos, comparação, gráficos em tela cheia usam z-index 300) --
+       senão o diálogo abre escondido atrás delas, parecendo que o botão "não faz nada". */
+    z-index: 350;
   }
   .confirm-card {
     width: 100%;
