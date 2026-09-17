@@ -44,6 +44,7 @@
   let fibraConsumidoVal = $state(0);
   let gorduraSaturadaMetaVal = $state(0);
   let gorduraSaturadaConsumidoVal = $state(0);
+  let pesoParaMacrosVal = $state(0);
   let refeicoesDiaVal = $state<RefeicaoDia[]>([]);
   let itensDiaVal = $state<ItemDiario[]>([]);
 
@@ -89,8 +90,9 @@
       carboidratoConsumidoVal = itensDia.reduce((acc, i) => acc + i.carboidratoG, 0);
       fibraConsumidoVal = itensDia.reduce((acc, i) => acc + i.fibraG, 0);
       gorduraSaturadaConsumidoVal = itensDia.reduce((acc, i) => acc + i.gorduraSaturadaG, 0);
+      pesoParaMacrosVal = pesoMedia ?? perfilDieta?.pesoAtual ?? 0;
       if (metasDia) {
-        const pesoParaMacros = pesoMedia ?? perfilDieta?.pesoAtual ?? 76;
+        const pesoParaMacros = pesoParaMacrosVal || 76;
         const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
         const parametroEfetivo = (chave: string): LimiteParametro => parametrosDieta.get(chave) ?? PARAMETROS_PADRAO[chave];
         fibraMetaVal = Math.round(gramasDoParametro(defParametro.get("fibras")!, parametroEfetivo("fibras").max, pesoParaMacros, metasDia.calorias));
@@ -174,6 +176,7 @@
           fibraMeta={fibraMetaVal}
           gorduraSaturadaConsumido={gorduraSaturadaConsumidoVal}
           gorduraSaturadaMeta={gorduraSaturadaMetaVal}
+          pesoAtual={pesoParaMacrosVal}
         />
       {:else if tipo === "refeicoes_dia"}
         <CardRefeicoesDia refeicoes={refeicoesDiaVal} itens={itensDiaVal} />

@@ -14,6 +14,7 @@
     fibraMeta,
     gorduraSaturadaConsumido,
     gorduraSaturadaMeta,
+    pesoAtual,
   }: {
     caloriasConsumido: number;
     caloriasMeta: number;
@@ -27,13 +28,25 @@
     fibraMeta: number;
     gorduraSaturadaConsumido: number;
     gorduraSaturadaMeta: number;
+    pesoAtual: number;
   } = $props();
 
   const COR_CARBO = "#5eead4";
   const COR_GORDURA = "#f9a8d4";
   const COR_PROTEINA = "#fbbf24";
 
-  let modoRestante = $state(true);
+  type ModoExibicao = "restante" | "absoluto" | "porPeso";
+  let modo = $state<ModoExibicao>("restante");
+
+  function proximoModo(atual: ModoExibicao): ModoExibicao {
+    if (atual === "restante") return "absoluto";
+    if (atual === "absoluto") return "porPeso";
+    return "restante";
+  }
+
+  function gPorKg(valor: number): string {
+    return pesoAtual > 0 ? (valor / pesoAtual).toFixed(1).replace(".", ",") : "—";
+  }
 
   function pctMeta(valor: number, meta: number): number {
     return meta > 0 ? (valor / meta) * 100 : 0;
@@ -68,29 +81,43 @@
 {/snippet}
 
 {#snippet anelCentroMacro(consumido: number, meta: number)}
-  {#if modoRestante && passouMeta(consumido, meta)}
+  {#if modo === "restante" && passouMeta(consumido, meta)}
     <strong>{(consumido - meta).toFixed(0)}g</strong>
     <span class="macro-meta">acima</span>
-  {:else if modoRestante}
+  {:else if modo === "restante"}
     <strong>{restante(consumido, meta).toFixed(0)}g</strong>
     <span class="macro-meta">rest.</span>
-  {:else}
+  {:else if modo === "absoluto"}
     <strong>{consumido.toFixed(0)}g</strong>
     <span class="macro-meta">/{meta.toFixed(0)}</span>
+  {:else}
+    <strong>{gPorKg(consumido)}</strong>
+    <span class="macro-meta">g/kg</span>
   {/if}
 {/snippet}
 
 <div class="card" role="button" tabindex="0" onclick={abrirDieta} onkeydown={(e) => e.key === "Enter" && abrirDieta()}>
   <p class="card-titulo">Calorias</p>
   <div class="calorias-linha">
-    <span class="calorias-valor"><strong>{caloriasConsumido.toFixed(0)}</strong> cal <span class="calorias-meta">/ {caloriasMeta.toFixed(0)}</span></span>
-    <span class="calorias-restantes">
-      {#if caloriasPassou}
-        <strong>{(caloriasConsumido - caloriasMeta).toFixed(0)}</strong> acima
-      {:else}
-        <strong>{restante(caloriasConsumido, caloriasMeta).toFixed(0)}</strong> restantes
-      {/if}
-    </span>
+    {#if modo === "absoluto"}
+      <span class="calorias-valor"><strong>{caloriasConsumido.toFixed(0)}</strong> cal <span class="calorias-meta">/ {caloriasMeta.toFixed(0)}</span></span>
+      <span class="calorias-restantes">
+        {#if caloriasPassou}
+          <strong>{(caloriasConsumido - caloriasMeta).toFixed(0)}</strong> acima
+        {:else}
+          <strong>{restante(caloriasConsumido, caloriasMeta).toFixed(0)}</strong> restantes
+        {/if}
+      </span>
+    {:else}
+      <span class="calorias-valor">
+        {#if caloriasPassou}
+          <strong>{(caloriasConsumido - caloriasMeta).toFixed(0)}</strong> acima
+        {:else}
+          <strong>{restante(caloriasConsumido, caloriasMeta).toFixed(0)}</strong> restantes
+        {/if}
+      </span>
+      <span class="calorias-restantes">{caloriasConsumido.toFixed(0)} cal <span class="calorias-meta">/ {caloriasMeta.toFixed(0)}</span></span>
+    {/if}
   </div>
   <div class="barra-wrap-grande">
     <div class="barra-grande" style={`width:${larguraBarra(pctMeta(caloriasConsumido, caloriasMeta))}%; background:var(--color-secondary);`}></div>
@@ -102,7 +129,7 @@
       class="toggle-btn"
       onclick={(e) => {
         e.stopPropagation();
-        modoRestante = !modoRestante;
+        modo = proximoModo(modo);
       }}
       aria-label="Alternar exibição"
     >
