@@ -352,11 +352,13 @@
    * dia") — setado por carregarMetasRefeicoes, junto com metasRefeicaoPorNome. */
   let refeicaoAutomaticaNome = $state<string | null>(null);
 
-  /** Meta AO VIVO da refeição automática: sobra do dia inteiro menos o que já foi realmente comido
-   * em TODAS as outras refeições de hoje — tenham meta configurada ou não, já tenham sido "fechadas"
-   * ou não. Diferente do cálculo estático usado em Gerenciar (que soma as METAS configuradas das
-   * outras refeições, não o consumo real): aqui o que importa é o alimento de fato lançado, senão
-   * uma refeição sem meta comida hoje ficaria invisível pra conta e a automática não encolheria. */
+  /** Meta AO VIVO da refeição automática: sobra do dia inteiro menos, pra CADA outra refeição de
+   * hoje, o que já foi realmente comido nela SE ela já tem algo lançado, senão a META dela (se
+   * tiver) — nunca zero. Uma refeição só "abre mão" do que sobrou da própria meta depois de ser
+   * de fato registrada; enquanto ainda não foi, o espaço dela continua reservado. Diferente do
+   * cálculo estático usado em Gerenciar (que soma sempre as METAS configuradas, nunca olha o que
+   * já foi comido): aqui, uma vez que uma refeição é lançada, o consumo real dela (que pode ser
+   * maior ou menor que a meta) que passa a valer pro resto do dia. */
   const metasRedistribuidas = $derived.by((): Map<string, MetaRedistribuida> => {
     const resultado = new Map<string, MetaRedistribuida>();
     if (!refeicaoAutomaticaNome || !metas) return resultado;
@@ -367,7 +369,16 @@
       .filter((r) => r.id !== automatica.id)
       .reduce(
         (acc, r) => {
-          const t = totaisRefeicao(r.id);
+          const temItensR = itens.some((i) => i.refeicaoId === r.id);
+          const metaR = metasRefeicaoPorNome.get(r.nome);
+          const t = temItensR
+            ? totaisRefeicao(r.id)
+            : {
+                calorias: metaR?.metaCalorias ?? 0,
+                carboidratoG: metaR?.metaCarboidratoG ?? 0,
+                gorduraG: metaR?.metaGorduraG ?? 0,
+                proteinaG: metaR?.metaProteinaG ?? 0,
+              };
           return {
             calorias: acc.calorias + t.calorias,
             carboidratoG: acc.carboidratoG + t.carboidratoG,
