@@ -1179,24 +1179,6 @@ export async function getMetasDiarias(): Promise<MetasDiarias> {
   };
 }
 
-/** Meta de calorias/macros "média" — a proporção g/kg salva no perfil é o valor fonte (só muda
- * quando o usuário ajusta manualmente em Gerenciar > Calorias); as gramas exibidas são essa
- * proporção × o peso médio da semana ATUAL, então acompanham sozinhas quando o peso muda, sem
- * precisar reabrir Gerenciar e salvar de novo. É o mesmo valor mostrado no anel de Gerenciar >
- * Calorias — a "mãe" da informação de calorias, igual em modo Fixa ou Ondulatória (a Ondulatória
- * só redistribui essa mesma média entre os dias da semana, nunca muda o total). Diferente de
- * getMetasDiarias(), que devolve meta_calorias GRAVADO da última vez que a aba Calorias foi salva
- * — esse sim fica parado até o usuário ajustar de novo, mesmo que o peso já tenha mudado desde
- * então. */
-export async function getMetaCaloriasMedia(): Promise<MetasDiarias> {
-  const [perfil, pesoMedio] = await Promise.all([getPerfilDietaEditavel(), getPesoMedioAtual()]);
-  const pesoAtual = pesoMedio ?? perfil.pesoAtual;
-  const proteinaG = Math.round(perfil.proteinaGKg * pesoAtual);
-  const gorduraG = Math.round(perfil.gorduraGKg * pesoAtual);
-  const carboidratoG = Math.round(perfil.carboidratoGKg * pesoAtual);
-  return { calorias: Math.round(4 * proteinaG + 9 * gorduraG + 4 * carboidratoG), proteinaG, gorduraG, carboidratoG };
-}
-
 // ---------------- Parâmetros (min/máx editáveis em Parametrização, por peso ou por calorias do dia) ----------------
 
 export interface DefinicaoParametro {
@@ -1644,13 +1626,16 @@ export async function getMetasDoDiaSemana(diaSemana: number): Promise<MetasDiari
   const modo = await getModoCalorias();
   if (modo === "fixa") return getMetasDiarias();
 
-  const [perfil, pesoMedio, manuais, parametros] = await Promise.all([
+  const [perfil, manuais, parametros] = await Promise.all([
     getPerfilDietaEditavel(),
-    getPesoMedioAtual(),
     getCaloriasDiaManuais(),
     getParametros(),
   ]);
-  const pesoAtual = pesoMedio ?? perfil.pesoAtual;
+  // As gramas gravadas da última vez são fixas (nunca mudam sozinhas) — usa o peso que estava
+  // vigente NAQUELE momento (perfil.pesoAtual, gravado junto), nunca o peso atual/fresco. Mesma
+  // regra de getMetasDiarias() (modo Fixa) e de Gerenciar > Calorias, agora consistente aqui
+  // também: só a proporção g/kg (informativa) acompanha o peso, as gramas ficam paradas.
+  const pesoAtual = perfil.pesoAtual;
   const proteinaG = Math.round(perfil.proteinaGKg * pesoAtual);
   const gorduraG = Math.round(perfil.gorduraGKg * pesoAtual);
   const carboidratoG = Math.round(perfil.carboidratoGKg * pesoAtual);

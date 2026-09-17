@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getMetaCaloriasMedia } from "../../lib/dietaApi";
+  import { getMetasDiarias } from "../../lib/dietaApi";
   import { getUltimoPeso, getPesoMedioAtual, getMeta, getMetaSemanal, getDiasParaObjetivo, formatDiasObjetivo } from "../../lib/pesoApi";
 
   let { onFechar }: { onFechar: () => void } = $props();
@@ -21,7 +21,7 @@
   async function carregar(): Promise<void> {
     loading = true;
     const [media, ultimoPeso, mediaPeso, meta, metaSemanal, dias] = await Promise.all([
-      getMetaCaloriasMedia(),
+      getMetasDiarias(),
       getUltimoPeso(),
       getPesoMedioAtual(),
       getMeta(),

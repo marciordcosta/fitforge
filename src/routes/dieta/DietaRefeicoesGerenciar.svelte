@@ -280,13 +280,20 @@
         getCaloriasDiaManuais(),
         getParametros(),
       ]);
+      // As gramas gravadas da última vez são o valor fixo (nunca mudam sozinhas) — reconstrói a
+      // partir da proporção × o peso que estava vigente NAQUELE momento (perfil.pesoAtual, também
+      // gravado junto), não o peso atual/fresco. Usar o peso fresco aqui fazia as calorias/macros
+      // "andarem sozinhas" a cada oscilação de peso, quando na verdade só a proporção g/kg (pra
+      // referência) deveria acompanhar o peso — as gramas ficam paradas até a próxima edição.
+      proteinaGInput = Math.round(perfil.proteinaGKg * perfil.pesoAtual);
+      gorduraGInput = Math.round(perfil.gorduraGKg * perfil.pesoAtual);
+      carboidratoGInput = Math.round(perfil.carboidratoGKg * perfil.pesoAtual);
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
-      proteinaGKg = perfil.proteinaGKg;
-      gorduraGKg = perfil.gorduraGKg;
-      carboidratoGKg = perfil.carboidratoGKg;
-      proteinaGInput = Math.round(proteinaGKg * pesoAtual);
-      gorduraGInput = Math.round(gorduraGKg * pesoAtual);
-      carboidratoGInput = Math.round(carboidratoGKg * pesoAtual);
+      // Proporção por peso (só informativa) recalculada com o peso ATUAL — é o que deve variar
+      // conforme o peso oscila, nunca as gramas.
+      proteinaGKg = pesoAtual > 0 ? Math.round((proteinaGInput / pesoAtual) * 100) / 100 : 0;
+      gorduraGKg = pesoAtual > 0 ? Math.round((gorduraGInput / pesoAtual) * 100) / 100 : 0;
+      carboidratoGKg = pesoAtual > 0 ? Math.round((carboidratoGInput / pesoAtual) * 100) / 100 : 0;
       caloriasInput = caloriasCalc;
       modoCalorias = modo;
       modoCaloriasOriginal = modo;
