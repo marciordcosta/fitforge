@@ -62,6 +62,29 @@
    * a tela de comparação (ao abrir uma foto de fato) sempre mostra sem embaçar. */
   let mostrarNormal = $state(false);
 
+  type Ordenacao = "data" | "maior_peso" | "menor_peso";
+  let ordenacao = $state<Ordenacao>("data");
+  let mostrarOrdenacao = $state(false);
+
+  const ORDENACOES: { valor: Ordenacao; label: string }[] = [
+    { valor: "data", label: "Data (mais recente)" },
+    { valor: "maior_peso", label: "Maior peso (média)" },
+    { valor: "menor_peso", label: "Menor peso (média)" },
+  ];
+
+  /** Grupos sem média entrada vão pro fim da lista, nas duas ordenações por peso — não tem base
+   * pra comparar, então não faz sentido competir pelo topo/fim com quem tem média de verdade. */
+  const gruposOrdenados = $derived.by(() => {
+    if (ordenacao === "data") return grupos;
+    const comMedia = grupos.filter((g) => mediaPorData.has(g.data));
+    const semMedia = grupos.filter((g) => !mediaPorData.has(g.data));
+    comMedia.sort((a, b) => {
+      const diff = mediaPorData.get(a.data)! - mediaPorData.get(b.data)!;
+      return ordenacao === "maior_peso" ? -diff : diff;
+    });
+    return [...comMedia, ...semMedia];
+  });
+
   let mostrarAdicionar = $state(false);
   let dataNovaFoto = $state(hojeISO());
   let mostrarOpcoesFoto = $state(false);
@@ -363,6 +386,13 @@
     <path d="M21 15l-5-5-9 9" />
   </svg>
 {/snippet}
+{#snippet iconOrdenar()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="4" y1="6" x2="20" y2="6" />
+    <line x1="4" y1="12" x2="14" y2="12" />
+    <line x1="4" y1="18" x2="8" y2="18" />
+  </svg>
+{/snippet}
 {#snippet iconOlho()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
@@ -413,6 +443,9 @@
       </button>
     {:else}
       <h1>Fotos</h1>
+      <button class="icon-btn" onclick={() => (mostrarOrdenacao = true)} aria-label="Ordenar">
+        {@render iconOrdenar()}
+      </button>
       <button
         class="icon-btn"
         onclick={() => (mostrarNormal = !mostrarNormal)}
@@ -431,7 +464,7 @@
   {:else if !grupos.length}
     <p class="muted">Nenhuma foto registrada ainda — toque no "+" pra adicionar a primeira.</p>
   {:else}
-    {#each grupos as grupo (grupo.data)}
+    {#each gruposOrdenados as grupo (grupo.data)}
       <div class="grupo-data-wrap" class:saindo={dataComparando?.data === grupo.data}>
         <div class="grupo-data-inner">
           <button
@@ -598,6 +631,18 @@
       {enviando ? "Enviando…" : "Escolher foto"}
     </Button>
   </Sheet>
+{/if}
+
+{#if mostrarOrdenacao}
+  <ActionSheet
+    titulo="Ordenar por"
+    onFechar={() => (mostrarOrdenacao = false)}
+    opcoes={ORDENACOES.map((o) => ({
+      label: o.label,
+      valor: ordenacao === o.valor ? "✓" : undefined,
+      onSelect: () => (ordenacao = o.valor),
+    }))}
+  />
 {/if}
 
 {#if mostrarOpcoesFoto}
