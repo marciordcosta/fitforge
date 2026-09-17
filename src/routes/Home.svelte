@@ -4,7 +4,19 @@
   import { getLayoutHome, type HomeCardTipo } from "../lib/homeApi";
   import { getUltimoPeso, getPesoMedioAtual, getMeta, getMetaSemanal } from "../lib/pesoApi";
   import { listTreinos, type TreinoComExercicios } from "../lib/treinoApi";
-  import { getMetasDoDia, getDiarioDoDia, garantirRefeicoesPadraoDoDia, type RefeicaoDia, type ItemDiario } from "../lib/dietaApi";
+  import {
+    getMetasDoDia,
+    getDiarioDoDia,
+    garantirRefeicoesPadraoDoDia,
+    getParametros,
+    getPerfilDietaEditavel,
+    DEFINICOES_PARAMETROS,
+    PARAMETROS_PADRAO,
+    gramasDoParametro,
+    type RefeicaoDia,
+    type ItemDiario,
+    type LimiteParametro,
+  } from "../lib/dietaApi";
   import CardPesoAtual from "./home/CardPesoAtual.svelte";
   import CardProximoTreino from "./home/CardProximoTreino.svelte";
   import CardCaloriasDia from "./home/CardCaloriasDia.svelte";
@@ -28,6 +40,10 @@
   let gorduraConsumidoVal = $state(0);
   let carboidratoMetaVal = $state(0);
   let carboidratoConsumidoVal = $state(0);
+  let fibraMetaVal = $state(0);
+  let fibraConsumidoVal = $state(0);
+  let gorduraSaturadaMetaVal = $state(0);
+  let gorduraSaturadaConsumidoVal = $state(0);
   let refeicoesDiaVal = $state<RefeicaoDia[]>([]);
   let itensDiaVal = $state<ItemDiario[]>([]);
 
@@ -42,16 +58,20 @@
       const diaSemanaHoje = new Date().getDay();
       const precisaDieta = tipos.includes("calorias_dia") || tipos.includes("refeicoes_dia");
 
-      const [pesoAtual, pesoMedia, meta, metaSemanal, treinos, metasDia, itensDia, refeicoesDia] =
+      const precisaPeso = tipos.includes("peso_atual") || precisaDieta;
+
+      const [pesoAtual, pesoMedia, meta, metaSemanal, treinos, metasDia, itensDia, refeicoesDia, parametrosDieta, perfilDieta] =
         await Promise.all([
           tipos.includes("peso_atual") ? getUltimoPeso() : Promise.resolve(null),
-          tipos.includes("peso_atual") ? getPesoMedioAtual() : Promise.resolve(null),
+          precisaPeso ? getPesoMedioAtual() : Promise.resolve(null),
           tipos.includes("peso_atual") ? getMeta() : Promise.resolve(null),
           tipos.includes("peso_atual") ? getMetaSemanal() : Promise.resolve(null),
           tipos.includes("proximo_treino") ? listTreinos() : Promise.resolve([]),
           precisaDieta ? getMetasDoDia(hoje) : Promise.resolve(null),
           precisaDieta ? getDiarioDoDia(hoje) : Promise.resolve([]),
           tipos.includes("refeicoes_dia") ? garantirRefeicoesPadraoDoDia(hoje) : Promise.resolve([]),
+          precisaDieta ? getParametros() : Promise.resolve(new Map<string, LimiteParametro>(Object.entries(PARAMETROS_PADRAO))),
+          precisaDieta ? getPerfilDietaEditavel() : Promise.resolve(null),
         ]);
 
       pesoAtualVal = pesoAtual;
@@ -67,6 +87,20 @@
       gorduraConsumidoVal = itensDia.reduce((acc, i) => acc + i.gorduraG, 0);
       carboidratoMetaVal = metasDia?.carboidratoG ?? 0;
       carboidratoConsumidoVal = itensDia.reduce((acc, i) => acc + i.carboidratoG, 0);
+      fibraConsumidoVal = itensDia.reduce((acc, i) => acc + i.fibraG, 0);
+      gorduraSaturadaConsumidoVal = itensDia.reduce((acc, i) => acc + i.gorduraSaturadaG, 0);
+      if (metasDia) {
+        const pesoParaMacros = pesoMedia ?? perfilDieta?.pesoAtual ?? 76;
+        const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
+        const parametroEfetivo = (chave: string): LimiteParametro => parametrosDieta.get(chave) ?? PARAMETROS_PADRAO[chave];
+        fibraMetaVal = Math.round(gramasDoParametro(defParametro.get("fibras")!, parametroEfetivo("fibras").max, pesoParaMacros, metasDia.calorias));
+        gorduraSaturadaMetaVal = Math.round(
+          gramasDoParametro(defParametro.get("gordura_saturada")!, parametroEfetivo("gordura_saturada").max, pesoParaMacros, metasDia.calorias),
+        );
+      } else {
+        fibraMetaVal = 0;
+        gorduraSaturadaMetaVal = 0;
+      }
       refeicoesDiaVal = refeicoesDia;
       itensDiaVal = itensDia;
       layout = tipos;
@@ -136,6 +170,10 @@
           gorduraMeta={gorduraMetaVal}
           carboidratoConsumido={carboidratoConsumidoVal}
           carboidratoMeta={carboidratoMetaVal}
+          fibraConsumido={fibraConsumidoVal}
+          fibraMeta={fibraMetaVal}
+          gorduraSaturadaConsumido={gorduraSaturadaConsumidoVal}
+          gorduraSaturadaMeta={gorduraSaturadaMetaVal}
         />
       {:else if tipo === "refeicoes_dia"}
         <CardRefeicoesDia refeicoes={refeicoesDiaVal} itens={itensDiaVal} />

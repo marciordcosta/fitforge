@@ -10,6 +10,10 @@
     gorduraMeta,
     carboidratoConsumido,
     carboidratoMeta,
+    fibraConsumido,
+    fibraMeta,
+    gorduraSaturadaConsumido,
+    gorduraSaturadaMeta,
   }: {
     caloriasConsumido: number;
     caloriasMeta: number;
@@ -19,6 +23,10 @@
     gorduraMeta: number;
     carboidratoConsumido: number;
     carboidratoMeta: number;
+    fibraConsumido: number;
+    fibraMeta: number;
+    gorduraSaturadaConsumido: number;
+    gorduraSaturadaMeta: number;
   } = $props();
 
   const COR_CARBO = "#5eead4";
@@ -125,6 +133,22 @@
           </div>
         </div>
       </div>
+      <div class="macro-col">
+        <p class="macro-nome">Gordura Sat.</p>
+        <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(gorduraSaturadaConsumido, gorduraSaturadaMeta))}%, var(--surface-border) ${larguraBarra(pctMeta(gorduraSaturadaConsumido, gorduraSaturadaMeta))}% 100%);`}>
+          <div class="macro-anel-centro">
+            {@render anelCentroMacro(gorduraSaturadaConsumido, gorduraSaturadaMeta)}
+          </div>
+        </div>
+      </div>
+      <div class="macro-col">
+        <p class="macro-nome">Fibras</p>
+        <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(fibraConsumido, fibraMeta))}%, var(--surface-border) ${larguraBarra(pctMeta(fibraConsumido, fibraMeta))}% 100%);`}>
+          <div class="macro-anel-centro">
+            {@render anelCentroMacro(fibraConsumido, fibraMeta)}
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -183,6 +207,7 @@
   }
   .macros-wrap {
     position: relative;
+    padding-right: 40px;
   }
   .toggle-btn {
     position: absolute;
@@ -205,20 +230,31 @@
   }
   .macros-grid {
     display: flex;
-    justify-content: space-between;
-    gap: var(--space-2);
+    gap: var(--space-3);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .macros-grid::-webkit-scrollbar {
+    display: none;
   }
   .macro-col {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--space-2);
-    flex: 1;
+    flex: 0 0 calc((100% - 2 * var(--space-3)) / 3);
+    min-width: 0;
+    scroll-snap-align: start;
   }
   .macro-nome {
     margin: 0;
     font-size: var(--font-size-sm);
     color: var(--surface-fg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
   }
   .macro-anel {
     width: 76px;
