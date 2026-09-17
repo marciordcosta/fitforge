@@ -71,12 +71,24 @@ function porPalavras<T>(builder: T, coluna: string, termo: string): T {
   );
 }
 
+/** Igual porPalavras, mas cada palavra pode bater no nome OU na marca (ex: "goiabinha mais leve"
+ * acha um alimento chamado "Goiabinha" da marca "Mais Leve") — cada palavra vira um OR entre as
+ * duas colunas, e as palavras entre si continuam em AND. */
+function porPalavrasNomeOuMarca<T>(builder: T, colunaNome: string, termo: string): T {
+  const palavras = termo.trim().split(/\s+/).filter(Boolean);
+  return palavras.reduce(
+    (b, p) => (b as unknown as { or: (v: string) => T }).or(`${colunaNome}.ilike.%${p}%,marca.ilike.%${p}%`),
+    builder,
+  );
+}
+
 /** Busca ignorando acento e maiúsculas — compara contra `nome_normalizado` (minúsculo, sem acento,
- * mantido em dia por trigger no banco) em vez da coluna `nome` bruta. */
+ * mantido em dia por trigger no banco) em vez da coluna `nome` bruta. Também busca pela marca (essa
+ * sem normalização de acento — marca costuma vir sem acento e não tem uma coluna normalizada). */
 export async function buscarAlimentos(query: string): Promise<Alimento[]> {
   const termo = query.trim();
   if (!termo) return [];
-  const { data, error } = await porPalavras(
+  const { data, error } = await porPalavrasNomeOuMarca(
     supabase.from("alimentos").select(ALIMENTO_SELECT).eq("oculta", false),
     "nome_normalizado",
     semAcento(termo.toLowerCase()),
