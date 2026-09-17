@@ -1,20 +1,36 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
+  import Button from "../../components/Button.svelte";
+  import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import type { RefeicaoDia, ItemDiario } from "../../lib/dietaApi";
 
   let { refeicoes, itens }: { refeicoes: RefeicaoDia[]; itens: ItemDiario[] } = $props();
 
+  let mostrarEscolherRefeicao = $state(false);
+
   const feitas = $derived(refeicoes.filter((r) => itens.some((i) => i.refeicaoId === r.id)).length);
   const largura = $derived(Math.min(100, refeicoes.length > 0 ? (feitas / refeicoes.length) * 100 : 0));
+
+  function opcoesRefeicoes(): AcaoSheet[] {
+    return refeicoes
+      .slice()
+      .sort((a, b) => a.ordem - b.ordem)
+      .map((r) => ({ label: r.nome, onSelect: () => navigate(`/dieta/alimentos/refeicao/${r.id}`) }));
+  }
 </script>
 
-<button type="button" class="card" onclick={() => navigate("/dieta")}>
+<div class="card" role="button" tabindex="0" onclick={() => navigate("/dieta")} onkeydown={(e) => e.key === "Enter" && navigate("/dieta")}>
   <p class="card-titulo">Refeições</p>
   <p class="valor-principal"><strong>{feitas}</strong> de {refeicoes.length} registradas</p>
   <div class="barra-wrap-grande">
     <div class="barra-grande" style={`width:${largura}%; background:var(--color-secondary);`}></div>
   </div>
-</button>
+  <Button onclick={(e) => { e.stopPropagation(); mostrarEscolherRefeicao = true; }}>Registrar Refeição</Button>
+</div>
+
+{#if mostrarEscolherRefeicao}
+  <ActionSheet titulo="Escolher refeição" opcoes={opcoesRefeicoes()} onFechar={() => (mostrarEscolherRefeicao = false)} />
+{/if}
 
 <style>
   .card {
@@ -45,6 +61,7 @@
     background: var(--surface-border);
     border-radius: 6px;
     overflow: hidden;
+    margin-bottom: var(--space-4);
   }
   .barra-grande {
     height: 100%;
