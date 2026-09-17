@@ -260,6 +260,9 @@
   }
 
   function aoPointerDown(e: PointerEvent) {
+    // Botão de seta: setPointerCapture no container "rouba" o click do botão (bug conhecido de
+    // Pointer Events) -- sem toque real pra swipe, só mouse no PC, a seta nunca respondia.
+    if ((e.target as HTMLElement).closest(".seta")) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     ponteirosAtivos.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
