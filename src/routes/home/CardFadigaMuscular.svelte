@@ -178,37 +178,39 @@
   {:else if !top6.length}
     <p class="muted">Nenhum músculo planejado ainda — adicione exercícios às rotinas.</p>
   {:else}
-    <button
-      type="button"
-      class="toggle-btn"
-      onclick={(e) => {
-        e.stopPropagation();
-        modoRestante = !modoRestante;
-      }}
-      aria-label="Alternar exibição"
-    >
-      {@render iconToggle()}
-    </button>
-    <div class="musculos-grid">
-      {#each top6 as item (item.musculo.id)}
-        <div class="musculo-col">
-          <p class="musculo-nome">{item.musculo.nome}</p>
-          <div class="musculo-anel" style={`background: ${gradienteFadiga(item.musculo.id, pctMeta(item.feito, item.planejado))};`}>
-            <div class="musculo-anel-centro">
-              {#if modoRestante && passouMeta(item.feito, item.planejado)}
-                <strong>{pctMeta(item.feito, item.planejado).toFixed(0)}%</strong>
-                <span class="musculo-meta">{(item.feito - item.planejado).toFixed(0)} acima</span>
-              {:else if modoRestante}
-                <strong>{pctMeta(item.feito, item.planejado).toFixed(0)}%</strong>
-                <span class="musculo-meta">{restante(item.feito, item.planejado).toFixed(0)} rest.</span>
-              {:else}
-                <strong>{item.feito.toFixed(0)}</strong>
-                <span class="musculo-meta">/{item.planejado.toFixed(0)}</span>
-              {/if}
+    <div class="musculos-wrap">
+      <button
+        type="button"
+        class="toggle-btn"
+        onclick={(e) => {
+          e.stopPropagation();
+          modoRestante = !modoRestante;
+        }}
+        aria-label="Alternar exibição"
+      >
+        {@render iconToggle()}
+      </button>
+      <div class="musculos-grid">
+        {#each top6 as item (item.musculo.id)}
+          <div class="musculo-col">
+            <p class="musculo-nome">{item.musculo.nome}</p>
+            <div class="musculo-anel" style={`background: ${gradienteFadiga(item.musculo.id, pctMeta(item.feito, item.planejado))};`}>
+              <div class="musculo-anel-centro">
+                {#if modoRestante && passouMeta(item.feito, item.planejado)}
+                  <strong>{pctMeta(item.feito, item.planejado).toFixed(0)}%</strong>
+                  <span class="musculo-meta">{(item.feito - item.planejado).toFixed(0)} acima</span>
+                {:else if modoRestante}
+                  <strong>{pctMeta(item.feito, item.planejado).toFixed(0)}%</strong>
+                  <span class="musculo-meta">{restante(item.feito, item.planejado).toFixed(0)} rest.</span>
+                {:else}
+                  <strong>{item.feito.toFixed(0)}</strong>
+                  <span class="musculo-meta">/{item.planejado.toFixed(0)}</span>
+                {/if}
+              </div>
             </div>
           </div>
-        </div>
-      {/each}
+        {/each}
+      </div>
     </div>
   {/if}
 </div>
@@ -234,10 +236,14 @@
     color: var(--color-danger);
     font-size: var(--font-size-sm);
   }
+  .musculos-wrap {
+    position: relative;
+    padding-right: 40px;
+  }
   .toggle-btn {
     position: absolute;
-    top: var(--space-4);
-    right: var(--space-4);
+    top: 0;
+    right: 0;
     width: 28px;
     height: 28px;
     border-radius: 50%;
@@ -256,7 +262,6 @@
   .musculos-grid {
     display: flex;
     gap: var(--space-3);
-    width: calc(100% - 48px);
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
