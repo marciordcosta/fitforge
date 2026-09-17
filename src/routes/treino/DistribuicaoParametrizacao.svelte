@@ -483,9 +483,9 @@
     cursor: pointer;
   }
   .fadiga-opcoes button.ativo {
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    border-color: var(--color-primary);
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
   }
   .param-subtitulo {
     margin: var(--space-3) 0 var(--space-2);
@@ -508,7 +508,7 @@
     width: 18px;
     height: 18px;
     margin-top: 1px;
-    accent-color: var(--color-primary);
+    accent-color: var(--color-secondary);
   }
   .checkbox-linha span {
     font-size: var(--font-size-base);
@@ -531,9 +531,9 @@
     cursor: pointer;
   }
   .opcoes-toggle button.ativo {
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    border-color: var(--color-primary);
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
   }
   .formula {
     margin: 0 0 var(--space-2);

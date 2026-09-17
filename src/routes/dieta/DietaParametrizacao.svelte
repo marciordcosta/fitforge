@@ -549,6 +549,6 @@
   .param-gkg-fixo input {
     width: 16px;
     height: 16px;
-    accent-color: var(--color-primary);
+    accent-color: var(--color-secondary);
   }
 </style>
