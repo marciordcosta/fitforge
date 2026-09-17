@@ -5,6 +5,7 @@
   let {
     pontosGrafico,
     diasComTreinoGrafico,
+    diasComTreinoNomeGrafico,
     modo,
     metaLinha,
     diffMetaPorPonto,
@@ -15,6 +16,7 @@
   }: {
     pontosGrafico: PesoRegistro[];
     diasComTreinoGrafico: Set<string>;
+    diasComTreinoNomeGrafico: Map<string, string>;
     modo: "diario" | "media";
     metaLinha: (number | null)[] | null;
     diffMetaPorPonto: (number | null)[] | null;
@@ -138,7 +140,20 @@
         responsive: true,
         maintainAspectRatio: false,
         layout: { padding: { top: 20 } },
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            displayColors: false,
+            callbacks: {
+              label: (ctx) => `${formatPeso(ctx.parsed.y ?? 0)} kg`,
+              afterLabel: (ctx) => {
+                const ponto = pontosGrafico[ctx.dataIndex];
+                const nomeTreino = ponto ? diasComTreinoNomeGrafico.get(ponto.data) : undefined;
+                return nomeTreino ? `Treino: ${nomeTreino}` : undefined;
+              },
+            },
+          },
+        },
         scales: {
           x: { ticks: { color: "#9aa0ab" }, grid: { display: false } },
           y: { ticks: { color: "#9aa0ab" }, grid: { color: "rgba(255, 255, 255, 0.08)" } },

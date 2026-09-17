@@ -88,6 +88,8 @@
   let pesosGraficoBruto = $state<PesoRegistro[]>([]);
   let dataInicioGrafico = $state("");
   let diasComTreinoGrafico = $state<Set<string>>(new Set());
+  /** Data -> nome da rotina, pro tooltip do gráfico (mesma info de diasComTreino, mas escopada ao período do gráfico). */
+  let diasComTreinoNomeGrafico = $state<Map<string, string>>(new Map());
   let loadingGrafico = $state(true);
   let mostrarFiltro = $state(false);
   let mostrarGraficoCheio = $state(false);
@@ -170,6 +172,7 @@
     pesosGraficoBruto = listaPesos;
     dataInicioGrafico = dataInicio;
     diasComTreinoGrafico = new Set(listaTreinos.map((t) => t.data));
+    diasComTreinoNomeGrafico = new Map(listaTreinos.map((t) => [t.data, t.treinoNome]));
     loadingGrafico = false;
   }
 
@@ -489,7 +492,20 @@
         responsive: true,
         maintainAspectRatio: false,
         layout: { padding: { top: 14, bottom: 22, left: 10, right: 14 } },
-        plugins: { legend: { display: false } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            displayColors: false,
+            callbacks: {
+              label: (ctx) => `${formatPeso(ctx.parsed.y ?? 0)} kg`,
+              afterLabel: (ctx) => {
+                const ponto = pontos[ctx.dataIndex];
+                const nomeTreino = ponto ? diasComTreinoNomeGrafico.get(ponto.data) : undefined;
+                return nomeTreino ? `Treino: ${nomeTreino}` : undefined;
+              },
+            },
+          },
+        },
         scales: {
           x: { display: false },
           y: {
@@ -548,6 +564,14 @@
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 {/snippet}
+{#snippet iconExpandir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="15 3 21 3 21 9" />
+    <polyline points="9 21 3 21 3 15" />
+    <line x1="21" y1="3" x2="14" y2="10" />
+    <line x1="3" y1="21" x2="10" y2="14" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="header">
@@ -567,9 +591,14 @@
   {:else if !pesosGrafico.length}
     <p class="muted">Nenhum registro nesse período.</p>
   {:else}
-    <button class="chart-wrap" onclick={() => (mostrarGraficoCheio = true)} aria-label="Ver gráfico em tela cheia">
+    <div class="chart-toolbar">
+      <button class="icone-topo" onclick={() => (mostrarGraficoCheio = true)} aria-label="Ver gráfico em tela cheia">
+        {@render iconExpandir()}
+      </button>
+    </div>
+    <div class="chart-wrap">
       <canvas bind:this={canvas}></canvas>
-    </button>
+    </div>
   {/if}
 
   <div class="quick-actions">
@@ -671,6 +700,7 @@
   <PesoGraficoTelaCheia
     {pontosGrafico}
     {diasComTreinoGrafico}
+    {diasComTreinoNomeGrafico}
     modo={modoGrafico}
     {metaLinha}
     {diffMetaPorPonto}
@@ -719,16 +749,33 @@
     width: 22px;
     height: 22px;
   }
+  .chart-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--space-2);
+  }
+  .icone-topo {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-card);
+    color: var(--surface-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .icone-topo svg {
+    width: 15px;
+    height: 15px;
+  }
   .chart-wrap {
     position: relative;
     display: block;
     width: 100%;
     height: 220px;
     margin-bottom: var(--space-5);
-    padding: 0;
-    border: none;
-    background: none;
-    cursor: pointer;
   }
   .modo-label {
     font-size: 12px;
