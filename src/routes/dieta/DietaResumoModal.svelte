@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { getPerfilDietaEditavel, getMetasDoDia } from "../../lib/dietaApi";
+  import { getMetaCaloriasMedia } from "../../lib/dietaApi";
   import { getUltimoPeso, getPesoMedioAtual, getMeta, getMetaSemanal, getDiasParaObjetivo, formatDiasObjetivo } from "../../lib/pesoApi";
-  import { hojeISO } from "../../lib/dates";
 
   let { onFechar }: { onFechar: () => void } = $props();
 
@@ -11,7 +10,6 @@
   let metaProteina = $state<number | null>(null);
   let metaGordura = $state<number | null>(null);
   let metaCarboidrato = $state<number | null>(null);
-  let caloriasAjustadasEm = $state<string | null>(null);
 
   let pesoAtual = $state<number | null>(null);
   let mediaSemanaPeso = $state<number | null>(null);
@@ -22,20 +20,18 @@
 
   async function carregar(): Promise<void> {
     loading = true;
-    const [perfil, metasHoje, ultimoPeso, mediaPeso, meta, metaSemanal, dias] = await Promise.all([
-      getPerfilDietaEditavel(),
-      getMetasDoDia(hojeISO()),
+    const [media, ultimoPeso, mediaPeso, meta, metaSemanal, dias] = await Promise.all([
+      getMetaCaloriasMedia(),
       getUltimoPeso(),
       getPesoMedioAtual(),
       getMeta(),
       getMetaSemanal(),
       getDiasParaObjetivo(),
     ]);
-    caloriasAjustadasEm = perfil.caloriasAjustadasEm;
-    metaCalorias = metasHoje.calorias;
-    metaProteina = metasHoje.proteinaG;
-    metaGordura = metasHoje.gorduraG;
-    metaCarboidrato = metasHoje.carboidratoG;
+    metaCalorias = media.calorias;
+    metaProteina = media.proteinaG;
+    metaGordura = media.gorduraG;
+    metaCarboidrato = media.carboidratoG;
     pesoAtual = ultimoPeso;
     mediaSemanaPeso = mediaPeso;
     temMeta = meta != null;
@@ -66,12 +62,6 @@
     return v == null ? "—" : `${v.toFixed(1).replace(".", ",")} kg`;
   }
 
-  function formatDataAjuste(iso: string | null): string {
-    if (!iso) return "Nunca ajustado";
-    const data = new Date(iso);
-    return `Ajustado em ${data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}`;
-  }
-
   const textoObjetivo = $derived(
     !temMeta ? "Sem meta de peso definida" : diasObjetivo == null ? "Sem dados suficientes pra estimar" : formatDiasObjetivo(diasObjetivo) + " para o objetivo",
   );
@@ -89,7 +79,6 @@
           <span class="resumo-label">Meta de calorias</span>
           <span class="resumo-valor">{formatKcal(metaCalorias)}</span>
         </div>
-        <p class="resumo-sub">{formatDataAjuste(caloriasAjustadasEm)}</p>
       </div>
 
       <div class="resumo-secao">
@@ -190,11 +179,6 @@
     font-size: var(--font-size-base);
     font-weight: 700;
     color: var(--surface-fg);
-  }
-  .resumo-sub {
-    margin: 2px 0 0;
-    font-size: 11px;
-    color: var(--surface-muted);
   }
   .resumo-macros {
     display: flex;
