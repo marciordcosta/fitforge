@@ -52,11 +52,9 @@
   .card {
     display: block;
     width: 100%;
-    background: var(--surface-card);
+    background: none;
     border: none;
-    border-radius: var(--radius-lg);
-    padding: var(--space-4);
-    box-shadow: var(--shadow-card);
+    padding: 0;
     margin-bottom: var(--space-4);
     text-align: left;
     font-family: inherit;
@@ -81,9 +79,9 @@
     justify-content: center;
     gap: var(--space-1);
     padding: var(--space-3) var(--space-1);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
+    border-radius: var(--radius-lg);
+    background: var(--surface-card);
+    box-shadow: var(--shadow-card);
     color: var(--surface-fg);
   }
   .quick-card-valor {

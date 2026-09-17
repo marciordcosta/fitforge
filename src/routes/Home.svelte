@@ -159,7 +159,9 @@
   .container {
     max-width: 480px;
     margin: 0 auto;
-    padding: var(--space-4);
+    padding-top: var(--space-4);
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
   }
   .header {
     display: flex;
