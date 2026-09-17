@@ -91,6 +91,10 @@
   let gorduraGInput = $state<number | null>(null);
   let carboidratoGKg = $state(2.93);
   let carboidratoGInput = $state<number | null>(null);
+  /** "Manter g/kg fixo" — editado em Parametrização, só carregado aqui pra reenviar sem alterar
+   * junto com o resto do perfil ao Salvar. */
+  let proteinaGkgFixo = $state(false);
+  let gorduraGkgFixo = $state(false);
 
   let modoCalorias = $state<"fixa" | "ondulatoria">("fixa");
   /** Último valor gravado no banco — pra saber se precisa persistir modo/distribuição no "Salvar" principal. */
@@ -288,6 +292,8 @@
       proteinaGInput = Math.round(perfil.proteinaGKg * perfil.pesoAtual);
       gorduraGInput = Math.round(perfil.gorduraGKg * perfil.pesoAtual);
       carboidratoGInput = Math.round(perfil.carboidratoGKg * perfil.pesoAtual);
+      proteinaGkgFixo = perfil.proteinaGkgFixo;
+      gorduraGkgFixo = perfil.gorduraGkgFixo;
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
       // Proporção por peso (só informativa) recalculada com o peso ATUAL — é o que deve variar
       // conforme o peso oscila, nunca as gramas.
@@ -676,6 +682,8 @@
         proteinaGKg,
         gorduraGKg,
         carboidratoGKg,
+        proteinaGkgFixo,
+        gorduraGkgFixo,
         fibrasG: Math.round((fibrasMinG + fibrasMaxG) / 2),
         aguaL: Math.round(((aguaMinL + aguaMaxL) / 2) * 10) / 10,
       });

@@ -12,6 +12,7 @@
     salvarTipoDieta,
     getPreferenciasRefeicoesHome,
     salvarPreferenciasRefeicoesHome,
+    salvarGkgFixo,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
     gramasDoParametro,
@@ -33,6 +34,13 @@
   let tipoDieta = $state<TipoDieta>("manutencao");
   let barraBase = $state<BaseReferenciaRefeicao>("refeicao");
   let valoresFormato = $state<FormatoValorRefeicao>("restante_acima");
+  /** "Manter g/kg fixo": por padrão (desmarcado) as GRAMAS de cada macro ficam fixas até a
+   * próxima edição em Gerenciar > Calorias, e é a proporção g/kg exibida que acompanha o peso.
+   * Marcado inverte isso pra esse macro — a proporção fica fixa e as gramas acompanham o peso
+   * sozinhas, com o carboidrato se ajustando pra manter a meta de calorias (que nunca muda
+   * sozinha). Carboidrato não tem essa opção — ele é sempre a válvula de ajuste. */
+  let proteinaGkgFixo = $state(false);
+  let gorduraGkgFixo = $state(false);
   let abertaExibicao = $state(false);
   let confirmandoDescartar = $state(false);
   let original = "";
@@ -97,7 +105,9 @@
       tipoDieta = tipo;
       barraBase = prefsRefeicoes.barraBase;
       valoresFormato = prefsRefeicoes.valoresFormato;
-      original = JSON.stringify({ valores, tipoDieta, barraBase, valoresFormato });
+      proteinaGkgFixo = perfil.proteinaGkgFixo;
+      gorduraGkgFixo = perfil.gorduraGkgFixo;
+      original = JSON.stringify({ valores, tipoDieta, barraBase, valoresFormato, proteinaGkgFixo, gorduraGkgFixo });
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -108,7 +118,10 @@
   void carregar();
 
   function sujo(): boolean {
-    return !carregando && JSON.stringify({ valores, tipoDieta, barraBase, valoresFormato }) !== original;
+    return (
+      !carregando &&
+      JSON.stringify({ valores, tipoDieta, barraBase, valoresFormato, proteinaGkgFixo, gorduraGkgFixo }) !== original
+    );
   }
 
   const guardaSaida = criarGuardaSaida(sujo);
@@ -138,6 +151,7 @@
       );
       await salvarTipoDieta(tipoDieta);
       await salvarPreferenciasRefeicoesHome({ barraBase, valoresFormato });
+      await Promise.all([salvarGkgFixo("proteina", proteinaGkgFixo), salvarGkgFixo("gordura", gorduraGkgFixo)]);
       mostrarToast("Salvo");
       guardaSaida.resolverSaida(() => voltar("/dieta"));
     } catch (err) {
@@ -260,6 +274,20 @@
                     {unidadeCalculada(def.unidade)} {def.base === "peso" ? "no seu peso" : "na sua meta de calorias"}
                   {/if}
                 </p>
+                {#if def.chave === "proteina" || def.chave === "gordura"}
+                  <label class="param-gkg-fixo">
+                    <input
+                      type="checkbox"
+                      checked={def.chave === "proteina" ? proteinaGkgFixo : gorduraGkgFixo}
+                      onchange={(e) => {
+                        const marcado = e.currentTarget.checked;
+                        if (def.chave === "proteina") proteinaGkgFixo = marcado;
+                        else gorduraGkgFixo = marcado;
+                      }}
+                    />
+                    Manter g/peso {def.chave === "proteina" ? "da proteína" : "da gordura"} fixo
+                  </label>
+                {/if}
               </div>
             {/each}
           </div>
@@ -508,5 +536,19 @@
   }
   .param-calculado.destaque {
     color: var(--surface-fg);
+  }
+  .param-gkg-fixo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    font-size: 13px;
+    color: var(--surface-fg);
+    cursor: pointer;
+  }
+  .param-gkg-fixo input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
   }
 </style>

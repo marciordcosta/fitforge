@@ -1162,20 +1162,31 @@ export interface MetasDiarias {
   carboidratoG: number;
 }
 
-const METAS_PADRAO: MetasDiarias = { calorias: 2000, proteinaG: 165, gorduraG: 56, carboidratoG: 223 };
-
-export async function getMetasDiarias(): Promise<MetasDiarias> {
-  const { data, error } = await supabase
-    .from("dieta_perfil")
-    .select("peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return METAS_PADRAO;
+/** Resolve as gramas de proteína/gordura respeitando "manter g/kg fixo" (Parametrização) de cada
+ * uma: fixo = usa o peso médio ATUAL (a proporção fica parada, as gramas acompanham o peso
+ * sozinhas); não fixo (padrão) = usa o peso da última edição salva (perfil.pesoAtual — as gramas
+ * ficam paradas, é a proporção que acompanha o peso, só como referência visual). */
+async function resolverProteinaGordura(perfil: PerfilDietaEditavel): Promise<{ proteinaG: number; gorduraG: number }> {
+  const pesoMedio = perfil.proteinaGkgFixo || perfil.gorduraGkgFixo ? await getPesoMedioAtual() : null;
+  const pesoProteina = perfil.proteinaGkgFixo ? (pesoMedio ?? perfil.pesoAtual) : perfil.pesoAtual;
+  const pesoGordura = perfil.gorduraGkgFixo ? (pesoMedio ?? perfil.pesoAtual) : perfil.pesoAtual;
   return {
-    calorias: data.meta_calorias,
-    proteinaG: data.proteina_g_kg * data.peso_atual,
-    gorduraG: data.gordura_g_kg * data.peso_atual,
-    carboidratoG: data.carboidrato_g_kg * data.peso_atual,
+    proteinaG: Math.round(perfil.proteinaGKg * pesoProteina),
+    gorduraG: Math.round(perfil.gorduraGKg * pesoGordura),
+  };
+}
+
+/** Calorias NUNCA mudam sozinhas (só quando editadas e salvas em Gerenciar) — o carboidrato é
+ * sempre a "válvula de ajuste" que fecha a meta de calorias com a proteína/gordura vigentes,
+ * nunca uma proporção própria independente. */
+export async function getMetasDiarias(): Promise<MetasDiarias> {
+  const perfil = await getPerfilDietaEditavel();
+  const { proteinaG, gorduraG } = await resolverProteinaGordura(perfil);
+  return {
+    calorias: perfil.metaCalorias,
+    proteinaG,
+    gorduraG,
+    carboidratoG: carboidratoGDoDia(perfil.metaCalorias, proteinaG, gorduraG),
   };
 }
 
@@ -1278,13 +1289,22 @@ export async function salvarParametro(chave: string, min: number, max: number): 
   if (error) throw error;
 }
 
-/** Perfil de metas editável na tela de Gerenciar (aba Calorias) — ratios em g/kg, não em gramas fixas. */
+/** Perfil de metas editável na tela de Gerenciar (aba Calorias) — as GRAMAS são o valor fixo (só
+ * mudam quando o usuário edita e salva de novo); proteinaGKg/gorduraGKg/carboidratoGKg gravam a
+ * proporção resultante daquela edição (gramas ÷ peso da época), reconstruída sempre com
+ * `pesoAtual` (também gravado junto) pra reproduzir as MESMAS gramas depois, não um valor novo. */
 export interface PerfilDietaEditavel {
   pesoAtual: number;
   metaCalorias: number;
   proteinaGKg: number;
   gorduraGKg: number;
   carboidratoGKg: number;
+  /** "Manter g/kg fixo" (Parametrização) — inverte a regra padrão só pra esse macro: em vez das
+   * gramas ficarem fixas, é a proporção g/kg que fica fixa, e as gramas acompanham o peso atual
+   * sozinhas. O carboidrato nunca tem esse campo — ele é sempre recalculado pra fechar a meta de
+   * calorias (que nunca muda sozinha), absorvendo o efeito desse ajuste. */
+  proteinaGkgFixo: boolean;
+  gorduraGkgFixo: boolean;
   /** Última vez que meta_calorias mudou de valor de fato (não conta editar só macros mantendo o
    * mesmo total) — usado pra dar carência ao status de aderência à dieta (getStatusAdesaoDieta).
    * null = nunca rastreado (perfil de antes dessa coluna existir, ou nunca mexeu nas calorias). */
@@ -1297,13 +1317,17 @@ const PERFIL_PADRAO: PerfilDietaEditavel = {
   proteinaGKg: 2.17,
   gorduraGKg: 0.66,
   carboidratoGKg: 2.93,
+  proteinaGkgFixo: false,
+  gorduraGkgFixo: false,
   caloriasAjustadasEm: null,
 };
 
 export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
   const { data, error } = await supabase
     .from("dieta_perfil")
-    .select("peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg, calorias_ajustadas_em")
+    .select(
+      "peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg, proteina_gkg_fixo, gordura_gkg_fixo, calorias_ajustadas_em",
+    )
     .maybeSingle();
   if (error) throw error;
   if (!data) return PERFIL_PADRAO;
@@ -1313,6 +1337,8 @@ export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
     proteinaGKg: data.proteina_g_kg,
     gorduraGKg: data.gordura_g_kg,
     carboidratoGKg: data.carboidrato_g_kg,
+    proteinaGkgFixo: data.proteina_gkg_fixo ?? false,
+    gorduraGkgFixo: data.gordura_gkg_fixo ?? false,
     caloriasAjustadasEm: data.calorias_ajustadas_em,
   };
 }
@@ -1329,6 +1355,8 @@ export async function salvarPerfilDieta(input: {
   proteinaGKg: number;
   gorduraGKg: number;
   carboidratoGKg: number;
+  proteinaGkgFixo: boolean;
+  gorduraGkgFixo: boolean;
   fibrasG: number;
   aguaL: number;
 }): Promise<void> {
@@ -1349,6 +1377,8 @@ export async function salvarPerfilDieta(input: {
       proteina_g_kg: input.proteinaGKg,
       gordura_g_kg: input.gorduraGKg,
       carboidrato_g_kg: input.carboidratoGKg,
+      proteina_gkg_fixo: input.proteinaGkgFixo,
+      gordura_gkg_fixo: input.gorduraGkgFixo,
       fibras_g: input.fibrasG,
       agua_l: input.aguaL,
       calorias_ajustadas_em: caloriasAjustadasEm,
@@ -1367,6 +1397,18 @@ export async function reiniciarCalibracaoDieta(): Promise<void> {
   const { error } = await supabase
     .from("dieta_perfil")
     .update({ calorias_ajustadas_em: new Date().toISOString() })
+    .eq("user_id", uid());
+  if (error) throw error;
+}
+
+/** "Manter g/kg fixo" (Parametrização) — editado numa tela separada de Gerenciar > Calorias, que
+ * é quem grava o resto do perfil; atualiza só esse campo pra não precisar reenviar peso/macros/
+ * calorias que essa tela nem carrega. */
+export async function salvarGkgFixo(macro: "proteina" | "gordura", fixo: boolean): Promise<void> {
+  const coluna = macro === "proteina" ? "proteina_gkg_fixo" : "gordura_gkg_fixo";
+  const { error } = await supabase
+    .from("dieta_perfil")
+    .update({ [coluna]: fixo })
     .eq("user_id", uid());
   if (error) throw error;
 }
@@ -1631,16 +1673,12 @@ export async function getMetasDoDiaSemana(diaSemana: number): Promise<MetasDiari
     getCaloriasDiaManuais(),
     getParametros(),
   ]);
-  // As gramas gravadas da última vez são fixas (nunca mudam sozinhas) — usa o peso que estava
-  // vigente NAQUELE momento (perfil.pesoAtual, gravado junto), nunca o peso atual/fresco. Mesma
-  // regra de getMetasDiarias() (modo Fixa) e de Gerenciar > Calorias, agora consistente aqui
-  // também: só a proporção g/kg (informativa) acompanha o peso, as gramas ficam paradas.
-  const pesoAtual = perfil.pesoAtual;
-  const proteinaG = Math.round(perfil.proteinaGKg * pesoAtual);
-  const gorduraG = Math.round(perfil.gorduraGKg * pesoAtual);
-  const carboidratoG = Math.round(perfil.carboidratoGKg * pesoAtual);
-  const caloriasMedia = Math.round(4 * proteinaG + 9 * gorduraG + 4 * carboidratoG);
-  const minimo = (parametros.get("calorias")?.min ?? PARAMETROS_PADRAO.calorias.min) * pesoAtual;
+  const { proteinaG, gorduraG } = await resolverProteinaGordura(perfil);
+  // Calorias nunca mudam sozinhas: a base semanal pra redistribuir entre os dias é sempre
+  // perfil.metaCalorias (o valor salvo), nunca uma soma recalculada a partir das proporções — que
+  // podia divergir por arredondamento, ou pelo ajuste de "g/kg fixo" mudando proteína/gordura.
+  const caloriasMedia = perfil.metaCalorias;
+  const minimo = (parametros.get("calorias")?.min ?? PARAMETROS_PADRAO.calorias.min) * perfil.pesoAtual;
   const manuaisCalorias = new Map([...manuais].map(([dia, v]) => [dia, v.calorias]));
 
   let diaResolvido: CaloriasPorDia;
