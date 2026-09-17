@@ -192,9 +192,8 @@
   .mes-nav button {
     width: 32px;
     height: 32px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-card);
+    border: none;
+    background: none;
     color: var(--surface-fg);
     font-size: var(--font-size-lg);
     cursor: pointer;
