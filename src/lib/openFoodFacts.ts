@@ -35,7 +35,10 @@ function mapearProduto(p: Record<string, unknown>): ProdutoOpenFoodFacts | null 
   const gorduraSaturada = (n["saturated-fat_100g"] as number | undefined) ?? null;
   const gorduraInsaturada = gorduraSaturada != null ? Math.max(0, gordura - gorduraSaturada) : null;
 
-  const nome = (p.product_name as string | undefined)?.trim();
+  // "product_name" pode vir no idioma de quem cadastrou o produto (geralmente inglês) mesmo pedindo
+  // lc=pt na URL -- "product_name_pt" é o campo com a tradução de fato marcada como português,
+  // quando existe, então tem prioridade.
+  const nome = ((p.product_name_pt as string | undefined) || (p.product_name as string | undefined))?.trim();
   const marca = (p.brands as string | undefined)?.split(",")[0]?.trim();
 
   return {
@@ -58,7 +61,7 @@ function mapearProduto(p: Record<string, unknown>): ProdutoOpenFoodFacts | null 
  */
 export async function buscarProdutoPorCodigoBarras(codigo: string): Promise<ProdutoOpenFoodFacts | null> {
   const resp = await fetch(
-    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(codigo)}.json?fields=product_name,brands,nutriments`,
+    `https://br.openfoodfacts.org/api/v2/product/${encodeURIComponent(codigo)}.json?fields=product_name,product_name_pt,brands,nutriments&lc=pt`,
   );
   if (!resp.ok) throw new Error("Falha ao consultar a Open Food Facts.");
   const json = await resp.json();
@@ -74,7 +77,7 @@ export async function buscarProdutoPorCodigoBarras(codigo: string): Promise<Prod
  */
 export async function buscarProdutosPorNome(nome: string): Promise<ProdutoOpenFoodFactsBusca[]> {
   const resp = await fetch(
-    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(nome)}&search_simple=1&action=process&json=1&page_size=15&fields=code,product_name,brands,nutriments`,
+    `https://br.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(nome)}&search_simple=1&action=process&json=1&page_size=15&fields=code,product_name,product_name_pt,brands,nutriments&lc=pt`,
   );
   if (!resp.ok) throw new Error("Falha ao pesquisar na Open Food Facts.");
   const json = await resp.json();
