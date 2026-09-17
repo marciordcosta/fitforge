@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigate } from "../lib/router.svelte";
+  import { navigate, router } from "../lib/router.svelte";
   import { hojeISO } from "../lib/dates";
   import { getLayoutHome, type HomeCardTipo } from "../lib/homeApi";
   import { getUltimoPeso, getPesoMedioAtual, getDiasParaObjetivo, getMeta, getMetaSemanal } from "../lib/pesoApi";
@@ -81,6 +81,19 @@
   }
 
   void carregar();
+
+  /** A Início fica sempre montada (só escondida via `hidden`) pra trocar de aba sem refetch — mas
+   * isso significa que voltar de "Cards da Início" com uma ordem/seleção nova não recarrega `layout`
+   * sozinho. Recarrega só nessa transição específica (configurar → home), não em toda troca de aba. */
+  let veioDeConfigurar = false;
+  $effect(() => {
+    if (router.path === "/inicio/configurar") {
+      veioDeConfigurar = true;
+    } else if (router.path === "/" && veioDeConfigurar) {
+      veioDeConfigurar = false;
+      void carregar();
+    }
+  });
 
   function abrirConfiguracao() {
     navigate("/inicio/configurar");
