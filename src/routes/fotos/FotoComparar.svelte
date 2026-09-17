@@ -471,5 +471,10 @@
       bottom: auto;
       transform: translate(-50%, -50%);
     }
+    /* Lado a lado, as fotos trocam de posição esquerda/direita, não em cima/embaixo -- o ícone
+       (uma seta duplo-sentido vertical) só precisa girar 90° pra continuar fazendo sentido. */
+    .trocar-btn svg {
+      transform: rotate(90deg);
+    }
   }
 </style>
