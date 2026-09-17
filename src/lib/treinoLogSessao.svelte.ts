@@ -38,7 +38,12 @@ export interface ExercicioSessao {
   descansoAte: number | null;
   descansoInicioEm: number | null;
   descansoNotificado: boolean;
-  recordes: RecordesExercicio;
+  /** Recordes de ANTES dessa sessão (histórico), imutável — nunca é atualizado durante o treino.
+   * As marcas de recorde de cada série são recalculadas do zero (recordesBase + séries já
+   * concluídas nessa sessão) a cada toggle, em vez de ir "absorvendo" cada novo valor aqui — sem
+   * isso, desmarcar e marcar de novo a mesma série parava de contar como recorde na segunda vez,
+   * porque a base já tinha sido silenciosamente atualizada pra igualar o valor da primeira vez. */
+  recordesBase: RecordesExercicio;
 }
 
 export interface SessaoTreinoAtiva {

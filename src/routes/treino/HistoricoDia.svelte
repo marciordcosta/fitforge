@@ -159,7 +159,7 @@
             descansoAte: null,
             descansoInicioEm: null,
             descansoNotificado: false,
-            recordes,
+            recordesBase: recordes,
           };
         }),
       );

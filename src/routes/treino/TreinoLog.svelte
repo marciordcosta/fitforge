@@ -94,7 +94,13 @@
 
     const salva = treinoLogSessao.atual;
     if (salva && salva.treinoId === treinoId) {
-      sessao = salva.sessao;
+      // Sessão persistida no localStorage de ANTES do campo virar recordesBase (era "recordes")
+      // não teria essa chave — sem essa checagem, retomar uma sessão assim quebrava a marcação de
+      // recorde silenciosamente (comparava contra `undefined`).
+      sessao = salva.sessao.map((ex) => ({
+        ...ex,
+        recordesBase: ex.recordesBase ?? { maiorPeso: 0, melhor1rm: 0, melhorVolumeSerie: 0 },
+      }));
       nomeTreino = salva.nomeTreino;
       inicio = salva.inicio;
       houveAlteracaoEstrutura = salva.houveAlteracaoEstrutura;
@@ -151,7 +157,7 @@
           descansoAte: null,
           descansoInicioEm: null,
           descansoNotificado: false,
-          recordes,
+          recordesBase: recordes,
         };
       }),
     );
@@ -371,6 +377,51 @@
     houveAlteracaoEstrutura = true;
   }
 
+  /** Recalcula do ZERO (a partir de recordesBase, imutável, + as séries já concluídas agora) quais
+   * séries desse exercício batem recorde de peso/1RM/volume nessa sessão — nunca incrementa um
+   * valor mutado. A versão anterior atualizava um "recordes" mutável a cada série batida; isso
+   * fazia a MESMA série, ao ser desmarcada e marcada de novo (comum ao ajustar peso/reps depois de
+   * já ter concluído), parar de contar como recorde na segunda vez — a base já tinha sido
+   * silenciosamente atualizada pra igualar o valor da primeira vez, então a comparação virava
+   * "285 > 285" (falso) em vez de "285 > 266" (verdadeiro). Recomputar tudo a cada toggle evita
+   * esse tipo de deriva por completo. Só a mais alta entre as séries já concluídas acumula o
+   * troféu de cada critério (nunca duas ao mesmo tempo pro mesmo critério). */
+  function atualizarRecordesExercicio(ex: ExercicioSessao): void {
+    for (const s of ex.sets) {
+      s.prPeso = false;
+      s.prPesoDelta = null;
+      s.pr1rm = false;
+      s.pr1rmDelta = null;
+      s.prVolume = false;
+      s.prVolumeDelta = null;
+    }
+    const concluidas = ex.sets.filter((s): s is SetSessao & { peso: number; repeticoes: number } =>
+      s.concluida && s.peso != null && s.repeticoes != null,
+    );
+    if (!concluidas.length) return;
+
+    const maiorPesoSessao = Math.max(...concluidas.map((s) => s.peso));
+    if (maiorPesoSessao > ex.recordesBase.maiorPeso) {
+      const s = concluidas.find((s) => s.peso === maiorPesoSessao)!;
+      s.prPeso = true;
+      s.prPesoDelta = maiorPesoSessao - ex.recordesBase.maiorPeso;
+    }
+
+    const melhor1rmSessao = Math.max(...concluidas.map((s) => calcular1RM(s.peso, s.repeticoes)));
+    if (melhor1rmSessao > ex.recordesBase.melhor1rm) {
+      const s = concluidas.find((s) => calcular1RM(s.peso, s.repeticoes) === melhor1rmSessao)!;
+      s.pr1rm = true;
+      s.pr1rmDelta = melhor1rmSessao - ex.recordesBase.melhor1rm;
+    }
+
+    const melhorVolumeSessao = Math.max(...concluidas.map((s) => s.peso * s.repeticoes));
+    if (melhorVolumeSessao > ex.recordesBase.melhorVolumeSerie) {
+      const s = concluidas.find((s) => s.peso * s.repeticoes === melhorVolumeSessao)!;
+      s.prVolume = true;
+      s.prVolumeDelta = melhorVolumeSessao - ex.recordesBase.melhorVolumeSerie;
+    }
+  }
+
   function toggleConcluida(exIdx: number, setIdx: number) {
     const ex = sessao[exIdx];
     const serieItem = ex.sets[setIdx];
@@ -387,14 +438,11 @@
     }
 
     serieItem.concluida = !serieItem.concluida;
+    // Aviso de recorde é só a medalha no número da série (ver atualizarRecordesExercicio), sem
+    // toast — fica visível o treino inteiro em vez de sumir em poucos segundos.
+    atualizarRecordesExercicio(ex);
 
     if (!serieItem.concluida) {
-      serieItem.prPeso = false;
-      serieItem.prPesoDelta = null;
-      serieItem.pr1rm = false;
-      serieItem.pr1rmDelta = null;
-      serieItem.prVolume = false;
-      serieItem.prVolumeDelta = null;
       ex.descansoAte = null;
       ex.descansoInicioEm = null;
       return;
@@ -405,52 +453,6 @@
       ex.descansoAte = ex.descansoInicioEm + ex.descanso_seg * 1000;
       ex.descansoNotificado = false;
       notificar("Descanso iniciado", `${ex.nome} — ${formatMinSeg(ex.descanso_seg)}`);
-    }
-
-    if (serieItem.peso != null && serieItem.repeticoes != null) {
-      const rm = calcular1RM(serieItem.peso, serieItem.repeticoes);
-      const volume = serieItem.peso * serieItem.repeticoes;
-      // Atualiza ex.recordes na hora (não só no fim da sessão): sem isso, duas séries desse
-      // mesmo exercício que batessem o MESMO recorde antigo (ex: 100kg na 1ª série, 95kg na 2ª,
-      // ambas acima do recorde anterior de 90kg) marcavam o troféu nas duas, mesmo só uma
-      // sobrevivendo como troféu de verdade no histórico. Também tira o troféu de séries
-      // anteriores dessa sessão que acabaram de ser superadas — só a mais alta do dia acumula.
-      // Sem toast/mensagem aqui de propósito: o aviso é só a medalha no número da série
-      // (renderizada com base em prPeso/pr1rm/prVolume), que fica visível o treino inteiro em vez
-      // de sumir em poucos segundos.
-      if (serieItem.peso > ex.recordes.maiorPeso) {
-        serieItem.prPeso = true;
-        serieItem.prPesoDelta = serieItem.peso - ex.recordes.maiorPeso;
-        for (const s of ex.sets) {
-          if (s !== serieItem) {
-            s.prPeso = false;
-            s.prPesoDelta = null;
-          }
-        }
-        ex.recordes = { ...ex.recordes, maiorPeso: serieItem.peso };
-      }
-      if (rm > ex.recordes.melhor1rm) {
-        serieItem.pr1rm = true;
-        serieItem.pr1rmDelta = rm - ex.recordes.melhor1rm;
-        for (const s of ex.sets) {
-          if (s !== serieItem) {
-            s.pr1rm = false;
-            s.pr1rmDelta = null;
-          }
-        }
-        ex.recordes = { ...ex.recordes, melhor1rm: rm };
-      }
-      if (volume > ex.recordes.melhorVolumeSerie) {
-        serieItem.prVolume = true;
-        serieItem.prVolumeDelta = volume - ex.recordes.melhorVolumeSerie;
-        for (const s of ex.sets) {
-          if (s !== serieItem) {
-            s.prVolume = false;
-            s.prVolumeDelta = null;
-          }
-        }
-        ex.recordes = { ...ex.recordes, melhorVolumeSerie: volume };
-      }
     }
   }
 
@@ -590,7 +592,7 @@
     ex.exercicio_id = novoExercicioId;
     ex.nome = novoNome;
     ex.observacao = observacoesNovoEx.get(novoExercicioId) ?? null;
-    ex.recordes = recordes;
+    ex.recordesBase = recordes;
     ex.sets = Array.from({ length: ex.sets.length }, (_, i) => {
       const ant = anterior.find((a) => a.serie === i + 1);
       return {
@@ -760,7 +762,7 @@
       descansoAte: null,
       descansoInicioEm: null,
       descansoNotificado: false,
-      recordes,
+      recordesBase: recordes,
     };
   }
 
