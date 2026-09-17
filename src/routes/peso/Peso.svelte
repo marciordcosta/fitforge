@@ -790,15 +790,16 @@
   .quick-card {
     flex: 1;
     min-width: 0;
+    aspect-ratio: 1 / 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: var(--space-1);
-    padding: var(--space-3) var(--space-1);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
+    padding: var(--space-1);
+    border-radius: var(--radius-lg);
     background: var(--surface-card);
+    box-shadow: var(--shadow-card);
     color: var(--surface-fg);
   }
   .quick-card-valor {
