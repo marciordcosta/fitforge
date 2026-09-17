@@ -521,6 +521,12 @@
     </div>
     <div class="chip-texto">
       <strong>{formatarData(dataComparando.data)}</strong>
+      {#if pesoPorData.has(dataComparando.data) || mediaPorData.has(dataComparando.data)}
+        <span class="chip-peso">
+          {formatarPeso(pesoPorData.get(dataComparando.data))}
+          <span class="chip-peso-media">· méd. sem. {formatarPeso(mediaPorData.get(dataComparando.data))}</span>
+        </span>
+      {/if}
       <span>Toque em outra data pra comparar</span>
     </div>
     <button type="button" class="chip-cancelar" onclick={() => (dataComparando = null)} aria-label="Cancelar comparação">
@@ -910,6 +916,9 @@
   .chip-texto span {
     font-size: 11px;
     color: var(--surface-muted);
+  }
+  .chip-peso-media {
+    opacity: 0.75;
   }
   .chip-cancelar {
     flex-shrink: 0;
