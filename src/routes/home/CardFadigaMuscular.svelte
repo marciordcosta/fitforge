@@ -171,7 +171,6 @@
 {/snippet}
 
 <div class="card" role="button" tabindex="0" onclick={() => navigate("/treino")} onkeydown={(e) => e.key === "Enter" && navigate("/treino")}>
-  <p class="card-titulo">Fadiga Muscular</p>
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else if erro}
@@ -224,11 +223,6 @@
     margin-bottom: var(--space-4);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-  }
-  .card-titulo {
-    margin: 0 0 var(--space-2);
-    font-size: var(--font-size-base);
-    color: var(--surface-muted);
   }
   .muted {
     margin: 0;

@@ -27,7 +27,6 @@
   onclick={abrirRotina}
   onkeydown={(e) => e.key === "Enter" && abrirRotina()}
 >
-  <p class="card-titulo">Rotinas</p>
   {#if treino}
     <div class="card-header">
       <h2>
@@ -59,11 +58,6 @@
     color: inherit;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-  }
-  .card-titulo {
-    margin: 0 0 var(--space-2);
-    font-size: var(--font-size-base);
-    color: var(--surface-muted);
   }
   .card-header {
     margin-bottom: var(--space-1);

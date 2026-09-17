@@ -21,7 +21,7 @@ export const CATALOGO_CARDS: HomeCardDefinicao[] = [
   { tipo: "proximo_treino", titulo: "Próximo treino", descricao: "Rotina agendada pra hoje" },
   { tipo: "calorias_dia", titulo: "Calorias do dia", descricao: "Anéis de calorias e macros restantes" },
   { tipo: "refeicoes_dia", titulo: "Refeições do dia", descricao: "Quantas já foram registradas" },
-  { tipo: "fadiga_muscular", titulo: "Fadiga muscular", descricao: "Séries feitas x planejadas por músculo" },
+  { tipo: "fadiga_muscular", titulo: "Séries", descricao: "Séries feitas x planejadas por músculo" },
 ];
 
 const TIPOS_VALIDOS = new Set<string>(CATALOGO_CARDS.map((c) => c.tipo));

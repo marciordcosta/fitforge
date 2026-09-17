@@ -2,7 +2,7 @@
   import { navigate, router } from "../lib/router.svelte";
   import { hojeISO } from "../lib/dates";
   import { getLayoutHome, type HomeCardTipo } from "../lib/homeApi";
-  import { getUltimoPeso, getPesoMedioAtual, getDiasParaObjetivo, getMeta, getMetaSemanal } from "../lib/pesoApi";
+  import { getUltimoPeso, getPesoMedioAtual, getMeta, getMetaSemanal } from "../lib/pesoApi";
   import { listTreinos, type TreinoComExercicios } from "../lib/treinoApi";
   import { getMetasDoDia, getDiarioDoDia, garantirRefeicoesPadraoDoDia, type RefeicaoDia, type ItemDiario } from "../lib/dietaApi";
   import CardPesoAtual from "./home/CardPesoAtual.svelte";
@@ -17,7 +17,6 @@
 
   let pesoAtualVal = $state<number | null>(null);
   let pesoMediaVal = $state<number | null>(null);
-  let diasObjetivoVal = $state<number | null>(null);
   let metaSemanalVal = $state<number | null>(null);
   let pesoAlvoVal = $state<number | null>(null);
   let treinoHoje = $state<TreinoComExercicios | null>(null);
@@ -43,11 +42,10 @@
       const diaSemanaHoje = new Date().getDay();
       const precisaDieta = tipos.includes("calorias_dia") || tipos.includes("refeicoes_dia");
 
-      const [pesoAtual, pesoMedia, diasObjetivo, meta, metaSemanal, treinos, metasDia, itensDia, refeicoesDia] =
+      const [pesoAtual, pesoMedia, meta, metaSemanal, treinos, metasDia, itensDia, refeicoesDia] =
         await Promise.all([
           tipos.includes("peso_atual") ? getUltimoPeso() : Promise.resolve(null),
           tipos.includes("peso_atual") ? getPesoMedioAtual() : Promise.resolve(null),
-          tipos.includes("peso_atual") ? getDiasParaObjetivo() : Promise.resolve(null),
           tipos.includes("peso_atual") ? getMeta() : Promise.resolve(null),
           tipos.includes("peso_atual") ? getMetaSemanal() : Promise.resolve(null),
           tipos.includes("proximo_treino") ? listTreinos() : Promise.resolve([]),
@@ -58,7 +56,6 @@
 
       pesoAtualVal = pesoAtual;
       pesoMediaVal = pesoMedia;
-      diasObjetivoVal = diasObjetivo;
       metaSemanalVal = metaSemanal;
       pesoAlvoVal = meta?.pesoAlvo ?? null;
       treinoHoje = treinos.find((t) => t.dia_semana === diaSemanaHoje) ?? null;
@@ -126,13 +123,7 @@
   {:else}
     {#each layout as tipo (tipo)}
       {#if tipo === "peso_atual"}
-        <CardPesoAtual
-          pesoAtual={pesoAtualVal}
-          media={pesoMediaVal}
-          metaSemanal={metaSemanalVal}
-          pesoAlvo={pesoAlvoVal}
-          diasObjetivo={diasObjetivoVal}
-        />
+        <CardPesoAtual pesoAtual={pesoAtualVal} media={pesoMediaVal} metaSemanal={metaSemanalVal} pesoAlvo={pesoAlvoVal} />
       {:else if tipo === "proximo_treino"}
         <CardProximoTreino treino={treinoHoje} />
       {:else if tipo === "calorias_dia"}
