@@ -5,29 +5,44 @@
   let {
     pesoAtual,
     media,
+    metaSemanal,
+    pesoAlvo,
     diasObjetivo,
   }: {
     pesoAtual: number | null;
     media: number | null;
+    metaSemanal: number | null;
+    pesoAlvo: number | null;
     diasObjetivo: number | null;
   } = $props();
 
-  const valorPrincipal = $derived(media ?? pesoAtual);
+  function formatKg(v: number | null): string {
+    return v == null ? "—" : `${v.toFixed(1).replace(".", ",")} kg`;
+  }
+
   const textoObjetivo = $derived(diasObjetivo != null ? `${formatDiasObjetivo(diasObjetivo, true)} para o objetivo` : null);
 </script>
 
 <button type="button" class="card" onclick={() => navigate("/peso")}>
   <p class="card-titulo">Peso</p>
-  <p class="valor-principal">
-    {#if valorPrincipal != null}
-      <strong>{valorPrincipal.toFixed(1)}</strong> <span class="unidade">kg</span>
-    {:else}
-      <span class="unidade">Sem registros ainda</span>
-    {/if}
-  </p>
-  {#if media != null && pesoAtual != null}
-    <p class="subtexto">Hoje: {pesoAtual.toFixed(1)} kg</p>
-  {/if}
+  <div class="quick-actions">
+    <div class="quick-card">
+      <span class="quick-card-label">Peso atual</span>
+      <span class="quick-card-valor">{formatKg(pesoAtual)}</span>
+    </div>
+    <div class="quick-card">
+      <span class="quick-card-label">Média atual</span>
+      <span class="quick-card-valor">{formatKg(media)}</span>
+    </div>
+    <div class="quick-card">
+      <span class="quick-card-label">Meta semanal</span>
+      <span class="quick-card-valor">{formatKg(metaSemanal)}</span>
+    </div>
+    <div class="quick-card">
+      <span class="quick-card-label">Meta Alvo</span>
+      <span class="quick-card-valor">{formatKg(pesoAlvo)}</span>
+    </div>
+  </div>
   {#if textoObjetivo}
     <p class="subtexto">{textoObjetivo}</p>
   {/if}
@@ -49,23 +64,41 @@
     cursor: pointer;
   }
   .card-titulo {
-    margin: 0 0 var(--space-2);
+    margin: 0 0 var(--space-3);
     font-size: var(--font-size-base);
     color: var(--surface-muted);
   }
-  .valor-principal {
-    margin: 0 0 var(--space-1);
-    font-size: var(--font-size-lg);
+  .quick-actions {
+    display: flex;
+    gap: var(--space-2);
   }
-  .valor-principal strong {
-    font-size: 22px;
+  .quick-card {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
   }
-  .unidade {
-    color: var(--surface-muted);
+  .quick-card-valor {
     font-size: var(--font-size-sm);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .quick-card-label {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--surface-muted);
+    white-space: nowrap;
   }
   .subtexto {
-    margin: 0;
+    margin: var(--space-3) 0 0;
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }

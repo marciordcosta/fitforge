@@ -7,7 +7,7 @@ function uid(): string {
   return id;
 }
 
-export type HomeCardTipo = "peso_atual" | "proximo_treino" | "calorias_dia" | "refeicoes_dia";
+export type HomeCardTipo = "peso_atual" | "proximo_treino" | "calorias_dia" | "refeicoes_dia" | "fadiga_muscular";
 
 export interface HomeCardDefinicao {
   tipo: HomeCardTipo;
@@ -17,10 +17,11 @@ export interface HomeCardDefinicao {
 
 /** Catálogo de cards disponíveis pra Início — a ordem aqui é a ordem padrão do primeiro acesso. */
 export const CATALOGO_CARDS: HomeCardDefinicao[] = [
-  { tipo: "peso_atual", titulo: "Peso atual", descricao: "Média móvel, peso do dia e dias pro objetivo" },
+  { tipo: "peso_atual", titulo: "Peso atual", descricao: "Peso, média, meta semanal e meta alvo" },
   { tipo: "proximo_treino", titulo: "Próximo treino", descricao: "Rotina agendada pra hoje" },
-  { tipo: "calorias_dia", titulo: "Calorias do dia", descricao: "Consumido vs. meta" },
+  { tipo: "calorias_dia", titulo: "Calorias do dia", descricao: "Anéis de calorias e macros restantes" },
   { tipo: "refeicoes_dia", titulo: "Refeições do dia", descricao: "Quantas já foram registradas" },
+  { tipo: "fadiga_muscular", titulo: "Fadiga muscular", descricao: "Séries feitas x planejadas por músculo" },
 ];
 
 const TIPOS_VALIDOS = new Set<string>(CATALOGO_CARDS.map((c) => c.tipo));

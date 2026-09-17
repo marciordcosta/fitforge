@@ -2,13 +2,14 @@
   import { navigate } from "../lib/router.svelte";
   import { hojeISO } from "../lib/dates";
   import { getLayoutHome, type HomeCardTipo } from "../lib/homeApi";
-  import { getUltimoPeso, getPesoMedioAtual, getDiasParaObjetivo } from "../lib/pesoApi";
+  import { getUltimoPeso, getPesoMedioAtual, getDiasParaObjetivo, getMeta, getMetaSemanal } from "../lib/pesoApi";
   import { listTreinos, type TreinoComExercicios } from "../lib/treinoApi";
   import { getMetasDoDia, getDiarioDoDia, garantirRefeicoesPadraoDoDia, type RefeicaoDia, type ItemDiario } from "../lib/dietaApi";
   import CardPesoAtual from "./home/CardPesoAtual.svelte";
   import CardProximoTreino from "./home/CardProximoTreino.svelte";
   import CardCaloriasDia from "./home/CardCaloriasDia.svelte";
   import CardRefeicoesDia from "./home/CardRefeicoesDia.svelte";
+  import CardFadigaMuscular from "./home/CardFadigaMuscular.svelte";
 
   let layout = $state<HomeCardTipo[]>([]);
   let loading = $state(true);
@@ -17,9 +18,17 @@
   let pesoAtualVal = $state<number | null>(null);
   let pesoMediaVal = $state<number | null>(null);
   let diasObjetivoVal = $state<number | null>(null);
+  let metaSemanalVal = $state<number | null>(null);
+  let pesoAlvoVal = $state<number | null>(null);
   let treinoHoje = $state<TreinoComExercicios | null>(null);
   let caloriasMeta = $state(0);
   let caloriasConsumido = $state(0);
+  let proteinaMetaVal = $state(0);
+  let proteinaConsumidoVal = $state(0);
+  let gorduraMetaVal = $state(0);
+  let gorduraConsumidoVal = $state(0);
+  let carboidratoMetaVal = $state(0);
+  let carboidratoConsumidoVal = $state(0);
   let refeicoesDiaVal = $state<RefeicaoDia[]>([]);
   let itensDiaVal = $state<ItemDiario[]>([]);
 
@@ -34,22 +43,33 @@
       const diaSemanaHoje = new Date().getDay();
       const precisaDieta = tipos.includes("calorias_dia") || tipos.includes("refeicoes_dia");
 
-      const [pesoAtual, pesoMedia, diasObjetivo, treinos, metasDia, itensDia, refeicoesDia] = await Promise.all([
-        tipos.includes("peso_atual") ? getUltimoPeso() : Promise.resolve(null),
-        tipos.includes("peso_atual") ? getPesoMedioAtual() : Promise.resolve(null),
-        tipos.includes("peso_atual") ? getDiasParaObjetivo() : Promise.resolve(null),
-        tipos.includes("proximo_treino") ? listTreinos() : Promise.resolve([]),
-        precisaDieta ? getMetasDoDia(hoje) : Promise.resolve(null),
-        precisaDieta ? getDiarioDoDia(hoje) : Promise.resolve([]),
-        tipos.includes("refeicoes_dia") ? garantirRefeicoesPadraoDoDia(hoje) : Promise.resolve([]),
-      ]);
+      const [pesoAtual, pesoMedia, diasObjetivo, meta, metaSemanal, treinos, metasDia, itensDia, refeicoesDia] =
+        await Promise.all([
+          tipos.includes("peso_atual") ? getUltimoPeso() : Promise.resolve(null),
+          tipos.includes("peso_atual") ? getPesoMedioAtual() : Promise.resolve(null),
+          tipos.includes("peso_atual") ? getDiasParaObjetivo() : Promise.resolve(null),
+          tipos.includes("peso_atual") ? getMeta() : Promise.resolve(null),
+          tipos.includes("peso_atual") ? getMetaSemanal() : Promise.resolve(null),
+          tipos.includes("proximo_treino") ? listTreinos() : Promise.resolve([]),
+          precisaDieta ? getMetasDoDia(hoje) : Promise.resolve(null),
+          precisaDieta ? getDiarioDoDia(hoje) : Promise.resolve([]),
+          tipos.includes("refeicoes_dia") ? garantirRefeicoesPadraoDoDia(hoje) : Promise.resolve([]),
+        ]);
 
       pesoAtualVal = pesoAtual;
       pesoMediaVal = pesoMedia;
       diasObjetivoVal = diasObjetivo;
+      metaSemanalVal = metaSemanal;
+      pesoAlvoVal = meta?.pesoAlvo ?? null;
       treinoHoje = treinos.find((t) => t.dia_semana === diaSemanaHoje) ?? null;
       caloriasMeta = metasDia?.calorias ?? 0;
       caloriasConsumido = itensDia.reduce((acc, i) => acc + i.calorias, 0);
+      proteinaMetaVal = metasDia?.proteinaG ?? 0;
+      proteinaConsumidoVal = itensDia.reduce((acc, i) => acc + i.proteinaG, 0);
+      gorduraMetaVal = metasDia?.gorduraG ?? 0;
+      gorduraConsumidoVal = itensDia.reduce((acc, i) => acc + i.gorduraG, 0);
+      carboidratoMetaVal = metasDia?.carboidratoG ?? 0;
+      carboidratoConsumidoVal = itensDia.reduce((acc, i) => acc + i.carboidratoG, 0);
       refeicoesDiaVal = refeicoesDia;
       itensDiaVal = itensDia;
       layout = tipos;
@@ -93,13 +113,30 @@
   {:else}
     {#each layout as tipo (tipo)}
       {#if tipo === "peso_atual"}
-        <CardPesoAtual pesoAtual={pesoAtualVal} media={pesoMediaVal} diasObjetivo={diasObjetivoVal} />
+        <CardPesoAtual
+          pesoAtual={pesoAtualVal}
+          media={pesoMediaVal}
+          metaSemanal={metaSemanalVal}
+          pesoAlvo={pesoAlvoVal}
+          diasObjetivo={diasObjetivoVal}
+        />
       {:else if tipo === "proximo_treino"}
         <CardProximoTreino treino={treinoHoje} />
       {:else if tipo === "calorias_dia"}
-        <CardCaloriasDia consumido={caloriasConsumido} meta={caloriasMeta} />
+        <CardCaloriasDia
+          caloriasConsumido={caloriasConsumido}
+          caloriasMeta={caloriasMeta}
+          proteinaConsumido={proteinaConsumidoVal}
+          proteinaMeta={proteinaMetaVal}
+          gorduraConsumido={gorduraConsumidoVal}
+          gorduraMeta={gorduraMetaVal}
+          carboidratoConsumido={carboidratoConsumidoVal}
+          carboidratoMeta={carboidratoMetaVal}
+        />
       {:else if tipo === "refeicoes_dia"}
         <CardRefeicoesDia refeicoes={refeicoesDiaVal} itens={itensDiaVal} />
+      {:else if tipo === "fadiga_muscular"}
+        <CardFadigaMuscular />
       {/if}
     {/each}
   {/if}
