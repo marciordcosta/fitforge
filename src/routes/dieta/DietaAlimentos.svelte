@@ -14,11 +14,22 @@
     getReceita,
     getAlimento,
     adicionarItemReceita,
+    criarAlimentoOpenFoodFacts,
     type Alimento,
     type ReceitaResumo,
+    type FonteAlimento,
   } from "../../lib/dietaApi";
+  import { buscarProdutosPorNome, type ProdutoOpenFoodFactsBusca } from "../../lib/openFoodFacts";
   import { receitaRascunho, adicionarAoRascunho, definirContexto, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
+
+  /** Rótulo discreto de origem, mostrado ao lado das calorias/porção -- "manual" não ganha rótulo
+   * (é o caso comum, o alimento é do próprio usuário, não precisa de aviso). */
+  function fonteLabel(fonte: FonteAlimento): string | null {
+    if (fonte === "taco") return "TACO";
+    if (fonte === "openfoodfacts") return "OFF";
+    return null;
+  }
 
   /** Quando presente, cada alimento ganha um "+" pra adicionar direto a essa refeição, sem passar pelo detalhamento. Sem isso, é só o catálogo normal. */
   let {
@@ -56,6 +67,10 @@
 
   let alimentos = $state<Alimento[]>([]);
   let resultadosReceitas = $state<ReceitaResumo[]>([]);
+  /** Complementar ao catálogo local -- só buscado quando há um termo digitado (não faz sentido
+   * "pesquisar tudo" na internet). Falha silenciosamente (sem rede/instabilidade da API externa não
+   * pode impedir de ver/usar os resultados do catálogo local, que são a fonte principal). */
+  let resultadosOFF = $state<ProdutoOpenFoodFactsBusca[]>([]);
   /** Nunca mostra a própria receita sendo editada como opção de "importar itens dela mesma". */
   const receitasParaMostrar = $derived(resultadosReceitas.filter((r) => r.id !== receitaIdExistente));
   let loading = $state(true);
@@ -87,6 +102,7 @@
     const meuToken = ++tokenBusca;
     loading = true;
     erro = null;
+    resultadosOFF = [];
     try {
       let alRes: Alimento[];
       let recRes: ReceitaResumo[];
@@ -108,6 +124,17 @@
         loading = false;
         carregouAlgumaVez = true;
       }
+    }
+
+    if (query.trim().length < 2) return;
+    try {
+      const off = await buscarProdutosPorNome(query);
+      if (meuToken !== tokenBusca) return;
+      const codigosLocais = new Set(alimentos.map((a) => a.codigoBarras).filter((c): c is string => !!c));
+      resultadosOFF = off.filter((p) => !codigosLocais.has(p.codigoBarras));
+    } catch {
+      // busca complementar -- sem rede ou instabilidade da API externa não deve impedir de ver os
+      // resultados do catálogo local, que já carregaram normalmente.
     }
   }
 
@@ -222,6 +249,53 @@
     adicionarAoRascunho(a);
     adicionadosIds = new Set(adicionadosIds).add(a.id);
     mostrarMensagem(`${a.nome} adicionado`);
+  }
+
+  /** Cria de fato o alimento no catálogo a partir de um resultado da Open Food Facts (busca por
+   * nome), só quando o usuário escolhe ele -- até lá é só um resultado "de fora", sem id nosso.
+   * Depois de criado, reaproveita as mesmas funções já usadas pro catálogo local. */
+  async function garantirAlimentoOFF(p: ProdutoOpenFoodFactsBusca): Promise<Alimento | null> {
+    adicionandoId = p.codigoBarras;
+    try {
+      const id = await criarAlimentoOpenFoodFacts({
+        nome: p.nome,
+        marca: p.marca,
+        caloriasPorPorcao: p.caloriasPorPorcao,
+        proteinaG: p.proteinaG,
+        gorduraG: p.gorduraG,
+        carboidratoG: p.carboidratoG,
+        fibraG: p.fibraG,
+        gorduraSaturadaG: p.gorduraSaturadaG,
+        gorduraInsaturadaG: p.gorduraInsaturadaG,
+        codigoBarras: p.codigoBarras,
+      });
+      const alimento = await getAlimento(id);
+      if (alimento) {
+        resultadosOFF = resultadosOFF.filter((r) => r.codigoBarras !== p.codigoBarras);
+        alimentos = [...alimentos, alimento];
+      }
+      return alimento;
+    } catch (err) {
+      alert("Erro ao adicionar alimento da Open Food Facts: " + (err as Error).message);
+      return null;
+    } finally {
+      adicionandoId = null;
+    }
+  }
+
+  async function abrirDetalhamentoOFF(p: ProdutoOpenFoodFactsBusca) {
+    const alimento = await garantirAlimentoOFF(p);
+    if (alimento) abrirDetalhamento(alimento);
+  }
+
+  async function adicionarRapidoOFF(p: ProdutoOpenFoodFactsBusca) {
+    const alimento = await garantirAlimentoOFF(p);
+    if (alimento) await adicionarRapido(alimento);
+  }
+
+  async function adicionarNaReceitaOFF(p: ProdutoOpenFoodFactsBusca) {
+    const alimento = await garantirAlimentoOFF(p);
+    if (alimento) await adicionarNaReceita(alimento);
   }
 
   function abrirScanner() {
@@ -358,7 +432,7 @@
       <p class="secao-titulo">Alimentos</p>
     {/if}
 
-    {#if !alimentos.length}
+    {#if !alimentos.length && !resultadosOFF.length}
       <p class="muted">Nenhum alimento encontrado.</p>
     {:else}
       <ul class="lista">
@@ -368,7 +442,10 @@
               <span class="avatar">{iniciais(a.nome)}</span>
               <span class="info">
                 <span class="nome">{a.nome}{#if a.marca} <span class="marca">· {a.marca}</span>{/if}</span>
-                <span class="sub">{a.caloriasPorPorcao.toFixed(0)} kcal / {a.porcaoPadraoQtd}{a.porcaoPadraoUnidade}</span>
+                <span class="sub">
+                  {a.caloriasPorPorcao.toFixed(0)} kcal / {a.porcaoPadraoQtd}{a.porcaoPadraoUnidade}
+                  {#if fonteLabel(a.fonte)}<span class="fonte-tag">{fonteLabel(a.fonte)}</span>{/if}
+                </span>
               </span>
             </button>
             {#if modoAdicionar}
@@ -390,6 +467,31 @@
                 aria-label="Adicionar"
               >
                 {#if adicionandoId === a.id}…{:else}{@render iconMais()}{/if}
+              </button>
+            {:else}
+              <span class="chevron">›</span>
+            {/if}
+          </li>
+        {/each}
+        {#each resultadosOFF as p (p.codigoBarras)}
+          <li class="linha">
+            <button class="info-btn" onclick={() => abrirDetalhamentoOFF(p)} disabled={adicionandoId === p.codigoBarras}>
+              <span class="avatar">{iniciais(p.nome)}</span>
+              <span class="info">
+                <span class="nome">{p.nome}{#if p.marca} <span class="marca">· {p.marca}</span>{/if}</span>
+                <span class="sub">
+                  {p.caloriasPorPorcao.toFixed(0)} kcal / 100g
+                  <span class="fonte-tag">OFF</span>
+                </span>
+              </span>
+            </button>
+            {#if modoAdicionar}
+              <button class="add-btn" onclick={() => adicionarRapidoOFF(p)} disabled={adicionandoId === p.codigoBarras} aria-label="Adicionar">
+                {#if adicionandoId === p.codigoBarras}…{:else}{@render iconMais()}{/if}
+              </button>
+            {:else if modoReceita}
+              <button class="add-btn" onclick={() => adicionarNaReceitaOFF(p)} disabled={adicionandoId === p.codigoBarras} aria-label="Adicionar">
+                {#if adicionandoId === p.codigoBarras}…{:else}{@render iconMais()}{/if}
               </button>
             {:else}
               <span class="chevron">›</span>
@@ -599,6 +701,18 @@
   .sub {
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .fonte-tag {
+    display: inline-block;
+    margin-left: var(--space-2);
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--surface-border);
+    color: var(--surface-muted);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
   }
   .muted {
     color: var(--surface-muted);

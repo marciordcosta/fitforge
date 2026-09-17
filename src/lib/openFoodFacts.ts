@@ -10,24 +10,20 @@ export interface ProdutoOpenFoodFacts {
   gorduraInsaturadaG: number | null;
 }
 
+/** Resultado de busca por nome — sempre tem código de barras (é assim que a Open Food Facts indexa
+ * cada produto internamente, mesmo quando a busca foi por texto, não por escaneamento). */
+export interface ProdutoOpenFoodFactsBusca extends ProdutoOpenFoodFacts {
+  codigoBarras: string;
+}
+
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-/**
- * Busca um produto pelo código de barras na Open Food Facts (base pública e gratuita, sem chave de API).
- * Os valores retornados são sempre por 100g, como a API fornece. Retorna null se o produto não existir
- * ou se faltar algum dos 4 macros essenciais (não dá pra cadastrar um alimento sem eles).
- */
-export async function buscarProdutoPorCodigoBarras(codigo: string): Promise<ProdutoOpenFoodFacts | null> {
-  const resp = await fetch(
-    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(codigo)}.json?fields=product_name,brands,nutriments`,
-  );
-  if (!resp.ok) throw new Error("Falha ao consultar a Open Food Facts.");
-  const json = await resp.json();
-  if (json.status !== 1 || !json.product) return null;
-
-  const p = json.product as Record<string, unknown>;
+/** Extrai os campos que interessam de um produto bruto da API — usado tanto pela busca por código
+ * de barras (1 produto) quanto pela busca por nome (lista). Retorna null se faltar algum dos 4
+ * macros essenciais (não dá pra cadastrar um alimento sem eles). */
+function mapearProduto(p: Record<string, unknown>): ProdutoOpenFoodFacts | null {
   const n = (p.nutriments ?? {}) as Record<string, unknown>;
   const calorias = n["energy-kcal_100g"] as number | undefined;
   const proteina = n["proteins_100g"] as number | undefined;
@@ -53,4 +49,42 @@ export async function buscarProdutoPorCodigoBarras(codigo: string): Promise<Prod
     gorduraSaturadaG: gorduraSaturada != null ? round1(gorduraSaturada) : null,
     gorduraInsaturadaG: gorduraInsaturada != null ? round1(gorduraInsaturada) : null,
   };
+}
+
+/**
+ * Busca um produto pelo código de barras na Open Food Facts (base pública e gratuita, sem chave de API).
+ * Os valores retornados são sempre por 100g, como a API fornece. Retorna null se o produto não existir
+ * ou se faltar algum dos 4 macros essenciais (não dá pra cadastrar um alimento sem eles).
+ */
+export async function buscarProdutoPorCodigoBarras(codigo: string): Promise<ProdutoOpenFoodFacts | null> {
+  const resp = await fetch(
+    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(codigo)}.json?fields=product_name,brands,nutriments`,
+  );
+  if (!resp.ok) throw new Error("Falha ao consultar a Open Food Facts.");
+  const json = await resp.json();
+  if (json.status !== 1 || !json.product) return null;
+  return mapearProduto(json.product as Record<string, unknown>);
+}
+
+/**
+ * Busca produtos pelo nome na Open Food Facts — complementar ao catálogo local/TACO, útil pra
+ * produtos industrializados/embalados (o forte da Open Food Facts é justamente ter marca e código
+ * de barras; comida caseira/in natura tende a não estar lá ou ter dados inconsistentes).
+ * Ignora produtos sem código de barras ou sem os 4 macros essenciais.
+ */
+export async function buscarProdutosPorNome(nome: string): Promise<ProdutoOpenFoodFactsBusca[]> {
+  const resp = await fetch(
+    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(nome)}&search_simple=1&action=process&json=1&page_size=15&fields=code,product_name,brands,nutriments`,
+  );
+  if (!resp.ok) throw new Error("Falha ao pesquisar na Open Food Facts.");
+  const json = await resp.json();
+  const produtos = (json.products ?? []) as Record<string, unknown>[];
+  const resultado: ProdutoOpenFoodFactsBusca[] = [];
+  for (const p of produtos) {
+    const codigo = p.code as string | undefined;
+    if (!codigo) continue;
+    const mapeado = mapearProduto(p);
+    if (mapeado) resultado.push({ ...mapeado, codigoBarras: codigo });
+  }
+  return resultado;
 }
