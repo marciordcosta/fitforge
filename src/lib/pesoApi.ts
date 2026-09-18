@@ -33,6 +33,7 @@ export async function getPesosDoPeriodo(dataInicio: string, dataFim: string): Pr
   const { data, error } = await supabase
     .from("pesos")
     .select("data, peso")
+    .eq("user_id", uid())
     .gte("data", dataInicio)
     .lte("data", dataFim)
     .order("data", { ascending: true });

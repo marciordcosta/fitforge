@@ -123,7 +123,7 @@
       exerciciosOrdenados.map(async (te) => {
         const [anterior, recordes] = await Promise.all([
           getUltimoRegistro(te.exercicio_id, fonte === "ultima_rotina" ? treinoId : undefined),
-          getRecordesExercicio(te.exercicio_id),
+          getRecordesExercicio(te.exercicio_id, hojeISO()),
         ]);
         const nSets = Math.max(te.series.length, 1);
         const sets: SetSessao[] = Array.from({ length: nSets }, (_, i) => {
@@ -238,12 +238,20 @@
     window.removeEventListener("pageshow", resincronizarAoVoltar);
   });
 
+  /** Entre vários exercícios com descanso rodando ao mesmo tempo (treino intercalado/superset),
+   * mostra o que começou por ÚLTIMO — não o primeiro da lista, senão um descanso mais antigo (do
+   * exercício "de cima") ofusca um mais novo iniciado depois em outro exercício. */
+  function maisRecente(lista: ExercicioSessao[]): ExercicioSessao {
+    return lista.reduce((mais, ex) => ((ex.descansoInicioEm ?? 0) > (mais.descansoInicioEm ?? 0) ? ex : mais));
+  }
+
   /** O cronômetro (anel ou barra) continua visível depois de zerar, contando o atraso em negativo,
    * até o usuário pular ou uma nova série iniciar outro descanso. */
   const exercicioDescansando = $derived.by(() => {
-    const ativo = sessao.find((ex) => ex.descansoAte && ex.descansoAte > agora);
-    if (ativo) return ativo;
-    return sessao.find((ex) => ex.descansoAte != null) ?? null;
+    const ativos = sessao.filter((ex) => ex.descansoAte && ex.descansoAte > agora);
+    if (ativos.length) return maisRecente(ativos);
+    const expirados = sessao.filter((ex) => ex.descansoAte != null);
+    return expirados.length ? maisRecente(expirados) : null;
   });
 
   const restanteDescansoSeg = $derived.by(() => {
@@ -586,7 +594,7 @@
     const fonte = await getHistoricoFonte();
     const [anterior, recordes, observacoesNovoEx] = await Promise.all([
       getUltimoRegistro(novoExercicioId, fonte === "ultima_rotina" ? treinoId : undefined),
-      getRecordesExercicio(novoExercicioId),
+      getRecordesExercicio(novoExercicioId, hojeISO()),
       getObservacoesAtuais([novoExercicioId]),
     ]);
     ex.exercicio_id = novoExercicioId;
@@ -729,7 +737,7 @@
     const fonte = await getHistoricoFonte();
     const [anterior, recordes] = await Promise.all([
       getUltimoRegistro(ex.id, fonte === "ultima_rotina" ? treinoId : undefined),
-      getRecordesExercicio(ex.id),
+      getRecordesExercicio(ex.id, hojeISO()),
     ]);
     const nSets = Math.max(anterior.length, 3);
     const sets: SetSessao[] = Array.from({ length: nSets }, (_, i) => {
@@ -873,11 +881,19 @@
     }
   }
 
+  /** Só persiste peso/reps de séries de fato CONCLUÍDAS (checkbox marcado) — um valor digitado
+   * mas nunca confirmado (ex: anotado só pra não esquecer, treino interrompido antes de marcar)
+   * não deve contar como executado. Mesmo critério que atualizarRecordesExercicio já usa pro
+   * troféu ao vivo; sem isso, esses valores "fantasma" entravam no volume/1RM salvo. */
   function registrosDoDiaAtual(): Map<string, { serie: number; peso: number | null; repeticoes: number | null }[]> {
     return new Map(
       sessao.map((ex) => [
         ex.exercicio_id,
-        ex.sets.map((s) => ({ serie: s.serie, peso: s.peso, repeticoes: s.repeticoes })),
+        ex.sets.map((s) => ({
+          serie: s.serie,
+          peso: s.concluida ? s.peso : null,
+          repeticoes: s.concluida ? s.repeticoes : null,
+        })),
       ]),
     );
   }

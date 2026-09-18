@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { parseISODate } from "../../lib/dates";
+  import { parseISODate, hojeISO } from "../../lib/dates";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { treinoLogSessao, type ExercicioSessao, type SetSessao } from "../../lib/treinoLogSessao.svelte";
   import Sheet from "../../components/Sheet.svelte";
@@ -131,7 +131,7 @@
     try {
       const novaSessao: ExercicioSessao[] = await Promise.all(
         sessao.map(async (ex) => {
-          const recordes = await getRecordesExercicio(ex.exercicioId);
+          const recordes = await getRecordesExercicio(ex.exercicioId, hojeISO());
           const sets: SetSessao[] = ex.sets.map((s) => ({
             serie: s.serie,
             peso: null,

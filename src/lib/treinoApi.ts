@@ -524,13 +524,13 @@ export function calcular1RM(peso: number, reps: number): number {
   return peso * (1 + reps / 30);
 }
 
-export async function getHistoricoExercicio(exercicioId: string): Promise<HistoricoPonto[]> {
-  const { data, error } = await supabase
-    .from("treino_registros")
-    .select("data, peso, repeticoes")
-    .eq("exercicio_id", exercicioId)
-    .not("peso", "is", null)
-    .order("data", { ascending: true });
+/** `antesDe`, quando informado, restringe ao histórico ESTRITAMENTE anterior a essa data — mesmo
+ * critério de getMelhoresAntesDe, usado por getRecordesExercicio pra calcular a base de recordes
+ * de uma sessão (ao vivo ou edição retroativa) sem contar o que já foi feito nesse mesmo dia. */
+export async function getHistoricoExercicio(exercicioId: string, antesDe?: string): Promise<HistoricoPonto[]> {
+  let query = supabase.from("treino_registros").select("data, peso, repeticoes").eq("exercicio_id", exercicioId).not("peso", "is", null);
+  if (antesDe) query = query.lt("data", antesDe);
+  const { data, error } = await query.order("data", { ascending: true });
   if (error) throw error;
 
   const porData = new Map<string, { peso: number; repeticoes: number }[]>();
@@ -605,8 +605,8 @@ export interface RecordesExercicio {
 }
 
 /** Recordes pessoais do exercício até agora (antes da sessão atual), usados para detectar novas marcas ao logar. */
-export async function getRecordesExercicio(exercicioId: string): Promise<RecordesExercicio> {
-  const historico = await getHistoricoExercicio(exercicioId);
+export async function getRecordesExercicio(exercicioId: string, antesDe?: string): Promise<RecordesExercicio> {
+  const historico = await getHistoricoExercicio(exercicioId, antesDe);
   if (!historico.length) return { maiorPeso: 0, melhor1rm: 0, melhorVolumeSerie: 0 };
   return {
     maiorPeso: Math.max(...historico.map((h) => h.maiorPeso)),
@@ -1046,10 +1046,78 @@ async function getMelhoresAntesDe(exercicioId: string, data: string): Promise<{ 
   return { melhor1rm, melhorVolume };
 }
 
+/** Corrige recorde_1rm/recorde_volume dos dias POSTERIORES a `apartirDeData` pro exercício, depois
+ * de uma edição retroativa (ex: corrigir um erro de digitação num treino antigo). Sem isso, um dia
+ * futuro podia continuar com o troféu de um valor que a correção do dia antigo tornou obsoleto (o
+ * dia antigo passou a ter uma marca maior, mas o troféu antigo ficava "congelado" e desatualizado).
+ * Refaz a mesma lógica de empate (só a primeira série do dia que bate o máximo marca) dia a dia, em
+ * ordem cronológica, partindo do melhor 1RM/volume já confirmado até `apartirDeData` (inclusive). */
+async function reconciliarRecordesFuturos(
+  exercicioId: string,
+  apartirDeData: string,
+  melhor1rmInicial: number,
+  melhorVolumeInicial: number,
+): Promise<void> {
+  const { data: rows, error } = await supabase
+    .from("treino_registros")
+    .select("id, data, peso, repeticoes, recorde_1rm, recorde_volume")
+    .eq("exercicio_id", exercicioId)
+    .gt("data", apartirDeData)
+    .not("peso", "is", null)
+    .order("data", { ascending: true });
+  if (error) throw error;
+  if (!rows?.length) return;
+
+  const porDia = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const lista = porDia.get(r.data) ?? [];
+    lista.push(r);
+    porDia.set(r.data, lista);
+  }
+
+  let melhor1rm = melhor1rmInicial;
+  let melhorVolume = melhorVolumeInicial;
+  const updates: { id: string; recorde_1rm: boolean; recorde_volume: boolean }[] = [];
+
+  for (const data of Array.from(porDia.keys()).sort()) {
+    const linhasDoDia = porDia.get(data)!;
+    const validas = linhasDoDia.filter((r) => r.peso != null && r.repeticoes != null);
+    const rmDia = Math.max(0, ...validas.map((r) => calcular1RM(Number(r.peso), Number(r.repeticoes))));
+    const volumeDia = Math.max(0, ...validas.map((r) => Number(r.peso) * Number(r.repeticoes)));
+    const bate1rm = rmDia > melhor1rm;
+    const bateVolume = volumeDia > melhorVolume;
+    let marcou1rm = false;
+    let marcouVolume = false;
+    for (const r of linhasDoDia) {
+      if (r.peso == null || r.repeticoes == null) continue;
+      const rm = calcular1RM(Number(r.peso), Number(r.repeticoes));
+      const vol = Number(r.peso) * Number(r.repeticoes);
+      const eh1rm = bate1rm && !marcou1rm && rm === rmDia;
+      const ehVolume = bateVolume && !marcouVolume && vol === volumeDia;
+      if (eh1rm) marcou1rm = true;
+      if (ehVolume) marcouVolume = true;
+      if (r.recorde_1rm !== eh1rm || r.recorde_volume !== ehVolume) {
+        updates.push({ id: r.id, recorde_1rm: eh1rm, recorde_volume: ehVolume });
+      }
+    }
+    if (bate1rm) melhor1rm = rmDia;
+    if (bateVolume) melhorVolume = volumeDia;
+  }
+
+  if (updates.length) {
+    await Promise.all(
+      updates.map((u) =>
+        supabase.from("treino_registros").update({ recorde_1rm: u.recorde_1rm, recorde_volume: u.recorde_volume }).eq("id", u.id),
+      ),
+    );
+  }
+}
+
 /** Salva todos os registros de uma sessão (substitui o que existir para essa data+rotina).
  * Também marca recorde_1rm/recorde_volume na série que bateu o maior 1RM/volume DESSE DIA,
- * quando ele supera tudo que já existia antes dessa data — a marca fica congelada no
- * histórico (nunca é recalculada depois, mesmo que um treino futuro bata um recorde maior). */
+ * quando ele supera tudo que já existia antes dessa data. Se houver dias posteriores já salvos
+ * pro mesmo exercício (edição retroativa), seus troféus são reconciliados em seguida — ver
+ * reconciliarRecordesFuturos. */
 export async function salvarRegistrosDoDia(
   treinoId: string | null,
   data: string,
@@ -1066,6 +1134,7 @@ export async function salvarRegistrosDoDia(
   );
 
   const linhas: Record<string, unknown>[] = [];
+  const novosMelhores = new Map<string, { melhor1rm: number; melhorVolume: number }>();
   let ordem = 0;
   for (const [exercicioId, sets] of porExercicio.entries()) {
     const validos = sets.filter((s) => s.peso != null && s.repeticoes != null);
@@ -1074,6 +1143,10 @@ export async function salvarRegistrosDoDia(
     const volumeDia = Math.max(0, ...validos.map((s) => s.peso! * s.repeticoes!));
     const bate1rm = rmDia > melhor1rm;
     const bateVolume = volumeDia > melhorVolume;
+    novosMelhores.set(exercicioId, {
+      melhor1rm: bate1rm ? rmDia : melhor1rm,
+      melhorVolume: bateVolume ? volumeDia : melhorVolume,
+    });
     // Empate no mesmo dia (duas séries idênticas batendo o mesmo máximo): só a primeira conta como
     // recorde — a segunda apenas igualou, não superou a anterior.
     let marcou1rm = false;
@@ -1102,9 +1175,20 @@ export async function salvarRegistrosDoDia(
     }
     ordem++;
   }
-  if (!linhas.length) return;
-  const { error: insError } = await supabase.from("treino_registros").insert(linhas);
-  if (insError) throw insError;
+  if (linhas.length) {
+    const { error: insError } = await supabase.from("treino_registros").insert(linhas);
+    if (insError) throw insError;
+  }
+
+  // Reconcilia dias FUTUROS já salvos pro mesmo exercício — só faz diferença numa edição
+  // retroativa (HistoricoDia); pro caso comum (salvando o treino de hoje) não há dias depois, a
+  // consulta volta vazia e não há nada pra atualizar.
+  await Promise.all(
+    exercicioIds.map((id) => {
+      const melhores = novosMelhores.get(id) ?? anteriores.get(id) ?? { melhor1rm: 0, melhorVolume: 0 };
+      return reconciliarRecordesFuturos(id, data, melhores.melhor1rm, melhores.melhorVolume);
+    }),
+  );
 }
 
 export interface DiaComTreino {

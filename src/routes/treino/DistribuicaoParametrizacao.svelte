@@ -115,7 +115,22 @@
 
   void carregar();
 
+  /** Sem isso, dava pra configurar Foco menor/igual a Manutenção e a faixa "moderado" (entre os
+   * dois) ficava vazia/invertida — a classificação de cor passava a saltar de "manutenção" direto
+   * pra "foco" de um jeito que não bate com a legenda mostrada logo abaixo dos campos. */
+  function validarFaixas(): string | null {
+    if (seriesManutencaoMin > seriesManutencaoMax) return "O mínimo de Manutenção não pode ser maior que o máximo.";
+    if (seriesFocoMin > seriesFocoMax) return "O mínimo de Foco não pode ser maior que o máximo.";
+    if (seriesFocoMin <= seriesManutencaoMax) return "O mínimo de Foco precisa ser maior que o máximo de Manutenção.";
+    return null;
+  }
+
   async function salvar() {
+    const erroValidacao = validarFaixas();
+    if (erroValidacao) {
+      alert(erroValidacao);
+      return;
+    }
     salvando = true;
     try {
       const p: ParametrosDistribuicao = {
