@@ -303,20 +303,18 @@ interface ItemReceitaBruto {
   } | null;
 }
 
-/** Arredonda cada item ANTES de somar (não soma bruto e arredonda só no final) — mesmo critério de
- * mapReceitaItem/getReceita, pra bater exatamente com o total mostrado ao abrir a própria receita. */
 function somarTotaisItensReceita(itens: ItemReceitaBruto[]) {
   return itens.reduce(
     (acc, it) => {
       if (!it.alimento) return acc;
       const fator = it.quantidade / it.alimento.porcao_padrao_qtd;
       return {
-        calorias: acc.calorias + round1(it.alimento.calorias_por_porcao * fator),
-        proteinaG: acc.proteinaG + round1(it.alimento.proteina_g * fator),
-        gorduraG: acc.gorduraG + round1(it.alimento.gordura_g * fator),
-        carboidratoG: acc.carboidratoG + round1(it.alimento.carboidrato_g * fator),
-        fibraG: acc.fibraG + round1((it.alimento.fibra_g ?? 0) * fator),
-        gorduraSaturadaG: acc.gorduraSaturadaG + round1((it.alimento.gordura_saturada_g ?? 0) * fator),
+        calorias: acc.calorias + it.alimento.calorias_por_porcao * fator,
+        proteinaG: acc.proteinaG + it.alimento.proteina_g * fator,
+        gorduraG: acc.gorduraG + it.alimento.gordura_g * fator,
+        carboidratoG: acc.carboidratoG + it.alimento.carboidrato_g * fator,
+        fibraG: acc.fibraG + (it.alimento.fibra_g ?? 0) * fator,
+        gorduraSaturadaG: acc.gorduraSaturadaG + (it.alimento.gordura_saturada_g ?? 0) * fator,
       };
     },
     { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0, fibraG: 0, gorduraSaturadaG: 0 },
@@ -364,11 +362,9 @@ export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
  * inteira com "multiple rows returned". */
 /** Meta de uma refeição do catálogo pelo nome, pra um dia específico — respeita o override do dia
  * da semana (Ondulatória) quando `data` é informada. Se essa refeição for a automática (última da
- * lista efetiva desse dia), a meta é AO VIVO: a diária menos, pra CADA outra refeição de hoje, o
- * que já foi realmente comido nela SE ela já tem algo lançado, senão a META CONFIGURADA dela (nunca
- * zero) — mesmo critério de metasRedistribuidas em DiarioAlimentar.svelte; mantenha as duas em
- * sincronia. Sem `data`, ignora overrides por dia e a automática (usa só a meta global do
- * catálogo). */
+ * lista efetiva desse dia), a meta é AO VIVO: a diária menos o que já foi realmente consumido nas
+ * OUTRAS refeições desse dia (consumo real, não a meta configurada delas) — mesmo cálculo do
+ * Diário. Sem `data`, ignora overrides por dia e a automática (usa só a meta global do catálogo). */
 /** Nome sozinho não identifica uma refeição de forma única: desde que passou a ser permitido
  * reaproveitar o mesmo nome em grupos de dias diferentes da Ondulatória (ex: "Lanche" em Lower1 e
  * outro "Lanche" independente em Upper1), duas linhas de dieta_refeicoes_modelo podem ter o mesmo
@@ -376,12 +372,9 @@ export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
  * semana (resolverCatalogoEfetivoDoDia), não ao catálogo inteiro sem filtro. */
 export async function getMetaRefeicaoPorNome(nome: string, data?: string): Promise<MetasDiarias | null> {
   let modelo: RefeicaoModelo | null;
-  let catalogo: RefeicaoModelo[] = [];
-  let diaSemana = 0;
   if (data != null) {
-    diaSemana = parseISODate(data).getDay();
-    let modelosPorDia: RefeicaoModeloDia[];
-    [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
+    const diaSemana = parseISODate(data).getDay();
+    const [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
     modelo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia).find((m) => m.nome === nome) ?? null;
   } else {
     const { data: linhas, error } = await supabase
@@ -396,49 +389,23 @@ export async function getMetaRefeicaoPorNome(nome: string, data?: string): Promi
   if (!modelo) return null;
 
   if (data != null) {
+    const diaSemana = parseISODate(data).getDay();
     const contexto = await getContextoMetaCatalogo(modelo.id, [diaSemana]);
     if (contexto.ehUltima) {
-      const [refeicoesHoje, itensHoje, metasDia] = await Promise.all([
-        getRefeicoesDoDia(data),
-        getDiarioDoDia(data),
-        listMetasDiaModelo(),
-      ]);
+      const [refeicoesHoje, itensHoje] = await Promise.all([getRefeicoesDoDia(data), getDiarioDoDia(data)]);
       const atual = refeicoesHoje.find((r) => r.nome === nome);
-      const outras = refeicoesHoje.filter((r) => r.id !== atual?.id);
-      const overridePorModelo = new Map(metasDia.filter((m) => m.diaSemana === diaSemana).map((m) => [m.modeloId, m]));
-      const modeloPorNome = new Map(catalogo.map((m) => [m.nome, m]));
-      const consumidoOutras = outras.reduce(
-        (acc, r) => {
-          const itensR = itensHoje.filter((i) => i.refeicaoId === r.id);
-          const t = itensR.length
-            ? itensR.reduce(
-                (a, i) => ({
-                  calorias: a.calorias + i.calorias,
-                  proteinaG: a.proteinaG + i.proteinaG,
-                  gorduraG: a.gorduraG + i.gorduraG,
-                  carboidratoG: a.carboidratoG + i.carboidratoG,
-                }),
-                { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
-              )
-            : (() => {
-                const m = modeloPorNome.get(r.nome);
-                const o = m ? overridePorModelo.get(m.id) : undefined;
-                return {
-                  calorias: o?.metaCalorias ?? m?.metaCalorias ?? 0,
-                  proteinaG: o?.metaProteinaG ?? m?.metaProteinaG ?? 0,
-                  gorduraG: o?.metaGorduraG ?? m?.metaGorduraG ?? 0,
-                  carboidratoG: o?.metaCarboidratoG ?? m?.metaCarboidratoG ?? 0,
-                };
-              })();
-          return {
-            calorias: acc.calorias + t.calorias,
-            proteinaG: acc.proteinaG + t.proteinaG,
-            gorduraG: acc.gorduraG + t.gorduraG,
-            carboidratoG: acc.carboidratoG + t.carboidratoG,
-          };
-        },
-        { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
-      );
+      const outrasIds = new Set(refeicoesHoje.filter((r) => r.id !== atual?.id).map((r) => r.id));
+      const consumidoOutras = itensHoje
+        .filter((i) => outrasIds.has(i.refeicaoId))
+        .reduce(
+          (acc, i) => ({
+            calorias: acc.calorias + i.calorias,
+            proteinaG: acc.proteinaG + i.proteinaG,
+            gorduraG: acc.gorduraG + i.gorduraG,
+            carboidratoG: acc.carboidratoG + i.carboidratoG,
+          }),
+          { calorias: 0, proteinaG: 0, gorduraG: 0, carboidratoG: 0 },
+        );
       return {
         calorias: Math.max(0, contexto.metaDiaria.calorias - consumidoOutras.calorias),
         proteinaG: Math.max(0, contexto.metaDiaria.proteinaG - consumidoOutras.proteinaG),

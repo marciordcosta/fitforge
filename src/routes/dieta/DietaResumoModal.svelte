@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { getMetasDoDia } from "../../lib/dietaApi";
-  import { hojeISO } from "../../lib/dates";
+  import { getMetasDiarias } from "../../lib/dietaApi";
   import { getUltimoPeso, getPesoMedioAtual, getMeta, getMetaSemanal, getDiasParaObjetivo, formatDiasObjetivo } from "../../lib/pesoApi";
 
   let { onFechar }: { onFechar: () => void } = $props();
@@ -22,7 +21,7 @@
   async function carregar(): Promise<void> {
     loading = true;
     const [media, ultimoPeso, mediaPeso, meta, metaSemanal, dias] = await Promise.all([
-      getMetasDoDia(hojeISO()),
+      getMetasDiarias(),
       getUltimoPeso(),
       getPesoMedioAtual(),
       getMeta(),
@@ -87,17 +86,17 @@
         <div class="resumo-macros">
           <div class="resumo-macro-item">
             <span class="resumo-macro-nome">Carb</span>
-            <span class="resumo-macro-gkg">{formatGPorKg(metaCarboidrato, mediaSemanaPeso)}</span>
+            <span class="resumo-macro-gkg">{formatGPorKg(metaCarboidrato, pesoAtual)}</span>
             <span class="resumo-macro-total">{formatG(metaCarboidrato)}</span>
           </div>
           <div class="resumo-macro-item">
             <span class="resumo-macro-nome">Gorduras</span>
-            <span class="resumo-macro-gkg">{formatGPorKg(metaGordura, mediaSemanaPeso)}</span>
+            <span class="resumo-macro-gkg">{formatGPorKg(metaGordura, pesoAtual)}</span>
             <span class="resumo-macro-total">{formatG(metaGordura)}</span>
           </div>
           <div class="resumo-macro-item">
             <span class="resumo-macro-nome">Proteínas</span>
-            <span class="resumo-macro-gkg">{formatGPorKg(metaProteina, mediaSemanaPeso)}</span>
+            <span class="resumo-macro-gkg">{formatGPorKg(metaProteina, pesoAtual)}</span>
             <span class="resumo-macro-total">{formatG(metaProteina)}</span>
           </div>
         </div>

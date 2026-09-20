@@ -8,13 +8,12 @@
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
-  import { hojeISO } from "../../lib/dates";
   import {
     getAlimento,
     getItemDiario,
     getRefeicaoDia,
     getRefeicoesDoDia,
-    getMetasDoDia,
+    getMetasDiarias,
     getMetaRefeicaoPorNome,
     getPreferenciasRefeicoesHome,
     adicionarItemDiario,
@@ -93,12 +92,12 @@
       if (editandoItem) {
         const item = await getItemDiario(itemDiarioId!);
         if (!item) return;
-        const [alimentoRes, refeicaoRes, prefs] = await Promise.all([
+        const [alimentoRes, refeicaoRes, metasRes, prefs] = await Promise.all([
           getAlimento(item.alimentoId),
           getRefeicaoDia(item.refeicaoId),
+          getMetasDiarias(),
           getPreferenciasRefeicoesHome(),
         ]);
-        const metasRes = await getMetasDoDia(refeicaoRes?.data ?? hojeISO());
         alimento = alimentoRes;
         refeicao = refeicaoRes;
         metas = metasRes;
@@ -110,7 +109,7 @@
       } else {
         const [alimentoRes, metasRes, refeicaoRes, prefs] = await Promise.all([
           getAlimento(alimentoId!),
-          getMetasDoDia(data ?? hojeISO()),
+          getMetasDiarias(),
           refeicaoIdInicial ? getRefeicaoDia(refeicaoIdInicial) : Promise.resolve(null),
           getPreferenciasRefeicoesHome(),
         ]);

@@ -28,7 +28,6 @@
     adicionarItemReceita,
     atualizarRefeicaoModelo,
     salvarNomeRefeicaoDias,
-    getMetasDoDiaSemana,
     getMetasDiarias,
     getPreferenciasRefeicoesHome,
     type RefeicaoModelo,
@@ -132,7 +131,7 @@
         listRefeicoesModelo(),
         listMetasDiaModelo(),
         getContextoMetaCatalogo(modeloId, diasSemana),
-        diasSemana?.length ? getMetasDoDiaSemana(diasSemana[0]) : getMetasDiarias(),
+        getMetasDiarias(),
         getPreferenciasRefeicoesHome(),
       ]);
       modelo = modelos.find((m) => m.id === modeloId) ?? null;

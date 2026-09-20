@@ -11,7 +11,7 @@
     getReceita,
     garantirRefeicoesPadraoDoDia,
     getRefeicoesDoDia,
-    getMetasDoDia,
+    getMetasDiarias,
     getPreferenciasRefeicoesHome,
     receitaEhMetaDeRefeicao,
     adicionarReceitaAoDiario,
@@ -72,7 +72,7 @@
     try {
       const [receitaRes, metasRes, , ehMeta, prefs] = await Promise.all([
         getReceita(receitaId),
-        getMetasDoDia(hojeISO()),
+        getMetasDiarias(),
         // Garante que as refeições padrão de hoje existam (pro picker "Adicionar à refeição"
         // abrir já com elas), mas sem pré-selecionar nenhuma — sem escolha explícita do usuário,
         // dava a falsa impressão de que a receita já ia entrar numa refeição específica.
