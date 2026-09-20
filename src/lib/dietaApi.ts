@@ -835,12 +835,31 @@ export async function reordenarRefeicoesDoDia(idsOrdenados: string[]): Promise<v
   if (comErro?.error) throw comErro.error;
 }
 
+/** Chamadas concorrentes pra mesma data (ex: a Início e o Diário carregando ao mesmo tempo na
+ * abertura do app) compartilham a MESMA promessa em vez de cada uma ler "existe alguma refeição?"
+ * e decidir criar por conta própria — sem isso, as duas podiam ler "nenhuma ainda" ao mesmo tempo
+ * (antes de qualquer uma ter inserido linha nenhuma) e cada uma criar o conjunto inteiro do
+ * catálogo, duplicando toda refeição do dia. Só protege dentro da mesma aba/sessão do navegador
+ * (não duas abas abertas ao mesmo tempo), mas é exatamente o caso que a Início (sempre montada)
+ * cria em praticamente todo carregamento da tela de Dieta. */
+const garantirRefeicoesPadraoEmAndamento = new Map<string, Promise<RefeicaoDia[]>>();
+
+export async function garantirRefeicoesPadraoDoDia(data: string): Promise<RefeicaoDia[]> {
+  const emAndamento = garantirRefeicoesPadraoEmAndamento.get(data);
+  if (emAndamento) return emAndamento;
+  const promessa = garantirRefeicoesPadraoDoDiaImpl(data).finally(() => {
+    garantirRefeicoesPadraoEmAndamento.delete(data);
+  });
+  garantirRefeicoesPadraoEmAndamento.set(data, promessa);
+  return promessa;
+}
+
 /** Se o dia ainda não tem nenhuma refeição, cria uma pra cada item do catálogo efetivo desse dia
  * da semana (respeitando a lista específica da Ondulatória, se houver) e retorna a lista já pronta.
  * Se já tiver refeições mas alguma foi criada antes de existir uma lista específica pro dia (ou de
  * uma mudança na Ondulatória) e não pertence mais à lista efetiva de hoje, remove — só quando ainda
  * está vazia, nunca uma que já tem alimento lançado. */
-export async function garantirRefeicoesPadraoDoDia(data: string): Promise<RefeicaoDia[]> {
+async function garantirRefeicoesPadraoDoDiaImpl(data: string): Promise<RefeicaoDia[]> {
   const existentes = await getRefeicoesDoDia(data);
   const diaSemana = parseISODate(data).getDay();
   const [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
