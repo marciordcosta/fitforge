@@ -393,7 +393,13 @@
    * silenciosamente atualizada pra igualar o valor da primeira vez, então a comparação virava
    * "285 > 285" (falso) em vez de "285 > 266" (verdadeiro). Recomputar tudo a cada toggle evita
    * esse tipo de deriva por completo. Só a mais alta entre as séries já concluídas acumula o
-   * troféu de cada critério (nunca duas ao mesmo tempo pro mesmo critério). */
+   * troféu de cada critério (nunca duas ao mesmo tempo pro MESMO critério) — em empate (ex: duas
+   * séries com o mesmo peso), a PRIMEIRA a atingir o valor fica com o troféu; a segunda só toma o
+   * lugar dela se SUPERAR de verdade, não em caso de empate. Séries diferentes podem segurar
+   * troféus de critérios diferentes ao mesmo tempo (ex: uma com o de peso, outra com o de
+   * 1RM+volume) — isso é esperado, não é recorde duplicado. Peso não considera reps: é uma
+   * categoria própria ("qual o kg mais pesado já erguido"), independente de 1RM/volume — reps já
+   * têm suas próprias categorias pra isso. */
   function atualizarRecordesExercicio(ex: ExercicioSessao): void {
     for (const s of ex.sets) {
       s.prPeso = false;
@@ -527,6 +533,10 @@
         ex.descansoNotificado = false;
       }
     }
+    // Exercício avulso dessa sessão (id sintético "novo-...", ainda não existe na rotina salva) não
+    // tem linha em treino_exercicios pra atualizar — persistir fica pro fim do treino, como
+    // qualquer outro ajuste desse tipo de exercício (ver trocarExercicioDeRotina, mesmo critério).
+    if (ex.treino_exercicio_id.startsWith("novo-")) return;
     try {
       await updateDescansoTreinoExercicio(ex.treino_exercicio_id, novoSeg);
     } catch (e) {

@@ -1050,8 +1050,9 @@ async function getMelhoresAntesDe(exercicioId: string, data: string): Promise<{ 
  * de uma edição retroativa (ex: corrigir um erro de digitação num treino antigo). Sem isso, um dia
  * futuro podia continuar com o troféu de um valor que a correção do dia antigo tornou obsoleto (o
  * dia antigo passou a ter uma marca maior, mas o troféu antigo ficava "congelado" e desatualizado).
- * Refaz a mesma lógica de empate (só a primeira série do dia que bate o máximo marca) dia a dia, em
- * ordem cronológica, partindo do melhor 1RM/volume já confirmado até `apartirDeData` (inclusive). */
+ * Refaz a mesma lógica de empate (só a primeira série do dia que bate o máximo marca — mesmo
+ * critério de salvarRegistrosDoDia/atualizarRecordesExercicio) dia a dia, em ordem cronológica,
+ * partindo do melhor 1RM/volume já confirmado até `apartirDeData` (inclusive). */
 async function reconciliarRecordesFuturos(
   exercicioId: string,
   apartirDeData: string,
@@ -1060,11 +1061,12 @@ async function reconciliarRecordesFuturos(
 ): Promise<void> {
   const { data: rows, error } = await supabase
     .from("treino_registros")
-    .select("id, data, peso, repeticoes, recorde_1rm, recorde_volume")
+    .select("id, data, serie, peso, repeticoes, recorde_1rm, recorde_volume")
     .eq("exercicio_id", exercicioId)
     .gt("data", apartirDeData)
     .not("peso", "is", null)
-    .order("data", { ascending: true });
+    .order("data", { ascending: true })
+    .order("serie", { ascending: true });
   if (error) throw error;
   if (!rows?.length) return;
 
@@ -1148,7 +1150,8 @@ export async function salvarRegistrosDoDia(
       melhorVolume: bateVolume ? volumeDia : melhorVolume,
     });
     // Empate no mesmo dia (duas séries idênticas batendo o mesmo máximo): só a primeira conta como
-    // recorde — a segunda apenas igualou, não superou a anterior.
+    // recorde — a segunda apenas igualou, não superou a anterior. Séries diferentes podem segurar
+    // troféus de critérios diferentes ao mesmo tempo (uma de 1RM, outra de volume) — não é bug.
     let marcou1rm = false;
     let marcouVolume = false;
 
