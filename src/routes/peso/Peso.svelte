@@ -297,47 +297,71 @@
   const pesoAlvoTexto = $derived(meta?.pesoAlvo != null ? `${formatPeso(meta.pesoAlvo)} kg` : "Sem meta");
 
   /**
-   * Peso esperado pela meta em cada dia plotado, usando a meta que estava REALMENTE valendo naquele
-   * dia (metaHistorico/metaNaData) — não a meta atual projetada pra trás. Parte do peso real do
-   * primeiro dia visível e, a cada dia seguinte, COMPÕE o ritmo semanal (%) da meta vigente naquele
-   * dia (juros compostos, mesmo critério de getDiasParaObjetivo) — uma trajetória própria,
-   * independente do peso real medido depois do ponto de partida. Se a meta era "manutenção" num
-   * trecho, o valor esperado nesse trecho é o próprio peso-alvo (sem ritmo). Isso faz a linha ter
-   * "quebras" nos dias em que a meta foi alterada — reflete o histórico real, não uma reta
-   * idealizada.
-   *
-   * Importante: precisa ser uma trajetória (não `pesoDoPonto * (1 + ritmo)` recalculado a partir do
-   * PRÓPRIO ponto) — senão, no modo "média", o ponto plotado e a base do alvo são o mesmo valor, e
-   * o desvio % vira uma constante que não reflete se a pessoa está no ritmo ou não (bug corrigido
-   * aqui: ver auditoria de cálculos).
+   * Peso esperado pela meta em cada dia plotado — BANDA com reancoragem, usando a meta que estava
+   * REALMENTE valendo naquele dia (metaHistorico/metaNaData). A linha desenhada segue sempre o
+   * ritmo MÍNIMO/padrão (percentualMin) a partir de um ponto de ancoragem; enquanto o peso real
+   * ficar dentro da banda [ritmo mínimo, ritmo máximo] projetada a partir dessa âncora, a linha não
+   * se mexe (continua na mesma inclinação). Só quando o peso real sai da banda (foi mais rápido que
+   * o ritmo máximo, ou mais devagar/regrediu além do mínimo tolerado) a âncora é resetada pro dia
+   * atual, e a projeção recomeça dali com o ritmo mínimo — sem acumular "dívida" indefinidamente
+   * (diferente da trajetória composta fixa de um ponto só, que nunca se ajusta), mas também sem
+   * virar tautológica (diferente de recalcular a cada dia a partir do próprio dia — ver auditoria
+   * de cálculos). Se a meta era "manutenção" num trecho, o valor esperado é o próprio peso-alvo
+   * (sem ritmo/banda). Troca de meta (mudou o `vigenteDesde` ativo) sempre força reancoragem.
    */
   const metaAlvoPorPonto = $derived.by(() => {
     if (!metaHistorico.length || !mediaMovelGrafico.length) return null;
 
-    const primeiro = mediaMovelGrafico[0];
-    const metaInicial = metaNaData(metaHistorico, primeiro.data);
-    if (!metaInicial) return null;
-
     const resultado: (number | null)[] = [];
-    let valorAnterior = metaInicial.tipo === "manutencao" ? (metaInicial.pesoAlvo ?? primeiro.peso) : primeiro.peso;
-    resultado.push(valorAnterior);
+    let ancoraValor: number | null = null;
+    let ancoraData: string | null = null;
+    let vigenteDesdeAnterior: string | null = null;
 
-    for (let i = 1; i < mediaMovelGrafico.length; i++) {
-      const dataAtual = mediaMovelGrafico[i].data;
-      const dataAnterior = mediaMovelGrafico[i - 1].data;
-      const metaDoDia = metaNaData(metaHistorico, dataAtual);
+    for (const ponto of mediaMovelGrafico) {
+      const metaDoDia = metaNaData(metaHistorico, ponto.data);
       if (!metaDoDia) {
+        resultado.push(null);
+        ancoraValor = null;
+        ancoraData = null;
+        vigenteDesdeAnterior = null;
+        continue;
+      }
+
+      if (metaDoDia.tipo === "manutencao") {
+        resultado.push(metaDoDia.pesoAlvo);
+        ancoraValor = null;
+        ancoraData = null;
+        vigenteDesdeAnterior = null;
+        continue;
+      }
+
+      if (metaDoDia.percentualMin == null || metaDoDia.percentualMax == null) {
         resultado.push(null);
         continue;
       }
-      if (metaDoDia.tipo === "manutencao") {
-        valorAnterior = metaDoDia.pesoAlvo ?? valorAnterior;
-      } else if (metaDoDia.percentual != null) {
-        const diasPassados =
-          Math.round((parseISODate(dataAtual).getTime() - parseISODate(dataAnterior).getTime()) / 86400000) || 1;
-        valorAnterior = valorAnterior * Math.pow(1 + metaDoDia.percentual / 100, diasPassados / 7);
+
+      const mudouMeta = vigenteDesdeAnterior !== metaDoDia.vigenteDesde;
+      vigenteDesdeAnterior = metaDoDia.vigenteDesde;
+
+      if (ancoraValor == null || ancoraData == null || mudouMeta) {
+        ancoraValor = ponto.peso;
+        ancoraData = ponto.data;
+      } else {
+        const dias = Math.round((parseISODate(ponto.data).getTime() - parseISODate(ancoraData).getTime()) / 86400000);
+        if (dias > 0) {
+          const valMin = ancoraValor * Math.pow(1 + metaDoDia.percentualMin / 100, dias / 7);
+          const valMax = ancoraValor * Math.pow(1 + metaDoDia.percentualMax / 100, dias / 7);
+          const limiteBaixo = Math.min(valMin, valMax);
+          const limiteAlto = Math.max(valMin, valMax);
+          if (ponto.peso < limiteBaixo || ponto.peso > limiteAlto) {
+            ancoraValor = ponto.peso;
+            ancoraData = ponto.data;
+          }
+        }
       }
-      resultado.push(valorAnterior);
+
+      const diasDesdeAncora = Math.round((parseISODate(ponto.data).getTime() - parseISODate(ancoraData).getTime()) / 86400000);
+      resultado.push(ancoraValor * Math.pow(1 + metaDoDia.percentualMin / 100, diasDesdeAncora / 7));
     }
     return resultado;
   });

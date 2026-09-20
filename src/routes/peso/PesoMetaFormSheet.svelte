@@ -22,8 +22,11 @@
   };
 
   let tipoDieta = $state<TipoDieta>("manutencao");
-  /** Sempre a magnitude (sem sinal) — o sinal é aplicado na hora de salvar, conforme o tipo de dieta. */
-  let percentual = $state<number | null>(null);
+  /** Sempre a magnitude (sem sinal) — o sinal é aplicado na hora de salvar, conforme o tipo de
+   * dieta. `percentualMin` é o ritmo padrão/conservador (usado como inclinação da linha de meta
+   * do gráfico); `percentualMax` é só o limite de tolerância antes da linha reancorar. */
+  let percentualMin = $state<number | null>(null);
+  let percentualMax = $state<number | null>(null);
   let pesoAlvo = $state<number | null>(null);
   let carregando = $state(true);
   let salvando = $state(false);
@@ -38,9 +41,14 @@
   const PERCENTUAL_MIN = 0.25;
   const PERCENTUAL_MAX = 1;
 
-  function clampPercentual(): void {
-    if (percentual == null) return;
-    percentual = Math.min(PERCENTUAL_MAX, Math.max(PERCENTUAL_MIN, percentual));
+  function clampPercentuais(): void {
+    if (percentualMin != null) percentualMin = Math.min(PERCENTUAL_MAX, Math.max(PERCENTUAL_MIN, percentualMin));
+    if (percentualMax != null) percentualMax = Math.min(PERCENTUAL_MAX, Math.max(PERCENTUAL_MIN, percentualMax));
+    // O mínimo é sempre a MENOR magnitude (ritmo conservador) — se o usuário inverter os campos,
+    // troca os valores em vez de deixar a banda invertida.
+    if (percentualMin != null && percentualMax != null && percentualMin > percentualMax) {
+      [percentualMin, percentualMax] = [percentualMax, percentualMin];
+    }
   }
 
   async function carregar() {
@@ -50,9 +58,10 @@
       tipoDieta = tipo;
       temMetaSalva = metaAtual != null;
       pesoAlvo = metaAtual?.pesoAlvo ?? ultimoPeso;
-      percentual = metaAtual?.tipo === "percentual" && metaAtual.percentual != null ? Math.abs(metaAtual.percentual) : null;
-      clampPercentual();
-      original = JSON.stringify({ tipoDieta, percentual, pesoAlvo });
+      percentualMin = metaAtual?.tipo === "percentual" && metaAtual.percentualMin != null ? Math.abs(metaAtual.percentualMin) : null;
+      percentualMax = metaAtual?.tipo === "percentual" && metaAtual.percentualMax != null ? Math.abs(metaAtual.percentualMax) : null;
+      clampPercentuais();
+      original = JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo });
     } finally {
       carregando = false;
     }
@@ -61,10 +70,10 @@
   void carregar();
 
   const precisaPercentual = $derived(tipoDieta !== "manutencao");
-  const podeSalvar = $derived(pesoAlvo != null && (!precisaPercentual || percentual != null));
+  const podeSalvar = $derived(pesoAlvo != null && (!precisaPercentual || (percentualMin != null && percentualMax != null)));
 
   function sujo(): boolean {
-    return !carregando && JSON.stringify({ tipoDieta, percentual, pesoAlvo }) !== original;
+    return !carregando && JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo }) !== original;
   }
 
   /** Sheet sem botão de voltar dedicado — fechar (toque fora, arrastar pra baixo) é o próprio
@@ -82,10 +91,10 @@
     salvando = true;
     try {
       if (tipoDieta === "manutencao") {
-        await salvarMeta("manutencao", null, pesoAlvo);
+        await salvarMeta("manutencao", null, null, pesoAlvo);
       } else {
         const sinal = tipoDieta === "bulking" ? 1 : -1;
-        await salvarMeta("percentual", sinal * Math.abs(percentual!), pesoAlvo);
+        await salvarMeta("percentual", sinal * Math.abs(percentualMin!), sinal * Math.abs(percentualMax!), pesoAlvo);
       }
       mostrarToast("Salvo");
       onSalvo();
@@ -119,21 +128,39 @@
     </button>
 
     {#if precisaPercentual}
-      <div class="campo">
-        <label for="meta-percentual">Percentual semanal (%)</label>
-        <input
-          id="meta-percentual"
-          type="number"
-          inputmode="decimal"
-          step="0.1"
-          min={PERCENTUAL_MIN}
-          max={PERCENTUAL_MAX}
-          placeholder="-"
-          bind:value={percentual}
-          onblur={clampPercentual}
-        />
-        <span class="campo-dica">Entre {PERCENTUAL_MIN}% e {PERCENTUAL_MAX}% — ritmo seguro pra fisiculturismo natural</span>
+      <div class="campo campo-dupla">
+        <div>
+          <label for="meta-percentual-min">Ritmo mínimo (%/semana)</label>
+          <input
+            id="meta-percentual-min"
+            type="number"
+            inputmode="decimal"
+            step="0.1"
+            min={PERCENTUAL_MIN}
+            max={PERCENTUAL_MAX}
+            placeholder="-"
+            bind:value={percentualMin}
+            onblur={clampPercentuais}
+          />
+        </div>
+        <div>
+          <label for="meta-percentual-max">Ritmo máximo (%/semana)</label>
+          <input
+            id="meta-percentual-max"
+            type="number"
+            inputmode="decimal"
+            step="0.1"
+            min={PERCENTUAL_MIN}
+            max={PERCENTUAL_MAX}
+            placeholder="-"
+            bind:value={percentualMax}
+            onblur={clampPercentuais}
+          />
+        </div>
       </div>
+      <span class="campo-dica campo-dica-dupla">
+        Entre {PERCENTUAL_MIN}% e {PERCENTUAL_MAX}% — a linha de meta segue o ritmo mínimo; só reancora se sair da faixa
+      </span>
     {/if}
 
     <div class="campo">
@@ -197,6 +224,20 @@
   .campo-dica {
     font-size: 12px;
     color: var(--surface-muted);
+  }
+  .campo-dica-dupla {
+    display: block;
+    margin: calc(var(--space-2) * -1) 0 var(--space-4);
+  }
+  .campo-dupla {
+    flex-direction: row;
+    gap: var(--space-3);
+  }
+  .campo-dupla > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
   }
   .campo input {
     box-sizing: border-box;

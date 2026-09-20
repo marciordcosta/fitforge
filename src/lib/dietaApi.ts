@@ -1744,7 +1744,8 @@ export async function getMetasDoDiaSemana(diaSemana: number): Promise<MetasDiari
 export type StatusAdesaoDieta = "dentro_do_plano" | "ajustar_calorias" | "calibrando";
 
 /** Compara o ritmo real de variação de peso (getTaxaVariacaoSemanal, pesoApi.ts) com o ritmo
- * esperado pela meta (peso_metas.percentual, sempre semanal). Só avalia depois de ~14 dias do
+ * esperado pela meta (peso_metas.percentual_min — o ritmo padrão/conservador da banda, sempre
+ * semanal). Só avalia depois de ~14 dias do
  * último ajuste real nas calorias (dieta_perfil.calorias_ajustadas_em) — antes disso a média de
  * peso ainda não "enxergou" o ajuste recente, e mostrar um veredito seria enganoso
  * ("calibrando"). Banda de tolerância generosa (40%-160% do ritmo esperado, mesmo sinal) — uma
@@ -1762,11 +1763,11 @@ export async function getStatusAdesaoDieta(): Promise<StatusAdesaoDieta | null> 
   if (meta.tipo === "manutencao") {
     return Math.abs(taxaAtual) <= 0.3 ? "dentro_do_plano" : "ajustar_calorias";
   }
-  if (meta.percentual == null || meta.percentual === 0) return null;
+  if (meta.percentualMin == null || meta.percentualMin === 0) return null;
 
   const mediaAtual = await getPesoMedioAtual();
   if (mediaAtual == null) return null;
-  const taxaEsperada = mediaAtual * (meta.percentual / 100);
+  const taxaEsperada = mediaAtual * (meta.percentualMin / 100);
   const dentro =
     Math.sign(taxaAtual) === Math.sign(taxaEsperada) &&
     Math.abs(taxaAtual) >= Math.abs(taxaEsperada) * 0.4 &&

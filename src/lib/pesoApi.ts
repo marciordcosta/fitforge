@@ -210,31 +210,42 @@ export async function getUltimoPeso(): Promise<number | null> {
 
 /** Meta única por usuário. Para "percentual", o sinal indica a direção: positivo = ganho,
  * negativo = perda — sempre semanal (cutting = negativo, bulking = positivo, derivado do Tipo de
- * Dieta em Dieta > Parâmetros, não escolhido aqui). `pesoAlvo` é o peso buscado — pro tipo
- * manutenção é o próprio peso de manutenção; pro tipo percentual é o alvo final da perda/ganho,
- * usado pra projetar quantos dias faltam (ver getDiasParaObjetivo). */
+ * Dieta em Dieta > Parâmetros, não escolhido aqui). `percentualMin`/`percentualMax` formam a
+ * BANDA de ritmo aceitável (ex: perda de 0,5% a 1%/semana — ambos com o mesmo sinal da direção,
+ * `percentualMin` sempre a MENOR magnitude, o ritmo "padrão"/conservador usado como inclinação
+ * da linha de meta do gráfico; `percentualMax` é só o limite de tolerância antes de reancorar —
+ * ver metaAlvoPorPonto em Peso.svelte). `pesoAlvo` é o peso buscado — pro tipo manutenção é o
+ * próprio peso de manutenção; pro tipo percentual é o alvo final da perda/ganho, usado pra
+ * projetar quantos dias faltam (ver getDiasParaObjetivo, que usa percentualMin como ritmo). */
 export interface PesoMeta {
   tipo: "percentual" | "manutencao";
-  percentual: number | null;
+  percentualMin: number | null;
+  percentualMax: number | null;
   pesoAlvo: number | null;
 }
 
 export async function getMeta(): Promise<PesoMeta | null> {
   const { data, error } = await supabase
     .from("peso_metas")
-    .select("tipo, percentual, peso_alvo")
+    .select("tipo, percentual_min, percentual_max, peso_alvo")
     .eq("user_id", uid())
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { tipo: data.tipo, percentual: data.percentual, pesoAlvo: data.peso_alvo };
+  return { tipo: data.tipo, percentualMin: data.percentual_min, percentualMax: data.percentual_max, pesoAlvo: data.peso_alvo };
 }
 
-export async function salvarMeta(tipo: "percentual" | "manutencao", percentual: number | null, pesoAlvo: number | null): Promise<void> {
+export async function salvarMeta(
+  tipo: "percentual" | "manutencao",
+  percentualMin: number | null,
+  percentualMax: number | null,
+  pesoAlvo: number | null,
+): Promise<void> {
   const { error } = await supabase.from("peso_metas").upsert({
     user_id: uid(),
     tipo,
-    percentual: tipo === "percentual" ? percentual : null,
+    percentual_min: tipo === "percentual" ? percentualMin : null,
+    percentual_max: tipo === "percentual" ? percentualMax : null,
     peso_alvo: pesoAlvo,
     updated_at: new Date().toISOString(),
   });
@@ -245,7 +256,8 @@ export async function salvarMeta(tipo: "percentual" | "manutencao", percentual: 
     {
       user_id: uid(),
       tipo,
-      percentual: tipo === "percentual" ? percentual : null,
+      percentual_min: tipo === "percentual" ? percentualMin : null,
+      percentual_max: tipo === "percentual" ? percentualMax : null,
       peso_alvo: pesoAlvo,
       vigente_desde: hojeISO(),
     },
@@ -269,13 +281,14 @@ export interface PesoMetaHistorico extends PesoMeta {
 export async function listMetaHistorico(): Promise<PesoMetaHistorico[]> {
   const { data, error } = await supabase
     .from("peso_metas_historico")
-    .select("tipo, percentual, peso_alvo, vigente_desde")
+    .select("tipo, percentual_min, percentual_max, peso_alvo, vigente_desde")
     .eq("user_id", uid())
     .order("vigente_desde", { ascending: true });
   if (error) throw error;
   return (data ?? []).map((l) => ({
     tipo: l.tipo as "percentual" | "manutencao",
-    percentual: l.percentual as number | null,
+    percentualMin: l.percentual_min as number | null,
+    percentualMax: l.percentual_max as number | null,
     pesoAlvo: l.peso_alvo as number | null,
     vigenteDesde: l.vigente_desde as string,
   }));
@@ -305,7 +318,7 @@ export async function getDiasParaObjetivo(): Promise<number | null> {
   const meta = await getMeta();
   if (!meta || meta.pesoAlvo == null) return null;
   if (meta.tipo === "manutencao") return null;
-  if (meta.percentual == null || meta.percentual === 0) return null;
+  if (meta.percentualMin == null || meta.percentualMin === 0) return null;
 
   const mediaAtual = await getPesoMedioAtual();
   if (mediaAtual == null) return null;
@@ -314,7 +327,7 @@ export async function getDiasParaObjetivo(): Promise<number | null> {
   if (Math.abs(meta.pesoAlvo - mediaAtual) <= EPSILON_KG) return 0;
 
   const razao = meta.pesoAlvo / mediaAtual;
-  const base = 1 + meta.percentual / 100;
+  const base = 1 + meta.percentualMin / 100;
   if (base <= 0) return null;
   const lnRazao = Math.log(razao);
   const lnBase = Math.log(base);
@@ -351,18 +364,18 @@ export async function getPesoMedioAtual(): Promise<number | null> {
   return janela.reduce((acc, p) => acc + p.peso, 0) / janela.length;
 }
 
-/** Peso-alvo da semana atual — pra meta "percentual", projeta um passo (%) a partir da média móvel
- * mais recente (mesma fórmula do card "Meta semanal" da tela de Peso: mediaAtual * (1+percentual/100));
- * pra "manutenção", é o próprio peso-alvo cadastrado (constante, sem ritmo). null sem meta ou sem
- * peso suficiente pra calcular a média. */
+/** Peso-alvo da semana atual — pra meta "percentual", projeta um passo no ritmo MÍNIMO/padrão da
+ * banda a partir da média móvel mais recente (mesma fórmula da linha de meta do gráfico de Peso:
+ * mediaAtual * (1+percentualMin/100)); pra "manutenção", é o próprio peso-alvo cadastrado
+ * (constante, sem ritmo). null sem meta ou sem peso suficiente pra calcular a média. */
 export async function getMetaSemanal(): Promise<number | null> {
   const meta = await getMeta();
   if (!meta) return null;
   if (meta.tipo === "manutencao") return meta.pesoAlvo;
-  if (meta.percentual == null) return null;
+  if (meta.percentualMin == null) return null;
   const mediaAtual = await getPesoMedioAtual();
   if (mediaAtual == null) return null;
-  return mediaAtual * (1 + meta.percentual / 100);
+  return mediaAtual * (1 + meta.percentualMin / 100);
 }
 
 /** Taxa de variação (kg/semana) das últimas 2 semanas: compara a média dos últimos 7 dias com a
