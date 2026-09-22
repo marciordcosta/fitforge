@@ -6,6 +6,7 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import DietaResumoModal from "./DietaResumoModal.svelte";
+  import DietaListaItens from "./DietaListaItens.svelte";
   import {
     garantirRefeicoesPadraoDoDia,
     getDiarioDoDia,
@@ -57,6 +58,9 @@
   let mostrarData = $state(false);
   type ModoExibicaoMacro = "restante" | "absoluto" | "porPeso";
   let modoExibicao = $state<ModoExibicaoMacro>("restante");
+  /** Expande/recolhe a lista de alimentos de TODAS as refeições do dia de uma vez (ícone ao lado
+   * do título "Diário") — mesma lista/funcionalidades da tela da refeição (DietaListaItens). */
+  let refeicoesExpandidas = $state(false);
 
   // ---------------- Reordenar refeições do dia (segurar o card) ----------------
   let reordenando = $state(false);
@@ -516,6 +520,11 @@
     <polyline points="6 9 12 15 18 9" />
   </svg>
 {/snippet}
+{#snippet iconExpandirDiario()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+{/snippet}
 {#snippet anelCentroMacro(valor: number, meta: number, corTexto: string | null = null)}
   {@const estilo = corTexto ? `color:${corTexto};` : ""}
   {#if modoExibicao === "restante" && passouMeta(valor, meta)}
@@ -755,7 +764,20 @@
       </button>
     </div>
 
-    <p class="diario-titulo">Diário</p>
+    <div class="diario-titulo-linha">
+      <p class="diario-titulo">Diário</p>
+      {#if refeicoes.length}
+        <button
+          type="button"
+          class="expandir-btn"
+          class:expandir-btn-ativo={refeicoesExpandidas}
+          onclick={() => (refeicoesExpandidas = !refeicoesExpandidas)}
+          aria-label={refeicoesExpandidas ? "Recolher refeições" : "Expandir refeições"}
+        >
+          {@render iconExpandirDiario()}
+        </button>
+      {/if}
+    </div>
 
     {#if !refeicoes.length}
       <p class="muted">Nenhuma refeição ainda. Toque em + pra criar.</p>
@@ -820,6 +842,18 @@
               {@render pctColuna("Carb", COR_CARBO, 0, { principal: "0g", secundario: "" })}
               {@render pctColuna("Gorduras", COR_GORDURA, 0, { principal: "0g", secundario: "" })}
               {@render pctColuna("Proteínas", COR_PROTEINA, 0, { principal: "0g", secundario: "" })}
+            </div>
+          {/if}
+          {#if refeicoesExpandidas && temItens}
+            {@const itensRefeicao = itens.filter((i) => i.refeicaoId === refeicao.id)}
+            <div
+              class="lista-itens-wrap"
+              role="presentation"
+              onclick={(e) => e.stopPropagation()}
+              onpointerdown={(e) => e.stopPropagation()}
+              oncontextmenu={(e) => e.stopPropagation()}
+            >
+              <DietaListaItens itens={itensRefeicao} refeicaoId={refeicao.id} dataRefeicao={dataAtual} onMudou={carregar} />
             </div>
           {/if}
           <button
@@ -1184,9 +1218,40 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
   }
+  .diario-titulo-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 var(--space-3);
+  }
   .diario-titulo {
     font-weight: 600;
-    margin: 0 0 var(--space-3);
+    margin: 0;
+  }
+  .expandir-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: var(--surface-muted);
+    cursor: pointer;
+  }
+  .expandir-btn svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.15s;
+  }
+  .expandir-btn-ativo {
+    color: var(--color-primary);
+  }
+  .expandir-btn-ativo svg {
+    transform: rotate(180deg);
+  }
+  .lista-itens-wrap {
+    margin-bottom: var(--space-3);
   }
   .acao-adicionar {
     width: 100%;
