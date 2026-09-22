@@ -296,6 +296,7 @@
     return pesoMedioAtual;
   });
   const mediaAtualTexto = $derived(pesoMedioCardValor != null ? `${formatPeso(pesoMedioCardValor)} kg` : "—");
+  const mediaAtualLabel = $derived(meta?.modoMedia === "semanal" ? "Média semanal" : "Média diária");
 
   /** "Meta Semanal" por dia — fonte única compartilhada com o card (calcularLinhaMetaPorDia em
    * pesoApi.ts). Roda sobre TODO o histórico (`pesosCompletos`), não sobre o período visível —
@@ -645,7 +646,7 @@
       class:quick-card-ativo={modoGrafico === "media"}
       onclick={() => selecionarModoGrafico("media")}
     >
-      <span class="quick-card-label">Peso média</span>
+      <span class="quick-card-label">{mediaAtualLabel}</span>
       <span class="quick-card-valor">{mediaAtualTexto}</span>
     </button>
     <button
