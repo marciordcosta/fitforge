@@ -4,7 +4,7 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { navigate } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
-  import { getMeta, getUltimoPeso, salvarMeta, excluirMeta } from "../../lib/pesoApi";
+  import { getMeta, getUltimoPeso, salvarMeta, excluirMeta, type DiaSemana, type ModoMedia } from "../../lib/pesoApi";
   import { getTipoDieta, type TipoDieta } from "../../lib/dietaApi";
 
   let {
@@ -20,13 +20,20 @@
     manutencao: "Manutenção",
     bulking: "Bulking (ganho)",
   };
+  const DIAS_SEMANA_ABREV = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   let tipoDieta = $state<TipoDieta>("manutencao");
   /** Sempre a magnitude (sem sinal) — o sinal é aplicado na hora de salvar, conforme o tipo de
-   * dieta. `percentualMin` é o ritmo padrão/conservador (usado como inclinação da linha de meta
-   * do gráfico); `percentualMax` é só o limite de tolerância antes da linha reancorar. */
+   * dieta. `percentualMin` é o ritmo usado pra calcular a meta de cada semana; `percentualMax` só
+   * dispara o alerta de "ajustar rota" quando a média real desvia demais dela. */
   let percentualMin = $state<number | null>(null);
   let percentualMax = $state<number | null>(null);
+  /** Dia da semana em que a meta reseta e recalcula (0=domingo..6=sábado) — ver
+   * calcularLinhaMetaPorDia em pesoApi.ts. */
+  let diaResetSemana = $state<DiaSemana>(1);
+  /** Como "a média" é calculada pra alimentar a meta e o card "Peso média" — ver ModoMedia em
+   * pesoApi.ts. */
+  let modoMedia = $state<ModoMedia>("diario");
   let pesoAlvo = $state<number | null>(null);
   let carregando = $state(true);
   let salvando = $state(false);
@@ -60,8 +67,10 @@
       pesoAlvo = metaAtual?.pesoAlvo ?? ultimoPeso;
       percentualMin = metaAtual?.tipo === "percentual" && metaAtual.percentualMin != null ? Math.abs(metaAtual.percentualMin) : null;
       percentualMax = metaAtual?.tipo === "percentual" && metaAtual.percentualMax != null ? Math.abs(metaAtual.percentualMax) : null;
+      diaResetSemana = metaAtual?.diaResetSemana ?? 1;
+      modoMedia = metaAtual?.modoMedia ?? "diario";
       clampPercentuais();
-      original = JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo });
+      original = JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo, diaResetSemana, modoMedia });
     } finally {
       carregando = false;
     }
@@ -73,7 +82,7 @@
   const podeSalvar = $derived(pesoAlvo != null && (!precisaPercentual || (percentualMin != null && percentualMax != null)));
 
   function sujo(): boolean {
-    return !carregando && JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo }) !== original;
+    return !carregando && JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo, diaResetSemana, modoMedia }) !== original;
   }
 
   /** Sheet sem botão de voltar dedicado — fechar (toque fora, arrastar pra baixo) é o próprio
@@ -91,10 +100,17 @@
     salvando = true;
     try {
       if (tipoDieta === "manutencao") {
-        await salvarMeta("manutencao", null, null, pesoAlvo);
+        await salvarMeta("manutencao", null, null, pesoAlvo, diaResetSemana, modoMedia);
       } else {
         const sinal = tipoDieta === "bulking" ? 1 : -1;
-        await salvarMeta("percentual", sinal * Math.abs(percentualMin!), sinal * Math.abs(percentualMax!), pesoAlvo);
+        await salvarMeta(
+          "percentual",
+          sinal * Math.abs(percentualMin!),
+          sinal * Math.abs(percentualMax!),
+          pesoAlvo,
+          diaResetSemana,
+          modoMedia,
+        );
       }
       mostrarToast("Salvo");
       onSalvo();
@@ -159,8 +175,33 @@
         </div>
       </div>
       <span class="campo-dica campo-dica-dupla">
-        Entre {PERCENTUAL_MIN}% e {PERCENTUAL_MAX}% — a linha de meta segue o ritmo mínimo; só reancora se sair da faixa
+        Entre {PERCENTUAL_MIN}% e {PERCENTUAL_MAX}% — a meta de cada semana usa o ritmo mínimo; o máximo só dispara o aviso de ajustar a rota
       </span>
+
+      <div class="campo">
+        <label for="meta-dia-reset">Reinicia a meta toda</label>
+        <div class="dia-opcoes" id="meta-dia-reset">
+          {#each DIAS_SEMANA_ABREV as dia, i (dia)}
+            <button type="button" class:ativo={diaResetSemana === i} onclick={() => (diaResetSemana = i as DiaSemana)}>{dia}</button>
+          {/each}
+        </div>
+        <span class="campo-dica">Nesse dia, a meta da próxima semana é recalculada em cima da sua média atual</span>
+      </div>
+
+      <div class="campo">
+        <label for="meta-modo-media">Como calcular a média de peso</label>
+        <div class="referencia-opcoes" id="meta-modo-media">
+          <button type="button" class:ativo={modoMedia === "diario"} onclick={() => (modoMedia = "diario")}>Diário</button>
+          <button type="button" class:ativo={modoMedia === "semanal"} onclick={() => (modoMedia = "semanal")}>Semanal</button>
+        </div>
+        <span class="campo-dica">
+          {#if modoMedia === "diario"}
+            Média móvel dos últimos 7 dias, recalculada todo dia
+          {:else}
+            Média da semana em andamento (só os dias já pesados desde o último reset), reinicia a cada início de semana
+          {/if}
+        </span>
+      </div>
     {/if}
 
     <div class="campo">
@@ -232,6 +273,48 @@
   .campo-dupla {
     flex-direction: row;
     gap: var(--space-3);
+  }
+  .dia-opcoes {
+    display: flex;
+    gap: 4px;
+  }
+  .dia-opcoes button {
+    flex: 1;
+    padding: var(--space-2) 2px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .dia-opcoes button.ativo {
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
+  }
+  .referencia-opcoes {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .referencia-opcoes button {
+    flex: 1;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .referencia-opcoes button.ativo {
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
   }
   .campo-dupla > div {
     flex: 1;
