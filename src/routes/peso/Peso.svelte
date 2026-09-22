@@ -308,9 +308,19 @@
    * virar tautológica (diferente de recalcular a cada dia a partir do próprio dia — ver auditoria
    * de cálculos). Se a meta era "manutenção" num trecho, o valor esperado é o próprio peso-alvo
    * (sem ritmo/banda). Troca de meta (mudou o `vigenteDesde` ativo) sempre força reancoragem.
+   *
+   * A linha (e a banda) nunca ULTRAPASSA o peso-alvo — a direção (perda/ganho) vem do sinal de
+   * percentualMin, não de comparar com a âncora (evita ambiguidade quando a âncora já bate o
+   * alvo). Ao chegar perto/bater o peso-alvo, a linha para ali em vez de continuar projetando
+   * pra além da meta.
    */
   const metaAlvoPorPonto = $derived.by(() => {
     if (!metaHistorico.length || !mediaMovelGrafico.length) return null;
+
+    function limitarPeloAlvo(valor: number, percentualMin: number, pesoAlvo: number | null): number {
+      if (pesoAlvo == null) return valor;
+      return percentualMin < 0 ? Math.max(valor, pesoAlvo) : Math.min(valor, pesoAlvo);
+    }
 
     const resultado: (number | null)[] = [];
     let ancoraValor: number | null = null;
@@ -349,8 +359,16 @@
       } else {
         const dias = Math.round((parseISODate(ponto.data).getTime() - parseISODate(ancoraData).getTime()) / 86400000);
         if (dias > 0) {
-          const valMin = ancoraValor * Math.pow(1 + metaDoDia.percentualMin / 100, dias / 7);
-          const valMax = ancoraValor * Math.pow(1 + metaDoDia.percentualMax / 100, dias / 7);
+          const valMin = limitarPeloAlvo(
+            ancoraValor * Math.pow(1 + metaDoDia.percentualMin / 100, dias / 7),
+            metaDoDia.percentualMin,
+            metaDoDia.pesoAlvo,
+          );
+          const valMax = limitarPeloAlvo(
+            ancoraValor * Math.pow(1 + metaDoDia.percentualMax / 100, dias / 7),
+            metaDoDia.percentualMin,
+            metaDoDia.pesoAlvo,
+          );
           const limiteBaixo = Math.min(valMin, valMax);
           const limiteAlto = Math.max(valMin, valMax);
           if (ponto.peso < limiteBaixo || ponto.peso > limiteAlto) {
@@ -361,7 +379,8 @@
       }
 
       const diasDesdeAncora = Math.round((parseISODate(ponto.data).getTime() - parseISODate(ancoraData).getTime()) / 86400000);
-      resultado.push(ancoraValor * Math.pow(1 + metaDoDia.percentualMin / 100, diasDesdeAncora / 7));
+      const alvoBruto = ancoraValor * Math.pow(1 + metaDoDia.percentualMin / 100, diasDesdeAncora / 7);
+      resultado.push(limitarPeloAlvo(alvoBruto, metaDoDia.percentualMin, metaDoDia.pesoAlvo));
     }
     return resultado;
   });
