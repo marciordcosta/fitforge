@@ -20,7 +20,10 @@
 
   const semanaInicio = $derived(segundaDaSemana(data));
   let treinosDaSemana = $state<TreinoComExercicios[]>([]);
-  let atribuicoes = $state<Map<number, Set<string>>>(new Map());
+  /** Um dia só por rotina (troca automática ao clicar em outra célula da mesma linha) — mais de
+   * uma rotina ainda pode cair no MESMO dia (a coluna aceita várias linhas marcadas), só a rotina
+   * em si não pode estar em 2 dias ao mesmo tempo. null = essa rotina não entra em nenhum dia. */
+  let atribuicoes = $state<Map<string, number | null>>(new Map());
   let loading = $state(true);
   let salvando = $state(false);
 
@@ -30,9 +33,8 @@
       const [todos, overrides] = await Promise.all([listTreinos(), listOverrideSemana(semanaInicio)]);
       treinosDaSemana = todos.filter((t) => t.dia_semana != null);
       const base = overrides.length ? overrides : horarioFixoComoOverride(todos);
-      const mapa = new Map<number, Set<string>>();
-      for (const dia of ORDEM_EXIBICAO) mapa.set(dia, new Set());
-      for (const o of base) mapa.get(o.diaSemana)?.add(o.treinoId);
+      const mapa = new Map<string, number | null>(treinosDaSemana.map((t) => [t.id, null]));
+      for (const o of base) mapa.set(o.treinoId, o.diaSemana);
       atribuicoes = mapa;
     } catch (err) {
       alert("Erro ao carregar a semana: " + (err as Error).message);
@@ -43,19 +45,20 @@
 
   void carregar();
 
-  function alternar(dia: number, treinoId: string) {
-    const atual = new Set(atribuicoes.get(dia));
-    if (atual.has(treinoId)) atual.delete(treinoId);
-    else atual.add(treinoId);
-    atribuicoes = new Map(atribuicoes).set(dia, atual);
+  /** Clicar numa célula já marcada desmarca (rotina fica sem dia essa semana); clicar numa célula
+   * diferente da mesma linha move a rotina pra lá automaticamente. */
+  function selecionar(dia: number, treinoId: string) {
+    const atual = new Map(atribuicoes);
+    atual.set(treinoId, atual.get(treinoId) === dia ? null : dia);
+    atribuicoes = atual;
   }
 
   async function salvar() {
     salvando = true;
     try {
       const linhas: TreinoOverrideDia[] = [];
-      for (const [dia, ids] of atribuicoes) {
-        for (const id of ids) linhas.push({ diaSemana: dia, treinoId: id });
+      for (const [treinoId, dia] of atribuicoes) {
+        if (dia != null) linhas.push({ diaSemana: dia, treinoId });
       }
       await salvarOverrideSemana(semanaInicio, linhas);
       mostrarToast("Salvo");
@@ -76,7 +79,7 @@
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else}
-    <p class="ajuda">Toque nas células pra marcar em quais dias cada treino cai — só vale pra essa semana.</p>
+    <p class="ajuda">Toque no dia que cada treino cai (um dia por treino) — só vale pra essa semana.</p>
     {#if !treinosDaSemana.length}
       <p class="dia-vazio">Nenhuma rotina com dia fixo configurado.</p>
     {:else}
@@ -88,12 +91,12 @@
         {#each treinosDaSemana as treino (treino.id)}
           <span class="celula celula-treino-nome">{treino.nome_treino}</span>
           {#each ORDEM_EXIBICAO as dia (dia)}
-            {@const marcado = atribuicoes.get(dia)?.has(treino.id) ?? false}
+            {@const marcado = atribuicoes.get(treino.id) === dia}
             <button
               type="button"
               class="celula celula-toggle"
               class:marcado
-              onclick={() => alternar(dia, treino.id)}
+              onclick={() => selecionar(dia, treino.id)}
               aria-label={`${treino.nome_treino} em ${DIAS_SEMANA_ABREV[dia]}`}
             >
               {#if marcado}✓{/if}
