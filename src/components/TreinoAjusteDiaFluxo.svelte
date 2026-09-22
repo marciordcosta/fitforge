@@ -19,13 +19,24 @@
   let mostrarAjustarDieta = $state(false);
   let processando = $state(false);
 
+  /**
+   * Só chama onMudou() no fim de tudo (nunca antes) — o pai (Home/Rotinas) pode recarregar e
+   * decidir que hoje não tem mais treino nenhum, o que destrói esse componente (ele só existe
+   * dentro do estado "tem treino hoje"). Chamar onMudou() cedo demais matava esse componente no
+   * meio do fluxo, antes da pergunta sobre a dieta conseguir aparecer — parecia que "nada
+   * acontecia" depois de mudar o dia.
+   */
   async function talvezPerguntarDieta(): Promise<void> {
     try {
       const modo = await getModoCalorias();
-      if (modo === "ondulatoria") mostrarConfirmDieta = true;
+      if (modo === "ondulatoria") {
+        mostrarConfirmDieta = true;
+        return;
+      }
     } catch {
       // informativo — se falhar, só não oferece o ajuste de dieta
     }
+    onMudou();
   }
 
   async function confirmarCancelar(): Promise<void> {
@@ -33,7 +44,6 @@
     processando = true;
     try {
       await cancelarTreinoDoDia(data);
-      onMudou();
       await talvezPerguntarDieta();
     } catch (err) {
       alert("Erro ao cancelar o treino: " + (err as Error).message);
@@ -44,7 +54,6 @@
 
   async function aoSalvarMudarDia(): Promise<void> {
     mostrarMudarDia = false;
-    onMudou();
     await talvezPerguntarDieta();
   }
 </script>

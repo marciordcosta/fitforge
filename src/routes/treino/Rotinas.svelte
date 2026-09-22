@@ -10,9 +10,12 @@
     listMusculos,
     getRegistrosPorTreinoPeriodo,
     getParametrosDistribuicao,
+    listOverrideSemana,
+    segundaDaSemana,
     DIAS_SEMANA_COMPLETO,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type TreinoComExercicios,
+    type TreinoOverrideDia,
     type Musculo,
     type ParametrosDistribuicao,
   } from "../../lib/treinoApi";
@@ -31,24 +34,40 @@
   let musculosPorExercicio = $state<Map<string, { musculo_id: string; peso: number }[]>>(new Map());
   let modoRestante = $state(true);
   let mostrarMenuNovo = $state(false);
+  /** Dia efetivo de cada rotina PRA ESSA SEMANA — igual ao dia fixo (treino.dia_semana) na maioria
+   * das vezes, mas reflete o override de "Mudar dia"/"Cancelar" (TreinoAjusteDiaFluxo) quando a
+   * semana atual tiver um: rotina sem entrada no override dessa semana vira null (sem dia, mesmo
+   * que tenha dia fixo normalmente). Usado pra ordenar a lista e rotular o card, não só pra
+   * decidir se mostra o fluxo "Não vai treinar hoje?". */
+  let diaEfetivoPorTreino = $state<Map<string, number | null>>(new Map());
 
-  /** Rotinas com dia informado sobem pro topo, ordenadas pelo dia mais próximo; sem dia, mantém a ordenação manual. */
-  function ordenarPorDia(lista: TreinoComExercicios[]): TreinoComExercicios[] {
+  function diaEfetivoDe(treinoId: string, diaFixo: number | null, overridesSemana: TreinoOverrideDia[]): number | null {
+    if (!overridesSemana.length) return diaFixo;
+    return overridesSemana.find((o) => o.treinoId === treinoId)?.diaSemana ?? null;
+  }
+
+  /** Rotinas com dia efetivo essa semana sobem pro topo, ordenadas pelo dia mais próximo; sem dia
+   * essa semana, mantém a ordenação manual. */
+  function ordenarPorDia(lista: TreinoComExercicios[], diaEfetivo: Map<string, number | null>): TreinoComExercicios[] {
     const hoje = new Date().getDay();
     const comDia = lista
-      .filter((t) => t.dia_semana != null)
-      .sort((a, b) => ((a.dia_semana! - hoje + 7) % 7) - ((b.dia_semana! - hoje + 7) % 7));
-    const semDia = lista.filter((t) => t.dia_semana == null);
+      .filter((t) => diaEfetivo.get(t.id) != null)
+      .sort((a, b) => ((diaEfetivo.get(a.id)! - hoje + 7) % 7) - ((diaEfetivo.get(b.id)! - hoje + 7) % 7));
+    const semDia = lista.filter((t) => diaEfetivo.get(t.id) == null);
     return [...comDia, ...semDia];
   }
 
   /** Parametrização "Por rotina pendente": pula rotinas já executadas essa semana (têm série
    * registrada de segunda até hoje) e sobe a próxima ainda não feita, mesmo que o dia dela não
    * seja o mais próximo — só depois delas voltam as já feitas, ambas na ordem de dia mais próximo
-   * entre si. Sem dia definido, entram por último, na ordem manual. */
-  function ordenarPorPendente(lista: TreinoComExercicios[], feitas: Map<string, number>): TreinoComExercicios[] {
-    const porDia = ordenarPorDia(lista.filter((t) => t.dia_semana != null));
-    const semDia = lista.filter((t) => t.dia_semana == null);
+   * entre si. Sem dia efetivo essa semana, entram por último, na ordem manual. */
+  function ordenarPorPendente(
+    lista: TreinoComExercicios[],
+    feitas: Map<string, number>,
+    diaEfetivo: Map<string, number | null>,
+  ): TreinoComExercicios[] {
+    const porDia = ordenarPorDia(lista.filter((t) => diaEfetivo.get(t.id) != null), diaEfetivo);
+    const semDia = lista.filter((t) => diaEfetivo.get(t.id) == null);
     const pendentes = porDia.filter((t) => !feitas.has(t.id));
     const jaFeitas = porDia.filter((t) => feitas.has(t.id));
     return [...pendentes, ...jaFeitas, ...semDia];
@@ -65,13 +84,15 @@
     loading = true;
     erroCarregar = null;
     try {
-      const [treinosCarregados, musculosCarregados, registros, parametros] = await Promise.all([
+      const [treinosCarregados, musculosCarregados, registros, parametros, overridesSemana] = await Promise.all([
         listTreinos(),
         listMusculos(),
         getRegistrosPorTreinoPeriodo(segundaISO(), hojeISO()),
         getParametrosDistribuicao(),
+        listOverrideSemana(segundaDaSemana(hojeISO())),
       ]);
       musculos = musculosCarregados;
+      diaEfetivoPorTreino = new Map(treinosCarregados.map((t) => [t.id, diaEfetivoDe(t.id, t.dia_semana, overridesSemana)]));
       parametrosDistribuicao = parametros;
 
       const mapaMusculos = new Map<string, { musculo_id: string; peso: number }[]>();
@@ -101,8 +122,8 @@
       feitoPorMusculoSalvo = mapaFeito;
       treinos =
         parametros.ordenacaoHome === "pendente"
-          ? ordenarPorPendente(treinosCarregados, mapaSeriesPorTreino)
-          : ordenarPorDia(treinosCarregados);
+          ? ordenarPorPendente(treinosCarregados, mapaSeriesPorTreino, diaEfetivoPorTreino)
+          : ordenarPorDia(treinosCarregados, diaEfetivoPorTreino);
     } catch (e) {
       erroCarregar = (e as Error).message;
     } finally {
@@ -391,7 +412,8 @@
     <p class="muted">Nenhuma rotina ainda. Crie a primeira.</p>
   {:else}
     {#each treinos as treino, i (treino.id)}
-      {@const destacada = i === 0 && treino.dia_semana != null}
+      {@const diaEfetivo = diaEfetivoPorTreino.get(treino.id) ?? null}
+      {@const destacada = i === 0 && diaEfetivo != null}
       <div
         class="rotina-item"
         role="button"
@@ -402,15 +424,15 @@
         <div class="card-header">
           <h2 class:nome-neutro={!destacada}>
             {treino.nome_treino}
-            {#if treino.dia_semana != null}
-              <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
+            {#if diaEfetivo != null}
+              <span class="dia-tag">{DIAS_SEMANA_COMPLETO[diaEfetivo]}</span>
             {/if}
           </h2>
         </div>
         <p class="preview">{preview(treino)}</p>
         {#if destacada}
           <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
-          {#if treino.dia_semana === new Date().getDay()}
+          {#if diaEfetivo === new Date().getDay()}
             <div role="presentation" onclick={(e) => e.stopPropagation()}>
               <TreinoAjusteDiaFluxo data={hojeISO()} onMudou={carregar} />
             </div>

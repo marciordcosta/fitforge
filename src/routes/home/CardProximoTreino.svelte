@@ -2,7 +2,7 @@
   import { navigate } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
   import TreinoAjusteDiaFluxo from "../../components/TreinoAjusteDiaFluxo.svelte";
-  import { DIAS_SEMANA_COMPLETO, type TreinoComExercicios } from "../../lib/treinoApi";
+  import type { TreinoComExercicios } from "../../lib/treinoApi";
 
   /** `treinos` no plural porque um dia pode ter mais de uma rotina depois de "Mudar dia" (ver
    * TreinoAjusteDiaFluxo) — no caso comum (0 ou 1) o card se comporta como sempre se comportou. */
@@ -35,12 +35,7 @@
         onkeydown={(e) => e.key === "Enter" && abrirRotina(treino)}
       >
         <div class="card-header">
-          <h2>
-            {treino.nome_treino}
-            {#if treino.dia_semana != null}
-              <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
-            {/if}
-          </h2>
+          <h2>{treino.nome_treino}</h2>
         </div>
         <p class="preview">{preview(treino)}</p>
         <Button variant="secondary" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
@@ -99,11 +94,6 @@
     align-items: center;
     gap: var(--space-2);
     flex-wrap: wrap;
-  }
-  .dia-tag {
-    font-size: var(--font-size-sm);
-    font-weight: 400;
-    color: var(--surface-muted);
   }
   .preview {
     margin: 0 0 var(--space-4);
