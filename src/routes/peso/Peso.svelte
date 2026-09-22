@@ -13,6 +13,7 @@
     calcularMediaMovelSerie,
     calcularMediaSemanalSerie,
     calcularLinhaMetaPorDia,
+    calcularMetaFimSemanaPorDia,
     getObservacaoMeta,
     type PesoRegistro,
     type PesoMeta,
@@ -306,12 +307,13 @@
     return calcularLinhaMetaPorDia(pesosCompletos, metaHistorico);
   });
 
-  /** Valor exibido no card "Meta semanal": o ÚLTIMO valor de metaAlvoCompletoPorData — mesmo mapa
-   * usado pela linha do gráfico, lido diretamente (não uma busca separada) — pra nunca divergir do
-   * que a linha mostra no seu último ponto. */
+  /** Valor exibido no card "Meta semanal": o ALVO FINAL da semana vigente (pra onde a linha está
+   * indo), não o ponto de hoje nela — diferente de metaAlvoCompletoPorData, que interpola o
+   * caminho até lá pro gráfico. */
   const metaSemanalValor = $derived.by(() => {
-    const mapa = metaAlvoCompletoPorData;
-    if (!mapa || !mapa.size) return null;
+    if (!metaHistorico.length || !pesosCompletos.length) return null;
+    const mapa = calcularMetaFimSemanaPorDia(pesosCompletos, metaHistorico);
+    if (!mapa.size) return null;
     const datas = Array.from(mapa.keys()).sort();
     const ultima = datas[datas.length - 1];
     return ultima != null ? (mapa.get(ultima) ?? null) : null;

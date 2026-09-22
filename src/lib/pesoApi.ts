@@ -437,27 +437,37 @@ function limitarPeloAlvo(valor: number, percentualMin: number, pesoAlvo: number 
   return percentualMin < 0 ? Math.max(valor, pesoAlvo) : Math.min(valor, pesoAlvo);
 }
 
+interface SegmentoMeta {
+  /** "manutencao": valor constante (peso-alvo). "percentual": interpola de `inicio` até `fim` ao
+   * longo da semana — ver calcularLinhaMetaPorDia. */
+  tipo: "manutencao" | "percentual";
+  valor: number | null;
+  inicio: number | null;
+  fim: number | null;
+  /** Data do limite de semana (início dela) a que esse dia pertence — só preenchido pra "percentual". */
+  limiteData: string | null;
+}
+
 /**
- * Calcula, por dia, a "Meta Semanal" — fonte única usada tanto pelo card "Meta Semanal" quanto pela
- * linha vermelha do gráfico de Peso, pra nunca divergir uma da outra.
+ * Base compartilhada entre calcularLinhaMetaPorDia (interpola dia a dia) e
+ * calcularMetaFimSemanaPorDia (só o alvo final da semana) — os dois só diferem em qual campo do
+ * segmento cada um lê, então calculam os limites de semana uma vez só.
  *
  * A cada início de semana (o dia configurado em `diaResetSemana`), a meta da semana é recalculada
  * do zero: pega a média vigente naquele dia (móvel ou de semana fechada, conforme `modoMedia`) e
  * aplica o ritmo MÍNIMO (`percentualMin`) uma única vez pra achar o alvo do FIM da semana — nunca
- * acumula "dívida" de semanas anteriores nem reage dia a dia. Dentro da semana, o valor de cada
- * dia é uma interpolação linear entre o início e esse alvo — e o início da semana é sempre onde a
+ * acumula "dívida" de semanas anteriores nem reage dia a dia. O início da semana é sempre onde a
  * semana ANTERIOR terminou (não a média real daquele dia), pra a linha nunca dar salto, só mudar
- * de inclinação: é isso que faz a curva ficar suave quando o filtro do gráfico mostra vários
- * meses (dá pra ver visualmente cada reajuste). Na primeira semana de uma configuração de meta
- * (sem semana anterior pra herdar), o início é a própria média vigente naquele dia.
+ * de inclinação. Na primeira semana de uma configuração de meta (sem semana anterior pra herdar),
+ * o início é a própria média vigente naquele dia.
  *
  * `percentualMax` NÃO entra nessa conta — só é usado pro alerta de "ajustar rota" (ver
  * getObservacaoMeta), nunca muda o formato da linha.
  *
  * Nunca ultrapassa o peso-alvo — direção (perda/ganho) definida pelo sinal de percentualMin.
  */
-export function calcularLinhaMetaPorDia(pesos: PesoRegistro[], historico: PesoMetaHistorico[]): Map<string, number | null> {
-  const mapa = new Map<string, number | null>();
+function calcularSegmentosPorDia(pesos: PesoRegistro[], historico: PesoMetaHistorico[]): Map<string, SegmentoMeta | null> {
+  const mapa = new Map<string, SegmentoMeta | null>();
   if (!historico.length) return mapa;
   const datas = Array.from(new Set(pesos.map((p) => p.data))).sort();
   if (!datas.length) return mapa;
@@ -492,7 +502,7 @@ export function calcularLinhaMetaPorDia(pesos: PesoRegistro[], historico: PesoMe
     if (!datasDaEra.length) continue;
 
     if (era.config.tipo === "manutencao") {
-      for (const d of datasDaEra) mapa.set(d, era.config.pesoAlvo);
+      for (const d of datasDaEra) mapa.set(d, { tipo: "manutencao", valor: era.config.pesoAlvo, inicio: null, fim: null, limiteData: null });
       continue;
     }
     if (era.config.percentualMin == null) {
@@ -537,26 +547,57 @@ export function calcularLinhaMetaPorDia(pesos: PesoRegistro[], historico: PesoMe
         mapa.set(data, null);
         continue;
       }
-      const diasNoLimite = Math.round((parseISODate(data).getTime() - parseISODate(limiteAtual).getTime()) / 86400000);
-      const fracao = Math.min(1, Math.max(0, diasNoLimite / 7));
-      const valor = inicioValor + (fimValor - inicioValor) * fracao;
-      mapa.set(data, limitarPeloAlvo(valor, percentualMin, pesoAlvo));
+      mapa.set(data, { tipo: "percentual", valor: null, inicio: inicioValor, fim: fimValor, limiteData: limiteAtual });
     }
   }
 
   return mapa;
 }
 
-/** Peso-alvo da semana atual — o último valor de calcularLinhaMetaPorDia, ancorado no dia mais
- * recente com peso registrado (não necessariamente hoje). Pra "manutenção", é o próprio peso-alvo
- * cadastrado. null sem meta ou sem peso suficiente. */
+/** Calcula, por dia, a "Meta Semanal" — fonte única usada pela linha vermelha do gráfico de Peso.
+ * Ver calcularSegmentosPorDia pro algoritmo completo. */
+export function calcularLinhaMetaPorDia(pesos: PesoRegistro[], historico: PesoMetaHistorico[]): Map<string, number | null> {
+  const segmentos = calcularSegmentosPorDia(pesos, historico);
+  const mapa = new Map<string, number | null>();
+  for (const [data, seg] of segmentos) {
+    if (!seg) {
+      mapa.set(data, null);
+    } else if (seg.tipo === "manutencao") {
+      mapa.set(data, seg.valor);
+    } else {
+      const diasNoLimite = Math.round((parseISODate(data).getTime() - parseISODate(seg.limiteData!).getTime()) / 86400000);
+      const fracao = Math.min(1, Math.max(0, diasNoLimite / 7));
+      mapa.set(data, seg.inicio! + (seg.fim! - seg.inicio!) * fracao);
+    }
+  }
+  return mapa;
+}
+
+/** Calcula, por dia, o ALVO FINAL da semana vigente (constante do início ao fim de cada semana,
+ * mudando só quando a semana reseta) — diferente de calcularLinhaMetaPorDia, que interpola o
+ * caminho até lá. Usado no card "Meta Semanal", que deve mostrar pra onde a semana está indo, não
+ * o ponto de hoje na linha. */
+export function calcularMetaFimSemanaPorDia(pesos: PesoRegistro[], historico: PesoMetaHistorico[]): Map<string, number | null> {
+  const segmentos = calcularSegmentosPorDia(pesos, historico);
+  const mapa = new Map<string, number | null>();
+  for (const [data, seg] of segmentos) {
+    if (!seg) mapa.set(data, null);
+    else if (seg.tipo === "manutencao") mapa.set(data, seg.valor);
+    else mapa.set(data, seg.fim);
+  }
+  return mapa;
+}
+
+/** Alvo FINAL da semana atual (não o ponto de hoje na linha — ver calcularMetaFimSemanaPorDia),
+ * ancorado no dia mais recente com peso registrado (não necessariamente hoje). Pra "manutenção",
+ * é o próprio peso-alvo cadastrado. null sem meta ou sem peso suficiente. */
 export async function getMetaSemanal(): Promise<number | null> {
   const meta = await getMeta();
   if (!meta) return null;
   if (meta.tipo === "manutencao") return meta.pesoAlvo;
   const [historico, registros] = await Promise.all([listMetaHistorico(), getPesosDoPeriodo("1900-01-01", hojeISO())]);
   if (!registros.length || !historico.length) return null;
-  const mapa = calcularLinhaMetaPorDia(registros, historico);
+  const mapa = calcularMetaFimSemanaPorDia(registros, historico);
   const datas = Array.from(mapa.keys()).sort();
   const ultima = datas[datas.length - 1];
   return ultima != null ? (mapa.get(ultima) ?? null) : null;
