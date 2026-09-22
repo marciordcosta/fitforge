@@ -4,6 +4,7 @@
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { toISODate, hojeISO } from "../../lib/dates";
   import TreinoAjusteDiaFluxo from "../../components/TreinoAjusteDiaFluxo.svelte";
+  import TreinoMudarDiaSheet from "./TreinoMudarDiaSheet.svelte";
   import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import {
     listTreinos,
@@ -34,6 +35,7 @@
   let musculosPorExercicio = $state<Map<string, { musculo_id: string; peso: number }[]>>(new Map());
   let modoRestante = $state(true);
   let mostrarMenuNovo = $state(false);
+  let mostrarMudarDiaDireto = $state(false);
   /** Dia efetivo de cada rotina PRA ESSA SEMANA — igual ao dia fixo (treino.dia_semana) na maioria
    * das vezes, mas reflete o override de "Mudar dia"/"Cancelar" (TreinoAjusteDiaFluxo) quando a
    * semana atual tiver um: rotina sem entrada no override dessa semana vira null (sem dia, mesmo
@@ -421,11 +423,23 @@
         onclick={() => navigate(`/treino/rotina/${treino.id}/ver`)}
         onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
       >
+        {#if diaEfetivo !== treino.dia_semana}
+          <button
+            type="button"
+            class="mudou-tag"
+            onclick={(e) => {
+              e.stopPropagation();
+              mostrarMudarDiaDireto = true;
+            }}
+          >
+            {diaEfetivo != null ? `Essa semana: ${DIAS_SEMANA_COMPLETO[diaEfetivo]}` : "Sem treino essa semana"}
+          </button>
+        {/if}
         <div class="card-header">
           <h2 class:nome-neutro={!destacada}>
             {treino.nome_treino}
-            {#if diaEfetivo != null}
-              <span class="dia-tag">{DIAS_SEMANA_COMPLETO[diaEfetivo]}</span>
+            {#if treino.dia_semana != null}
+              <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
             {/if}
           </h2>
         </div>
@@ -444,6 +458,17 @@
     {/each}
   {/if}
 </div>
+
+{#if mostrarMudarDiaDireto}
+  <TreinoMudarDiaSheet
+    data={hojeISO()}
+    onFechar={() => (mostrarMudarDiaDireto = false)}
+    onSalvo={() => {
+      mostrarMudarDiaDireto = false;
+      void carregar();
+    }}
+  />
+{/if}
 
 {#if mostrarMenuNovo}
   <ActionSheet
@@ -643,12 +668,27 @@
     margin: 0 0 var(--space-3);
   }
   .rotina-item {
+    position: relative;
     cursor: pointer;
     background: var(--surface-card);
     padding: var(--space-4);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
+  }
+  .mudou-tag {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    padding: 4px var(--space-2);
+    border-radius: 999px;
+    border: 1px solid var(--color-secondary);
+    background: color-mix(in srgb, var(--color-secondary) 15%, var(--surface-card));
+    color: var(--color-secondary);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
   }
   .iniciar-secundario {
     width: 100%;
