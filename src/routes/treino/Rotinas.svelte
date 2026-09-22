@@ -3,6 +3,7 @@
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { toISODate, hojeISO } from "../../lib/dates";
+  import TreinoAjusteDiaFluxo from "../../components/TreinoAjusteDiaFluxo.svelte";
   import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import {
     listTreinos,
@@ -409,6 +410,11 @@
         <p class="preview">{preview(treino)}</p>
         {#if destacada}
           <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+          {#if treino.dia_semana === new Date().getDay()}
+            <div role="presentation" onclick={(e) => e.stopPropagation()}>
+              <TreinoAjusteDiaFluxo data={hojeISO()} onMudou={carregar} />
+            </div>
+          {/if}
         {:else}
           <button type="button" class="iniciar-secundario" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</button>
         {/if}

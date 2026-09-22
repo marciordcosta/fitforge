@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
-import { hojeISO } from "./dates";
+import { hojeISO, parseISODate, toISODate } from "./dates";
 
 export const PESOS_CONTRIBUICAO_PRESET = [1, 0.75, 0.5, 0.25] as const;
 
@@ -798,6 +798,91 @@ export async function atualizarOrdemTreinos(idsOrdenados: string[]): Promise<voi
   await Promise.all(
     idsOrdenados.map((id, ordem) => supabase.from("treinos").update({ ordem }).eq("id", id)),
   );
+}
+
+// ---------------- Override semanal (mudar/cancelar o treino de um dia só nessa semana) ----------------
+
+/** Segunda-feira da semana que contém essa data — mesma convenção de "semana" já usada em
+ * Rotinas.svelte (registros de segunda até hoje). */
+export function segundaDaSemana(data: string): string {
+  const d = parseISODate(data);
+  const delta = (d.getDay() + 6) % 7;
+  return toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - delta));
+}
+
+export interface TreinoOverrideDia {
+  diaSemana: number;
+  treinoId: string;
+}
+
+/** Overrides de uma semana (identificada pela segunda-feira dela). Vazio = a semana segue o
+ * horário fixo normalmente. QUALQUER linha presente significa que a semana inteira "destravou"
+ * do horário fixo — um dia dessa semana sem nenhuma linha aqui é um dia sem treino de propósito,
+ * não "ainda não configurado". */
+export async function listOverrideSemana(semanaInicio: string): Promise<TreinoOverrideDia[]> {
+  const { data, error } = await supabase
+    .from("treino_semana_override")
+    .select("dia_semana, treino_id")
+    .eq("user_id", uid())
+    .eq("semana_inicio", semanaInicio);
+  if (error) throw error;
+  return (data ?? []).map((l) => ({ diaSemana: l.dia_semana as number, treinoId: l.treino_id as string }));
+}
+
+/** Substitui o override de UMA semana pelas linhas informadas (uma por combinação dia+treino; um
+ * dia pode aparecer 0, 1 ou várias vezes). Lista vazia "destrava" a semana com NENHUM treino em
+ * dia nenhum — pra voltar ao horário fixo de verdade, use limparOverrideSemana. */
+export async function salvarOverrideSemana(semanaInicio: string, dias: TreinoOverrideDia[]): Promise<void> {
+  const usuario = uid();
+  const { error: errDel } = await supabase
+    .from("treino_semana_override")
+    .delete()
+    .eq("user_id", usuario)
+    .eq("semana_inicio", semanaInicio);
+  if (errDel) throw errDel;
+  if (!dias.length) return;
+  const { error: errIns } = await supabase
+    .from("treino_semana_override")
+    .insert(dias.map((d) => ({ user_id: usuario, semana_inicio: semanaInicio, dia_semana: d.diaSemana, treino_id: d.treinoId })));
+  if (errIns) throw errIns;
+}
+
+/** Remove o override de uma semana — ela volta a seguir o horário fixo normalmente. */
+export async function limparOverrideSemana(semanaInicio: string): Promise<void> {
+  const { error } = await supabase.from("treino_semana_override").delete().eq("user_id", uid()).eq("semana_inicio", semanaInicio);
+  if (error) throw error;
+}
+
+/** Converte o horário FIXO (treinos.dia_semana) numa lista de overrides — base pra "destravar"
+ * uma semana ainda sem override nenhum (usado por cancelarTreinoDoDia e ao abrir o modal "Mudar
+ * dia"). */
+export function horarioFixoComoOverride(treinos: TreinoComExercicios[]): TreinoOverrideDia[] {
+  return treinos.filter((t) => t.dia_semana != null).map((t) => ({ diaSemana: t.dia_semana as number, treinoId: t.id }));
+}
+
+/** Cancela só o treino de UMA data específica: "destrava" a semana dela a partir do horário fixo
+ * (se ainda não estava destravada) e remove esse dia da lista — os outros dias da semana
+ * continuam exatamente como o horário fixo já dizia. */
+export async function cancelarTreinoDoDia(data: string): Promise<void> {
+  const semanaInicio = segundaDaSemana(data);
+  const diaSemana = parseISODate(data).getDay();
+  const existentes = await listOverrideSemana(semanaInicio);
+  const base = existentes.length ? existentes : horarioFixoComoOverride(await listTreinos());
+  await salvarOverrideSemana(semanaInicio, base.filter((d) => d.diaSemana !== diaSemana));
+}
+
+/** Rotinas efetivamente agendadas pra essa data: override da semana se ela tiver um (mesmo que
+ * fique vazio de propósito), senão o horário fixo (treinos.dia_semana). */
+export async function getTreinosEfetivosDoDia(data: string, todosOsTreinos?: TreinoComExercicios[]): Promise<TreinoComExercicios[]> {
+  const treinos = todosOsTreinos ?? (await listTreinos());
+  const semanaInicio = segundaDaSemana(data);
+  const diaSemana = parseISODate(data).getDay();
+  const overrides = await listOverrideSemana(semanaInicio);
+  if (overrides.length) {
+    const idsHoje = new Set(overrides.filter((o) => o.diaSemana === diaSemana).map((o) => o.treinoId));
+    return treinos.filter((t) => idsHoje.has(t.id));
+  }
+  return treinos.filter((t) => t.dia_semana === diaSemana);
 }
 
 export async function duplicateTreino(id: string): Promise<string> {

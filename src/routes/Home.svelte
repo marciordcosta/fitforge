@@ -3,7 +3,7 @@
   import { hojeISO } from "../lib/dates";
   import { getLayoutHome, type HomeCardTipo } from "../lib/homeApi";
   import { getUltimoPeso, getPesoMedioAtual, getMeta, getMetaSemanal } from "../lib/pesoApi";
-  import { listTreinos, type TreinoComExercicios } from "../lib/treinoApi";
+  import { listTreinos, getTreinosEfetivosDoDia, type TreinoComExercicios } from "../lib/treinoApi";
   import {
     getMetasDoDia,
     getDiarioDoDia,
@@ -31,7 +31,7 @@
   let pesoMediaVal = $state<number | null>(null);
   let metaSemanalVal = $state<number | null>(null);
   let pesoAlvoVal = $state<number | null>(null);
-  let treinoHoje = $state<TreinoComExercicios | null>(null);
+  let treinosHoje = $state<TreinoComExercicios[]>([]);
   let caloriasMeta = $state(0);
   let caloriasConsumido = $state(0);
   let proteinaMetaVal = $state(0);
@@ -56,7 +56,6 @@
     try {
       const tipos = await getLayoutHome();
       const hoje = hojeISO();
-      const diaSemanaHoje = new Date().getDay();
       const precisaDieta = tipos.includes("calorias_dia") || tipos.includes("refeicoes_dia");
 
       const precisaPeso = tipos.includes("peso_atual") || precisaDieta;
@@ -79,7 +78,7 @@
       pesoMediaVal = pesoMedia;
       metaSemanalVal = metaSemanal;
       pesoAlvoVal = meta?.pesoAlvo ?? null;
-      treinoHoje = treinos.find((t) => t.dia_semana === diaSemanaHoje) ?? null;
+      treinosHoje = tipos.includes("proximo_treino") ? await getTreinosEfetivosDoDia(hoje, treinos) : [];
       caloriasMeta = metasDia?.calorias ?? 0;
       caloriasConsumido = itensDia.reduce((acc, i) => acc + i.calorias, 0);
       proteinaMetaVal = metasDia?.proteinaG ?? 0;
@@ -161,7 +160,7 @@
       {#if tipo === "peso_atual"}
         <CardPesoAtual pesoAtual={pesoAtualVal} media={pesoMediaVal} metaSemanal={metaSemanalVal} pesoAlvo={pesoAlvoVal} />
       {:else if tipo === "proximo_treino"}
-        <CardProximoTreino treino={treinoHoje} />
+        <CardProximoTreino treinos={treinosHoje} data={hojeISO()} onMudou={carregar} />
       {:else if tipo === "calorias_dia"}
         <CardCaloriasDia
           caloriasConsumido={caloriasConsumido}

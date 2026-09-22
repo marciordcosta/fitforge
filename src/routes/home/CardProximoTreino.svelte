@@ -1,9 +1,12 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
+  import TreinoAjusteDiaFluxo from "../../components/TreinoAjusteDiaFluxo.svelte";
   import { DIAS_SEMANA_COMPLETO, type TreinoComExercicios } from "../../lib/treinoApi";
 
-  let { treino }: { treino: TreinoComExercicios | null } = $props();
+  /** `treinos` no plural porque um dia pode ter mais de uma rotina depois de "Mudar dia" (ver
+   * TreinoAjusteDiaFluxo) — no caso comum (0 ou 1) o card se comporta como sempre se comportou. */
+  let { treinos, data, onMudou }: { treinos: TreinoComExercicios[]; data: string; onMudou: () => void } = $props();
 
   function preview(t: TreinoComExercicios): string {
     const nomes = t.exercicios
@@ -15,49 +18,77 @@
     return nomes.join(", ");
   }
 
-  function abrirRotina(): void {
+  function abrirRotina(treino: TreinoComExercicios | null): void {
     navigate(treino ? `/treino/rotina/${treino.id}/ver` : "/treino");
   }
 </script>
 
-<div
-  class="card"
-  role="button"
-  tabindex="0"
-  onclick={abrirRotina}
-  onkeydown={(e) => e.key === "Enter" && abrirRotina()}
->
-  {#if treino}
-    <div class="card-header">
-      <h2>
-        {treino.nome_treino}
-        {#if treino.dia_semana != null}
-          <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
-        {/if}
-      </h2>
-    </div>
-    <p class="preview">{preview(treino)}</p>
-    <Button variant="secondary" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+<div class="card">
+  {#if treinos.length}
+    {#each treinos as treino, i (treino.id)}
+      <div
+        class="treino-bloco"
+        class:com-margem={i < treinos.length - 1}
+        role="button"
+        tabindex="0"
+        onclick={() => abrirRotina(treino)}
+        onkeydown={(e) => e.key === "Enter" && abrirRotina(treino)}
+      >
+        <div class="card-header">
+          <h2>
+            {treino.nome_treino}
+            {#if treino.dia_semana != null}
+              <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
+            {/if}
+          </h2>
+        </div>
+        <p class="preview">{preview(treino)}</p>
+        <Button variant="secondary" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+      </div>
+    {/each}
+    <TreinoAjusteDiaFluxo {data} {onMudou} />
   {:else}
-    <p class="subtexto">Nenhum treino agendado pra hoje</p>
+    <button class="sem-treino-btn" onclick={() => abrirRotina(null)}>
+      <p class="subtexto">Nenhum treino agendado pra hoje</p>
+    </button>
+    <TreinoAjusteDiaFluxo {data} {onMudou} />
   {/if}
 </div>
 
 <style>
   .card {
-    display: block;
-    width: 100%;
     background: var(--surface-card);
-    border: none;
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
+  }
+  .treino-bloco {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
     text-align: left;
     font-family: inherit;
     color: inherit;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+  }
+  .treino-bloco.com-margem {
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .sem-treino-btn {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
   }
   .card-header {
     margin-bottom: var(--space-1);

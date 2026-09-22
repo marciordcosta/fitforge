@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
-import { DIAS_SEMANA_ABREV } from "./treinoApi";
+import { DIAS_SEMANA_ABREV, segundaDaSemana } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
 import { parseISODate } from "./dates";
 
@@ -1677,18 +1677,90 @@ export function carboidratoGDoDia(caloriasDoDia: number, proteinaG: number, gord
   return Math.max(0, Math.round((caloriasDoDia - 4 * proteinaG - 9 * gorduraG) / 4));
 }
 
+// ---------------- Override semanal da Ondulatória (reposicionar as metas de calorias só nessa semana) ----------------
+
+export interface DietaOverrideDia {
+  diaSemana: number;
+  calorias: number;
+  gorduraG: number;
+}
+
+/** Overrides de uma semana (identificada pela segunda-feira dela, mesma convenção de
+ * segundaDaSemana em treinoApi.ts). Vazio = a semana segue a Ondulatória normal configurada em
+ * Parametrização. */
+export async function listOverrideSemanaDieta(semanaInicio: string): Promise<DietaOverrideDia[]> {
+  const { data, error } = await supabase
+    .from("dieta_semana_override")
+    .select("dia_semana, calorias, gordura_g")
+    .eq("user_id", uid())
+    .eq("semana_inicio", semanaInicio);
+  if (error) throw error;
+  return (data ?? []).map((l) => ({ diaSemana: l.dia_semana as number, calorias: l.calorias as number, gorduraG: l.gordura_g as number }));
+}
+
+/** Substitui o override de UMA semana pelos 7 dias informados (reposiciona os mesmos valores de
+ * calorias/gordura entre os dias, não inventa valores novos). Lista vazia volta a semana pra
+ * Ondulatória normal. */
+export async function salvarOverrideSemanaDieta(semanaInicio: string, dias: DietaOverrideDia[]): Promise<void> {
+  const usuario = uid();
+  const { error: errDel } = await supabase
+    .from("dieta_semana_override")
+    .delete()
+    .eq("user_id", usuario)
+    .eq("semana_inicio", semanaInicio);
+  if (errDel) throw errDel;
+  if (!dias.length) return;
+  const { error: errIns } = await supabase.from("dieta_semana_override").insert(
+    dias.map((d) => ({ user_id: usuario, semana_inicio: semanaInicio, dia_semana: d.diaSemana, calorias: d.calorias, gordura_g: d.gorduraG })),
+  );
+  if (errIns) throw errIns;
+}
+
+/** Os 7 dias da semana com o perfil (calorias/gordura) que a Ondulatória normal dá hoje pra cada
+ * um — ponto de partida pra "reposicionar" no modal, antes de qualquer troca. */
+export async function perfilSemanalOndulatoria(): Promise<DietaOverrideDia[]> {
+  const dias = await Promise.all(
+    [0, 1, 2, 3, 4, 5, 6].map(async (diaSemana) => {
+      const meta = await getMetasDoDiaSemana(diaSemana);
+      return { diaSemana, calorias: meta.calorias, gorduraG: meta.gorduraG };
+    }),
+  );
+  return dias;
+}
+
 /**
  * Meta de macros/calorias efetiva pra uma data específica — respeita o modo Fixa/Ondulatória.
- * Em Fixa, é a mesma meta global de sempre (getMetasDiarias). Em Ondulatória, resolve o dia da
- * semana dessa data: proteína é sempre o valor global atual (constante, nunca varia por dia,
- * nem em dias travados manualmente); a gordura é redistribuída entre os dias automáticos (dias
- * manuais "gastam" da meta semanal, o resto divide igual entre os automáticos — distribuirValorPorDia);
- * o carboidrato é sempre calculado por cima pra fechar a meta de calorias daquele dia (automático
- * ou manual) com a proteína/gordura vigentes — assim, se a proteína global mudar, todo dia manual
- * recalcula o carboidrato na hora pra manter a calorias travada daquele dia, sem precisar regravar
- * nada. Mesma lógica usada em Gerenciar > Refeições.
+ * Em Fixa, é a mesma meta global de sempre (getMetasDiarias). Em Ondulatória, primeiro olha se a
+ * SEMANA dessa data tem um override salvo (ver salvarOverrideSemanaDieta) — se tiver, usa o
+ * perfil (calorias/gordura) reposicionado ali pra esse dia da semana, só valendo pra essa semana.
+ * Sem override, resolve o dia da semana dessa data pela Ondulatória normal: proteína é sempre o
+ * valor global atual (constante, nunca varia por dia, nem em dias travados manualmente); a
+ * gordura é redistribuída entre os dias automáticos (dias manuais "gastam" da meta semanal, o
+ * resto divide igual entre os automáticos — distribuirValorPorDia); o carboidrato é sempre
+ * calculado por cima pra fechar a meta de calorias daquele dia (automático ou manual, ou do
+ * override) com a proteína/gordura vigentes. Mesma lógica usada em Gerenciar > Refeições (exceto
+ * o override, que só se aplica a uma data concreta, não a um dia da semana abstrato).
  */
 export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
+  const modo = await getModoCalorias();
+  if (modo === "ondulatoria") {
+    const semanaInicio = segundaDaSemana(data);
+    const overrides = await listOverrideSemanaDieta(semanaInicio);
+    if (overrides.length) {
+      const diaSemana = parseISODate(data).getDay();
+      const doDia = overrides.find((o) => o.diaSemana === diaSemana);
+      if (doDia) {
+        const perfil = await getPerfilDietaEditavel();
+        const { proteinaG } = await resolverProteinaGordura(perfil);
+        return {
+          calorias: doDia.calorias,
+          proteinaG,
+          gorduraG: doDia.gorduraG,
+          carboidratoG: carboidratoGDoDia(doDia.calorias, proteinaG, doDia.gorduraG),
+        };
+      }
+    }
+  }
   return getMetasDoDiaSemana(parseISODate(data).getDay());
 }
 
