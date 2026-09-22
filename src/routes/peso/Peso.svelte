@@ -313,6 +313,12 @@
    * percentualMin, não de comparar com a âncora (evita ambiguidade quando a âncora já bate o
    * alvo). Ao chegar perto/bater o peso-alvo, a linha para ali em vez de continuar projetando
    * pra além da meta.
+   *
+   * A banda só é REAVALIADA em marcos semanais (7 em 7 dias desde a âncora), nunca dia a dia: o
+   * ritmo é "por semana", então um dia sozinho depois de reancorar tem uma banda ridiculamente
+   * estreita (a diferença entre, ex., 0,5%/semana e 1%/semana em 1 dia é quase nada) — testar
+   * todo dia fazia reancorar quase todo dia, grudando a linha na própria média. Entre um marco
+   * semanal e outro a linha continua compondo normalmente, só não é usada pra decidir reancorar.
    */
   const metaAlvoPorPonto = $derived.by(() => {
     if (!metaHistorico.length || !mediaMovelGrafico.length) return null;
@@ -322,9 +328,15 @@
       return percentualMin < 0 ? Math.max(valor, pesoAlvo) : Math.min(valor, pesoAlvo);
     }
 
+    function somarDiasISO(iso: string, dias: number): string {
+      const d = parseISODate(iso);
+      return toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + dias));
+    }
+
     const resultado: (number | null)[] = [];
     let ancoraValor: number | null = null;
     let ancoraData: string | null = null;
+    let proximaChecagem: string | null = null;
     let vigenteDesdeAnterior: string | null = null;
 
     for (const ponto of mediaMovelGrafico) {
@@ -333,6 +345,7 @@
         resultado.push(null);
         ancoraValor = null;
         ancoraData = null;
+        proximaChecagem = null;
         vigenteDesdeAnterior = null;
         continue;
       }
@@ -341,6 +354,7 @@
         resultado.push(metaDoDia.pesoAlvo);
         ancoraValor = null;
         ancoraData = null;
+        proximaChecagem = null;
         vigenteDesdeAnterior = null;
         continue;
       }
@@ -356,26 +370,26 @@
       if (ancoraValor == null || ancoraData == null || mudouMeta) {
         ancoraValor = ponto.peso;
         ancoraData = ponto.data;
-      } else {
+        proximaChecagem = somarDiasISO(ponto.data, 7);
+      } else if (proximaChecagem != null && ponto.data >= proximaChecagem) {
         const dias = Math.round((parseISODate(ponto.data).getTime() - parseISODate(ancoraData).getTime()) / 86400000);
-        if (dias > 0) {
-          const valMin = limitarPeloAlvo(
-            ancoraValor * Math.pow(1 + metaDoDia.percentualMin / 100, dias / 7),
-            metaDoDia.percentualMin,
-            metaDoDia.pesoAlvo,
-          );
-          const valMax = limitarPeloAlvo(
-            ancoraValor * Math.pow(1 + metaDoDia.percentualMax / 100, dias / 7),
-            metaDoDia.percentualMin,
-            metaDoDia.pesoAlvo,
-          );
-          const limiteBaixo = Math.min(valMin, valMax);
-          const limiteAlto = Math.max(valMin, valMax);
-          if (ponto.peso < limiteBaixo || ponto.peso > limiteAlto) {
-            ancoraValor = ponto.peso;
-            ancoraData = ponto.data;
-          }
+        const valMin = limitarPeloAlvo(
+          ancoraValor * Math.pow(1 + metaDoDia.percentualMin / 100, dias / 7),
+          metaDoDia.percentualMin,
+          metaDoDia.pesoAlvo,
+        );
+        const valMax = limitarPeloAlvo(
+          ancoraValor * Math.pow(1 + metaDoDia.percentualMax / 100, dias / 7),
+          metaDoDia.percentualMin,
+          metaDoDia.pesoAlvo,
+        );
+        const limiteBaixo = Math.min(valMin, valMax);
+        const limiteAlto = Math.max(valMin, valMax);
+        if (ponto.peso < limiteBaixo || ponto.peso > limiteAlto) {
+          ancoraValor = ponto.peso;
+          ancoraData = ponto.data;
         }
+        proximaChecagem = somarDiasISO(ponto.data, 7);
       }
 
       const diasDesdeAncora = Math.round((parseISODate(ponto.data).getTime() - parseISODate(ancoraData).getTime()) / 86400000);
