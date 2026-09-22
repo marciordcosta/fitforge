@@ -4,6 +4,7 @@
   import { mostrarToast } from "../../lib/toast.svelte";
   import { DIAS_SEMANA_ABREV, segundaDaSemana } from "../../lib/treinoApi";
   import { listOverrideSemanaDieta, salvarOverrideSemanaDieta, perfilSemanalOndulatoria, type DietaOverrideDia } from "../../lib/dietaApi";
+  import { marcarDietaDesatualizada } from "../../lib/dietaInvalidacao.svelte";
 
   let { data, onFechar, onSalvo }: { data: string; onFechar: () => void; onSalvo: () => void } = $props();
 
@@ -61,6 +62,7 @@
     salvando = true;
     try {
       await salvarOverrideSemanaDieta(semanaInicio, dias);
+      marcarDietaDesatualizada();
       mostrarToast("Salvo");
       onSalvo();
     } catch (err) {

@@ -33,6 +33,7 @@
     type BaseReferenciaRefeicao,
   } from "../../lib/dietaApi";
   import { mostrarToast } from "../../lib/toast.svelte";
+  import { dietaInvalidacao } from "../../lib/dietaInvalidacao.svelte";
   import { listTreinos, type Treino } from "../../lib/treinoApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
 
@@ -322,6 +323,17 @@
   }
 
   void carregar();
+
+  /** A aba Dieta fica sempre montada (ver App.svelte) — sem isso, ajustar as calorias da semana
+   * pelo fluxo "Não vai treinar hoje?" (iniciado no Home/Treino) não aparecia aqui até recarregar
+   * a página. */
+  let versaoDietaVista = dietaInvalidacao.versao;
+  $effect(() => {
+    if (dietaInvalidacao.versao !== versaoDietaVista) {
+      versaoDietaVista = dietaInvalidacao.versao;
+      void carregar();
+    }
+  });
 
   const dataLabel = $derived.by(() => {
     if (dataAtual === hojeISO()) return "Hoje";

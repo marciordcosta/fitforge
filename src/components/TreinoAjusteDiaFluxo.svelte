@@ -91,7 +91,14 @@
 {/if}
 
 {#if mostrarAjustarDieta}
-  <DietaAjustarSemanaSheet {data} onFechar={() => (mostrarAjustarDieta = false)} onSalvo={() => (mostrarAjustarDieta = false)} />
+  <DietaAjustarSemanaSheet
+    {data}
+    onFechar={() => (mostrarAjustarDieta = false)}
+    onSalvo={() => {
+      mostrarAjustarDieta = false;
+      onMudou();
+    }}
+  />
 {/if}
 
 <style>
