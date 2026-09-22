@@ -51,7 +51,6 @@
     <button class="sem-treino-btn" onclick={() => abrirRotina(null)}>
       <p class="subtexto">Nenhum treino agendado pra hoje</p>
     </button>
-    <TreinoAjusteDiaFluxo {data} {onMudou} />
   {/if}
 </div>
 
