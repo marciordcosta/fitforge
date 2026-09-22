@@ -4,7 +4,7 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { navigate } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
-  import { getMeta, getUltimoPeso, salvarMeta, excluirMeta } from "../../lib/pesoApi";
+  import { getMeta, getUltimoPeso, salvarMeta, excluirMeta, type ReferenciaIdeal, type EstiloMeta } from "../../lib/pesoApi";
   import { getTipoDieta, type TipoDieta } from "../../lib/dietaApi";
 
   let {
@@ -22,11 +22,17 @@
   };
 
   let tipoDieta = $state<TipoDieta>("manutencao");
+  /** Estilo da linha de meta (ver calcularLinhaMetaPorDia em pesoApi.ts) — "ritmo_semanal" (estilo
+   * MacroFactor: reseta a cada 7 dias, projeta no ritmo escolhido) ou "faixa_alvo" (estilo
+   * TrendWeight: sem trajetória, meta = peso-alvo constante). Só relevante pra tipo "percentual". */
+  let estiloMeta = $state<EstiloMeta>("ritmo_semanal");
   /** Sempre a magnitude (sem sinal) — o sinal é aplicado na hora de salvar, conforme o tipo de
-   * dieta. `percentualMin` é o ritmo padrão/conservador (usado como inclinação da linha de meta
-   * do gráfico); `percentualMax` é só o limite de tolerância antes da linha reancorar. */
+   * dieta. Só usados quando estiloMeta é "ritmo_semanal": `percentualMin` é o ritmo
+   * padrão/conservador, `percentualMax` o mais agressivo — `referenciaIdeal` escolhe qual dos
+   * dois vira a inclinação da linha. */
   let percentualMin = $state<number | null>(null);
   let percentualMax = $state<number | null>(null);
+  let referenciaIdeal = $state<ReferenciaIdeal>("minimo");
   let pesoAlvo = $state<number | null>(null);
   let carregando = $state(true);
   let salvando = $state(false);
@@ -58,10 +64,12 @@
       tipoDieta = tipo;
       temMetaSalva = metaAtual != null;
       pesoAlvo = metaAtual?.pesoAlvo ?? ultimoPeso;
+      estiloMeta = metaAtual?.estiloMeta ?? "ritmo_semanal";
       percentualMin = metaAtual?.tipo === "percentual" && metaAtual.percentualMin != null ? Math.abs(metaAtual.percentualMin) : null;
       percentualMax = metaAtual?.tipo === "percentual" && metaAtual.percentualMax != null ? Math.abs(metaAtual.percentualMax) : null;
+      referenciaIdeal = metaAtual?.referenciaIdeal ?? "minimo";
       clampPercentuais();
-      original = JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo });
+      original = JSON.stringify({ tipoDieta, estiloMeta, percentualMin, percentualMax, referenciaIdeal, pesoAlvo });
     } finally {
       carregando = false;
     }
@@ -70,10 +78,11 @@
   void carregar();
 
   const precisaPercentual = $derived(tipoDieta !== "manutencao");
-  const podeSalvar = $derived(pesoAlvo != null && (!precisaPercentual || (percentualMin != null && percentualMax != null)));
+  const precisaRitmo = $derived(precisaPercentual && estiloMeta === "ritmo_semanal");
+  const podeSalvar = $derived(pesoAlvo != null && (!precisaRitmo || (percentualMin != null && percentualMax != null)));
 
   function sujo(): boolean {
-    return !carregando && JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo }) !== original;
+    return !carregando && JSON.stringify({ tipoDieta, estiloMeta, percentualMin, percentualMax, referenciaIdeal, pesoAlvo }) !== original;
   }
 
   /** Sheet sem botão de voltar dedicado — fechar (toque fora, arrastar pra baixo) é o próprio
@@ -91,10 +100,17 @@
     salvando = true;
     try {
       if (tipoDieta === "manutencao") {
-        await salvarMeta("manutencao", null, null, pesoAlvo);
+        await salvarMeta("manutencao", estiloMeta, null, null, referenciaIdeal, pesoAlvo);
       } else {
         const sinal = tipoDieta === "bulking" ? 1 : -1;
-        await salvarMeta("percentual", sinal * Math.abs(percentualMin!), sinal * Math.abs(percentualMax!), pesoAlvo);
+        await salvarMeta(
+          "percentual",
+          estiloMeta,
+          precisaRitmo ? sinal * Math.abs(percentualMin!) : null,
+          precisaRitmo ? sinal * Math.abs(percentualMax!) : null,
+          referenciaIdeal,
+          pesoAlvo,
+        );
       }
       mostrarToast("Salvo");
       onSalvo();
@@ -128,6 +144,27 @@
     </button>
 
     {#if precisaPercentual}
+      <div class="campo">
+        <label for="meta-estilo">Estilo da meta</label>
+        <div class="referencia-opcoes" id="meta-estilo">
+          <button type="button" class:ativo={estiloMeta === "ritmo_semanal"} onclick={() => (estiloMeta = "ritmo_semanal")}>
+            Ritmo semanal
+          </button>
+          <button type="button" class:ativo={estiloMeta === "faixa_alvo"} onclick={() => (estiloMeta = "faixa_alvo")}>
+            Faixa no alvo
+          </button>
+        </div>
+        <span class="campo-dica">
+          {#if estiloMeta === "ritmo_semanal"}
+            A meta reseta toda semana pro seu progresso real e projeta a próxima no ritmo escolhido — sem tentar "recuperar o atraso".
+          {:else}
+            A meta é sempre o peso-alvo, sem trajetória — só compara sua média real com ele.
+          {/if}
+        </span>
+      </div>
+    {/if}
+
+    {#if precisaRitmo}
       <div class="campo campo-dupla">
         <div>
           <label for="meta-percentual-min">Ritmo mínimo (%/semana)</label>
@@ -159,8 +196,18 @@
         </div>
       </div>
       <span class="campo-dica campo-dica-dupla">
-        Entre {PERCENTUAL_MIN}% e {PERCENTUAL_MAX}% — a linha de meta segue o ritmo mínimo; só reancora se sair da faixa
+        Entre {PERCENTUAL_MIN}% e {PERCENTUAL_MAX}%
       </span>
+
+      <div class="campo">
+        <label for="meta-referencia-ideal">Linha segue o ritmo</label>
+        <div class="referencia-opcoes" id="meta-referencia-ideal">
+          <button type="button" class:ativo={referenciaIdeal === "minimo"} onclick={() => (referenciaIdeal = "minimo")}>Mínimo</button>
+          <button type="button" class:ativo={referenciaIdeal === "media"} onclick={() => (referenciaIdeal = "media")}>Média</button>
+          <button type="button" class:ativo={referenciaIdeal === "maximo"} onclick={() => (referenciaIdeal = "maximo")}>Máximo</button>
+        </div>
+        <span class="campo-dica">Qual ritmo vira a inclinação da linha a cada semana</span>
+      </div>
     {/if}
 
     <div class="campo">
@@ -210,6 +257,27 @@
     margin-top: 2px;
     color: var(--color-primary);
     font-size: 12px;
+  }
+  .referencia-opcoes {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .referencia-opcoes button {
+    flex: 1;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .referencia-opcoes button.ativo {
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
   }
   .campo {
     display: flex;
