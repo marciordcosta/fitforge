@@ -2,59 +2,31 @@
   import ActionSheet from "./ActionSheet.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import TreinoMudarDiaSheet from "../routes/treino/TreinoMudarDiaSheet.svelte";
-  import DietaAjustarSemanaSheet from "../routes/dieta/DietaAjustarSemanaSheet.svelte";
   import { cancelarTreinoDoDia } from "../lib/treinoApi";
-  import { getModoCalorias } from "../lib/dietaApi";
 
-  /** Texto "Não vai treinar hoje?" + todo o fluxo de mudar/cancelar o treino do dia (só essa
-   * semana) e, se a dieta estiver em modo Ondulatória, oferecer ajustar as metas de calorias da
-   * semana também — usado no card do Home e no item "de hoje" de Rotinas.svelte, pra nunca ter
-   * duas implementações divergentes da mesma interação. */
+  /** Texto "Não vai treinar hoje?" + o fluxo de mudar/cancelar o treino do dia (só essa semana) —
+   * usado no card do Home e no item "de hoje" de Rotinas.svelte, pra nunca ter duas implementações
+   * divergentes da mesma interação. A pergunta sobre ajustar a dieta (quando 1 rotina troca de dia
+   * e a dieta está em Ondulatória) mora dentro do próprio TreinoMudarDiaSheet — ele já sabe os 2
+   * dias envolvidos na troca, não precisa de um seletor de 7 dias separado. */
   let { data, onMudou }: { data: string; onMudou: () => void } = $props();
 
   let mostrarMenu = $state(false);
   let mostrarConfirmCancelar = $state(false);
   let mostrarMudarDia = $state(false);
-  let mostrarConfirmDieta = $state(false);
-  let mostrarAjustarDieta = $state(false);
   let processando = $state(false);
-
-  /**
-   * Só chama onMudou() no fim de tudo (nunca antes) — o pai (Home/Rotinas) pode recarregar e
-   * decidir que hoje não tem mais treino nenhum, o que destrói esse componente (ele só existe
-   * dentro do estado "tem treino hoje"). Chamar onMudou() cedo demais matava esse componente no
-   * meio do fluxo, antes da pergunta sobre a dieta conseguir aparecer — parecia que "nada
-   * acontecia" depois de mudar o dia.
-   */
-  async function talvezPerguntarDieta(): Promise<void> {
-    try {
-      const modo = await getModoCalorias();
-      if (modo === "ondulatoria") {
-        mostrarConfirmDieta = true;
-        return;
-      }
-    } catch {
-      // informativo — se falhar, só não oferece o ajuste de dieta
-    }
-    onMudou();
-  }
 
   async function confirmarCancelar(): Promise<void> {
     mostrarConfirmCancelar = false;
     processando = true;
     try {
       await cancelarTreinoDoDia(data);
-      await talvezPerguntarDieta();
+      onMudou();
     } catch (err) {
       alert("Erro ao cancelar o treino: " + (err as Error).message);
     } finally {
       processando = false;
     }
-  }
-
-  async function aoSalvarMudarDia(): Promise<void> {
-    mostrarMudarDia = false;
-    await talvezPerguntarDieta();
   }
 </script>
 
@@ -83,28 +55,11 @@
 {/if}
 
 {#if mostrarMudarDia}
-  <TreinoMudarDiaSheet {data} onFechar={() => (mostrarMudarDia = false)} onSalvo={aoSalvarMudarDia} />
-{/if}
-
-{#if mostrarConfirmDieta}
-  <ConfirmDialog
-    titulo="Quer ajustar as metas de calorias dessa semana também?"
-    textoConfirmar="Ajustar"
-    destrutivo={false}
-    onConfirmar={() => {
-      mostrarConfirmDieta = false;
-      mostrarAjustarDieta = true;
-    }}
-    onCancelar={() => (mostrarConfirmDieta = false)}
-  />
-{/if}
-
-{#if mostrarAjustarDieta}
-  <DietaAjustarSemanaSheet
+  <TreinoMudarDiaSheet
     {data}
-    onFechar={() => (mostrarAjustarDieta = false)}
+    onFechar={() => (mostrarMudarDia = false)}
     onSalvo={() => {
-      mostrarAjustarDieta = false;
+      mostrarMudarDia = false;
       onMudou();
     }}
   />

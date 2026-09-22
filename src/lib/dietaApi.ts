@@ -3,6 +3,7 @@ import { auth } from "./auth.svelte";
 import { DIAS_SEMANA_ABREV, segundaDaSemana } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
 import { parseISODate } from "./dates";
+import { marcarDietaDesatualizada } from "./dietaInvalidacao.svelte";
 
 function uid(): string {
   const id = auth.user?.id;
@@ -1717,7 +1718,7 @@ export async function salvarOverrideSemanaDieta(semanaInicio: string, dias: Diet
 }
 
 /** Os 7 dias da semana com o perfil (calorias/gordura) que a Ondulatória normal dá hoje pra cada
- * um — ponto de partida pra "reposicionar" no modal, antes de qualquer troca. */
+ * um — ponto de partida pra trocar entre 2 dias sem inventar valor novo. */
 export async function perfilSemanalOndulatoria(): Promise<DietaOverrideDia[]> {
   const dias = await Promise.all(
     [0, 1, 2, 3, 4, 5, 6].map(async (diaSemana) => {
@@ -1726,6 +1727,26 @@ export async function perfilSemanalOndulatoria(): Promise<DietaOverrideDia[]> {
     }),
   );
   return dias;
+}
+
+/** Troca a meta de calorias/gordura entre 2 dias da semana ATUAL — usado quando uma rotina muda de
+ * dia (TreinoMudarDiaSheet) e o usuário confirma que quer trocar a meta de calorias junto. Parte
+ * do override já salvo dessa semana (se houver) ou do perfil normal da Ondulatória, troca só os 2
+ * dias pedidos e grava — os outros 5 dias continuam exatamente como estavam. */
+export async function trocarCaloriasEntreDias(data: string, diaA: number, diaB: number): Promise<void> {
+  const semanaInicio = segundaDaSemana(data);
+  const existentes = await listOverrideSemanaDieta(semanaInicio);
+  const base = existentes.length ? existentes : await perfilSemanalOndulatoria();
+  const a = base.find((d) => d.diaSemana === diaA);
+  const b = base.find((d) => d.diaSemana === diaB);
+  if (!a || !b) return;
+  const novaLista = base.map((d) => {
+    if (d.diaSemana === diaA) return { ...d, calorias: b.calorias, gorduraG: b.gorduraG };
+    if (d.diaSemana === diaB) return { ...d, calorias: a.calorias, gorduraG: a.gorduraG };
+    return d;
+  });
+  await salvarOverrideSemanaDieta(semanaInicio, novaLista);
+  marcarDietaDesatualizada();
 }
 
 /**

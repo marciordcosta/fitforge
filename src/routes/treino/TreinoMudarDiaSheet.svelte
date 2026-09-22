@@ -1,6 +1,7 @@
 <script lang="ts">
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
   import {
     listTreinos,
@@ -12,6 +13,7 @@
     type TreinoComExercicios,
     type TreinoOverrideDia,
   } from "../../lib/treinoApi";
+  import { getModoCalorias, trocarCaloriasEntreDias } from "../../lib/dietaApi";
 
   let { data, onFechar, onSalvo }: { data: string; onFechar: () => void; onSalvo: () => void } = $props();
 
@@ -24,8 +26,17 @@
    * uma rotina ainda pode cair no MESMO dia (a coluna aceita várias linhas marcadas), só a rotina
    * em si não pode estar em 2 dias ao mesmo tempo. null = essa rotina não entra em nenhum dia. */
   let atribuicoes = $state<Map<string, number | null>>(new Map());
+  /** Estado no momento em que o sheet abriu — comparado no salvar pra saber se alguma rotina
+   * TROCOU de dia (não só entrou/saiu), pra oferecer trocar a meta de calorias entre os 2 dias
+   * envolvidos automaticamente, sem precisar de um seletor de 7 dias separado. */
+  let atribuicoesOriginais = $state<Map<string, number | null>>(new Map());
   let loading = $state(true);
   let salvando = $state(false);
+  /** Quando não-nulo, pergunta se quer trocar a meta de calorias entre esses 2 dias também —
+   * só faz sentido quando exatamente 1 rotina trocou de um dia definido pra outro (não faz
+   * sentido "trocar calorias" quando várias rotinas mudam ao mesmo tempo, ou quando uma rotina só
+   * entra/sai sem um par claro). */
+  let trocaCaloriasProposta = $state<{ de: number; para: number } | null>(null);
 
   async function carregar() {
     loading = true;
@@ -36,6 +47,7 @@
       const mapa = new Map<string, number | null>(treinosDaSemana.map((t) => [t.id, null]));
       for (const o of base) mapa.set(o.treinoId, o.diaSemana);
       atribuicoes = mapa;
+      atribuicoesOriginais = new Map(mapa);
     } catch (err) {
       alert("Erro ao carregar a semana: " + (err as Error).message);
     } finally {
@@ -57,17 +69,49 @@
     salvando = true;
     try {
       const linhas: TreinoOverrideDia[] = [];
-      for (const [treinoId, dia] of atribuicoes) {
-        if (dia != null) linhas.push({ diaSemana: dia, treinoId });
+      const mudancas: { de: number; para: number }[] = [];
+      for (const [treinoId, diaNovo] of atribuicoes) {
+        if (diaNovo != null) linhas.push({ diaSemana: diaNovo, treinoId });
+        const diaAntigo = atribuicoesOriginais.get(treinoId) ?? null;
+        if (diaAntigo != null && diaNovo != null && diaAntigo !== diaNovo) mudancas.push({ de: diaAntigo, para: diaNovo });
       }
       await salvarOverrideSemana(semanaInicio, linhas);
       mostrarToast("Salvo");
+
+      if (mudancas.length === 1) {
+        try {
+          if ((await getModoCalorias()) === "ondulatoria") {
+            trocaCaloriasProposta = mudancas[0];
+            return; // onSalvo só dispara depois que essa pergunta for respondida (ver ConfirmDialog abaixo)
+          }
+        } catch {
+          // informativo — se falhar, só não oferece a troca de calorias
+        }
+      }
       onSalvo();
     } catch (err) {
       alert("Erro ao salvar: " + (err as Error).message);
     } finally {
       salvando = false;
     }
+  }
+
+  async function confirmarTrocaCalorias() {
+    const troca = trocaCaloriasProposta;
+    trocaCaloriasProposta = null;
+    if (!troca) return;
+    try {
+      await trocarCaloriasEntreDias(data, troca.de, troca.para);
+      mostrarToast("Salvo");
+    } catch (err) {
+      alert("Erro ao trocar a meta de calorias: " + (err as Error).message);
+    }
+    onSalvo();
+  }
+
+  function cancelarTrocaCalorias() {
+    trocaCaloriasProposta = null;
+    onSalvo();
   }
 </script>
 
@@ -108,6 +152,16 @@
     <Button onclick={salvar} disabled={salvando}>Salvar</Button>
   {/if}
 </Sheet>
+
+{#if trocaCaloriasProposta}
+  <ConfirmDialog
+    titulo={`Quer trocar a meta de calorias entre ${DIAS_SEMANA_ABREV[trocaCaloriasProposta.de]} e ${DIAS_SEMANA_ABREV[trocaCaloriasProposta.para]} também?`}
+    textoConfirmar="Trocar"
+    destrutivo={false}
+    onConfirmar={confirmarTrocaCalorias}
+    onCancelar={cancelarTrocaCalorias}
+  />
+{/if}
 
 <style>
   .muted {
