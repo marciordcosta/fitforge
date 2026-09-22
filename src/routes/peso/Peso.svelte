@@ -140,14 +140,22 @@
   let pesoMedioAtual = $state<number | null>(null);
   let metaSemanalValor = $state<number | null>(null);
 
+  /** Histórico COMPLETO de peso (independente do período/filtro escolhido no gráfico) — usado só
+   * pra trilhar a âncora da linha de meta (metaAlvoPorPonto). Sem isso, a âncora só enxergava o
+   * que estava visível no filtro (ex: "1 semana"), então reancorava sempre bem no início da janela
+   * visível — e como o primeiro marco semanal cai perto do fim de uma janela de 7 dias, a linha
+   * "saltava" pro peso atual quase toda vez que a tela abria. */
+  let pesosCompletos = $state<PesoRegistro[]>([]);
+
   async function carregarMeta() {
-    const [metaCarregada, historico, dias, ultimo, media, metaSemana] = await Promise.all([
+    const [metaCarregada, historico, dias, ultimo, media, metaSemana, pesosTudo] = await Promise.all([
       getMeta(),
       listMetaHistorico(),
       getDiasParaObjetivo(),
       getUltimoPeso(),
       getPesoMedioAtual(),
       getMetaSemanal(),
+      getPesosDoPeriodo("1900-01-01", hojeISO()),
     ]);
     meta = metaCarregada;
     metaHistorico = historico;
@@ -155,6 +163,7 @@
     ultimoPeso = ultimo;
     pesoMedioAtual = media;
     metaSemanalValor = metaSemana;
+    pesosCompletos = pesosTudo;
   }
 
   void carregarMeta();
@@ -271,6 +280,11 @@
     calcularMediaMovel(pesosGraficoBruto).filter((p) => p.data >= dataInicioGrafico),
   );
 
+  /** Média móvel de TODO o histórico (não limitada pelo período/filtro do gráfico) — usada só pra
+   * trilhar a âncora da linha de meta (metaAlvoPorPonto), que precisa de continuidade desde antes
+   * do que está visível na tela. */
+  const mediaMovelCompleta = $derived.by(() => calcularMediaMovel(pesosCompletos));
+
   /** Pontos efetivamente plotados no gráfico principal, conforme o modo escolhido — mesmas datas nos dois modos, só muda se o peso é bruto ou suavizado. */
   const pontosGrafico = $derived.by(() => (modoGrafico === "media" ? mediaMovelGrafico : pesosGrafico));
 
@@ -319,9 +333,15 @@
    * estreita (a diferença entre, ex., 0,5%/semana e 1%/semana em 1 dia é quase nada) — testar
    * todo dia fazia reancorar quase todo dia, grudando a linha na própria média. Entre um marco
    * semanal e outro a linha continua compondo normalmente, só não é usada pra decidir reancorar.
+   *
+   * Roda sobre `mediaMovelCompleta` (TODO o histórico), não sobre o período visível — senão a
+   * âncora reiniciava sempre no primeiro dia visível do filtro escolhido (ex: "1 semana"), e como
+   * o primeiro marco semanal cai perto do fim de uma janela de 7 dias, a linha "saltava" pro peso
+   * atual quase toda vez que a tela abria. O resultado é indexado por data (Map) — metaAlvoPorPonto
+   * logo abaixo só recorta esse mapa pros dias efetivamente exibidos.
    */
-  const metaAlvoPorPonto = $derived.by(() => {
-    if (!metaHistorico.length || !mediaMovelGrafico.length) return null;
+  const metaAlvoCompletoPorData = $derived.by(() => {
+    if (!metaHistorico.length || !mediaMovelCompleta.length) return null;
 
     function limitarPeloAlvo(valor: number, percentualMin: number, pesoAlvo: number | null): number {
       if (pesoAlvo == null) return valor;
@@ -333,16 +353,16 @@
       return toISODate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + dias));
     }
 
-    const resultado: (number | null)[] = [];
+    const mapa = new Map<string, number | null>();
     let ancoraValor: number | null = null;
     let ancoraData: string | null = null;
     let proximaChecagem: string | null = null;
     let vigenteDesdeAnterior: string | null = null;
 
-    for (const ponto of mediaMovelGrafico) {
+    for (const ponto of mediaMovelCompleta) {
       const metaDoDia = metaNaData(metaHistorico, ponto.data);
       if (!metaDoDia) {
-        resultado.push(null);
+        mapa.set(ponto.data, null);
         ancoraValor = null;
         ancoraData = null;
         proximaChecagem = null;
@@ -351,7 +371,7 @@
       }
 
       if (metaDoDia.tipo === "manutencao") {
-        resultado.push(metaDoDia.pesoAlvo);
+        mapa.set(ponto.data, metaDoDia.pesoAlvo);
         ancoraValor = null;
         ancoraData = null;
         proximaChecagem = null;
@@ -360,7 +380,7 @@
       }
 
       if (metaDoDia.percentualMin == null || metaDoDia.percentualMax == null) {
-        resultado.push(null);
+        mapa.set(ponto.data, null);
         continue;
       }
 
@@ -394,9 +414,17 @@
 
       const diasDesdeAncora = Math.round((parseISODate(ponto.data).getTime() - parseISODate(ancoraData).getTime()) / 86400000);
       const alvoBruto = ancoraValor * Math.pow(1 + metaDoDia.percentualMin / 100, diasDesdeAncora / 7);
-      resultado.push(limitarPeloAlvo(alvoBruto, metaDoDia.percentualMin, metaDoDia.pesoAlvo));
+      mapa.set(ponto.data, limitarPeloAlvo(alvoBruto, metaDoDia.percentualMin, metaDoDia.pesoAlvo));
     }
-    return resultado;
+    return mapa;
+  });
+
+  /** Recorte de metaAlvoCompletoPorData pros dias efetivamente exibidos no período/filtro
+   * escolhido — mesma ordem/tamanho de mediaMovelGrafico, pra alinhar com pontosGrafico. */
+  const metaAlvoPorPonto = $derived.by(() => {
+    const mapa = metaAlvoCompletoPorData;
+    if (!mapa || !mediaMovelGrafico.length) return null;
+    return mediaMovelGrafico.map((p) => mapa.get(p.data) ?? null);
   });
 
   /** Linha da meta no gráfico: o histórico real ponto a ponto (metaAlvoPorPonto), sem simplificar
