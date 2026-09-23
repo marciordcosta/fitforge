@@ -209,6 +209,7 @@
     width: 18px;
     height: 18px;
     accent-color: var(--color-secondary);
+    color-scheme: dark;
     cursor: pointer;
   }
   .salvar-btn {
