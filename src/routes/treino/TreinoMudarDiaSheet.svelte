@@ -219,9 +219,8 @@
     padding: 0;
   }
   .celula-toggle.marcado {
-    background: var(--color-secondary);
     border-color: var(--color-secondary);
-    color: var(--surface-bg);
+    color: var(--color-secondary);
   }
   .salvar-btn {
     border: none;
