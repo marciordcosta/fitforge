@@ -202,16 +202,18 @@
     padding-right: 4px;
   }
   .celula-toggle {
-    aspect-ratio: 1;
-    width: 100%;
+    justify-self: center;
+    align-self: center;
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--radius-sm);
+    border-radius: 4px;
     border: 1px solid var(--surface-border);
     background: var(--surface-bg);
     color: transparent;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     cursor: pointer;
     padding: 0;
