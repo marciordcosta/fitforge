@@ -42,7 +42,11 @@
     loading = true;
     try {
       const [todos, overrides] = await Promise.all([listTreinos(), listOverrideSemana(semanaInicio)]);
-      treinosDaSemana = todos.filter((t) => t.dia_semana != null);
+      // Ordem da sequência semanal (Seg..Dom), não a ordem manual das rotinas — fica mais fácil de
+      // ler a grade quando as linhas seguem o mesmo sentido das colunas.
+      treinosDaSemana = todos
+        .filter((t) => t.dia_semana != null)
+        .sort((a, b) => ORDEM_EXIBICAO.indexOf(a.dia_semana!) - ORDEM_EXIBICAO.indexOf(b.dia_semana!));
       const base = overrides.length ? overrides : horarioFixoComoOverride(todos);
       const mapa = new Map<string, number | null>(treinosDaSemana.map((t) => [t.id, null]));
       for (const o of base) mapa.set(o.treinoId, o.diaSemana);
