@@ -25,6 +25,9 @@
 
 <div class="card">
   {#if treinos.length}
+    <div class="canto-superior" role="presentation" onclick={(e) => e.stopPropagation()}>
+      <TreinoAjusteDiaFluxo {data} {onMudou} />
+    </div>
     {#each treinos as treino, i (treino.id)}
       <div
         class="treino-bloco"
@@ -41,7 +44,6 @@
         <Button variant="secondary" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
       </div>
     {/each}
-    <TreinoAjusteDiaFluxo {data} {onMudou} />
   {:else}
     <button class="sem-treino-btn" onclick={() => abrirRotina(null)}>
       <p class="subtexto">Nenhum treino agendado pra hoje</p>
@@ -51,11 +53,17 @@
 
 <style>
   .card {
+    position: relative;
     background: var(--surface-card);
     border-radius: var(--radius-lg);
     padding: var(--space-4);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
+  }
+  .canto-superior {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
   }
   .treino-bloco {
     display: block;

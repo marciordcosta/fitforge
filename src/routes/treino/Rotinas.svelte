@@ -423,18 +423,16 @@
         onclick={() => navigate(`/treino/rotina/${treino.id}/ver`)}
         onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
       >
-        {#if diaEfetivo !== treino.dia_semana}
-          <button
-            type="button"
-            class="mudou-tag"
-            onclick={(e) => {
-              e.stopPropagation();
-              mostrarMudarDiaDireto = true;
-            }}
-          >
-            {diaEfetivo != null ? `Essa semana: ${DIAS_SEMANA_COMPLETO[diaEfetivo]}` : "Sem treino essa semana"}
-          </button>
-        {/if}
+        <div class="canto-superior" role="presentation" onclick={(e) => e.stopPropagation()}>
+          {#if diaEfetivo !== treino.dia_semana}
+            <button type="button" class="mudou-tag" onclick={() => (mostrarMudarDiaDireto = true)}>
+              {diaEfetivo != null ? `Essa semana: ${DIAS_SEMANA_COMPLETO[diaEfetivo]}` : "Sem treino essa semana"}
+            </button>
+          {/if}
+          {#if destacada && diaEfetivo === new Date().getDay()}
+            <TreinoAjusteDiaFluxo data={hojeISO()} onMudou={carregar} />
+          {/if}
+        </div>
         <div class="card-header">
           <h2 class:nome-neutro={!destacada}>
             {treino.nome_treino}
@@ -446,11 +444,6 @@
         <p class="preview">{preview(treino)}</p>
         {#if destacada}
           <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
-          {#if diaEfetivo === new Date().getDay()}
-            <div role="presentation" onclick={(e) => e.stopPropagation()}>
-              <TreinoAjusteDiaFluxo data={hojeISO()} onMudou={carregar} />
-            </div>
-          {/if}
         {:else}
           <button type="button" class="iniciar-secundario" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</button>
         {/if}
@@ -676,10 +669,15 @@
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-4);
   }
-  .mudou-tag {
+  .canto-superior {
     position: absolute;
     top: var(--space-3);
     right: var(--space-3);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .mudou-tag {
     padding: 4px var(--space-2);
     border-radius: 999px;
     border: 1px solid var(--color-secondary);
