@@ -136,15 +136,14 @@
           <span class="celula celula-treino-nome">{treino.nome_treino}</span>
           {#each ORDEM_EXIBICAO as dia (dia)}
             {@const marcado = atribuicoes.get(treino.id) === dia}
-            <button
-              type="button"
-              class="celula celula-toggle"
-              class:marcado
-              onclick={() => selecionar(dia, treino.id)}
-              aria-label={`${treino.nome_treino} em ${DIAS_SEMANA_ABREV[dia]}`}
-            >
-              {#if marcado}✓{/if}
-            </button>
+            <span class="celula celula-toggle-wrap">
+              <input
+                type="checkbox"
+                checked={marcado}
+                onchange={() => selecionar(dia, treino.id)}
+                aria-label={`${treino.nome_treino} em ${DIAS_SEMANA_ABREV[dia]}`}
+              />
+            </span>
           {/each}
         {/each}
       </div>
@@ -201,26 +200,16 @@
     white-space: nowrap;
     padding-right: 4px;
   }
-  .celula-toggle {
+  .celula-toggle-wrap {
     justify-self: center;
     align-self: center;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
-    color: transparent;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    padding: 0;
   }
-  .celula-toggle.marcado {
-    border-color: var(--color-secondary);
-    color: var(--color-secondary);
+  .celula-toggle-wrap input {
+    display: block;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-secondary);
+    cursor: pointer;
   }
   .salvar-btn {
     border: none;
