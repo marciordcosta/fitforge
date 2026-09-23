@@ -1586,10 +1586,10 @@ export async function limparMetasMusculoRotina(treinoId: string): Promise<void> 
 export async function getRegistrosPorTreinoPeriodo(
   dataInicio: string,
   dataFim: string,
-): Promise<{ treino_id: string | null; exercicio_id: string }[]> {
+): Promise<{ treino_id: string | null; exercicio_id: string; data: string }[]> {
   const { data, error } = await supabase
     .from("treino_registros")
-    .select("treino_id, exercicio_id")
+    .select("treino_id, exercicio_id, data")
     .gte("data", dataInicio)
     .lte("data", dataFim);
   if (error) throw error;

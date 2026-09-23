@@ -2,6 +2,7 @@
   import { navigate } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { toISODate, hojeISO } from "../../lib/dates";
   import TreinoAjusteDiaFluxo from "../../components/TreinoAjusteDiaFluxo.svelte";
   import TreinoMudarDiaSheet from "./TreinoMudarDiaSheet.svelte";
@@ -43,11 +44,41 @@
    * essa semana" e decidir se mostra o fluxo "Não vai treinar hoje?". */
   let statusPorTreino = $state<Map<string, StatusSemanalTreino>>(new Map());
   let revertendo = $state<string | null>(null);
+  /** Id da rotina escolhida como destacada nessa carga (ver escolherDestacada) — o template usa
+   * isso, e não só "i === 0", pra não destacar por acidente a primeira rotina sem dia nenhum
+   * quando nenhuma rotina tem slot pra hoje. */
+  let destacadaId = $state<string | null>(null);
+  /** Rotinas com registro salvo HOJE (a única forma de gravar treino_registros é concluindo o
+   * treino em TreinoLog.svelte) — usado pra trocar "Iniciar Rotina" por "Concluído" no card
+   * destacado. */
+  let concluidosHoje = $state<Set<string>>(new Set());
+  const hojeSemana = new Date().getDay();
+  /** Ação pendente de confirmação no card destacado: reabrir uma rotina já concluída hoje, ou
+   * iniciar a "próxima rotina" (que não é a de hoje) antes da hora. */
+  let acaoConfirmacao = $state<{ tipo: "reiniciar" | "iniciar"; treino: TreinoComExercicios } | null>(null);
 
   function diaEfetivoDeStatus(treino: TreinoComExercicios, status: StatusSemanalTreino): number | null {
     if (status.tipo === "reagendado") return status.novoDia;
     if (status.tipo === "cancelado") return null;
     return treino.dia_semana;
+  }
+
+  /** Qual rotina ocupa o card grande do topo. Fica fixa o dia todo: concluir ou cancelar a rotina
+   * de hoje não entrega o slot pra outra (nem no modo "Por rotina pendente") — só troca se outra
+   * rotina passar a ter hoje como dia efetivo (reagendada PRA hoje). Sem nada com dia efetivo
+   * hoje, prioriza a rotina cujo dia FIXO é hoje mas foi tocada essa semana (reagendada ou
+   * cancelada), pra manter o status visível no topo; por último cai pra próxima rotina futura. */
+  function escolherDestacada(
+    lista: TreinoComExercicios[],
+    diaEfetivo: Map<string, number | null>,
+    status: Map<string, StatusSemanalTreino>,
+  ): TreinoComExercicios | null {
+    const deHoje = lista.find((t) => diaEfetivo.get(t.id) === hojeSemana);
+    if (deHoje) return deHoje;
+    const tocadaHoje = lista.find((t) => t.dia_semana === hojeSemana && status.get(t.id)?.tipo !== "normal");
+    if (tocadaHoje) return tocadaHoje;
+    const comDia = lista.filter((t) => diaEfetivo.get(t.id) != null);
+    return comDia.length ? ordenarPorDia(comDia, diaEfetivo)[0] : null;
   }
 
   async function reverter(treino: TreinoComExercicios): Promise<void> {
@@ -61,6 +92,13 @@
     } finally {
       revertendo = null;
     }
+  }
+
+  function confirmarAcao(): void {
+    const acao = acaoConfirmacao;
+    acaoConfirmacao = null;
+    if (!acao) return;
+    navigate(`/treino/log/${acao.treino.id}`);
   }
 
   /** Rotinas com dia efetivo essa semana sobem pro topo, ordenadas pelo dia mais próximo; sem dia
@@ -130,9 +168,12 @@
 
       const mapaSeriesPorTreino = new Map<string, number>();
       const mapaFeito = new Map<string, number>();
+      const hoje = hojeISO();
+      const concluidos = new Set<string>();
       for (const r of registros) {
         if (r.treino_id) {
           mapaSeriesPorTreino.set(r.treino_id, (mapaSeriesPorTreino.get(r.treino_id) ?? 0) + 1);
+          if (r.data === hoje) concluidos.add(r.treino_id);
         }
         for (const m of mapaMusculos.get(r.exercicio_id) ?? []) {
           mapaFeito.set(m.musculo_id, (mapaFeito.get(m.musculo_id) ?? 0) + m.peso);
@@ -140,10 +181,16 @@
       }
       seriesPorTreino = mapaSeriesPorTreino;
       feitoPorMusculoSalvo = mapaFeito;
-      treinos =
+      concluidosHoje = concluidos;
+
+      const destacadaEscolhida = escolherDestacada(treinosCarregados, diaEfetivoPorTreino, statusPorTreino);
+      destacadaId = destacadaEscolhida?.id ?? null;
+      const resto = treinosCarregados.filter((t) => t.id !== destacadaEscolhida?.id);
+      const restoOrdenado =
         parametros.ordenacaoHome === "pendente"
-          ? ordenarPorPendente(treinosCarregados, mapaSeriesPorTreino, diaEfetivoPorTreino)
-          : ordenarPorDia(treinosCarregados, diaEfetivoPorTreino);
+          ? ordenarPorPendente(resto, mapaSeriesPorTreino, diaEfetivoPorTreino)
+          : ordenarPorDia(resto, diaEfetivoPorTreino);
+      treinos = destacadaEscolhida ? [destacadaEscolhida, ...restoOrdenado] : restoOrdenado;
     } catch (e) {
       erroCarregar = (e as Error).message;
     } finally {
@@ -434,7 +481,9 @@
     {#each treinos as treino, i (treino.id)}
       {@const status = statusPorTreino.get(treino.id) ?? { tipo: "normal" }}
       {@const diaEfetivo = diaEfetivoDeStatus(treino, status)}
-      {@const destacada = i === 0 && diaEfetivo != null}
+      {@const destacada = i === 0 && treino.id === destacadaId}
+      {@const ehHoje = diaEfetivo === hojeSemana}
+      {@const concluidaHoje = concluidosHoje.has(treino.id)}
       <div
         class="rotina-item"
         role="button"
@@ -442,7 +491,7 @@
         onclick={() => navigate(`/treino/rotina/${treino.id}/ver`)}
         onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
       >
-        {#if destacada && diaEfetivo === new Date().getDay()}
+        {#if destacada && ehHoje}
           <div class="canto-superior" role="presentation" onclick={(e) => e.stopPropagation()}>
             <TreinoAjusteDiaFluxo data={hojeISO()} onMudou={carregar} />
           </div>
@@ -468,7 +517,15 @@
         {/if}
         <p class="preview">{preview(treino)}</p>
         {#if destacada}
-          <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+          {#if status.tipo !== "normal"}
+            <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+          {:else if ehHoje && concluidaHoje}
+            <Button variant="secondary" onclick={(e) => { e.stopPropagation(); acaoConfirmacao = { tipo: "reiniciar", treino }; }}>Concluído</Button>
+          {:else if ehHoje}
+            <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+          {:else}
+            <Button onclick={(e) => { e.stopPropagation(); acaoConfirmacao = { tipo: "iniciar", treino }; }}>Próxima rotina</Button>
+          {/if}
         {:else}
           <button type="button" class="iniciar-secundario" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</button>
         {/if}
@@ -495,6 +552,16 @@
       { label: "Nova Rotina", subtitulo: "Cadastro completo, com dias e metas", icon: iconNovaRotina, onSelect: () => navigate("/treino/rotina/nova") },
       { label: "Treino Avulso", subtitulo: "Sessão livre de hoje, sem rotina fixa", icon: iconTreinoAvulso, onSelect: () => navigate("/treino/avulso") },
     ]}
+  />
+{/if}
+
+{#if acaoConfirmacao}
+  <ConfirmDialog
+    titulo={acaoConfirmacao.tipo === "reiniciar" ? "Deseja reiniciar a rotina?" : "Deseja iniciar a rotina?"}
+    textoConfirmar={acaoConfirmacao.tipo === "reiniciar" ? "Reiniciar" : "Iniciar"}
+    destrutivo={false}
+    onConfirmar={confirmarAcao}
+    onCancelar={() => (acaoConfirmacao = null)}
   />
 {/if}
 
