@@ -3,7 +3,15 @@
   import { hojeISO } from "../lib/dates";
   import { getLayoutHome, type HomeCardTipo } from "../lib/homeApi";
   import { getUltimoPeso, getPesoMedioAtual, getMeta, getMetaSemanal } from "../lib/pesoApi";
-  import { listTreinos, getTreinosEfetivosDoDia, type TreinoComExercicios } from "../lib/treinoApi";
+  import {
+    listTreinos,
+    getTreinosEfetivosDoDia,
+    listOverrideSemana,
+    segundaDaSemana,
+    statusSemanalDoTreino,
+    type TreinoComExercicios,
+    type StatusSemanalTreino,
+  } from "../lib/treinoApi";
   import {
     getMetasDoDia,
     getDiarioDoDia,
@@ -32,6 +40,9 @@
   let metaSemanalVal = $state<number | null>(null);
   let pesoAlvoVal = $state<number | null>(null);
   let treinosHoje = $state<TreinoComExercicios[]>([]);
+  /** Rotinas cujo dia FIXO é hoje, mas que essa semana foram reagendadas pra outro dia ou
+   * canceladas — mostradas como card "fantasma" (ver CardProximoTreino) pra dar como reverter. */
+  let fantasmasHoje = $state<{ treino: TreinoComExercicios; status: StatusSemanalTreino }[]>([]);
   let caloriasMeta = $state(0);
   let caloriasConsumido = $state(0);
   let proteinaMetaVal = $state(0);
@@ -78,7 +89,18 @@
       pesoMediaVal = pesoMedia;
       metaSemanalVal = metaSemanal;
       pesoAlvoVal = meta?.pesoAlvo ?? null;
-      treinosHoje = tipos.includes("proximo_treino") ? await getTreinosEfetivosDoDia(hoje, treinos) : [];
+      if (tipos.includes("proximo_treino")) {
+        const diaSemanaHoje = new Date().getDay();
+        const overridesSemana = await listOverrideSemana(segundaDaSemana(hoje));
+        treinosHoje = await getTreinosEfetivosDoDia(hoje, treinos, overridesSemana);
+        fantasmasHoje = treinos
+          .filter((t) => t.dia_semana === diaSemanaHoje)
+          .map((t) => ({ treino: t, status: statusSemanalDoTreino(t, overridesSemana) }))
+          .filter((f) => f.status.tipo !== "normal");
+      } else {
+        treinosHoje = [];
+        fantasmasHoje = [];
+      }
       caloriasMeta = metasDia?.calorias ?? 0;
       caloriasConsumido = itensDia.reduce((acc, i) => acc + i.calorias, 0);
       proteinaMetaVal = metasDia?.proteinaG ?? 0;
@@ -160,7 +182,7 @@
       {#if tipo === "peso_atual"}
         <CardPesoAtual pesoAtual={pesoAtualVal} media={pesoMediaVal} metaSemanal={metaSemanalVal} pesoAlvo={pesoAlvoVal} />
       {:else if tipo === "proximo_treino"}
-        <CardProximoTreino treinos={treinosHoje} data={hojeISO()} onMudou={carregar} />
+        <CardProximoTreino treinos={treinosHoje} fantasmas={fantasmasHoje} data={hojeISO()} onMudou={carregar} />
       {:else if tipo === "calorias_dia"}
         <CardCaloriasDia
           caloriasConsumido={caloriasConsumido}

@@ -2,11 +2,23 @@
   import { navigate } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
   import TreinoAjusteDiaFluxo from "../../components/TreinoAjusteDiaFluxo.svelte";
-  import type { TreinoComExercicios } from "../../lib/treinoApi";
+  import { moverTreinoParaDia, DIAS_SEMANA_COMPLETO, type TreinoComExercicios, type StatusSemanalTreino } from "../../lib/treinoApi";
 
   /** `treinos` no plural porque um dia pode ter mais de uma rotina depois de "Mudar dia" (ver
-   * TreinoAjusteDiaFluxo) — no caso comum (0 ou 1) o card se comporta como sempre se comportou. */
-  let { treinos, data, onMudou }: { treinos: TreinoComExercicios[]; data: string; onMudou: () => void } = $props();
+   * TreinoAjusteDiaFluxo) — no caso comum (0 ou 1) o card se comporta como sempre se comportou.
+   * `fantasmas` são rotinas cujo dia FIXO é hoje, mas que essa semana foram reagendadas pra outro
+   * dia ou canceladas — mostradas com o rótulo do que aconteceu e uma forma rápida de reverter. */
+  let {
+    treinos,
+    fantasmas,
+    data,
+    onMudou,
+  }: {
+    treinos: TreinoComExercicios[];
+    fantasmas: { treino: TreinoComExercicios; status: StatusSemanalTreino }[];
+    data: string;
+    onMudou: () => void;
+  } = $props();
 
   function preview(t: TreinoComExercicios): string {
     const nomes = t.exercicios
@@ -21,17 +33,36 @@
   function abrirRotina(treino: TreinoComExercicios | null): void {
     navigate(treino ? `/treino/rotina/${treino.id}/ver` : "/treino");
   }
+
+  let revertendo = $state<string | null>(null);
+
+  async function reverter(treino: TreinoComExercicios): Promise<void> {
+    if (treino.dia_semana == null) return;
+    revertendo = treino.id;
+    try {
+      await moverTreinoParaDia(treino.id, treino.dia_semana, data);
+      onMudou();
+    } catch (err) {
+      alert("Erro ao reverter: " + (err as Error).message);
+    } finally {
+      revertendo = null;
+    }
+  }
+
+  function rotuloStatus(status: StatusSemanalTreino): string {
+    return status.tipo === "reagendado" ? `Reagendado para ${DIAS_SEMANA_COMPLETO[status.novoDia]}` : "Cancelado essa semana";
+  }
 </script>
 
 <div class="card">
-  {#if treinos.length}
+  {#if treinos.length || fantasmas.length}
     <div class="canto-superior" role="presentation" onclick={(e) => e.stopPropagation()}>
       <TreinoAjusteDiaFluxo {data} {onMudou} />
     </div>
     {#each treinos as treino, i (treino.id)}
       <div
         class="treino-bloco"
-        class:com-margem={i < treinos.length - 1}
+        class:com-margem={i < treinos.length - 1 || fantasmas.length > 0}
         role="button"
         tabindex="0"
         onclick={() => abrirRotina(treino)}
@@ -42,6 +73,34 @@
         </div>
         <p class="preview">{preview(treino)}</p>
         <Button variant="secondary" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+      </div>
+    {/each}
+    {#each fantasmas as { treino, status }, i (treino.id)}
+      <div
+        class="treino-bloco fantasma"
+        class:com-margem={i < fantasmas.length - 1}
+        role="button"
+        tabindex="0"
+        onclick={() => abrirRotina(treino)}
+        onkeydown={(e) => e.key === "Enter" && abrirRotina(treino)}
+      >
+        <div class="card-header">
+          <h2 class="nome-neutro">{treino.nome_treino}</h2>
+        </div>
+        <p class="status-fantasma">{rotuloStatus(status)}</p>
+        <div class="acoes-fantasma">
+          <button
+            type="button"
+            class="reverter-btn"
+            disabled={revertendo === treino.id}
+            onclick={(e) => { e.stopPropagation(); void reverter(treino); }}
+          >
+            Reverter
+          </button>
+          {#if status.tipo === "cancelado"}
+            <Button variant="secondary" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+          {/if}
+        </div>
       </div>
     {/each}
   {:else}
@@ -103,6 +162,9 @@
     gap: var(--space-2);
     flex-wrap: wrap;
   }
+  .nome-neutro {
+    color: var(--surface-muted);
+  }
   .preview {
     margin: 0 0 var(--space-4);
     font-size: var(--font-size-sm);
@@ -113,6 +175,34 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
+  }
+  .status-fantasma {
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-sm);
+    color: var(--color-negative);
+  }
+  .acoes-fantasma {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .acoes-fantasma :global(button) {
+    flex: 1;
+  }
+  .reverter-btn {
+    flex: 1;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: none;
+    color: var(--surface-fg);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .reverter-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .subtexto {
     margin: 0;

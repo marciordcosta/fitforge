@@ -872,17 +872,49 @@ export async function cancelarTreinoDoDia(data: string): Promise<void> {
 }
 
 /** Rotinas efetivamente agendadas pra essa data: override da semana se ela tiver um (mesmo que
- * fique vazio de propósito), senão o horário fixo (treinos.dia_semana). */
-export async function getTreinosEfetivosDoDia(data: string, todosOsTreinos?: TreinoComExercicios[]): Promise<TreinoComExercicios[]> {
+ * fique vazio de propósito), senão o horário fixo (treinos.dia_semana). Aceita os overrides já
+ * carregados (evita refazer a mesma busca de quem já os tem, ex: pra montar os "fantasmas" de
+ * statusSemanalDoTreino ao mesmo tempo). */
+export async function getTreinosEfetivosDoDia(
+  data: string,
+  todosOsTreinos?: TreinoComExercicios[],
+  overridesSemana?: TreinoOverrideDia[],
+): Promise<TreinoComExercicios[]> {
   const treinos = todosOsTreinos ?? (await listTreinos());
   const semanaInicio = segundaDaSemana(data);
   const diaSemana = parseISODate(data).getDay();
-  const overrides = await listOverrideSemana(semanaInicio);
+  const overrides = overridesSemana ?? (await listOverrideSemana(semanaInicio));
   if (overrides.length) {
     const idsHoje = new Set(overrides.filter((o) => o.diaSemana === diaSemana).map((o) => o.treinoId));
     return treinos.filter((t) => idsHoje.has(t.id));
   }
   return treinos.filter((t) => t.dia_semana === diaSemana);
+}
+
+export type StatusSemanalTreino = { tipo: "normal" } | { tipo: "reagendado"; novoDia: number } | { tipo: "cancelado" };
+
+/** Como uma rotina com dia fixo está indo essa semana: "normal" (segue o horário fixo, ou a semana
+ * não tem override nenhum), "reagendado" (o override moveu ela pra outro dia) ou "cancelado" (o
+ * override removeu ela da semana, sem dia nenhum). Rotinas sem dia fixo (avulsas) são sempre
+ * "normal" — não fazem parte do horário fixo, não há o que reagendar/cancelar. */
+export function statusSemanalDoTreino(treino: TreinoComExercicios, overridesSemana: TreinoOverrideDia[]): StatusSemanalTreino {
+  if (treino.dia_semana == null || !overridesSemana.length) return { tipo: "normal" };
+  const doOverride = overridesSemana.find((o) => o.treinoId === treino.id);
+  if (!doOverride) return { tipo: "cancelado" };
+  if (doOverride.diaSemana === treino.dia_semana) return { tipo: "normal" };
+  return { tipo: "reagendado", novoDia: doOverride.diaSemana };
+}
+
+/** Move (ou remove, com novoDia null) UMA rotina específica pra um dia da semana ATUAL, sem mexer
+ * nas outras rotinas já reposicionadas nessa semana — usado pelos atalhos de reverter/cancelar que
+ * agem numa rotina só (diferente de salvarOverrideSemana, que substitui a semana inteira). */
+export async function moverTreinoParaDia(treinoId: string, novoDia: number | null, data: string): Promise<void> {
+  const semanaInicio = segundaDaSemana(data);
+  const existentes = await listOverrideSemana(semanaInicio);
+  const base = existentes.length ? existentes : horarioFixoComoOverride(await listTreinos());
+  const semEssaRotina = base.filter((o) => o.treinoId !== treinoId);
+  const novaLista = novoDia != null ? [...semEssaRotina, { diaSemana: novoDia, treinoId }] : semEssaRotina;
+  await salvarOverrideSemana(semanaInicio, novaLista);
 }
 
 export async function duplicateTreino(id: string): Promise<string> {

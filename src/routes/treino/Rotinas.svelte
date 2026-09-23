@@ -13,10 +13,12 @@
     getParametrosDistribuicao,
     listOverrideSemana,
     segundaDaSemana,
+    statusSemanalDoTreino,
+    moverTreinoParaDia,
     DIAS_SEMANA_COMPLETO,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type TreinoComExercicios,
-    type TreinoOverrideDia,
+    type StatusSemanalTreino,
     type Musculo,
     type ParametrosDistribuicao,
   } from "../../lib/treinoApi";
@@ -36,16 +38,29 @@
   let modoRestante = $state(true);
   let mostrarMenuNovo = $state(false);
   let mostrarMudarDiaDireto = $state(false);
-  /** Dia efetivo de cada rotina PRA ESSA SEMANA — igual ao dia fixo (treino.dia_semana) na maioria
-   * das vezes, mas reflete o override de "Mudar dia"/"Cancelar" (TreinoAjusteDiaFluxo) quando a
-   * semana atual tiver um: rotina sem entrada no override dessa semana vira null (sem dia, mesmo
-   * que tenha dia fixo normalmente). Usado pra ordenar a lista e rotular o card, não só pra
-   * decidir se mostra o fluxo "Não vai treinar hoje?". */
-  let diaEfetivoPorTreino = $state<Map<string, number | null>>(new Map());
+  /** Status de cada rotina PRA ESSA SEMANA (normal/reagendado/cancelado — ver statusSemanalDoTreino
+   * em treinoApi.ts). Usado pra ordenar a lista, rotular o card com "Reagendado para X"/"Cancelado
+   * essa semana" e decidir se mostra o fluxo "Não vai treinar hoje?". */
+  let statusPorTreino = $state<Map<string, StatusSemanalTreino>>(new Map());
+  let revertendo = $state<string | null>(null);
 
-  function diaEfetivoDe(treinoId: string, diaFixo: number | null, overridesSemana: TreinoOverrideDia[]): number | null {
-    if (!overridesSemana.length) return diaFixo;
-    return overridesSemana.find((o) => o.treinoId === treinoId)?.diaSemana ?? null;
+  function diaEfetivoDeStatus(treino: TreinoComExercicios, status: StatusSemanalTreino): number | null {
+    if (status.tipo === "reagendado") return status.novoDia;
+    if (status.tipo === "cancelado") return null;
+    return treino.dia_semana;
+  }
+
+  async function reverter(treino: TreinoComExercicios): Promise<void> {
+    if (treino.dia_semana == null) return;
+    revertendo = treino.id;
+    try {
+      await moverTreinoParaDia(treino.id, treino.dia_semana, hojeISO());
+      await carregar();
+    } catch (err) {
+      alert("Erro ao reverter: " + (err as Error).message);
+    } finally {
+      revertendo = null;
+    }
   }
 
   /** Rotinas com dia efetivo essa semana sobem pro topo, ordenadas pelo dia mais próximo; sem dia
@@ -94,7 +109,10 @@
         listOverrideSemana(segundaDaSemana(hojeISO())),
       ]);
       musculos = musculosCarregados;
-      diaEfetivoPorTreino = new Map(treinosCarregados.map((t) => [t.id, diaEfetivoDe(t.id, t.dia_semana, overridesSemana)]));
+      statusPorTreino = new Map(treinosCarregados.map((t) => [t.id, statusSemanalDoTreino(t, overridesSemana)]));
+      const diaEfetivoPorTreino = new Map(
+        treinosCarregados.map((t) => [t.id, diaEfetivoDeStatus(t, statusPorTreino.get(t.id)!)]),
+      );
       parametrosDistribuicao = parametros;
 
       const mapaMusculos = new Map<string, { musculo_id: string; peso: number }[]>();
@@ -414,7 +432,8 @@
     <p class="muted">Nenhuma rotina ainda. Crie a primeira.</p>
   {:else}
     {#each treinos as treino, i (treino.id)}
-      {@const diaEfetivo = diaEfetivoPorTreino.get(treino.id) ?? null}
+      {@const status = statusPorTreino.get(treino.id) ?? { tipo: "normal" }}
+      {@const diaEfetivo = diaEfetivoDeStatus(treino, status)}
       {@const destacada = i === 0 && diaEfetivo != null}
       <div
         class="rotina-item"
@@ -423,16 +442,11 @@
         onclick={() => navigate(`/treino/rotina/${treino.id}/ver`)}
         onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
       >
-        <div class="canto-superior" role="presentation" onclick={(e) => e.stopPropagation()}>
-          {#if diaEfetivo !== treino.dia_semana}
-            <button type="button" class="mudou-tag" onclick={() => (mostrarMudarDiaDireto = true)}>
-              {diaEfetivo != null ? `Essa semana: ${DIAS_SEMANA_COMPLETO[diaEfetivo]}` : "Sem treino essa semana"}
-            </button>
-          {/if}
-          {#if destacada && diaEfetivo === new Date().getDay()}
+        {#if destacada && diaEfetivo === new Date().getDay()}
+          <div class="canto-superior" role="presentation" onclick={(e) => e.stopPropagation()}>
             <TreinoAjusteDiaFluxo data={hojeISO()} onMudou={carregar} />
-          {/if}
-        </div>
+          </div>
+        {/if}
         <div class="card-header">
           <h2 class:nome-neutro={!destacada}>
             {treino.nome_treino}
@@ -441,6 +455,17 @@
             {/if}
           </h2>
         </div>
+        {#if status.tipo !== "normal"}
+          <div class="status-semana" role="presentation" onclick={(e) => e.stopPropagation()}>
+            <span class="status-semana-texto">
+              {status.tipo === "reagendado" ? `Reagendado para ${DIAS_SEMANA_COMPLETO[status.novoDia]}` : "Cancelado essa semana"}
+            </span>
+            <button type="button" class="status-semana-link" disabled={revertendo === treino.id} onclick={() => reverter(treino)}>
+              Reverter
+            </button>
+            <button type="button" class="status-semana-link" onclick={() => (mostrarMudarDiaDireto = true)}> Mudar </button>
+          </div>
+        {/if}
         <p class="preview">{preview(treino)}</p>
         {#if destacada}
           <Button onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
@@ -677,16 +702,36 @@
     align-items: center;
     gap: var(--space-2);
   }
-  .mudou-tag {
-    padding: 4px var(--space-2);
-    border-radius: 999px;
-    border: 1px solid var(--color-secondary);
-    background: color-mix(in srgb, var(--color-secondary) 15%, var(--surface-card));
+  .status-semana {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: 0 0 var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-secondary) 12%, var(--surface-bg));
+  }
+  .status-semana-texto {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-secondary);
+  }
+  .status-semana-link {
+    flex-shrink: 0;
+    border: none;
+    background: none;
     color: var(--color-secondary);
     font-family: inherit;
-    font-size: 11px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
+    text-decoration: underline;
     cursor: pointer;
+    padding: 0;
+  }
+  .status-semana-link:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .iniciar-secundario {
     width: 100%;
