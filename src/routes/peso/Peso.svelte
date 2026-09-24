@@ -1,5 +1,7 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
+  import { fly } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
   import { navigate, router } from "../../lib/router.svelte";
   import { toISODate, parseISODate, hojeISO } from "../../lib/dates";
   import {
@@ -208,7 +210,12 @@
 
   void carregarGrafico();
 
+  /** Sentido da última troca de mês (1 = avançou, -1 = voltou) — só pra animação da grade saber
+   * de que lado deslizar (ver `direcaoMes` no template). */
+  let direcaoMes = $state(1);
+
   function trocarMes(delta: number) {
+    direcaoMes = delta;
     mesBase = new Date(mesBase.getFullYear(), mesBase.getMonth() + delta, 1);
     void carregar();
   }
@@ -704,7 +711,12 @@
     </div>
 
     {#if !loading}
-      <div class="grade">
+      {#key mesLabel}
+        <div
+          class="grade"
+          in:fly={{ x: direcaoMes * 32, duration: 220, easing: cubicOut }}
+          out:fly={{ x: direcaoMes * -32, duration: 160, easing: cubicOut }}
+        >
         {#each celulas as cel, i (i)}
           {#if cel === null}
             <div class="celula vazia"></div>
@@ -727,7 +739,8 @@
             </button>
           {/if}
         {/each}
-      </div>
+        </div>
+      {/key}
     {/if}
   </div>
 </div>
@@ -919,6 +932,7 @@
   }
   .mes-swipe {
     touch-action: pan-y;
+    overflow: hidden;
   }
   .dias-semana {
     display: grid;
