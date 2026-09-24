@@ -13,6 +13,8 @@
     getPreferenciasRefeicoesHome,
     salvarPreferenciasRefeicoesHome,
     salvarGkgFixo,
+    getAcumularCalorias,
+    salvarAcumularCalorias,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
     gramasDoParametro,
@@ -22,6 +24,7 @@
     type BaseReferenciaRefeicao,
     type FormatoValorRefeicao,
   } from "../../lib/dietaApi";
+  import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
 
   let pesoAtual = $state(76);
@@ -41,6 +44,10 @@
    * sozinha). Carboidrato não tem essa opção — ele é sempre a válvula de ajuste. */
   let proteinaGkgFixo = $state(false);
   let gorduraGkgFixo = $state(false);
+  let acumularCalorias = $state(false);
+  /** Dia da semana (0=domingo..6=sábado) em que o saldo acumulado reinicia — null enquanto
+   * acumularCalorias está desmarcado. */
+  let diaResetSaldoCalorico = $state<number | null>(null);
   let abertaExibicao = $state(false);
   let confirmandoDescartar = $state(false);
   let original = "";
@@ -90,12 +97,13 @@
     carregando = true;
     erro = null;
     try {
-      const [perfil, pesoMedio, parametros, tipo, prefsRefeicoes] = await Promise.all([
+      const [perfil, pesoMedio, parametros, tipo, prefsRefeicoes, acumular] = await Promise.all([
         getPerfilDietaEditavel(),
         getPesoMedioAtual(),
         getParametros(),
         getTipoDieta(),
         getPreferenciasRefeicoesHome(),
+        getAcumularCalorias(),
       ]);
       pesoAtual = pesoMedio ?? perfil.pesoAtual;
       caloriasCalc = Math.round(4 * perfil.proteinaGKg * pesoAtual + 9 * perfil.gorduraGKg * pesoAtual + 4 * perfil.carboidratoGKg * pesoAtual);
@@ -107,7 +115,18 @@
       valoresFormato = prefsRefeicoes.valoresFormato;
       proteinaGkgFixo = perfil.proteinaGkgFixo;
       gorduraGkgFixo = perfil.gorduraGkgFixo;
-      original = JSON.stringify({ valores, tipoDieta, barraBase, valoresFormato, proteinaGkgFixo, gorduraGkgFixo });
+      acumularCalorias = acumular.ativo;
+      diaResetSaldoCalorico = acumular.diaReset;
+      original = JSON.stringify({
+        valores,
+        tipoDieta,
+        barraBase,
+        valoresFormato,
+        proteinaGkgFixo,
+        gorduraGkgFixo,
+        acumularCalorias,
+        diaResetSaldoCalorico,
+      });
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -120,7 +139,16 @@
   function sujo(): boolean {
     return (
       !carregando &&
-      JSON.stringify({ valores, tipoDieta, barraBase, valoresFormato, proteinaGkgFixo, gorduraGkgFixo }) !== original
+      JSON.stringify({
+        valores,
+        tipoDieta,
+        barraBase,
+        valoresFormato,
+        proteinaGkgFixo,
+        gorduraGkgFixo,
+        acumularCalorias,
+        diaResetSaldoCalorico,
+      }) !== original
     );
   }
 
@@ -151,7 +179,11 @@
       );
       await salvarTipoDieta(tipoDieta);
       await salvarPreferenciasRefeicoesHome({ barraBase, valoresFormato });
-      await Promise.all([salvarGkgFixo("proteina", proteinaGkgFixo), salvarGkgFixo("gordura", gorduraGkgFixo)]);
+      await Promise.all([
+        salvarGkgFixo("proteina", proteinaGkgFixo),
+        salvarGkgFixo("gordura", gorduraGkgFixo),
+        salvarAcumularCalorias(acumularCalorias, acumularCalorias ? diaResetSaldoCalorico : null),
+      ]);
       mostrarToast("Salvo");
       guardaSaida.resolverSaida(() => voltar("/dieta"));
     } catch (err) {
@@ -209,6 +241,30 @@
                     >{opcao.label}</button>
                   {/each}
                 </div>
+              </div>
+              <div class="param-linha">
+                <label class="param-gkg-fixo">
+                  <input
+                    type="checkbox"
+                    checked={acumularCalorias}
+                    onchange={(e) => {
+                      acumularCalorias = e.currentTarget.checked;
+                      if (acumularCalorias && diaResetSaldoCalorico == null) diaResetSaldoCalorico = 1;
+                    }}
+                  />
+                  Acumular calorias?
+                </label>
+                <p class="param-ajuda">Sobra ou falta de calorias do dia entra na conta do dia seguinte, até reiniciar.</p>
+                {#if acumularCalorias}
+                  <p class="param-nome dia-reset-titulo">Dia de reinício da semana</p>
+                  <div class="dia-reset-opcoes">
+                    {#each DIAS_SEMANA_ABREV as label, dia (dia)}
+                      <button type="button" class:ativo={diaResetSaldoCalorico === dia} onclick={() => (diaResetSaldoCalorico = dia)}>
+                        {label}
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
               </div>
             {/if}
             {#each definicoesDaCategoria(categoria) as def (def.chave)}
@@ -550,5 +606,35 @@
     width: 16px;
     height: 16px;
     accent-color: var(--color-secondary);
+  }
+  .param-ajuda {
+    margin: var(--space-1) 0 0;
+    font-size: 12px;
+    color: var(--surface-muted);
+  }
+  .dia-reset-titulo {
+    margin-top: var(--space-3);
+    margin-bottom: var(--space-2);
+  }
+  .dia-reset-opcoes {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: var(--space-1);
+  }
+  .dia-reset-opcoes button {
+    padding: var(--space-2) 0;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .dia-reset-opcoes button.ativo {
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
   }
 </style>

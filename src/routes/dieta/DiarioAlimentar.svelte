@@ -4,6 +4,7 @@
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import DietaRefeicaoDiaFormSheet from "./DietaRefeicaoDiaFormSheet.svelte";
   import DietaResumoModal from "./DietaResumoModal.svelte";
   import DietaListaItens from "./DietaListaItens.svelte";
@@ -20,6 +21,11 @@
     getStatusAdesaoDieta,
     reordenarRefeicoesDoDia,
     getPreferenciasRefeicoesHome,
+    getAcumularCalorias,
+    getSaldoCaloricoEntrando,
+    getDeltasRefeicaoDoDia,
+    salvarDiluicaoSaldo,
+    salvarAjusteSaldoCalorico,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
     gramasDoParametro,
@@ -152,6 +158,127 @@
   };
   let metasRefeicaoPorNome = $state<Map<string, RefeicaoModelo>>(new Map());
   let parametros = $state<Map<string, LimiteParametro>>(new Map(Object.entries(PARAMETROS_PADRAO)));
+
+  // ---------------- Saldo calórico acumulado (Parametrização > Calorias > Acumular calorias) ----------------
+
+  let acumularAtivo = $state(false);
+  /** Quanto ainda falta diluir hoje (kcal) — positivo = sobrou (a favor), negativo = estourou
+   * (precisa tirar). 0/não mostrado quando já foi todo diluído ou o dia é o de reinício. */
+  let saldoPendente = $state(0);
+  let mostrarMenuSaldo = $state(false);
+  let mostrarDiluirManual = $state(false);
+  let mostrarEditarSaldo = $state(false);
+  let mostrarConfirmExcluirSaldo = $state(false);
+  let valorEditarSaldo = $state("");
+  let salvandoSaldo = $state(false);
+
+  interface ItemDiluicaoManual {
+    nome: string;
+    /** Delta já aplicado (grama de carboidrato) — editado via o campo em kcal na tela. */
+    deltaG: number;
+    /** Meta de carboidrato ORIGINAL da refeição (sem delta nenhum) — teto pra não deixar o campo
+     * "retirar" passar de 0. */
+    metaCarboidratoG: number;
+  }
+  let itensDiluicaoManual = $state<ItemDiluicaoManual[]>([]);
+
+  const restanteManualKcal = $derived(saldoPendente - itensDiluicaoManual.reduce((acc, i) => acc + i.deltaG * 4, 0));
+
+  function abrirMenuSaldo(): void {
+    mostrarMenuSaldo = true;
+  }
+
+  /** Refeições elegíveis pra diluição: têm meta configurada e não são a automática (que já absorve
+   * sozinha qualquer sobra/falta do total do dia via metasRedistribuidas — um delta atribuído a ela
+   * diretamente não teria efeito nenhum no card dela, já que ela nunca lê a própria meta). */
+  function refeicoesElegiveisDiluicao(): { nome: string; metaCalorias: number; metaCarboidratoG: number }[] {
+    return [...metasRefeicaoPorNome.entries()]
+      .filter(([nome, m]) => nome !== refeicaoAutomaticaNome && m.metaCalorias != null)
+      .map(([nome, m]) => ({ nome, metaCalorias: m.metaCalorias ?? 0, metaCarboidratoG: m.metaCarboidratoG ?? 0 }));
+  }
+
+  /** Cada refeição elegível recebe uma fatia do saldo proporcional ao tamanho (calorias) da própria
+   * meta. Retirando (saldo negativo), trava em 0 — o que não coube continua pendente e rola pro dia
+   * seguinte sozinho (getSaldoCaloricoEntrando). */
+  async function diluirProporcional(): Promise<void> {
+    const elegiveis = refeicoesElegiveisDiluicao();
+    const somaCalorias = elegiveis.reduce((acc, r) => acc + r.metaCalorias, 0);
+    if (!elegiveis.length || somaCalorias <= 0) return;
+    salvandoSaldo = true;
+    try {
+      const deltas = new Map<string, number>();
+      for (const r of elegiveis) {
+        const deltaG = (saldoPendente * r.metaCalorias) / somaCalorias / 4;
+        deltas.set(r.nome, deltaG < 0 ? Math.max(deltaG, -r.metaCarboidratoG) : deltaG);
+      }
+      await salvarDiluicaoSaldo(dataAtual, deltas);
+      mostrarToast("Salvo");
+      void carregar();
+    } catch (err) {
+      alert("Erro ao diluir o saldo: " + (err as Error).message);
+    } finally {
+      salvandoSaldo = false;
+    }
+  }
+
+  function abrirDiluirManual(): void {
+    itensDiluicaoManual = refeicoesElegiveisDiluicao().map((r) => ({ nome: r.nome, deltaG: 0, metaCarboidratoG: r.metaCarboidratoG }));
+    mostrarDiluirManual = true;
+  }
+
+  async function salvarDiluirManual(): Promise<void> {
+    salvandoSaldo = true;
+    try {
+      const deltas = new Map(itensDiluicaoManual.filter((i) => i.deltaG !== 0).map((i) => [i.nome, i.deltaG]));
+      await salvarDiluicaoSaldo(dataAtual, deltas);
+      mostrarDiluirManual = false;
+      mostrarToast("Salvo");
+      void carregar();
+    } catch (err) {
+      alert("Erro ao diluir o saldo: " + (err as Error).message);
+    } finally {
+      salvandoSaldo = false;
+    }
+  }
+
+  function abrirEditarSaldo(): void {
+    valorEditarSaldo = String(saldoPendente);
+    mostrarEditarSaldo = true;
+  }
+
+  async function salvarEditarSaldo(): Promise<void> {
+    const novo = Number(valorEditarSaldo);
+    if (!Number.isFinite(novo)) return;
+    salvandoSaldo = true;
+    try {
+      await salvarAjusteSaldoCalorico(dataAtual, Math.round(novo));
+      mostrarEditarSaldo = false;
+      mostrarToast("Salvo");
+      void carregar();
+    } catch (err) {
+      alert("Erro ao editar o saldo: " + (err as Error).message);
+    } finally {
+      salvandoSaldo = false;
+    }
+  }
+
+  function abrirExcluirSaldo(): void {
+    mostrarConfirmExcluirSaldo = true;
+  }
+
+  async function confirmarExcluirSaldo(): Promise<void> {
+    mostrarConfirmExcluirSaldo = false;
+    salvandoSaldo = true;
+    try {
+      await salvarAjusteSaldoCalorico(dataAtual, 0);
+      mostrarToast("Salvo");
+      void carregar();
+    } catch (err) {
+      alert("Erro ao excluir o saldo: " + (err as Error).message);
+    } finally {
+      salvandoSaldo = false;
+    }
+  }
   let pesoAtual = $state(76);
   let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima" });
   const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
@@ -299,18 +426,37 @@
     erro = null;
     try {
       const refeicoesRes = await garantirRefeicoesPadraoDoDia(dataAlvo);
-      const [itensRes, metasRes, metasRefeicoesRes] = await Promise.all([
+      const [itensRes, metasRes, metasRefeicoesRes, acumular, saldoEntrando, deltasHojeRes] = await Promise.all([
         getDiarioDoDia(dataAlvo),
         getMetasDoDia(dataAlvo),
         carregarMetasRefeicoes(dataAlvo),
+        getAcumularCalorias(),
+        getSaldoCaloricoEntrando(dataAlvo),
+        getDeltasRefeicaoDoDia(dataAlvo),
       ]);
       if (meuToken !== tokenCarregar) return;
       refeicoes = refeicoesRes;
       itens = itensRes;
-      metas = metasRes;
       if (metasRefeicoesRes) {
         metasRefeicaoPorNome = metasRefeicoesRes.mapa;
         refeicaoAutomaticaNome = metasRefeicoesRes.ultimaNome;
+      }
+      acumularAtivo = acumular.ativo;
+      // Diluído hoje entra no total (metas) e na meta da refeição pra quem recebeu — o que ainda
+      // não foi diluído fica só no card do saldo, sem mexer em nenhuma meta (ver Confirmar antes de
+      // codar: total do dia só muda depois que o usuário decide diluir).
+      const diluidoHojeKcal = [...deltasHojeRes.values()].reduce((acc, g) => acc + g * 4, 0);
+      saldoPendente = Math.round(saldoEntrando - diluidoHojeKcal);
+      metas = { ...metasRes, calorias: metasRes.calorias + diluidoHojeKcal, carboidratoG: metasRes.carboidratoG + diluidoHojeKcal / 4 };
+      if (deltasHojeRes.size) {
+        const novoMapa = new Map(metasRefeicaoPorNome);
+        for (const [nome, deltaG] of deltasHojeRes) {
+          if (nome === refeicaoAutomaticaNome) continue;
+          const m = novoMapa.get(nome);
+          if (!m) continue;
+          novoMapa.set(nome, { ...m, metaCalorias: (m.metaCalorias ?? 0) + deltaG * 4, metaCarboidratoG: (m.metaCarboidratoG ?? 0) + deltaG });
+        }
+        metasRefeicaoPorNome = novoMapa;
       }
     } catch (err) {
       if (meuToken === tokenCarregar) erro = (err as Error).message;
@@ -650,6 +796,23 @@
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
   </svg>
 {/snippet}
+{#snippet iconDiluir()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2v20" />
+    <path d="M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  </svg>
+{/snippet}
+{#snippet iconEditarSaldo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+{/snippet}
+{#snippet iconExcluirSaldo()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+{/snippet}
 
 <div class="container has-bottom-nav">
   <div class="topo">
@@ -909,6 +1072,12 @@
           </button>
         </div>
       {/each}
+      {#if acumularAtivo && saldoPendente !== 0}
+        <button type="button" class="card-saldo" class:negativo={saldoPendente < 0} onclick={abrirMenuSaldo}>
+          <span class="card-saldo-label">{saldoPendente > 0 ? "Calorias acumuladas" : "Calorias em falta"}</span>
+          <span class="card-saldo-valor">{saldoPendente > 0 ? "+" : ""}{saldoPendente} kcal</span>
+        </button>
+      {/if}
     {/if}
     </div>
   {/if}
@@ -916,6 +1085,64 @@
 
 {#if mostrarResumo}
   <DietaResumoModal onFechar={() => (mostrarResumo = false)} />
+{/if}
+
+{#if mostrarMenuSaldo}
+  <ActionSheet
+    titulo={saldoPendente > 0 ? `+${saldoPendente} kcal acumuladas` : `${saldoPendente} kcal em falta`}
+    onFechar={() => (mostrarMenuSaldo = false)}
+    opcoes={[
+      { label: "Diluir proporcional", subtitulo: "Divide entre as refeições, do tamanho de cada uma", icon: iconDiluir, onSelect: diluirProporcional },
+      { label: "Diluir manualmente", subtitulo: "Escolho quanto entra em cada refeição", icon: iconDiluir, onSelect: abrirDiluirManual },
+      { label: "Editar", icon: iconEditarSaldo, onSelect: abrirEditarSaldo },
+      { label: "Excluir", subtitulo: "Zera o saldo acumulado", icon: iconExcluirSaldo, destructive: true, onSelect: abrirExcluirSaldo },
+    ]}
+  />
+{/if}
+
+{#if mostrarDiluirManual}
+  <Sheet titulo="Diluir manualmente" onFechar={() => (mostrarDiluirManual = false)}>
+    <p class="diluir-ajuda">
+      Quanto entra (ou sai) de cada refeição — sempre no carboidrato. Restante a distribuir:
+      <strong>{restanteManualKcal > 0 ? "+" : ""}{restanteManualKcal.toFixed(0)} kcal</strong>
+    </p>
+    <ul class="diluir-lista">
+      {#each itensDiluicaoManual as item, idx (item.nome)}
+        <li class="diluir-linha">
+          <span class="diluir-nome">{item.nome}</span>
+          <input
+            class="diluir-input"
+            type="number"
+            inputmode="decimal"
+            step="1"
+            value={Math.round(item.deltaG * 4)}
+            onchange={(e) => {
+              const kcal = Number(e.currentTarget.value) || 0;
+              const deltaG = kcal / 4;
+              itensDiluicaoManual[idx] = { ...item, deltaG: deltaG < 0 ? Math.max(deltaG, -item.metaCarboidratoG) : deltaG };
+            }}
+          />
+        </li>
+      {/each}
+    </ul>
+    <Button onclick={salvarDiluirManual} disabled={salvandoSaldo}>Salvar</Button>
+  </Sheet>
+{/if}
+
+{#if mostrarEditarSaldo}
+  <Sheet titulo="Editar saldo acumulado" onFechar={() => (mostrarEditarSaldo = false)}>
+    <input class="editar-saldo-input" type="number" inputmode="decimal" step="1" bind:value={valorEditarSaldo} />
+    <Button onclick={salvarEditarSaldo} disabled={salvandoSaldo || !valorEditarSaldo.trim()}>Salvar</Button>
+  </Sheet>
+{/if}
+
+{#if mostrarConfirmExcluirSaldo}
+  <ConfirmDialog
+    titulo="Zerar o saldo de calorias acumulado?"
+    textoConfirmar="Excluir"
+    onConfirmar={confirmarExcluirSaldo}
+    onCancelar={() => (mostrarConfirmExcluirSaldo = false)}
+  />
 {/if}
 
 {#if reordenando}
@@ -1434,5 +1661,72 @@
   .reordenar-refeicoes-setas button:disabled {
     opacity: 0.35;
     cursor: not-allowed;
+  }
+  .card-saldo {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    margin-top: var(--space-2);
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--color-success);
+    background: color-mix(in srgb, var(--color-success) 10%, var(--surface-card));
+    color: var(--color-success);
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .card-saldo.negativo {
+    border-color: var(--color-negative);
+    background: color-mix(in srgb, var(--color-negative) 10%, var(--surface-card));
+    color: var(--color-negative);
+  }
+  .card-saldo-label {
+    font-size: var(--font-size-sm);
+  }
+  .card-saldo-valor {
+    font-size: var(--font-size-base);
+    font-weight: 700;
+  }
+  .diluir-ajuda {
+    margin: 0 0 var(--space-4);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .diluir-lista {
+    list-style: none;
+    margin: 0 0 var(--space-4);
+    padding: 0;
+  }
+  .diluir-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .diluir-nome {
+    font-size: var(--font-size-base);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .diluir-input,
+  .editar-saldo-input {
+    box-sizing: border-box;
+    width: 96px;
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    text-align: center;
+  }
+  .editar-saldo-input {
+    width: 100%;
+    margin-bottom: var(--space-3);
   }
 </style>

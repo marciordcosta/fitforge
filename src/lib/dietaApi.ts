@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { DIAS_SEMANA_ABREV, segundaDaSemana } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
-import { parseISODate } from "./dates";
+import { parseISODate, somarDias } from "./dates";
 import { marcarDietaDesatualizada } from "./dietaInvalidacao.svelte";
 
 function uid(): string {
@@ -1832,6 +1832,160 @@ export async function getMetasDoDiaSemana(diaSemana: number): Promise<MetasDiari
     gorduraG: gorduraResolvida,
     carboidratoG: carboidratoGDoDia(diaResolvido.calorias, proteinaG, gorduraResolvida),
   };
+}
+
+// ---------------- Saldo calórico acumulado (Parametrização > Calorias > Acumular calorias) ----------------
+
+export async function getAcumularCalorias(): Promise<{ ativo: boolean; diaReset: number | null }> {
+  const { data, error } = await supabase.from("dieta_perfil").select("acumular_calorias, dia_reset_saldo_calorico").maybeSingle();
+  if (error) throw error;
+  return { ativo: data?.acumular_calorias ?? false, diaReset: (data?.dia_reset_saldo_calorico as number | null) ?? null };
+}
+
+export async function salvarAcumularCalorias(ativo: boolean, diaReset: number | null): Promise<void> {
+  const { error } = await supabase
+    .from("dieta_perfil")
+    .upsert(
+      { user_id: uid(), acumular_calorias: ativo, dia_reset_saldo_calorico: diaReset, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" },
+    );
+  if (error) throw error;
+}
+
+/** Deltas de carboidrato (g) já aplicados às refeições NESSA data, por nome de refeição — vazio se
+ * o saldo daquele dia ainda não foi diluído. */
+export async function getDeltasRefeicaoDoDia(data: string): Promise<Map<string, number>> {
+  const { data: linhas, error } = await supabase.from("dieta_saldo_refeicao").select("refeicao_nome, delta_carboidrato_g").eq("data", data);
+  if (error) throw error;
+  return new Map((linhas ?? []).map((l) => [l.refeicao_nome as string, l.delta_carboidrato_g as number]));
+}
+
+/** Substitui de uma vez a diluição inteira de um dia (delete+insert, mesmo padrão do resto do
+ * arquivo) — reabrir "Diluir" e salvar de novo troca a distribuição anterior pela nova, nunca soma
+ * em cima. Deltas em gramas de CARBOIDRATO (a válvula de ajuste, nunca proteína/gordura); o que não
+ * for coberto pela soma dos deltas continua pendente e rola pro dia seguinte sozinho (ver
+ * getSaldoCaloricoEntrando). */
+export async function salvarDiluicaoSaldo(data: string, deltasCarboidratoG: Map<string, number>): Promise<void> {
+  const usuario = uid();
+  const { error: delError } = await supabase.from("dieta_saldo_refeicao").delete().eq("user_id", usuario).eq("data", data);
+  if (delError) throw delError;
+  const linhas = [...deltasCarboidratoG.entries()]
+    .filter(([, delta]) => Math.round(delta) !== 0)
+    .map(([refeicaoNome, delta]) => ({ user_id: usuario, data, refeicao_nome: refeicaoNome, delta_carboidrato_g: delta }));
+  if (linhas.length) {
+    const { error } = await supabase.from("dieta_saldo_refeicao").insert(linhas);
+    if (error) throw error;
+  }
+  marcarDietaDesatualizada();
+}
+
+/** Total consumido por dia, num intervalo [inicio, fimExclusivo) — uma consulta só em vez de uma
+ * por dia, usada pelo cálculo do saldo acumulado (getSaldoCaloricoEntrando). */
+async function getCaloriasConsumidasPorDia(inicio: string, fimExclusivo: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase.from("diario_alimentos").select("data, calorias").gte("data", inicio).lt("data", fimExclusivo);
+  if (error) throw error;
+  const mapa = new Map<string, number>();
+  for (const l of data ?? []) mapa.set(l.data as string, (mapa.get(l.data as string) ?? 0) + (l.calorias as number));
+  return mapa;
+}
+
+/** Total já diluído (kcal, convertido dos deltas de carboidrato) por dia, no mesmo intervalo. */
+async function getSaldoDiluidoPorDia(inicio: string, fimExclusivo: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from("dieta_saldo_refeicao")
+    .select("data, delta_carboidrato_g")
+    .gte("data", inicio)
+    .lt("data", fimExclusivo);
+  if (error) throw error;
+  const mapa = new Map<string, number>();
+  for (const l of data ?? []) mapa.set(l.data as string, (mapa.get(l.data as string) ?? 0) + (l.delta_carboidrato_g as number) * 4);
+  return mapa;
+}
+
+/** Igual getSaldoDiluidoPorDia, só que pra UM dia só — usado ao editar o saldo (salvarAjusteSaldoCalorico). */
+async function getSaldoDiluidoDoDia(data: string): Promise<number> {
+  const mapa = await getSaldoDiluidoPorDia(data, somarDias(data, 1));
+  return mapa.get(data) ?? 0;
+}
+
+/** Correções manuais (Editar/Excluir no card de saldo) no intervalo — chave é a data a que a
+ * correção pertence (ver salvarAjusteSaldoCalorico: sempre o dia ANTERIOR ao dia editado no app). */
+async function getAjustesPorDia(inicio: string, fimExclusivo: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from("dieta_saldo_ajuste")
+    .select("data, saldo_final_kcal")
+    .gte("data", inicio)
+    .lt("data", fimExclusivo);
+  if (error) throw error;
+  return new Map((data ?? []).map((l) => [l.data as string, l.saldo_final_kcal as number]));
+}
+
+/** Data mais recente <= `data` cujo dia da semana é `diaReset`. */
+function diaDeResetMaisRecente(data: string, diaReset: number): string {
+  let cursor = data;
+  for (let i = 0; i < 7; i++) {
+    if (parseISODate(cursor).getDay() === diaReset) return cursor;
+    cursor = somarDias(cursor, -1);
+  }
+  return data;
+}
+
+/**
+ * Saldo acumulado que ENTRA no dia `data` (antes de qualquer diluição feita nesse próprio dia) —
+ * caminha dia a dia desde o dia de reinício mais recente até ontem, somando (meta do dia + o que
+ * foi diluído naquele dia − consumido naquele dia). Puramente derivado da meta/consumo/diluição já
+ * salvos — nunca fica "desatualizado" se um dia passado for editado depois (mesmo espírito da linha
+ * de meta de peso). No próprio dia de reinício o saldo sempre volta a 0. Se um dia no meio do
+ * caminho tem uma correção manual (Editar/Excluir — dieta_saldo_ajuste), a soma "salta" pra esse
+ * valor naquele ponto e ignora tudo antes dele, continuando a acumular normalmente dali em diante.
+ */
+export async function getSaldoCaloricoEntrando(data: string): Promise<number> {
+  const { ativo, diaReset } = await getAcumularCalorias();
+  if (!ativo || diaReset == null) return 0;
+  if (parseISODate(data).getDay() === diaReset) return 0;
+
+  const ontem = somarDias(data, -1);
+  const inicio = diaDeResetMaisRecente(ontem, diaReset);
+  const dias: string[] = [];
+  for (let d = inicio; d <= ontem; d = somarDias(d, 1)) dias.push(d);
+  if (!dias.length) return 0;
+
+  const [metasPorDia, consumidoPorDia, diluidoPorDia, ajustesPorDia] = await Promise.all([
+    Promise.all(dias.map((d) => getMetasDoDia(d))),
+    getCaloriasConsumidasPorDia(inicio, data),
+    getSaldoDiluidoPorDia(inicio, data),
+    getAjustesPorDia(inicio, data),
+  ]);
+
+  let saldo = 0;
+  for (let i = 0; i < dias.length; i++) {
+    const d = dias[i];
+    const ajuste = ajustesPorDia.get(d);
+    if (ajuste != null) {
+      saldo = ajuste;
+    } else {
+      saldo += metasPorDia[i].calorias + (diluidoPorDia.get(d) ?? 0) - (consumidoPorDia.get(d) ?? 0);
+    }
+  }
+  return saldo;
+}
+
+/** "Editar"/"Excluir" no card de saldo acumulado: corrige diretamente o saldo PENDENTE mostrado
+ * pra `dataReferencia` (o dia do card, hoje normalmente) pra `novoSaldoPendente` (0 no caso de
+ * "Excluir" — zera o acumulado). Guardado como o saldo final do dia ANTERIOR (a correção entra na
+ * soma de getSaldoCaloricoEntrando um dia antes do que ela afeta), somando de volta o que já foi
+ * diluído hoje (que continua valendo, a correção não desfaz uma diluição já feita). */
+export async function salvarAjusteSaldoCalorico(dataReferencia: string, novoSaldoPendente: number): Promise<void> {
+  const diluidoHoje = await getSaldoDiluidoDoDia(dataReferencia);
+  const dataAjuste = somarDias(dataReferencia, -1);
+  const { error } = await supabase
+    .from("dieta_saldo_ajuste")
+    .upsert(
+      { user_id: uid(), data: dataAjuste, saldo_final_kcal: novoSaldoPendente + diluidoHoje },
+      { onConflict: "user_id,data" },
+    );
+  if (error) throw error;
+  marcarDietaDesatualizada();
 }
 
 export type StatusAdesaoDieta = "dentro_do_plano" | "ajustar_calorias" | "calibrando";
