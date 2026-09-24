@@ -475,6 +475,16 @@
     }
 
     if (ex.descanso_seg) {
+      // Só um exercício tem descanso "pendente" por vez — limpa qualquer outro que tenha ficado
+      // esquecido (venceu e nunca foi pulado, ex: o usuário seguiu pra outro exercício sem tocar
+      // em "Pular"). Sem isso, esse antigo ressurgia do nada quando o usuário pulasse ESTE aqui,
+      // já que exercicioDescansando cai de volta pro mais recente vencido qualquer.
+      for (const outro of sessao) {
+        if (outro !== ex && outro.descansoAte != null) {
+          outro.descansoAte = null;
+          outro.descansoInicioEm = null;
+        }
+      }
       ex.descansoInicioEm = Date.now();
       ex.descansoAte = ex.descansoInicioEm + ex.descanso_seg * 1000;
       ex.descansoNotificado = false;
