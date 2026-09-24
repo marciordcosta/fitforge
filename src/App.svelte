@@ -193,9 +193,6 @@
 {/if}
 
 <style>
-  .abas-swipe {
-    display: contents;
-  }
   .loading {
     min-height: 100vh;
     display: flex;
