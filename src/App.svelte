@@ -26,6 +26,13 @@
     return "home";
   });
 
+  /** As telas fora da rotina ao vivo / comparação de fotos (essas duas já são cheias e cuidam do
+   * próprio topo) — usado tanto pelo TreinoTopoFixo (antes das abas, ver template) quanto pelo
+   * TreinoMinimizado/BottomNav logo abaixo. */
+  const mostrarFlutuantes = $derived(
+    !router.path.startsWith("/treino/log/") && !router.path.startsWith("/fotos/comparar/"),
+  );
+
   let blockedAlertShown = false;
 
   $effect(() => {
@@ -54,6 +61,9 @@
 {:else if router.path === "/login"}
   <Login />
 {:else if auth.user && auth.isAllowed}
+  {#if mostrarFlutuantes && treinoLogSessao.atual}
+    <TreinoTopoFixo />
+  {/if}
   <div hidden={abaAtiva !== "home"}><Home /></div>
   <div hidden={abaAtiva !== "treino"}><Treino /></div>
   <div hidden={abaAtiva !== "peso"}><Peso /></div>
@@ -62,9 +72,8 @@
   {#if abaAtiva === "configurar"}
     <HomeParametrizacao />
   {/if}
-  {#if !router.path.startsWith("/treino/log/") && !router.path.startsWith("/fotos/comparar/")}
+  {#if mostrarFlutuantes}
     {#if treinoLogSessao.atual}
-      <TreinoTopoFixo />
       <TreinoMinimizado />
     {/if}
     <BottomNav />

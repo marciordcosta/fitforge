@@ -4,7 +4,9 @@
 
   /** Resumo fixo da rotina ao vivo (nome, duração, séries, concluir), sempre visível no topo de
    * qualquer tela do app enquanto uma rotina está em andamento — exceto na própria tela da rotina
-   * (que já tem esse mesmo resumo fixo dentro dela). Não mostra nada sobre descanso: isso é
+   * (que já tem esse mesmo resumo fixo dentro dela, ver .header-fixo em TreinoLog.svelte — o visual
+   * aqui é deliberadamente idêntico, ponta a ponta, sem cantos/margens, pra parecer o MESMO topbar
+   * que só "acompanha" pra fora da tela, não um card novo). Não mostra nada sobre descanso: isso é
    * exclusividade do TreinoMinimizado (barra/anel), pra nunca misturar os dois cronômetros. Tocar
    * em qualquer parte, incluindo o ícone de concluir, só abre a rotina ao vivo — concluir de fato
    * exige a tela (validação/confirmação já vivem só lá). */
@@ -60,38 +62,44 @@
 {/snippet}
 
 {#if treinoLogSessao.atual}
-  <button class="topo-fixo" onclick={abrirRotina} aria-label="Abrir rotina ao vivo">
-    <span class="stat stat-treino">
-      <span class="stat-label">Treino</span>
-      <span class="stat-valor nome-treino">{treinoLogSessao.atual.nomeTreino}</span>
-    </span>
-    <span class="stat">
-      <span class="stat-label">Duração</span>
-      <span class="stat-valor duracao">{duracaoLabel}</span>
-    </span>
-    <span class="stat">
-      <span class="stat-label">Séries</span>
-      <span class="stat-valor">{seriesTotal}/{seriesPlanejadas}</span>
-    </span>
-    <span class="concluir-icone" aria-hidden="true">{@render iconCheck()}</span>
-  </button>
+  <div class="topo-fixo">
+    <button class="topo-fixo-inner" onclick={abrirRotina} aria-label="Abrir rotina ao vivo">
+      <span class="stat stat-treino">
+        <span class="stat-label">Treino</span>
+        <span class="stat-valor nome-treino">{treinoLogSessao.atual.nomeTreino}</span>
+      </span>
+      <span class="stat">
+        <span class="stat-label">Duração</span>
+        <span class="stat-valor duracao">{duracaoLabel}</span>
+      </span>
+      <span class="stat">
+        <span class="stat-label">Séries</span>
+        <span class="stat-valor">{seriesTotal}/{seriesPlanejadas}</span>
+      </span>
+      <span class="concluir-icone" aria-hidden="true">{@render iconCheck()}</span>
+    </button>
+  </div>
 {/if}
 
 <style>
   .topo-fixo {
-    position: fixed;
-    left: var(--space-3);
-    right: var(--space-3);
-    top: calc(env(safe-area-inset-top, 0px) + var(--space-3));
-    z-index: 55;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--surface-border);
+  }
+  .topo-fixo-inner {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    background: var(--surface-card);
-    border: 1px solid var(--surface-border);
-    border-radius: var(--radius-lg);
-    padding: var(--space-2) var(--space-3);
-    box-shadow: var(--shadow-float);
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    background: none;
+    border: none;
     font-family: inherit;
     text-align: left;
     cursor: pointer;
@@ -101,17 +109,20 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 2px;
   }
   .stat-treino {
-    flex: 1;
+    min-width: 0;
+    max-width: 40%;
+    align-items: flex-start;
   }
   .stat-label {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--surface-muted);
   }
   .stat-valor {
-    font-size: 15px;
+    font-size: 17px;
     font-weight: 600;
     color: var(--surface-fg);
   }
@@ -119,14 +130,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 100%;
   }
   .duracao {
+    display: inline-block;
+    min-width: 84px;
+    text-align: center;
     font-variant-numeric: tabular-nums;
   }
   .concluir-icone {
     flex-shrink: 0;
-    width: 30px;
-    height: 30px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -135,7 +150,7 @@
     border-radius: 50%;
   }
   .concluir-icone svg {
-    width: 15px;
-    height: 15px;
+    width: 18px;
+    height: 18px;
   }
 </style>
