@@ -163,6 +163,19 @@ export async function getFotosDaData(data: string): Promise<FotoItem[]> {
   return (linhas ?? []).map((l) => ({ id: l.id, path: l.url, data: l.data_foto }));
 }
 
+/** Dias com pelo menos uma foto dentro do período — usado pra marcar o indicador de foto na grade
+ * do calendário de Peso, sem carregar as imagens em si (só as datas). */
+export async function getDiasComFoto(dataInicio: string, dataFim: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("fotos")
+    .select("data_foto")
+    .eq("user_id", uid())
+    .gte("data_foto", dataInicio)
+    .lte("data_foto", dataFim);
+  if (error) throw error;
+  return new Set((data ?? []).map((l) => l.data_foto));
+}
+
 export async function getFotoPorId(id: string): Promise<FotoItem | null> {
   const { data, error } = await supabase
     .from("fotos")

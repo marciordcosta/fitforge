@@ -15,6 +15,7 @@
     calcularLinhaMetaPorDia,
     calcularMetaFimSemanaPorDia,
     getObservacaoMeta,
+    getDiasComFoto,
     type PesoRegistro,
     type PesoMeta,
     type PesoMetaHistorico,
@@ -64,6 +65,9 @@
   let pesos = $state<PesoRegistro[]>([]);
   /** Data -> nome da rotina executada nesse dia (treino_registros), pro nome pequeno no calendário. */
   let diasComTreino = $state<Map<string, string>>(new Map());
+  /** Dias do mês visível com pelo menos uma foto de acompanhamento — só marca o indicador na
+   * grade, as imagens em si só carregam ao abrir o dia. */
+  let diasComFoto = $state<Set<string>>(new Set());
   /** Dia da semana -> nome da rotina agendada (independente de ter sido feita) — só usado pra
    * destacar dias FUTUROS com rotina prevista; dias passados/hoje sem registro real não usam isso,
    * o destaque de treino "some" se o dia passar sem ninguém ter registrado o treino. */
@@ -170,12 +174,14 @@
     loading = true;
     const dataInicio = toISODate(mesInicio);
     const dataFim = toISODate(mesFim);
-    const [listaPesos, listaTreinos] = await Promise.all([
+    const [listaPesos, listaTreinos, diasFoto] = await Promise.all([
       getPesosDoPeriodo(dataInicio, dataFim),
       getDiasComTreino(dataInicio, dataFim),
+      getDiasComFoto(dataInicio, dataFim),
     ]);
     pesos = listaPesos;
     diasComTreino = new Map(listaTreinos.map((t) => [t.data, t.treinoNome]));
+    diasComFoto = diasFoto;
     loading = false;
   }
 
@@ -245,14 +251,14 @@
   const celulas = $derived.by(() => {
     const totalDias = mesFim.getDate();
     const primeiroDiaSemana = (mesInicio.getDay() + 6) % 7; // 0=Seg..6=Dom
-    const lista: ({ dia: number; iso: string; peso: number | null; nomeTreino: string | null } | null)[] = [];
+    const lista: ({ dia: number; iso: string; peso: number | null; nomeTreino: string | null; temFoto: boolean } | null)[] = [];
     for (let i = 0; i < primeiroDiaSemana; i++) lista.push(null);
     const hoje = hojeISO();
     for (let dia = 1; dia <= totalDias; dia++) {
       const data = new Date(mesBase.getFullYear(), mesBase.getMonth(), dia);
       const iso = toISODate(data);
       const nomeTreino = diasComTreino.get(iso) ?? (iso > hoje ? (treinoPorDiaSemana.get(data.getDay()) ?? null) : null);
-      lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null, nomeTreino });
+      lista.push({ dia, iso, peso: pesosPorData.get(iso) ?? null, nomeTreino, temFoto: diasComFoto.has(iso) });
     }
     return lista;
   });
@@ -597,6 +603,12 @@
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 {/snippet}
+{#snippet iconFotoMini()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="7" y="7" width="13" height="13" rx="2" />
+    <path d="M4 14V6a2 2 0 0 1 2-2h8" />
+  </svg>
+{/snippet}
 {#snippet iconExpandir()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="15 3 21 3 21 9" />
@@ -700,6 +712,9 @@
             {@const ehHoje = cel.iso === hojeISO()}
             {@const temTreino = cel.nomeTreino != null}
             <button class="celula" class:com-peso={cel.peso != null} onclick={() => abrirDia(cel.iso)}>
+              {#if cel.temFoto}
+                <span class="foto-indicador" aria-hidden="true">{@render iconFotoMini()}</span>
+              {/if}
               <span
                 class="dia-numero"
                 class:dia-numero-treino={temTreino}
@@ -962,6 +977,19 @@
      do dia (PesoDiaSheet), não aqui — poluía demais o card. */
   .dia-numero.dia-numero-treino {
     color: var(--color-negative);
+  }
+  .foto-indicador {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 10px;
+    height: 10px;
+    color: var(--surface-muted);
+    opacity: 0.9;
+  }
+  .foto-indicador svg {
+    width: 100%;
+    height: 100%;
   }
   .peso-valor {
     font-size: 9px;
