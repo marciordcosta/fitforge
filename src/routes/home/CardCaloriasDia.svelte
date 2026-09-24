@@ -64,6 +64,28 @@
     return valor > meta;
   }
 
+  /** Hachura diagonal usada pra marcar "quanto passou" quando um macro estoura a meta (mesma ideia
+   * de DiarioAlimentar.svelte, duplicada aqui — componente próprio, sem acesso ao dietaApi). */
+  function hachuraEstouro(cor: string): string {
+    return `repeating-linear-gradient(45deg, ${cor} 0px, ${cor} 3px, transparent 3px, transparent 6px)`;
+  }
+
+  function fundoBarraComEstouro(valor: number, meta: number, cor: string): string {
+    const pct = pctMeta(valor, meta);
+    if (pct <= 100 || meta <= 0) return cor;
+    const solidPct = (meta / valor) * 100;
+    return `linear-gradient(to right, ${cor} 0%, ${cor} ${solidPct}%, transparent ${solidPct}%), ${hachuraEstouro(cor)}`;
+  }
+
+  function fundoAnelComEstouro(valor: number, meta: number, cor: string): string {
+    const pct = pctMeta(valor, meta);
+    if (pct <= 100 || meta <= 0) {
+      return `conic-gradient(${cor} 0% ${larguraBarra(pct)}%, var(--surface-border) ${larguraBarra(pct)}% 100%)`;
+    }
+    const solidPct = (meta / valor) * 100;
+    return `conic-gradient(${cor} 0% ${solidPct}%, transparent ${solidPct}% 100%), ${hachuraEstouro(cor)}`;
+  }
+
   const caloriasPassou = $derived(passouMeta(caloriasConsumido, caloriasMeta));
 
   function abrirDieta(): void {
@@ -120,7 +142,10 @@
     {/if}
   </div>
   <div class="barra-wrap-grande">
-    <div class="barra-grande" style={`width:${larguraBarra(pctMeta(caloriasConsumido, caloriasMeta))}%; background:var(--color-secondary);`}></div>
+    <div
+      class="barra-grande"
+      style={`width:${larguraBarra(pctMeta(caloriasConsumido, caloriasMeta))}%; background:${fundoBarraComEstouro(caloriasConsumido, caloriasMeta, "var(--color-secondary)")};`}
+    ></div>
   </div>
 
   <div class="macros-wrap">
@@ -138,7 +163,7 @@
     <div class="macros-grid">
       <div class="macro-col">
         <p class="macro-nome">Carb</p>
-        <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(carboidratoConsumido, carboidratoMeta))}%, var(--surface-border) ${larguraBarra(pctMeta(carboidratoConsumido, carboidratoMeta))}% 100%);`}>
+        <div class="macro-anel" style={`background: ${fundoAnelComEstouro(carboidratoConsumido, carboidratoMeta, COR_CARBO)};`}>
           <div class="macro-anel-centro">
             {@render anelCentroMacro(carboidratoConsumido, carboidratoMeta)}
           </div>
@@ -146,7 +171,7 @@
       </div>
       <div class="macro-col">
         <p class="macro-nome">Gorduras</p>
-        <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(gorduraConsumido, gorduraMeta))}%, var(--surface-border) ${larguraBarra(pctMeta(gorduraConsumido, gorduraMeta))}% 100%);`}>
+        <div class="macro-anel" style={`background: ${fundoAnelComEstouro(gorduraConsumido, gorduraMeta, COR_GORDURA)};`}>
           <div class="macro-anel-centro">
             {@render anelCentroMacro(gorduraConsumido, gorduraMeta)}
           </div>
@@ -154,7 +179,7 @@
       </div>
       <div class="macro-col">
         <p class="macro-nome">Proteínas</p>
-        <div class="macro-anel" style={`background: conic-gradient(${COR_PROTEINA} 0% ${larguraBarra(pctMeta(proteinaConsumido, proteinaMeta))}%, var(--surface-border) ${larguraBarra(pctMeta(proteinaConsumido, proteinaMeta))}% 100%);`}>
+        <div class="macro-anel" style={`background: ${fundoAnelComEstouro(proteinaConsumido, proteinaMeta, COR_PROTEINA)};`}>
           <div class="macro-anel-centro">
             {@render anelCentroMacro(proteinaConsumido, proteinaMeta)}
           </div>
@@ -162,7 +187,7 @@
       </div>
       <div class="macro-col">
         <p class="macro-nome">Gordura Sat.</p>
-        <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(gorduraSaturadaConsumido, gorduraSaturadaMeta))}%, var(--surface-border) ${larguraBarra(pctMeta(gorduraSaturadaConsumido, gorduraSaturadaMeta))}% 100%);`}>
+        <div class="macro-anel" style={`background: ${fundoAnelComEstouro(gorduraSaturadaConsumido, gorduraSaturadaMeta, COR_GORDURA)};`}>
           <div class="macro-anel-centro">
             {@render anelCentroMacro(gorduraSaturadaConsumido, gorduraSaturadaMeta)}
           </div>
@@ -170,7 +195,7 @@
       </div>
       <div class="macro-col">
         <p class="macro-nome">Fibras</p>
-        <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(fibraConsumido, fibraMeta))}%, var(--surface-border) ${larguraBarra(pctMeta(fibraConsumido, fibraMeta))}% 100%);`}>
+        <div class="macro-anel" style={`background: ${fundoAnelComEstouro(fibraConsumido, fibraMeta, COR_CARBO)};`}>
           <div class="macro-anel-centro">
             {@render anelCentroMacro(fibraConsumido, fibraMeta)}
           </div>

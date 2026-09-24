@@ -308,25 +308,41 @@
     return Math.min(100, pct);
   }
 
-  /** Preenchimento do anel dividido pelas faixas de fadiga (A/B/C) do músculo, na mesma
-   * proporção das barras de edição — o total preenchido continua sendo `pct`, só a cor
-   * interna passa a variar em vez de ser uma única cor sólida. */
-  function gradienteFadiga(musculoId: string, pct: number): string {
-    const preenchido = larguraBarra(pct);
+  const COR_ALERTA = "#f87171";
+
+  /** Hachura diagonal usada pra marcar "quanto passou" quando o feito estoura o planejado (mesma
+   * ideia das barras/anéis de macro em DiarioAlimentar/CardCaloriasDia). */
+  function hachuraEstouro(cor: string): string {
+    return `repeating-linear-gradient(45deg, ${cor} 0px, ${cor} 3px, transparent 3px, transparent 6px)`;
+  }
+
+  /** Preenchimento do anel dividido pelas faixas de fadiga (A/B/C) do músculo, na mesma proporção
+   * das barras de edição, dentro do planejado. Acima do planejado (mesma técnica das barras/anéis
+   * de macro de Dieta): o anel passa a representar o FEITO como 100%, os segmentos de fadiga ficam
+   * comprimidos até onde o planejado ficou, e o resto vira hachurado — mantido em sincronia manual
+   * com CardFadigaMuscular.svelte (Home). */
+  function gradienteFadiga(musculoId: string, feito: number, planejado: number): string {
+    const pct = pctMeta(feito, planejado);
     const partes = partesPorMusculo.get(musculoId);
     const total = partes ? partes.a + partes.b + partes.c : 0;
     const segmentos = total > 0 ? partesParaSegmentos(partes!) : [{ valor: 1, cor: CORES_FAIXA.a }];
 
+    const limite = pct <= 100 || planejado <= 0 ? larguraBarra(pct) : (planejado / feito) * 100;
     let acumulado = 0;
     const stops: string[] = [];
     for (const seg of segmentos) {
       if (seg.valor <= 0) continue;
       const inicio = acumulado;
-      acumulado += (seg.valor / (total || 1)) * preenchido;
+      acumulado += (seg.valor / (total || 1)) * limite;
       stops.push(`${seg.cor} ${inicio}% ${acumulado}%`);
     }
-    stops.push(`var(--surface-border) ${preenchido}% 100%`);
-    return `conic-gradient(${stops.join(", ")})`;
+
+    if (pct <= 100 || planejado <= 0) {
+      stops.push(`var(--surface-border) ${limite}% 100%`);
+      return `conic-gradient(${stops.join(", ")})`;
+    }
+    stops.push(`transparent ${limite}% 100%`);
+    return `conic-gradient(${stops.join(", ")}), ${hachuraEstouro(COR_ALERTA)}`;
   }
 </script>
 
@@ -428,7 +444,7 @@
               <p class="musculo-nome">{item.musculo.nome}</p>
               <div
                 class="musculo-anel"
-                style={`background: ${gradienteFadiga(item.musculo.id, pctMeta(item.feito, item.planejado))};`}
+                style={`background: ${gradienteFadiga(item.musculo.id, item.feito, item.planejado)};`}
               >
                 <div class="musculo-anel-centro">
                   {#if modoRestante && passouMeta(item.feito, item.planejado)}
