@@ -548,12 +548,22 @@
     }
   }
 
+  /** "Failed to fetch" (rede caiu bem na hora de sair do campo) é o erro mais comum aqui, e some
+   * sozinho num instante — tenta de novo uma vez antes de incomodar o usuário com alerta. */
   async function salvarObservacao(exIdx: number) {
     const ex = sessao[exIdx];
-    try {
-      await salvarObservacaoExercicio(ex.exercicio_id, ex.observacao?.trim() ?? "", hojeISO());
-    } catch (e) {
-      mostrarAlerta("Erro ao salvar observação: " + (e as Error).message);
+    const observacao = ex.observacao?.trim() ?? "";
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      try {
+        await salvarObservacaoExercicio(ex.exercicio_id, observacao, hojeISO());
+        return;
+      } catch (e) {
+        if (tentativa === 2) {
+          mostrarAlerta("Erro ao salvar observação: " + (e as Error).message);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      }
     }
   }
 
