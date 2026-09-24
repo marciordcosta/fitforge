@@ -6,8 +6,6 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
-  import WheelPicker from "../../components/WheelPicker.svelte";
-  import WheelPickerMacros from "../../components/WheelPickerMacros.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import {
     listRefeicoesModelo,
@@ -15,7 +13,6 @@
     getReceita,
     getContextoMetaCatalogo,
     salvarMetaNumericaRefeicao,
-    salvarMetaNumericaRefeicaoDias,
     garantirReceitaPrivadaRefeicao,
     desvincularMetaReceita,
     removerMetaReceitaDias,
@@ -177,14 +174,25 @@
   const carboidratoG = $derived(ehUltima ? Math.max(0, contexto!.disponivel.carboidratoG) : (overrideDia?.metaCarboidratoG ?? modelo?.metaCarboidratoG ?? null));
   const receitaIdAtual = $derived(overrideDia?.metaReceitaId ?? modelo?.metaReceitaId ?? null);
 
-  const caloriasCarbo = $derived((carboidratoG ?? 0) * 4);
-  const caloriasGordura = $derived((gorduraG ?? 0) * 9);
-  const caloriasProteina = $derived((proteinaG ?? 0) * 4);
-  const caloriasCalc = $derived(caloriasCarbo + caloriasGordura + caloriasProteina);
+  const caloriasCalc = $derived((carboidratoG ?? 0) * 4 + (gorduraG ?? 0) * 9 + (proteinaG ?? 0) * 4);
 
-  const pctCarbo = $derived(caloriasCalc > 0 ? (caloriasCarbo / caloriasCalc) * 100 : 0);
-  const pctGordura = $derived(caloriasCalc > 0 ? (caloriasGordura / caloriasCalc) * 100 : 0);
-  const pctProteina = $derived(caloriasCalc > 0 ? (caloriasProteina / caloriasCalc) * 100 : 0);
+  /** Anel do topo: composição real dos alimentos já inseridos (mesmo cálculo e mesmo padrão visual
+   * não-clicável de DietaRefeicaoVisualizar.svelte) — não é mais a meta. A meta em si (proteinaG/
+   * gorduraG/carboidratoG acima) continua existindo só como referência pra "Total dos Alimentos"
+   * logo abaixo. */
+  const totalCaloriasAlimentos = $derived(totaisItens?.calorias ?? 0);
+  const totalCarboidratoAlimentos = $derived(totaisItens?.carboidratoG ?? 0);
+  const totalGorduraAlimentos = $derived(totaisItens?.gorduraG ?? 0);
+  const totalProteinaAlimentos = $derived(totaisItens?.proteinaG ?? 0);
+
+  const caloriasCarboAlimentos = $derived(totalCarboidratoAlimentos * 4);
+  const caloriasGorduraAlimentos = $derived(totalGorduraAlimentos * 9);
+  const caloriasProteinaAlimentos = $derived(totalProteinaAlimentos * 4);
+  const caloriasMacrosAlimentos = $derived(caloriasCarboAlimentos + caloriasGorduraAlimentos + caloriasProteinaAlimentos);
+
+  const pctCarbo = $derived(caloriasMacrosAlimentos > 0 ? (caloriasCarboAlimentos / caloriasMacrosAlimentos) * 100 : 0);
+  const pctGordura = $derived(caloriasMacrosAlimentos > 0 ? (caloriasGorduraAlimentos / caloriasMacrosAlimentos) * 100 : 0);
+  const pctProteina = $derived(caloriasMacrosAlimentos > 0 ? (caloriasProteinaAlimentos / caloriasMacrosAlimentos) * 100 : 0);
 
   /** Mesma regra do Diário (Exibição das Refeições, em Parametrização): a barra pode corresponder
    * à meta DESSA refeição (padrão, a roda tripla acima) ou à meta diária inteira. */
@@ -223,87 +231,14 @@
     }
   }
 
-  // Com 0 kcal (nenhum macro definido ainda), o conic-gradient sem essa checagem preenchia o anel
-  // inteiro com a cor da proteína por engano (o último stop, aberto até 100%, "herda" tudo quando
-  // os stops anteriores têm largura zero) — mostrando um anel sólido amarelo pra uma meta vazia.
+  // Sem alimentos ainda, o conic-gradient sem essa checagem preenchia o anel inteiro com a cor da
+  // proteína por engano (o último stop, aberto até 100%, "herda" tudo quando os stops anteriores
+  // têm largura zero) — mostra uma cor neutra em vez disso.
   const donutStyle = $derived(
-    caloriasCalc > 0
+    caloriasMacrosAlimentos > 0
       ? `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`
       : `background: var(--surface-border);`,
   );
-
-  let mostrarMacros = $state(false);
-
-  /** A roda em si continua em ordem crescente normal (menor em cima, maior embaixo, igual todo
-   * seletor de rolar) — só o texto secundário embaixo do título mostra quanto restaria pra bater
-   * a meta do dia com o valor selecionado no momento. */
-  function opcoesGramas(max: number): { valor: number; label: string }[] {
-    const opcoes: { valor: number; label: string }[] = [];
-    for (let v = 0; v <= max; v++) opcoes.push({ valor: v, label: `${v} g` });
-    return opcoes;
-  }
-
-  /** % que o valor selecionado na roda representa da meta DIÁRIA inteira desse macro — o % da
-   * meta da refeição (linha de cima) já é mostrado pelo próprio WheelPickerMacros (mostrarPct). */
-  function secundarioPercentualDiario(v: number, metaDiariaG: number | null | undefined): string {
-    if (!metaDiariaG) return `${v} g`;
-    return `${((v / metaDiariaG) * 100).toFixed(0)}% do dia`;
-  }
-
-  /** Teto de cada macro pra essa refeição: não editar acima do que sobraria pra última (automática)
-   * — nunca menor que o valor já salvo, pra não escondê-lo da roda ao abrir. */
-  function colunasMacros() {
-    const tetoCarbo = contexto ? Math.max(Math.round(carboidratoG ?? 0), Math.min(300, Math.round(contexto.disponivel.carboidratoG))) : 300;
-    const tetoGordura = contexto ? Math.max(Math.round(gorduraG ?? 0), Math.min(150, Math.round(contexto.disponivel.gorduraG))) : 150;
-    const tetoProteina = contexto ? Math.max(Math.round(proteinaG ?? 0), Math.min(300, Math.round(contexto.disponivel.proteinaG))) : 300;
-    return [
-      { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesGramas(tetoCarbo), valorAtual: Math.round(carboidratoG ?? 0), kcalPorGrama: 4, secundario: (v: number) => secundarioPercentualDiario(v, metasDia?.carboidratoG) },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesGramas(tetoGordura), valorAtual: Math.round(gorduraG ?? 0), kcalPorGrama: 9, secundario: (v: number) => secundarioPercentualDiario(v, metasDia?.gorduraG) },
-      { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesGramas(tetoProteina), valorAtual: Math.round(proteinaG ?? 0), kcalPorGrama: 4, secundario: (v: number) => secundarioPercentualDiario(v, metasDia?.proteinaG) },
-    ];
-  }
-
-  /** Rodapé do modal: calorias que essa refeição vai "consumir" da meta do dia com a escolha atual. */
-  function formatarRodapeCalorias(caloriasEscolhidas: number): string {
-    return `${caloriasEscolhidas} cal`;
-  }
-
-  async function confirmarMacros(valores: Record<string, number>): Promise<void> {
-    try {
-      if (diasSemana?.length) {
-        await salvarMetaNumericaRefeicaoDias(modeloId, diasSemana, valores.proteinaG, valores.gorduraG, valores.carboidratoG);
-      } else {
-        await salvarMetaNumericaRefeicao(modeloId, valores.proteinaG, valores.gorduraG, valores.carboidratoG);
-      }
-      await carregar();
-      mostrarToast("Salvo");
-    } catch (err) {
-      alert("Erro ao salvar meta: " + (err as Error).message);
-    }
-  }
-
-  let mostrarCalorias = $state(false);
-
-  /** Toca no anel: abre só a roda de calorias, igual ao anel da aba Calorias/Gerenciar — ajustar o
-   * valor recalcula o carboidrato pra fechar a conta, mantendo gordura/proteína fixas. */
-  function infoCalorias() {
-    const proteina = proteinaG ?? 0;
-    const gordura = gorduraG ?? 0;
-    const teto = Math.max(Math.round(caloriasCalc), contexto ? Math.round(contexto.disponivel.calorias) : Math.round(caloriasCalc));
-    const opcoes: { valor: number; label: string }[] = [];
-    for (let v = 0; v <= teto; v += 10) opcoes.push({ valor: v, label: `${v} kcal` });
-    return {
-      titulo: "Calorias (kcal)",
-      opcoes,
-      valorAtual: Math.round(caloriasCalc / 10) * 10,
-      onSelecionar: (v: number) => confirmarCalorias(v, proteina, gordura),
-    };
-  }
-
-  async function confirmarCalorias(calorias: number, proteina: number, gordura: number): Promise<void> {
-    const novoCarboidratoG = Math.max(0, Math.round((calorias - 4 * proteina - 9 * gordura) / 4));
-    await confirmarMacros({ proteinaG: proteina, gorduraG: gordura, carboidratoG: novoCarboidratoG });
-  }
 
   let itemEditando = $state<ReceitaItem | null>(null);
   let itemParaRemover = $state<ReceitaItem | null>(null);
@@ -464,6 +399,9 @@
     itemEditando = item;
   }
 
+  /** Menu com as duas opções de exclusão (refeição inteira ou só a meta) — cada uma abre seu
+   * próprio ConfirmDialog de confirmação, já existentes. */
+  let mostrarMenuExcluir = $state(false);
   let confirmandoRemoverMeta = $state(false);
   let removendoMeta = $state(false);
   let confirmandoExcluirRefeicao = $state(false);
@@ -564,29 +502,19 @@
   {:else}
     <div class="conteudo" class:carregando={loading}>
       <div class="card-meta">
-        <p class="card-meta-titulo">
-          Meta da Refeição
-          {#if ehUltima}<span class="card-meta-auto">Automática — sobra do dia</span>{/if}
-        </p>
+        <p class="card-meta-titulo">Total da Refeição</p>
         <div class="resumo">
-          <button
-            type="button"
-            class="donut"
-            disabled={ehUltima}
-            onclick={() => (mostrarCalorias = true)}
-            style={donutStyle}
-            aria-label="Ajustar calorias"
-          >
-            <span class="donut-centro">
-              <strong>{caloriasCalc.toFixed(0)}</strong>
+          <div class="donut" style={donutStyle}>
+            <div class="donut-centro">
+              <strong>{totalCaloriasAlimentos.toFixed(0)}</strong>
               <span>Cal</span>
-            </span>
-          </button>
-          <button type="button" class="resumo-macros" disabled={ehUltima} onclick={() => (mostrarMacros = true)} aria-label="Ajustar macros">
-            <span><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br /><span class="valor-g">{(carboidratoG ?? 0).toFixed(0)} g</span><br />Carb</span>
-            <span><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br /><span class="valor-g">{(gorduraG ?? 0).toFixed(0)} g</span><br />Gorduras</span>
-            <span><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{(proteinaG ?? 0).toFixed(0)} g</span><br />Proteínas</span>
-          </button>
+            </div>
+          </div>
+          <div class="resumo-macros">
+            <p><strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong><br /><span class="valor-g">{totalCarboidratoAlimentos.toFixed(0)} g</span><br />Carb</p>
+            <p><strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong><br /><span class="valor-g">{totalGorduraAlimentos.toFixed(0)} g</span><br />Gorduras</p>
+            <p><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{totalProteinaAlimentos.toFixed(0)} g</span><br />Proteínas</p>
+          </div>
         </div>
       </div>
 
@@ -664,32 +592,21 @@
 
       {#if !ehUltima}
         <div class="acao-excluir">
-          <Button variant="danger" onclick={() => (confirmandoRemoverMeta = true)} disabled={removendoMeta}>Remover Meta</Button>
-          <Button variant="danger" onclick={() => (confirmandoExcluirRefeicao = true)} disabled={excluindoRefeicao}>Excluir Refeição</Button>
+          <Button variant="danger" onclick={() => (mostrarMenuExcluir = true)} disabled={removendoMeta || excluindoRefeicao}>Excluir</Button>
         </div>
       {/if}
     </div>
   {/if}
 </div>
 
-{#if mostrarMacros}
-  <WheelPickerMacros
-    titulo="Ajustar Macros (g)"
-    colunas={colunasMacros()}
-    onSelecionar={confirmarMacros}
-    onFechar={() => (mostrarMacros = false)}
-    formatarRodape={formatarRodapeCalorias}
-  />
-{/if}
-
-{#if mostrarCalorias}
-  {@const info = infoCalorias()}
-  <WheelPicker
-    titulo={info.titulo}
-    opcoes={info.opcoes}
-    valorAtual={info.valorAtual}
-    onSelecionar={info.onSelecionar}
-    onFechar={() => (mostrarCalorias = false)}
+{#if mostrarMenuExcluir}
+  <ActionSheet
+    titulo="Excluir"
+    onFechar={() => (mostrarMenuExcluir = false)}
+    opcoes={[
+      { label: "Excluir Refeição", icon: iconLixeira, destructive: true, onSelect: () => (confirmandoExcluirRefeicao = true) },
+      { label: "Excluir Meta", icon: iconLixeira, destructive: true, onSelect: () => (confirmandoRemoverMeta = true) },
+    ]}
   />
 {/if}
 
@@ -733,8 +650,8 @@
 
 {#if confirmandoRemoverMeta}
   <ConfirmDialog
-    titulo="Remover a meta e os alimentos dessa refeição?"
-    textoConfirmar="Remover Meta"
+    titulo="Excluir a meta e os alimentos dessa refeição?"
+    textoConfirmar="Excluir Meta"
     onConfirmar={removerMetaCompleta}
     onCancelar={() => (confirmandoRemoverMeta = false)}
   />
@@ -835,11 +752,6 @@
     align-items: baseline;
     gap: var(--space-2);
   }
-  .card-meta-auto {
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--surface-muted);
-  }
   .resumo {
     width: 100%;
     display: flex;
@@ -847,23 +759,12 @@
     gap: var(--space-5);
     padding: var(--space-3) 0 0;
   }
-  .donut:disabled,
-  .resumo-macros:disabled {
-    cursor: default;
-  }
   .donut {
     position: relative;
-    display: block;
     width: 84px;
     height: 84px;
     border-radius: 50%;
     flex-shrink: 0;
-    border: none;
-    padding: 0;
-    background-color: transparent;
-    color: inherit;
-    font-family: inherit;
-    cursor: pointer;
   }
   .donut-centro {
     position: absolute;
@@ -889,14 +790,8 @@
     justify-content: space-between;
     gap: var(--space-2);
     color: var(--surface-fg);
-    background: none;
-    border: none;
-    padding: 0;
-    text-align: left;
-    font-family: inherit;
-    cursor: pointer;
   }
-  .resumo-macros > span {
+  .resumo-macros > p {
     flex: 1;
     min-width: 0;
     margin: 0;

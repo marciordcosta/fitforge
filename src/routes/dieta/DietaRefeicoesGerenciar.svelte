@@ -491,7 +491,13 @@
     }
     const proteina = proteinaGInput ?? 0;
     blocosEdicao = blocosEdicao.map((b, i) =>
-      i === idx ? { ...b, carboidratoG: valores.carboidratoG } : { ...b, carboidratoG: carboidratoGDoDia(b.calorias, proteina, b.gorduraG) },
+      i === idx
+        // `calorias` é o campo travado de cada bloco (ver comentário de manuaisEfetivos) -- sem
+        // recalculá-lo aqui, o carboidrato escolhido era descartado silenciosamente ao salvar,
+        // porque manuaisEfetivos sempre deriva o carboidrato de volta a partir de `calorias`
+        // (nunca lê o carboidrato salvo direto).
+        ? { ...b, carboidratoG: valores.carboidratoG, calorias: valores.carboidratoG * 4 + b.gorduraG * 9 + proteina * 4 }
+        : { ...b, carboidratoG: carboidratoGDoDia(b.calorias, proteina, b.gorduraG) },
     );
   }
 

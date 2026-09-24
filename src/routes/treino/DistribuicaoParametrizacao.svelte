@@ -122,6 +122,10 @@
     if (seriesManutencaoMin > seriesManutencaoMax) return "O mínimo de Manutenção não pode ser maior que o máximo.";
     if (seriesFocoMin > seriesFocoMax) return "O mínimo de Foco não pode ser maior que o máximo.";
     if (seriesFocoMin <= seriesManutencaoMax) return "O mínimo de Foco precisa ser maior que o máximo de Manutenção.";
+    // Mesma lógica das faixas de série acima: sem essa trava, dava pra configurar o Corte A maior
+    // ou igual ao Corte B e a Fase B (entre os dois) nunca aparecia (tudo até o Corte A vira "a",
+    // o resto vira "c" direto).
+    if (fadigaFasesCorteA >= fadigaFasesCorteB) return "O Corte A precisa ser menor que o Corte B.";
     return null;
   }
 
