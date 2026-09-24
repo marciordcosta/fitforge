@@ -8,6 +8,7 @@
     duplicateTreino,
     deleteTreino,
     getObservacoesAtuais,
+    getUltimoRegistro,
     DIAS_SEMANA_COMPLETO,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
@@ -16,18 +17,38 @@
 
   let treino = $state<TreinoComExercicios | null>(null);
   let observacoesPorExercicio = $state<Map<string, string>>(new Map());
+  /** Peso da última vez que cada série foi registrada (independente de rotina) — usado como
+   * fallback quando a rotina não tem peso_alvo definido pra série, em vez de mostrar "—". Chave
+   * "exercicio_id:serie". */
+  let ultimoPesoPorSerie = $state<Map<string, number>>(new Map());
   let loading = $state(true);
   let erroCarregar = $state<string | null>(null);
   let processando = $state(false);
   let confirmandoExclusao = $state(false);
   let menuAberto = $state(false);
 
+  function pesoExibido(exercicioId: string, s: { serie: number; peso_alvo: number | null }): number | null {
+    return s.peso_alvo ?? ultimoPesoPorSerie.get(`${exercicioId}:${s.serie}`) ?? null;
+  }
+
   async function carregar() {
     loading = true;
     erroCarregar = null;
     try {
       treino = await getTreino(treinoId);
-      observacoesPorExercicio = await getObservacoesAtuais(treino?.exercicios.map((e) => e.exercicio_id) ?? []);
+      const exercicioIds = treino?.exercicios.map((e) => e.exercicio_id) ?? [];
+      const [obs, ultimos] = await Promise.all([
+        getObservacoesAtuais(exercicioIds),
+        Promise.all([...new Set(exercicioIds)].map(async (id) => [id, await getUltimoRegistro(id)] as const)),
+      ]);
+      observacoesPorExercicio = obs;
+      const mapa = new Map<string, number>();
+      for (const [exercicioId, registros] of ultimos) {
+        for (const r of registros) {
+          if (r.peso != null) mapa.set(`${exercicioId}:${r.serie}`, r.peso);
+        }
+      }
+      ultimoPesoPorSerie = mapa;
     } catch (e) {
       erroCarregar = (e as Error).message;
     } finally {
@@ -146,9 +167,10 @@
                 <span>Intervalo de repetição</span>
               </div>
               {#each te.series.slice().sort((a, b) => a.serie - b.serie) as s (s.serie)}
+                {@const peso = pesoExibido(te.exercicio_id, s)}
                 <div class="series-linha">
                   <span class="serie-num">{s.serie}</span>
-                  <span>{s.peso_alvo != null ? `${s.peso_alvo}kg` : "—"}</span>
+                  <span>{peso != null ? `${peso}kg` : "—"}</span>
                   <span>
                     {s.rep_min != null && s.rep_max != null
                       ? `${s.rep_min} a ${s.rep_max}`

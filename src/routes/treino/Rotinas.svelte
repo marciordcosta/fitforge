@@ -491,7 +491,7 @@
         onclick={() => navigate(`/treino/rotina/${treino.id}/ver`)}
         onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
       >
-        {#if destacada && ehHoje}
+        {#if destacada && ehHoje && !concluidaHoje}
           <div class="canto-superior" role="presentation" onclick={(e) => e.stopPropagation()}>
             <TreinoAjusteDiaFluxo data={hojeISO()} onMudou={carregar} />
           </div>

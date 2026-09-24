@@ -640,7 +640,7 @@
       class:quick-card-ativo={modoGrafico === "diario"}
       onclick={() => selecionarModoGrafico("diario")}
     >
-      <span class="quick-card-label">Peso hoje</span>
+      <span class="quick-card-label">Últ. registro</span>
       <span class="quick-card-valor">{pesoAtualTexto}</span>
     </button>
     <button
