@@ -23,11 +23,11 @@
   import { receitaRascunho, adicionarAoRascunho, definirContexto, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
   import DietaAlimentoFormSheet from "./DietaAlimentoFormSheet.svelte";
 
-  /** Rótulo discreto de origem, mostrado ao lado das calorias/porção -- "manual" não ganha rótulo
-   * (é o caso comum, o alimento é do próprio usuário, não precisa de aviso). */
+  /** Rótulo discreto de origem, mostrado ao lado das calorias/porção. */
   function fonteLabel(fonte: FonteAlimento): string | null {
     if (fonte === "taco") return "TACO";
     if (fonte === "openfoodfacts") return "OFF";
+    if (fonte === "manual") return "Manual";
     return null;
   }
 
