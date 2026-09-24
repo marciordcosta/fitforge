@@ -501,8 +501,7 @@
     <p class="erro">Erro ao carregar: {erro}</p>
   {:else}
     <div class="conteudo" class:carregando={loading}>
-      <div class="card-meta">
-        <p class="card-meta-titulo">Total da Refeição</p>
+      {#if totaisItens}
         <div class="resumo">
           <div class="donut" style={donutStyle}>
             <div class="donut-centro">
@@ -516,7 +515,7 @@
             <p><strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong><br /><span class="valor-g">{totalProteinaAlimentos.toFixed(0)} g</span><br />Proteínas</p>
           </div>
         </div>
-      </div>
+      {/if}
 
       {#if totaisItens}
         <p class="pct-titulo">Total dos Alimentos</p>
@@ -737,27 +736,11 @@
     width: 36px;
     flex-shrink: 0;
   }
-  .card-meta {
-    background: var(--surface-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
-    padding: var(--space-4);
-    margin-bottom: var(--space-4);
-  }
-  .card-meta-titulo {
-    margin: 0;
-    font-weight: 600;
-    color: var(--surface-fg);
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-  }
   .resumo {
-    width: 100%;
     display: flex;
     align-items: center;
     gap: var(--space-5);
-    padding: var(--space-3) 0 0;
+    padding: var(--space-3) 0 var(--space-5);
   }
   .donut {
     position: relative;
