@@ -1,6 +1,6 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
-  import { parseISODate, toISODate, hojeISO } from "../../lib/dates";
+  import { parseISODate, toISODate, hojeISO, somarDias } from "../../lib/dates";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
@@ -1203,7 +1203,11 @@
 {#if mostrarData}
   <Sheet titulo="Selecionar dia" onFechar={() => (mostrarData = false)}>
     <input class="data-input" type="date" value={dataAtual} onchange={(e) => selecionarData(e.currentTarget.value)} />
-    <button class="hoje-btn" onclick={() => selecionarData(hojeISO())}>Hoje</button>
+    {#if dataAtual === hojeISO()}
+      <button class="hoje-btn" onclick={() => selecionarData(somarDias(hojeISO(), -1))}>Ontem</button>
+    {:else}
+      <button class="hoje-btn" onclick={() => selecionarData(hojeISO())}>Hoje</button>
+    {/if}
   </Sheet>
 {/if}
 
