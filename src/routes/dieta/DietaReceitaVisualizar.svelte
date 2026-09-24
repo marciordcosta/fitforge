@@ -783,7 +783,7 @@
   .item-barra {
     height: 100%;
     border-radius: 3px;
-    background: var(--color-primary);
+    background: var(--color-secondary);
   }
   .item-detalhe {
     flex-shrink: 0;
