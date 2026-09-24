@@ -1421,14 +1421,14 @@
   }
   .macro-anel {
     position: relative;
-    width: 68px;
-    height: 68px;
+    width: 76px;
+    height: 76px;
     margin: 0 auto;
     border-radius: 50%;
   }
   .macro-anel-centro {
     position: absolute;
-    inset: 6px;
+    inset: 8px;
     border-radius: 50%;
     background: var(--surface-card);
     display: flex;
