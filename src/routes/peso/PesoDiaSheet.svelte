@@ -15,7 +15,6 @@
     salvarPeso,
     excluirPeso,
     adicionarFoto,
-    excluirFotoDoDia,
     type FotoItem,
   } from "../../lib/pesoApi";
 
@@ -118,18 +117,6 @@
     }
   }
 
-  async function removerFoto(item: FotoItem) {
-    salvando = true;
-    try {
-      await excluirFotoDoDia(item);
-      fotos = fotos.filter((f) => f.id !== item.id);
-    } catch (err) {
-      alert("Erro ao remover foto: " + (err as Error).message);
-    } finally {
-      salvando = false;
-    }
-  }
-
   function abrirFotoNoModulo(): void {
     navigate(`/fotos/dia/${data}`);
   }
@@ -212,21 +199,23 @@
         >
           {@render iconCamera()}
         </button>
-        {#each fotos as item (item.id)}
-          <div class="foto-preview">
-            <button
-              type="button"
-              class="foto-preview-img"
-              onclick={abrirFotoNoModulo}
-              aria-label="Ver no módulo de Fotos"
-            >
-              {#if urlsFotos.get(item.path)}
-                <img src={urlsFotos.get(item.path)} alt="Foto de acompanhamento" />
-              {/if}
-            </button>
-            <button class="foto-remover" onclick={() => removerFoto(item)} disabled={salvando} aria-label="Remover foto">✕</button>
+        {#if fotos.length}
+          <div class="foto-pilha">
+            {#each fotos as item, i (item.id)}
+              <button
+                type="button"
+                class="foto-preview-img"
+                style="z-index: {i}; margin-left: {i === 0 ? 0 : -34}px; transform: rotate({(i % 2 === 0 ? -1 : 1) * (3 + (i % 3) * 2)}deg);"
+                onclick={abrirFotoNoModulo}
+                aria-label="Ver fotos do dia no módulo de Fotos"
+              >
+                {#if urlsFotos.get(item.path)}
+                  <img src={urlsFotos.get(item.path)} alt="Foto de acompanhamento" />
+                {/if}
+              </button>
+            {/each}
           </div>
-        {/each}
+        {/if}
       </div>
     {/if}
     <input bind:this={inputCamera} type="file" accept="image/*" capture="environment" class="foto-input" onchange={selecionarFoto} />
@@ -331,6 +320,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    padding: var(--space-2) 0;
     overflow-x: auto;
   }
   .foto-btn {
@@ -354,42 +344,34 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
-  .foto-preview {
-    position: relative;
+  .foto-pilha {
+    display: flex;
+    align-items: center;
     flex-shrink: 0;
-    width: 72px;
-    height: 72px;
+    padding-right: var(--space-3);
   }
   .foto-preview-img {
     display: block;
-    width: 100%;
-    height: 100%;
+    flex-shrink: 0;
+    width: 72px;
+    height: 72px;
     padding: 0;
-    border: none;
+    border: 2px solid var(--surface-bg);
     border-radius: var(--radius-md);
     background: var(--surface-bg);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
     overflow: hidden;
     cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .foto-preview-img:active {
+    transform: scale(0.96) !important;
   }
   .foto-preview-img img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-  }
-  .foto-remover {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: none;
-    background: var(--color-danger);
-    color: #fff;
-    font-size: 11px;
-    line-height: 1;
-    cursor: pointer;
   }
   .foto-input {
     display: none;
