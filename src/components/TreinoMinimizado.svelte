@@ -47,39 +47,31 @@
     return segundos < 0 ? `-${formatMMSS(-segundos)}` : formatMMSS(segundos);
   }
 
+  /** Exclusividade do descanso: nunca mostra a duração total da rotina (isso já fica fixo no
+   * TreinoTopoFixo) — sem isso, um bug de resincronização ao apagar/reacender a tela podia fazer
+   * esse indicador "confundir" os dois cronômetros e mostrar o tempo errado. Sem descanso ativo,
+   * o indicador simplesmente some (ver `{#if info}` no template). */
   const info = $derived.by(() => {
     const atual = treinoLogSessao.atual;
     if (!atual) return null;
 
     /** Mesma regra do cronômetro na tela ao vivo: continua marcando "Descanso" mesmo depois de
-     * zerar (contando o atraso em negativo) até pular ou iniciar outro descanso — sem isso, aqui
-     * fora da tela o card voltava a mostrar a duração total assim que o descanso zerava. */
+     * zerar (contando o atraso em negativo) até pular ou iniciar outro descanso. */
     const descansando =
       atual.sessao.find((ex) => ex.descansoAte && ex.descansoAte > agora) ??
       atual.sessao.find((ex) => ex.descansoAte != null);
-    if (descansando) {
-      const restante = Math.ceil((descansando.descansoAte! - agora) / 1000);
-      const inicioDescanso = descansando.descansoInicioEm ?? descansando.descansoAte!;
-      const totalDescanso = descansando.descansoAte! - inicioDescanso;
-      const progresso = totalDescanso > 0 ? Math.min(Math.max((agora - inicioDescanso) / totalDescanso, 0), 1) : 1;
-      return {
-        titulo: "Descanso",
-        tempo: formatMMSSAssinado(restante),
-        subtitulo: descansando.nome,
-        atrasado: restante < 0,
-        progresso,
-      };
-    }
+    if (!descansando) return null;
 
-    const total = Math.floor((agora - atual.inicio) / 1000);
-    const duracao = total < 60 ? `${total}s` : formatMMSS(total);
-    const emAndamento = atual.sessao.find((ex) => ex.sets.some((s) => !s.concluida));
+    const restante = Math.ceil((descansando.descansoAte! - agora) / 1000);
+    const inicioDescanso = descansando.descansoInicioEm ?? descansando.descansoAte!;
+    const totalDescanso = descansando.descansoAte! - inicioDescanso;
+    const progresso = totalDescanso > 0 ? Math.min(Math.max((agora - inicioDescanso) / totalDescanso, 0), 1) : 1;
     return {
-      titulo: atual.nomeTreino,
-      tempo: duracao,
-      subtitulo: emAndamento?.nome ?? atual.sessao[atual.sessao.length - 1]?.nome ?? "",
-      atrasado: false,
-      progresso: 0,
+      titulo: "Descanso",
+      tempo: formatMMSSAssinado(restante),
+      subtitulo: descansando.nome,
+      atrasado: restante < 0,
+      progresso,
     };
   });
 
@@ -215,9 +207,11 @@
     box-shadow: var(--shadow-float);
     z-index: 60;
   }
+  /** Deslocada mais que o TreinoTopoFixo (nome/duração/séries/concluir, sempre fixo no topo
+   * enquanto essa barra também aparece, já que os dois só existem juntos) pra não sobrepor ele. */
   .barra.cima {
     bottom: auto;
-    top: calc(env(safe-area-inset-top, 0px) + var(--space-3));
+    top: calc(env(safe-area-inset-top, 0px) + 72px);
   }
   .icone-btn {
     flex-shrink: 0;

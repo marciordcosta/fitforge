@@ -4,6 +4,7 @@
   import { treinoLogSessao } from "./lib/treinoLogSessao.svelte";
   import BottomNav from "./components/BottomNav.svelte";
   import TreinoMinimizado from "./components/TreinoMinimizado.svelte";
+  import TreinoTopoFixo from "./components/TreinoTopoFixo.svelte";
   import Toast from "./components/Toast.svelte";
   import Login from "./routes/login/Login.svelte";
   import Home from "./routes/Home.svelte";
@@ -63,6 +64,7 @@
   {/if}
   {#if !router.path.startsWith("/treino/log/") && !router.path.startsWith("/fotos/comparar/")}
     {#if treinoLogSessao.atual}
+      <TreinoTopoFixo />
       <TreinoMinimizado />
     {/if}
     <BottomNav />
