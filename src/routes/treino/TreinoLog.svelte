@@ -313,6 +313,14 @@
     if (!exercicioDescansando) anelExpandido = false;
   });
 
+  /** Assim que o descanso passa do tempo (fica negativo), abre sozinho o popover com "Pular"/+15 —
+   * é exatamente o momento em que o usuário precisa decidir rápido, sem ter que caçar o anel
+   * flutuante e tocar nele primeiro. Só dispara uma vez por descanso (na transição pra atrasado),
+   * então continua respeitando se o usuário fechar de novo manualmente depois. */
+  $effect(() => {
+    if (descansoAtrasado) anelExpandido = true;
+  });
+
   function iniciarArrasteAnel(e: PointerEvent): void {
     const el = e.currentTarget as HTMLElement;
     el.setPointerCapture(e.pointerId);
