@@ -2,7 +2,7 @@
   import { navigate } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
   import TreinoAjusteDiaFluxo from "../../components/TreinoAjusteDiaFluxo.svelte";
-  import { moverTreinoParaDia, DIAS_SEMANA_COMPLETO, type TreinoComExercicios, type StatusSemanalTreino } from "../../lib/treinoApi";
+  import { moverTreinoParaDia, labelDiaSemanaRelativo, type TreinoComExercicios, type StatusSemanalTreino } from "../../lib/treinoApi";
 
   /** `treinos` no plural porque um dia pode ter mais de uma rotina depois de "Mudar dia" (ver
    * TreinoAjusteDiaFluxo) — no caso comum (0 ou 1) o card se comporta como sempre se comportou.
@@ -50,7 +50,7 @@
   }
 
   function rotuloStatus(status: StatusSemanalTreino): string {
-    return status.tipo === "reagendado" ? `Reagendado para ${DIAS_SEMANA_COMPLETO[status.novoDia]}` : "Cancelado essa semana";
+    return status.tipo === "reagendado" ? `Reagendado para ${labelDiaSemanaRelativo(status.novoDia)}` : "Cancelado essa semana";
   }
 </script>
 

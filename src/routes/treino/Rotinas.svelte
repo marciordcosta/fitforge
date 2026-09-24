@@ -16,7 +16,8 @@
     segundaDaSemana,
     statusSemanalDoTreino,
     moverTreinoParaDia,
-    DIAS_SEMANA_COMPLETO,
+    labelDiaSemanaRelativo,
+    ehDiaHoje,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type TreinoComExercicios,
     type StatusSemanalTreino,
@@ -516,14 +517,14 @@
           <h2 class:nome-neutro={!destacada}>
             {treino.nome_treino}
             {#if treino.dia_semana != null}
-              <span class="dia-tag">{DIAS_SEMANA_COMPLETO[treino.dia_semana]}</span>
+              <span class="dia-tag" class:dia-tag-hoje={ehDiaHoje(treino.dia_semana)}>{labelDiaSemanaRelativo(treino.dia_semana)}</span>
             {/if}
           </h2>
         </div>
         {#if status.tipo !== "normal"}
           <div class="status-semana" role="presentation" onclick={(e) => e.stopPropagation()}>
             <span class="status-semana-texto">
-              {status.tipo === "reagendado" ? `Reagendado para ${DIAS_SEMANA_COMPLETO[status.novoDia]}` : "Cancelado essa semana"}
+              {status.tipo === "reagendado" ? `Reagendado para ${labelDiaSemanaRelativo(status.novoDia)}` : "Cancelado essa semana"}
             </span>
             <button type="button" class="status-semana-link" disabled={revertendo === treino.id} onclick={() => reverter(treino)}>
               Reverter
@@ -846,6 +847,10 @@
     font-weight: 400;
     color: var(--surface-muted);
     margin-left: var(--space-1);
+  }
+  .dia-tag.dia-tag-hoje {
+    color: var(--color-primary);
+    font-weight: 600;
   }
   .preview {
     color: var(--surface-muted);
