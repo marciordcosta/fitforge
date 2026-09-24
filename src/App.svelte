@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { router, navigate } from "./lib/router.svelte";
   import { auth, logout } from "./lib/auth.svelte";
   import { treinoLogSessao } from "./lib/treinoLogSessao.svelte";
@@ -70,6 +71,22 @@
     swipeAbasInicioX = null;
   }
 
+  /** Direção da última troca de aba (frente = indo pra direita na ordem do BottomNav, tras = pra
+   * esquerda) — só pra animação de entrada saber de que lado deslizar, ver `.aba-entrada-*` no
+   * template/estilo. `abaAnterior` é uma variável comum (não $state) de propósito: só serve de
+   * "memória" pro efeito comparar, não precisa disparar re-render sozinha. */
+  let abaAnterior = untrack(() => abaAtiva);
+  let direcaoTransicaoAba = $state<"frente" | "tras">("frente");
+  $effect(() => {
+    const atual = abaAtiva;
+    const idxAtual = ABAS_SWIPE.findIndex((a) => a.chave === atual);
+    const idxAnterior = ABAS_SWIPE.findIndex((a) => a.chave === abaAnterior);
+    if (idxAtual !== -1 && idxAnterior !== -1 && idxAtual !== idxAnterior) {
+      direcaoTransicaoAba = idxAtual > idxAnterior ? "frente" : "tras";
+    }
+    abaAnterior = atual;
+  });
+
   let blockedAlertShown = false;
 
   $effect(() => {
@@ -101,11 +118,11 @@
   {#if mostrarFlutuantes && treinoLogSessao.atual}
     <TreinoTopoFixo />
   {/if}
-  <div hidden={abaAtiva !== "home"}><Home /></div>
-  <div hidden={abaAtiva !== "treino"}><Treino /></div>
-  <div hidden={abaAtiva !== "peso"}><Peso /></div>
-  <div hidden={abaAtiva !== "dieta"}><Dieta /></div>
-  <div hidden={abaAtiva !== "fotos"}><Fotos /></div>
+  <div hidden={abaAtiva !== "home"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Home /></div>
+  <div hidden={abaAtiva !== "treino"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Treino /></div>
+  <div hidden={abaAtiva !== "peso"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Peso /></div>
+  <div hidden={abaAtiva !== "dieta"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Dieta /></div>
+  <div hidden={abaAtiva !== "fotos"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Fotos /></div>
   {#if abaAtiva === "configurar"}
     <HomeParametrizacao />
   {/if}
@@ -133,6 +150,35 @@
 {/if}
 
 <style>
+  /* display:none -> visível reinicia animation do zero sozinho (diferente de transition, que não
+     roda em toggle de display) — é o que faz a troca de aba parecer suave em vez do corte seco de
+     antes, sem precisar manter as duas abas montadas lado a lado (o de saída só some, sem animar). */
+  .aba-entrada-frente {
+    animation: aba-entra-frente 220ms ease-out;
+  }
+  .aba-entrada-tras {
+    animation: aba-entra-tras 220ms ease-out;
+  }
+  @keyframes aba-entra-frente {
+    from {
+      opacity: 0;
+      transform: translateX(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes aba-entra-tras {
+    from {
+      opacity: 0;
+      transform: translateX(-18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
   .swipe-borda {
     position: fixed;
     top: 0;
