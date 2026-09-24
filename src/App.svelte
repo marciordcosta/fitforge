@@ -43,11 +43,15 @@
     { chave: "fotos", caminho: "/fotos" },
   ];
   const LIMIAR_SWIPE_ABAS_PX = 70;
-  /** Se moveu mais que isso na vertical, foi rolagem da página, não um swipe de trocar de módulo. */
-  const LIMIAR_VERTICAL_CANCELA_SWIPE_ABAS_PX = 60;
 
   let swipeAbasInicioX: number | null = null;
   let swipeAbasInicioY: number | null = null;
+  /** null = ainda indeciso (poucos px de movimento); "horizontal"/"vertical" = já decidiu, ver
+   * aoPointerMoveAbas. Precisa decidir cedo e chamar preventDefault assim que for "horizontal",
+   * senão o navegador às vezes já reivindica o gesto como rolagem nativa antes do pointerup — sem
+   * isso o swipe simplesmente não acontecia (a rolagem vertical nativa "engolia" o toque). */
+  let swipeAbasDecisao: "horizontal" | "vertical" | null = null;
+  const LIMIAR_DECISAO_SWIPE_ABAS_PX = 12;
 
   /** Não inicia o swipe de módulo se o toque começou numa superfície que já tem seu próprio
    * arrasto/rolagem horizontal — em vez de listar cada tela manualmente, reaproveita convenções já
@@ -90,15 +94,33 @@
     }
     swipeAbasInicioX = e.clientX;
     swipeAbasInicioY = e.clientY;
+    swipeAbasDecisao = null;
+  }
+
+  /** Decide, nos primeiros px de movimento, se o gesto é horizontal (troca de módulo) ou vertical
+   * (rolagem normal da página) — e só then chama preventDefault, e só pro caso horizontal, pra não
+   * atrapalhar a rolagem vertical nativa quando é isso que o usuário está fazendo. */
+  function aoPointerMoveAbas(e: PointerEvent): void {
+    if (swipeAbasInicioX == null || swipeAbasInicioY == null) return;
+    if (swipeAbasDecisao === "vertical") return;
+    const dx = e.clientX - swipeAbasInicioX;
+    const dy = e.clientY - swipeAbasInicioY;
+    if (swipeAbasDecisao == null) {
+      if (Math.abs(dx) < LIMIAR_DECISAO_SWIPE_ABAS_PX && Math.abs(dy) < LIMIAR_DECISAO_SWIPE_ABAS_PX) return;
+      swipeAbasDecisao = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
+      if (swipeAbasDecisao === "vertical") return;
+    }
+    e.preventDefault();
   }
 
   function aoPointerUpAbas(e: PointerEvent): void {
     if (swipeAbasInicioX == null || swipeAbasInicioY == null) return;
     const dx = e.clientX - swipeAbasInicioX;
-    const dy = e.clientY - swipeAbasInicioY;
+    const decisaoHorizontal = swipeAbasDecisao === "horizontal";
     swipeAbasInicioX = null;
     swipeAbasInicioY = null;
-    if (Math.abs(dy) > LIMIAR_VERTICAL_CANCELA_SWIPE_ABAS_PX) return;
+    swipeAbasDecisao = null;
+    if (!decisaoHorizontal) return;
     if (Math.abs(dx) < LIMIAR_SWIPE_ABAS_PX) return;
     const indiceAtual = ABAS_SWIPE.findIndex((a) => a.chave === abaAtiva);
     if (indiceAtual === -1) return;
@@ -110,6 +132,7 @@
   function aoPointerCancelAbas(): void {
     swipeAbasInicioX = null;
     swipeAbasInicioY = null;
+    swipeAbasDecisao = null;
   }
 
   let blockedAlertShown = false;
@@ -147,6 +170,7 @@
     class="abas-swipe"
     role="presentation"
     onpointerdown={aoPointerDownAbas}
+    onpointermove={aoPointerMoveAbas}
     onpointerup={aoPointerUpAbas}
     onpointercancel={aoPointerCancelAbas}
   >
