@@ -10,13 +10,13 @@
   import { mostrarToast } from "../../lib/toast.svelte";
   import {
     getPesoDoDia,
-    getFotoDoDia,
-    getUrlAssinadaFoto,
+    getFotosDaData,
+    getUrlsAssinadas,
     salvarPeso,
     excluirPeso,
     adicionarFoto,
     excluirFotoDoDia,
-    type FotoRegistro,
+    type FotoItem,
   } from "../../lib/pesoApi";
 
   let {
@@ -33,8 +33,8 @@
   let pesoOriginal = $state<number | null>(null);
   let salvando = $state(false);
   let carregando = $state(true);
-  let foto = $state<FotoRegistro | null>(null);
-  let fotoUrl = $state<string | null>(null);
+  let fotos = $state<FotoItem[]>([]);
+  let urlsFotos = $state<Map<string, string>>(new Map());
   let nomeRotina = $state<string | null>(null);
   let treinoIdRotina = $state<string | null>(null);
   let treinoEfetuado = $state(false);
@@ -72,14 +72,14 @@
     try {
       const [p, f, treinosNoDia, todosTreinos] = await Promise.all([
         getPesoDoDia(data),
-        getFotoDoDia(data),
+        getFotosDaData(data),
         getDiasComTreino(data, data),
         listTreinos(),
       ]);
       peso = p;
       pesoOriginal = p;
-      foto = f;
-      fotoUrl = f ? await getUrlAssinadaFoto(f.path) : null;
+      fotos = f;
+      urlsFotos = await getUrlsAssinadas(f.map((item) => item.path));
 
       if (treinosNoDia[0]) {
         nomeRotina = treinosNoDia[0].treinoNome;
@@ -105,10 +105,11 @@
     if (!arquivo) return;
     salvando = true;
     try {
-      // Adiciona sem apagar a foto que já estava aqui — mantém o histórico pra galeria/comparação
-      // (só troca qual é a "atual" mostrada nesse slot, pra mais recente).
-      foto = await adicionarFoto(data, arquivo);
-      fotoUrl = await getUrlAssinadaFoto(foto.path);
+      // Adiciona sem apagar as fotos que já estavam aqui — mantém o histórico pra galeria/comparação.
+      const novaFoto = await adicionarFoto(data, arquivo, fotos.length);
+      const urlNova = (await getUrlsAssinadas([novaFoto.path])).get(novaFoto.path) ?? "";
+      fotos = [...fotos, novaFoto];
+      urlsFotos = new Map(urlsFotos).set(novaFoto.path, urlNova);
     } catch (err) {
       alert("Erro ao salvar foto: " + (err as Error).message);
     } finally {
@@ -117,18 +118,20 @@
     }
   }
 
-  async function removerFoto() {
-    if (!foto) return;
+  async function removerFoto(item: FotoItem) {
     salvando = true;
     try {
-      await excluirFotoDoDia(foto);
-      foto = null;
-      fotoUrl = null;
+      await excluirFotoDoDia(item);
+      fotos = fotos.filter((f) => f.id !== item.id);
     } catch (err) {
       alert("Erro ao remover foto: " + (err as Error).message);
     } finally {
       salvando = false;
     }
+  }
+
+  function abrirFotoNoModulo(): void {
+    navigate(`/fotos/dia/${data}`);
   }
 
   async function salvar() {
@@ -201,20 +204,29 @@
       <p class="muted">Carregando…</p>
     {:else}
       <div class="foto-linha">
-        {#if fotoUrl}
-          <div class="foto-preview">
-            <img src={fotoUrl} alt="Foto de acompanhamento" />
-            <button class="foto-remover" onclick={removerFoto} disabled={salvando} aria-label="Remover foto">✕</button>
-          </div>
-        {/if}
         <button
           class="foto-btn"
           onclick={() => (mostrarOpcoesFoto = true)}
           disabled={salvando}
-          aria-label={fotoUrl ? "Adicionar outra foto" : "Adicionar foto"}
+          aria-label={fotos.length ? "Adicionar outra foto" : "Adicionar foto"}
         >
           {@render iconCamera()}
         </button>
+        {#each fotos as item (item.id)}
+          <div class="foto-preview">
+            <button
+              type="button"
+              class="foto-preview-img"
+              onclick={abrirFotoNoModulo}
+              aria-label="Ver no módulo de Fotos"
+            >
+              {#if urlsFotos.get(item.path)}
+                <img src={urlsFotos.get(item.path)} alt="Foto de acompanhamento" />
+              {/if}
+            </button>
+            <button class="foto-remover" onclick={() => removerFoto(item)} disabled={salvando} aria-label="Remover foto">✕</button>
+          </div>
+        {/each}
       </div>
     {/if}
     <input bind:this={inputCamera} type="file" accept="image/*" capture="environment" class="foto-input" onchange={selecionarFoto} />
@@ -319,8 +331,10 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    overflow-x: auto;
   }
   .foto-btn {
+    flex-shrink: 0;
     width: 72px;
     height: 72px;
     border-radius: var(--radius-md);
@@ -342,14 +356,26 @@
   }
   .foto-preview {
     position: relative;
-    width: 96px;
-    height: 96px;
+    flex-shrink: 0;
+    width: 72px;
+    height: 72px;
   }
-  .foto-preview img {
+  .foto-preview-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--surface-bg);
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .foto-preview-img img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: var(--radius-md);
+    display: block;
   }
   .foto-remover {
     position: absolute;

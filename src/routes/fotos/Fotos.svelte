@@ -15,6 +15,10 @@
   {:then { default: FotoComparar }}
     <FotoComparar fotoId1={segmentos[1]} fotoId2={segmentos[2]} />
   {/await}
+{:else if segmentos[0] === "dia" && segmentos[1]}
+  {#key segmentos[1]}
+    <FotosGaleria dataDestaque={segmentos[1]} />
+  {/key}
 {:else}
   <FotosGaleria />
 {/if}

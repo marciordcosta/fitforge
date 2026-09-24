@@ -19,6 +19,11 @@
     type FotoItem,
   } from "../../lib/pesoApi";
 
+  /** Data pra já abrir em tela cheia assim que carregar — usado ao chegar aqui vindo de outro
+   * módulo (ex: "Ver no módulo de Fotos" no registro de peso do dia), pra "destacar" aquele dia
+   * em vez de só cair na lista geral. */
+  let { dataDestaque }: { dataDestaque?: string } = $props();
+
   interface FotoAbertaState {
     grupo: FotoGrupoData;
     indiceInicial: number;
@@ -153,6 +158,10 @@
         carregarPesosPorData(lista.map((g) => g.data)),
       ]);
       urls = urlsRes;
+      if (dataDestaque) {
+        const grupo = lista.find((g) => g.data === dataDestaque);
+        if (grupo?.fotos[0]) void abrirFoto(grupo.fotos[0]);
+      }
     } catch (err) {
       erro = (err as Error).message;
     } finally {
