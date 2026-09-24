@@ -447,6 +447,32 @@
     return Math.min(100, pct);
   }
 
+  /** Hachura diagonal usada pra marcar "quanto passou" quando um macro estoura a meta. */
+  function hachuraEstouro(cor: string): string {
+    return `repeating-linear-gradient(45deg, ${cor} 0px, ${cor} 3px, transparent 3px, transparent 6px)`;
+  }
+
+  /** Fundo da barra linear grande (Calorias): dentro da meta, preenchimento sólido normal (a
+   * largura do elemento já cuida da proporção). Acima da meta, o elemento passa a representar o
+   * VALOR (não a meta) como 100% de largura — o trecho sólido marca onde a meta ficou (mais
+   * estreito quanto maior o excesso) e o resto vira hachurado, deixando visível "quanto" passou. */
+  function fundoBarraComEstouro(valor: number, meta: number, cor: string): string {
+    const pct = pctMeta(valor, meta);
+    if (pct <= 100 || meta <= 0) return cor;
+    const solidPct = (meta / valor) * 100;
+    return `linear-gradient(to right, ${cor} 0%, ${cor} ${solidPct}%, transparent ${solidPct}%), ${hachuraEstouro(cor)}`;
+  }
+
+  /** Mesma ideia de fundoBarraComEstouro, só que pro anel (conic-gradient) dos macros. */
+  function fundoAnelComEstouro(valor: number, meta: number, cor: string): string {
+    const pct = pctMeta(valor, meta);
+    if (pct <= 100 || meta <= 0) {
+      return `conic-gradient(${cor} 0% ${larguraBarra(pct)}%, var(--surface-border) ${larguraBarra(pct)}% 100%)`;
+    }
+    const solidPct = (meta / valor) * 100;
+    return `conic-gradient(${cor} 0% ${solidPct}%, transparent ${solidPct}% 100%), ${hachuraEstouro(cor)}`;
+  }
+
   function restante(valor: number, meta: number): number {
     return Math.max(0, meta - valor);
   }
@@ -695,7 +721,10 @@
           {/if}
         </div>
         <div class="barra-wrap-grande">
-          <div class="barra-grande" style={`width:${larguraBarra(pctMeta(totalCalorias, metas.calorias))}%; background:var(--color-secondary);`}></div>
+          <div
+            class="barra-grande"
+            style={`width:${larguraBarra(pctMeta(totalCalorias, metas.calorias))}%; background:${fundoBarraComEstouro(totalCalorias, metas.calorias, "var(--color-secondary)")};`}
+          ></div>
         </div>
       </div>
 
@@ -708,7 +737,7 @@
             <p class="macro-nome">Carb</p>
             <div
               class="macro-anel"
-              style={`background: conic-gradient(${statusCarbo === "abaixo" ? COR_ALERTA : COR_CARBO} 0% ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalCarboidrato, metas.carboidratoG))}% 100%);`}
+              style={`background: ${fundoAnelComEstouro(totalCarboidrato, metas.carboidratoG, statusCarbo === "abaixo" ? COR_ALERTA : COR_CARBO)};`}
             >
               <div class="macro-anel-centro">
                 {@render anelCentroMacro(totalCarboidrato, metas.carboidratoG, statusCarbo === "acima" ? COR_ALERTA : null)}
@@ -719,7 +748,7 @@
             <p class="macro-nome">Gorduras</p>
             <div
               class="macro-anel"
-              style={`background: conic-gradient(${statusGordura === "abaixo" ? COR_ALERTA : COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGordura, metas.gorduraG))}% 100%);`}
+              style={`background: ${fundoAnelComEstouro(totalGordura, metas.gorduraG, statusGordura === "abaixo" ? COR_ALERTA : COR_GORDURA)};`}
             >
               <div class="macro-anel-centro">
                 {@render anelCentroMacro(totalGordura, metas.gorduraG, statusGordura === "acima" ? COR_ALERTA : null)}
@@ -730,7 +759,7 @@
             <p class="macro-nome">Proteínas</p>
             <div
               class="macro-anel"
-              style={`background: conic-gradient(${statusProteina === "abaixo" ? COR_ALERTA : COR_PROTEINA} 0% ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalProteina, metas.proteinaG))}% 100%);`}
+              style={`background: ${fundoAnelComEstouro(totalProteina, metas.proteinaG, statusProteina === "abaixo" ? COR_ALERTA : COR_PROTEINA)};`}
             >
               <div class="macro-anel-centro">
                 {@render anelCentroMacro(totalProteina, metas.proteinaG, statusProteina === "acima" ? COR_ALERTA : null)}
@@ -739,7 +768,7 @@
           </div>
           <div class="macro-col">
             <p class="macro-nome">Gordura Sat.</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_GORDURA} 0% ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalGorduraSaturada, gorduraSaturadaMaxG))}% 100%);`}>
+            <div class="macro-anel" style={`background: ${fundoAnelComEstouro(totalGorduraSaturada, gorduraSaturadaMaxG, COR_GORDURA)};`}>
               <div class="macro-anel-centro">
                 {@render anelCentroMacro(totalGorduraSaturada, gorduraSaturadaMaxG)}
               </div>
@@ -747,7 +776,7 @@
           </div>
           <div class="macro-col">
             <p class="macro-nome">Fibras</p>
-            <div class="macro-anel" style={`background: conic-gradient(${COR_CARBO} 0% ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}%, var(--surface-border) ${larguraBarra(pctMeta(totalFibras, fibrasMaxG))}% 100%);`}>
+            <div class="macro-anel" style={`background: ${fundoAnelComEstouro(totalFibras, fibrasMaxG, COR_CARBO)};`}>
               <div class="macro-anel-centro">
                 {@render anelCentroMacro(totalFibras, fibrasMaxG)}
               </div>
