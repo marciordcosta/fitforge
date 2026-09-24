@@ -426,7 +426,7 @@
         {/if}
       </div>
       <div class="barra-wrap-grande">
-        <div class="barra-grande" style={`width:${larguraBarra(pctMeta(executado, programado))}%; background:var(--color-secondary);`}></div>
+        <div class="barra-grande" style={`width:${larguraBarra(pctMeta(executado, programado))}%; background:#fff;`}></div>
       </div>
     </div>
 
