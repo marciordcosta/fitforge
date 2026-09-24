@@ -10,7 +10,6 @@
     getObservacoesAtuais,
     getUltimoRegistro,
     labelDiaSemanaRelativo,
-    ehDiaHoje,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
 
@@ -127,7 +126,7 @@
     <h1>
       {treino?.nome_treino ?? ""}
       {#if treino?.dia_semana != null}
-        <span class="dia-inline" class:dia-inline-hoje={ehDiaHoje(treino.dia_semana)}>{labelDiaSemanaRelativo(treino.dia_semana)}</span>
+        <span class="dia-inline">{labelDiaSemanaRelativo(treino.dia_semana)}</span>
       {/if}
     </h1>
     {#if treino}
@@ -301,10 +300,6 @@
     font-size: var(--font-size-sm);
     font-weight: 400;
     color: var(--surface-muted);
-  }
-  .dia-inline.dia-inline-hoje {
-    color: var(--color-primary);
-    font-weight: 600;
   }
   .exercicio-card {
     padding: var(--space-3) 0;

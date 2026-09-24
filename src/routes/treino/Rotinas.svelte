@@ -17,7 +17,6 @@
     statusSemanalDoTreino,
     moverTreinoParaDia,
     labelDiaSemanaRelativo,
-    ehDiaHoje,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type TreinoComExercicios,
     type StatusSemanalTreino,
@@ -517,7 +516,7 @@
           <h2 class:nome-neutro={!destacada}>
             {treino.nome_treino}
             {#if treino.dia_semana != null}
-              <span class="dia-tag" class:dia-tag-hoje={ehDiaHoje(treino.dia_semana)}>{labelDiaSemanaRelativo(treino.dia_semana)}</span>
+              <span class="dia-tag">{labelDiaSemanaRelativo(treino.dia_semana)}</span>
             {/if}
           </h2>
         </div>
@@ -847,10 +846,6 @@
     font-weight: 400;
     color: var(--surface-muted);
     margin-left: var(--space-1);
-  }
-  .dia-tag.dia-tag-hoje {
-    color: var(--color-primary);
-    font-weight: 600;
   }
   .preview {
     color: var(--surface-muted);

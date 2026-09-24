@@ -90,10 +90,6 @@ export const DIAS_SEMANA_COMPLETO = [
   "Sábado",
 ] as const;
 
-export function ehDiaHoje(diaSemana: number): boolean {
-  return diaSemana === new Date().getDay();
-}
-
 /** "Hoje"/"Amanhã"/"Ontem" quando o dia da semana cai perto de hoje, senão o nome do dia por
  * extenso — troca só o TEXTO mostrado nos cards de rotina, nunca a configuração/agendamento em
  * si (o dia_semana salvo continua o mesmo). */
