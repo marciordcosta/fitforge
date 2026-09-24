@@ -46,6 +46,9 @@
     const id = padraoId;
     if (!id) return;
     listMusculosDoPadrao(id).then((lista) => {
+      // Escolher um Padrão e trocar rápido pra outro antes dessa busca terminar podia deixar a
+      // resposta do Padrão ANTERIOR chegar depois e sobrescrever a lista com os músculos errados.
+      if (id !== padraoId) return;
       const pesosAtuais = new Map(linhasMusculos.map((l) => [l.nome, l.peso]));
       linhasMusculos = lista.map((m) => ({ nome: m.nome, peso: pesosAtuais.get(m.nome) ?? 1 }));
     });

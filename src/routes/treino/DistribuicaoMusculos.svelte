@@ -16,6 +16,7 @@
     somarPartes,
     partesParaSegmentos,
     CORES_FAIXA,
+    faixaPorPosicaoRelativa,
     contarSeriesPorFaixaDePosicao as contarSeriesPorFaixaDePosicaoBase,
     partesFadigaSemanal as partesFadigaSemanalBase,
     type Partes,
@@ -872,9 +873,17 @@
   const mesFim = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth() + 1, 0));
   const mesLabel = $derived(`${MESES[mesBase.getMonth()]} ${mesBase.getFullYear()}`);
 
+  /** Token de sequenciamento: trocar de mês rápido pode fazer o fetch de um mês antigo resolver
+   * DEPOIS do mais recente — sem isso, o resultado desatualizado sobrescrevia os dados do mês
+   * certo (o cabeçalho já mostrava o mês novo, mas os números embaixo eram do anterior). */
+  let tokenRealizado = 0;
+
   async function carregarRealizado() {
+    const meuToken = ++tokenRealizado;
     carregandoRealizado = true;
-    linhasRealizadoMes = await getVolumeRealizadoBruto(toISODate(mesInicio), toISODate(mesFim));
+    const linhas = await getVolumeRealizadoBruto(toISODate(mesInicio), toISODate(mesFim));
+    if (meuToken !== tokenRealizado) return;
+    linhasRealizadoMes = linhas;
     carregandoRealizado = false;
     carregouRealizadoAlgumaVez = true;
   }
@@ -1197,9 +1206,9 @@
       let somaGradual = gradualPorExercicio.get(ex.id) ?? 0;
       for (let s = 0; s < ex.series.length; s++) {
         posicao += 1;
-        const cor = corPorFaixa((posicao / totalSeries) * 100);
-        if (cor === CORES_FAIXA.a) partes.a += 1;
-        else if (cor === CORES_FAIXA.b) partes.b += 1;
+        const faixa = faixaPorPosicaoRelativa(posicao, totalSeries, parametrosDistribuicao);
+        if (faixa === "a") partes.a += 1;
+        else if (faixa === "b") partes.b += 1;
         else partes.c += 1;
         somaGradual += fatorPerformanceGradual(posicao, parametrosDistribuicao.fadigaGradualC, parametrosDistribuicao.fadigaGradualD);
       }
@@ -1282,7 +1291,13 @@
   /** Tendência do músculo = média da variação de 1RM de cada exercício que o trabalha (nessa
    * rotina). Caindo sugere reduzir séries, estável sugere tentar aumentar (pra sair do platô),
    * subindo sugere manter (já está funcionando). */
+  /** Token de sequenciamento: abrir um músculo, fechar e abrir outro rápido antes do primeiro
+   * fetch terminar podia deixar a tendência do músculo ERRADO sobrescrever a do que está aberto
+   * agora, se a resposta mais lenta chegasse depois da mais rápida. */
+  let tokenTendencia = 0;
+
   async function carregarTendenciaMusculo(itens: ItemMusculoRotina[]): Promise<void> {
+    const meuToken = ++tokenTendencia;
     carregandoTendencia = true;
     tendenciaMusculo = null;
     try {
@@ -1294,13 +1309,14 @@
         const v = variacaoExercicio(pontos);
         if (v != null) variacoes.push(v);
       }
+      if (meuToken !== tokenTendencia) return;
       if (!variacoes.length) return;
       const media = variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
       if (media > 0.02) tendenciaMusculo = { status: "subindo" };
       else if (media < -0.02) tendenciaMusculo = { status: "caindo" };
       else tendenciaMusculo = { status: "estavel" };
     } finally {
-      carregandoTendencia = false;
+      if (meuToken === tokenTendencia) carregandoTendencia = false;
     }
   }
 

@@ -215,6 +215,7 @@
 
   $effect(() => {
     if (!loading) desenharGrafico();
+    return () => chart?.destroy();
   });
 </script>
 

@@ -295,7 +295,10 @@
     if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_FORMATO_DESCANSO, formatoDescanso);
   });
 
-  const ANEL_DIAMETRO = 70;
+  // Precisa bater com .descanso-anel (width/height 80px) -- usado só pra matemática de posição
+  // (ponto inicial, limites de arrasto, onde abrir o popover), não afeta o desenho do anel em si
+  // (viewBox do SVG é independente, escala pro tamanho real do CSS sozinho).
+  const ANEL_DIAMETRO = 80;
   const ANEL_RAIO = 31;
   const ANEL_CIRCUNFERENCIA = 2 * Math.PI * ANEL_RAIO;
 
@@ -690,7 +693,12 @@
     const numSeriesDestino = destinoItem.series.length;
     const ordemDestino = destinoItem.ordem;
     const numSeriesOrigem = ex.sets.length;
-    const ordemOrigem = treino?.exercicios.find((te) => te.id === treinoExercicioIdOrigem)?.ordem ?? 0;
+    // Não usa `treino?.exercicios.find(...)`: numa sessão retomada (localStorage), `carregar()`
+    // nunca chama getTreino e `treino` fica null pro resto da tela — isso sempre caía no fallback
+    // `?? 0`, jogando o exercício que entra pro topo da rotina em vez de manter a posição de quem
+    // saiu. `exIdx` (posição dentro de `sessao`, que reflete a ordem carregada) é a própria posição
+    // que queremos preservar, então funciona independente de `treino` estar carregado ou não.
+    const ordemOrigem = exIdx;
     const ehSlotPersistido = !treinoExercicioIdOrigem.startsWith("novo-");
     processandoTroca = true;
     try {
@@ -1063,12 +1071,14 @@
                 inputmode="decimal"
                 placeholder={serieItem.anteriorPeso != null ? String(serieItem.anteriorPeso) : "-"}
                 bind:value={serieItem.peso}
+                onchange={() => atualizarRecordesExercicio(ex)}
               />
               <input
                 type="number"
                 inputmode="decimal"
                 placeholder={serieItem.anteriorReps != null ? String(serieItem.anteriorReps) : "-"}
                 bind:value={serieItem.repeticoes}
+                onchange={() => atualizarRecordesExercicio(ex)}
               />
               <button
                 class="check"

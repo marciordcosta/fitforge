@@ -44,7 +44,11 @@
   }
 
   function removerSerie(exercicioId: string, serie: number): void {
-    itens = itens.map((i) => (i.exercicio.id === exercicioId ? { ...i, series: i.series.filter((s) => s.serie !== serie) } : i));
+    itens = itens.map((i) =>
+      i.exercicio.id === exercicioId
+        ? { ...i, series: i.series.filter((s) => s.serie !== serie).map((s, idx) => ({ ...s, serie: idx + 1 })) }
+        : i,
+    );
   }
 
   let confirmandoDescartar = $state(false);
