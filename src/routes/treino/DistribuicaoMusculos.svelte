@@ -1435,9 +1435,6 @@
    * (staged em `pendentesMoverTrocar`) até Salvar, igual a qualquer outra ação do editor. */
   let movendoItem = $state<ItemMusculoRotina | null>(null);
   let modoPickerRotina = $state<"mover" | "trocar" | null>(null);
-  /** Rotina de destino já escolhida — só usado no modo "trocar" (passo 2: qual exercício dela
-   * troca de lugar); no modo "mover" a escolha da rotina já executa a ação. */
-  let rotinaDestinoTroca = $state<TreinoComExercicios | null>(null);
   let processandoPickerRotina = $state(false);
 
   function abrirSubmenuTrocar(item: ItemMusculoRotina): void {
@@ -1448,7 +1445,6 @@
   function abrirMoverExercicio(item: ItemMusculoRotina): void {
     movendoItem = item;
     modoPickerRotina = "mover";
-    rotinaDestinoTroca = null;
     menuExercicioMusculo = null;
     menuTrocarSubmenu = null;
   }
@@ -1456,7 +1452,6 @@
   function abrirTrocarDeRotina(item: ItemMusculoRotina): void {
     movendoItem = item;
     modoPickerRotina = "trocar";
-    rotinaDestinoTroca = null;
     menuExercicioMusculo = null;
     menuTrocarSubmenu = null;
   }
@@ -1483,22 +1478,9 @@
       : [],
   );
 
-  function escolherRotinaDestino(treino: TreinoComExercicios): void {
-    if (modoPickerRotina === "mover") {
-      moverExercicio(treino);
-    } else {
-      rotinaDestinoTroca = treino;
-    }
-  }
-
-  function voltarParaEscolherRotina(): void {
-    rotinaDestinoTroca = null;
-  }
-
   function fecharMover(): void {
     modoPickerRotina = null;
     movendoItem = null;
-    rotinaDestinoTroca = null;
   }
 
   /** Move o exercício pra rotina de destino — só no RASCUNHO local (nada é gravado até Salvar):
@@ -1532,10 +1514,9 @@
    * entra assume a MESMA posição (ordem) e o MESMO número de séries de quem saiu daquele lugar —
    * o slot continua igual, só muda qual exercício ocupa ele. Peso/reps são pré-preenchidos com o
    * último desempenho registrado desse exercício, igual "+ Adicionar Exercício". */
-  async function trocarExercicioDeRotina(destinoItem: ItemMusculoRotina): Promise<void> {
-    if (!movendoItem || !rotinaDestinoTroca || !modalEditorRotina) return;
+  async function trocarExercicioDeRotina(destino: TreinoComExercicios, destinoItem: ItemMusculoRotina): Promise<void> {
+    if (!movendoItem || !modalEditorRotina) return;
     const origem = movendoItem;
-    const destino = rotinaDestinoTroca;
     processandoPickerRotina = true;
     const anterior = await getUltimoRegistro(destinoItem.exercicioId);
     processandoPickerRotina = false;
@@ -3115,36 +3096,20 @@
   <div class="acima-editor">
     <div class="tela-editor-rotina">
       <div class="editor-conteudo">
-        {#if !rotinaDestinoTroca}
-          <div class="header">
-            <button class="back" onclick={fecharMover} aria-label="Voltar">{@render iconVoltar()}</button>
-            <h1>{modoPickerRotina === "mover" ? "Mover" : "Substituir"} "{movendoItem.exercicioNome}"</h1>
-            <span class="spacer"></span>
-          </div>
+        <div class="header">
+          <button class="back" onclick={fecharMover} aria-label="Voltar">{@render iconVoltar()}</button>
+          <h1>{modoPickerRotina === "mover" ? "Mover" : "Substituir"} "{movendoItem.exercicioNome}"</h1>
+          <span class="spacer"></span>
+        </div>
+        {#if modoPickerRotina === "mover"}
           <p class="muted">Escolha a rotina de destino.</p>
-          {#if modoPickerRotina === "mover"}
-            {#if !rotinasParaMover.length}
-              <p class="muted">Nenhuma rotina disponível — todas as outras já têm esse exercício.</p>
-            {:else}
-              <ul class="picker-lista-mover">
-                {#each rotinasParaMover as treinoOpcao (treinoOpcao.id)}
-                  <li>
-                    <button class="picker-item-mover" disabled={processandoPickerRotina} onclick={() => escolherRotinaDestino(treinoOpcao)}>
-                      <span class="picker-item-mover-nome">{treinoOpcao.nome_treino}</span>
-                      <span class="picker-item-mover-sub"
-                      >{treinoOpcao.exercicios.length} {treinoOpcao.exercicios.length === 1 ? "exercício" : "exercícios"}</span>
-                    </button>
-                  </li>
-                {/each}
-              </ul>
-            {/if}
-          {:else if !rotinasParaTrocar.length}
-            <p class="muted">Nenhuma rotina disponível pra troca — as outras estão vazias ou já têm esse exercício.</p>
+          {#if !rotinasParaMover.length}
+            <p class="muted">Nenhuma rotina disponível — todas as outras já têm esse exercício.</p>
           {:else}
             <ul class="picker-lista-mover">
-              {#each rotinasParaTrocar as treinoOpcao (treinoOpcao.id)}
+              {#each rotinasParaMover as treinoOpcao (treinoOpcao.id)}
                 <li>
-                  <button class="picker-item-mover" onclick={() => escolherRotinaDestino(treinoOpcao)}>
+                  <button class="picker-item-mover" disabled={processandoPickerRotina} onclick={() => moverExercicio(treinoOpcao)}>
                     <span class="picker-item-mover-nome">{treinoOpcao.nome_treino}</span>
                     <span class="picker-item-mover-sub"
                     >{treinoOpcao.exercicios.length} {treinoOpcao.exercicios.length === 1 ? "exercício" : "exercícios"}</span>
@@ -3153,33 +3118,41 @@
               {/each}
             </ul>
           {/if}
+        {:else if !rotinasParaTrocar.length}
+          <p class="muted">Nenhuma rotina disponível pra troca — as outras estão vazias ou já têm esse exercício.</p>
         {:else}
-          <div class="header">
-            <button class="back" onclick={voltarParaEscolherRotina} aria-label="Voltar">{@render iconVoltar()}</button>
-            <h1>Trocar por qual exercício?</h1>
-            <span class="spacer"></span>
-          </div>
-          <p class="muted">"{movendoItem.exercicioNome}" vai pra "{rotinaDestinoTroca.nome_treino}" — escolha quem troca de lugar com ele.</p>
-          <ul class="picker-lista-mover">
-            {#each rotinaDestinoTroca.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te (te.id)}
-              <li>
-                <button
-                  class="picker-item-mover"
-                  disabled={processandoPickerRotina}
-                  onclick={() =>
-                    trocarExercicioDeRotina({
-                      treinoId: rotinaDestinoTroca!.id,
-                      treinoNome: rotinaDestinoTroca!.nome_treino,
-                      treinoExercicioId: te.id,
-                      exercicioId: te.exercicio_id,
-                      exercicioNome: te.exercicio?.nome ?? "",
-                      series: te.series.length,
-                      posicao: te.ordem + 1,
-                    })}
-                >
-                  <span class="picker-item-mover-nome">{te.exercicio?.nome ?? ""}</span>
-                  <span class="picker-item-mover-sub">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
-                </button>
+          <ul class="troca-rotinas-lista">
+            {#each rotinasParaTrocar as treinoOpcao (treinoOpcao.id)}
+              <li class="troca-rotina-card">
+                <p class="troca-rotina-nome">{treinoOpcao.nome_treino}</p>
+                <ul class="troca-exercicios-lista">
+                  {#each treinoOpcao.exercicios.slice().sort((a, b) => a.ordem - b.ordem) as te (te.id)}
+                    <li class="troca-exercicio-linha">
+                      <span class="troca-exercicio-info">
+                        <span class="troca-exercicio-nome">{te.exercicio?.nome ?? ""}</span>
+                        <span class="troca-exercicio-sub">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
+                      </span>
+                      <button
+                        type="button"
+                        class="troca-exercicio-btn"
+                        disabled={processandoPickerRotina}
+                        onclick={() =>
+                          trocarExercicioDeRotina(treinoOpcao, {
+                            treinoId: treinoOpcao.id,
+                            treinoNome: treinoOpcao.nome_treino,
+                            treinoExercicioId: te.id,
+                            exercicioId: te.exercicio_id,
+                            exercicioNome: te.exercicio?.nome ?? "",
+                            series: te.series.length,
+                            posicao: te.ordem + 1,
+                          })}
+                        aria-label={`Trocar por ${te.exercicio?.nome ?? ""}`}
+                      >
+                        {@render iconMover()}
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
               </li>
             {/each}
           </ul>
@@ -4227,6 +4200,78 @@
     white-space: nowrap;
     font-size: var(--font-size-base);
     color: var(--surface-fg);
+  }
+  .troca-rotinas-lista {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+  }
+  .troca-rotina-card {
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-card);
+  }
+  .troca-rotina-nome {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--surface-fg);
+  }
+  .troca-exercicios-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .troca-exercicio-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--surface-border);
+  }
+  .troca-exercicio-linha:first-child {
+    border-top: none;
+  }
+  .troca-exercicio-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .troca-exercicio-nome {
+    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .troca-exercicio-sub {
+    font-size: 12px;
+    color: var(--surface-muted);
+  }
+  .troca-exercicio-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-bg);
+    color: var(--color-primary);
+    cursor: pointer;
+  }
+  .troca-exercicio-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .troca-exercicio-btn :global(svg) {
+    width: 16px;
+    height: 16px;
   }
   .adicionar-exercicio-musculo-btn {
     width: 100%;

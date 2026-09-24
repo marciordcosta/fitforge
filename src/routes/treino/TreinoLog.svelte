@@ -644,7 +644,6 @@
   // ---------------- Substituir puxando de outra rotina (troca os dois de lugar) ----------------
 
   let trocandoExIdx = $state<number | null>(null);
-  let rotinaDestinoTroca = $state<TreinoComExercicios | null>(null);
   let processandoTroca = $state(false);
 
   /** Rotinas candidatas: precisam ter pelo menos 1 exercício (precisa de alguém pra trocar de
@@ -657,22 +656,18 @@
       : [],
   );
 
-  /** Exercícios da rotina de destino que ainda não estão na sessão de hoje — escolher um que já
+  /** Exercícios de uma rotina candidata que ainda não estão na sessão de hoje — escolher um que já
    * está aqui (de outro exercício da mesma sessão) duplicaria o exercicio_id em `sessao`. */
-  const exerciciosParaTrocar = $derived(
-    rotinaDestinoTroca
-      ? rotinaDestinoTroca.exercicios.filter((te) => !sessao.some((ex) => ex.exercicio_id === te.exercicio_id))
-      : [],
-  );
+  function exerciciosParaTrocarDe(treinoOpcao: TreinoComExercicios): TreinoExercicio[] {
+    return treinoOpcao.exercicios.filter((te) => !sessao.some((ex) => ex.exercicio_id === te.exercicio_id));
+  }
 
   function abrirTrocarDeRotina(exIdx: number): void {
     trocandoExIdx = exIdx;
-    rotinaDestinoTroca = null;
   }
 
   function fecharTrocarDeRotina(): void {
     trocandoExIdx = null;
-    rotinaDestinoTroca = null;
   }
 
   /** Troca os dois exercícios de rotina entre si: o que sai daqui entra na rotina de destino, na
@@ -684,8 +679,8 @@
    * exercício avulso dessa sessão (id sintético, ainda não existe na rotina salva) não tem o que
    * persistir aqui — nesse caso só a rotina de destino muda na hora, e o lado de cá continua
    * dependendo do fim do treino, como qualquer outro exercício avulso. */
-  async function trocarExercicioDeRotina(destinoItem: TreinoExercicio): Promise<void> {
-    if (trocandoExIdx == null || !rotinaDestinoTroca) return;
+  async function trocarExercicioDeRotina(rotinaDestinoTroca: TreinoComExercicios, destinoItem: TreinoExercicio): Promise<void> {
+    if (trocandoExIdx == null) return;
     const exIdx = trocandoExIdx;
     const ex = sessao[exIdx];
     const exercicioIdSai = ex.exercicio_id;
@@ -1301,52 +1296,45 @@
 
 {#if trocandoExIdx !== null}
   {@const idxTroca = trocandoExIdx}
+  {@const cardsTroca = rotinasParaTrocar
+    .map((treinoOpcao) => ({ treinoOpcao, exercicios: exerciciosParaTrocarDe(treinoOpcao).slice().sort((a, b) => a.ordem - b.ordem) }))
+    .filter((c) => c.exercicios.length > 0)}
   <div class="tela-avulso">
     <div class="tela-avulso-conteudo">
-      {#if !rotinaDestinoTroca}
-        <div class="picker-header">
-          <button class="voltar-icon" onclick={fecharTrocarDeRotina} aria-label="Cancelar">←</button>
-          <h1>Substituir "{sessao[idxTroca]?.nome}"</h1>
-          <span class="header-spacer"></span>
-        </div>
-        <p class="muted">Escolha a rotina de destino.</p>
-        {#if !rotinasParaTrocar.length}
-          <p class="muted">Nenhuma rotina disponível pra troca — as outras estão vazias ou já têm esse exercício.</p>
-        {:else}
-          <ul class="troca-lista">
-            {#each rotinasParaTrocar as treinoOpcao (treinoOpcao.id)}
-              <li>
-                <button class="troca-item" onclick={() => (rotinaDestinoTroca = treinoOpcao)}>
-                  <span class="troca-item-nome">{treinoOpcao.nome_treino}</span>
-                  <span class="troca-item-sub"
-                    >{treinoOpcao.exercicios.length} {treinoOpcao.exercicios.length === 1 ? "exercício" : "exercícios"}</span
-                  >
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
+      <div class="picker-header">
+        <button class="voltar-icon" onclick={fecharTrocarDeRotina} aria-label="Cancelar">←</button>
+        <h1>Substituir "{sessao[idxTroca]?.nome}"</h1>
+        <span class="header-spacer"></span>
+      </div>
+      {#if !cardsTroca.length}
+        <p class="muted">Nenhuma rotina disponível pra troca — as outras estão vazias, já têm esse exercício, ou todos os exercícios delas já estão na sessão de hoje.</p>
       {:else}
-        <div class="picker-header">
-          <button class="voltar-icon" onclick={() => (rotinaDestinoTroca = null)} aria-label="Voltar">←</button>
-          <h1>Trocar por qual exercício?</h1>
-          <span class="header-spacer"></span>
-        </div>
-        <p class="muted">"{sessao[idxTroca]?.nome}" vai pra "{rotinaDestinoTroca.nome_treino}" — escolha quem troca de lugar com ele.</p>
-        {#if !exerciciosParaTrocar.length}
-          <p class="muted">Nenhum exercício disponível — todos já estão na sessão de hoje.</p>
-        {:else}
-          <ul class="troca-lista">
-            {#each exerciciosParaTrocar.slice().sort((a, b) => a.ordem - b.ordem) as te (te.id)}
-              <li>
-                <button class="troca-item" disabled={processandoTroca} onclick={() => trocarExercicioDeRotina(te)}>
-                  <span class="troca-item-nome">{te.exercicio?.nome ?? ""}</span>
-                  <span class="troca-item-sub">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
+        <ul class="troca-rotinas-lista">
+          {#each cardsTroca as { treinoOpcao, exercicios } (treinoOpcao.id)}
+            <li class="troca-rotina-card">
+              <p class="troca-rotina-nome">{treinoOpcao.nome_treino}</p>
+              <ul class="troca-exercicios-lista">
+                {#each exercicios as te (te.id)}
+                  <li class="troca-exercicio-linha">
+                    <span class="troca-exercicio-info">
+                      <span class="troca-exercicio-nome">{te.exercicio?.nome ?? ""}</span>
+                      <span class="troca-exercicio-sub">{te.series.length} {te.series.length === 1 ? "série" : "séries"}</span>
+                    </span>
+                    <button
+                      type="button"
+                      class="troca-exercicio-btn"
+                      disabled={processandoTroca}
+                      onclick={() => trocarExercicioDeRotina(treinoOpcao, te)}
+                      aria-label={`Trocar por ${te.exercicio?.nome ?? ""}`}
+                    >
+                      {@render iconSubstituir()}
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            </li>
+          {/each}
+        </ul>
       {/if}
     </div>
   </div>
@@ -1510,7 +1498,6 @@
       mostrarCriarAvulso = false;
       substituindoExIdx = null;
       trocandoExIdx = null;
-      rotinaDestinoTroca = null;
       reordenando = false;
     }}
   />
@@ -2111,37 +2098,77 @@
     width: 56px;
     flex-shrink: 0;
   }
-  .troca-lista {
+  .troca-rotinas-lista {
     list-style: none;
     margin: var(--space-3) 0 0;
     padding: 0;
   }
-  .troca-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 100%;
+  .troca-rotina-card {
     padding: var(--space-3);
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-3);
     border-radius: var(--radius-md);
     border: 1px solid var(--surface-border);
     background: var(--surface-card);
+  }
+  .troca-rotina-nome {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-base);
+    font-weight: 600;
     color: var(--surface-fg);
-    text-align: left;
-    font-family: inherit;
+  }
+  .troca-exercicios-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .troca-exercicio-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--surface-border);
+  }
+  .troca-exercicio-linha:first-child {
+    border-top: none;
+  }
+  .troca-exercicio-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .troca-exercicio-nome {
+    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .troca-exercicio-sub {
+    font-size: 12px;
+    color: var(--surface-muted);
+  }
+  .troca-exercicio-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-bg);
+    color: var(--color-primary);
     cursor: pointer;
   }
-  .troca-item:disabled {
+  .troca-exercicio-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
-  .troca-item-nome {
-    font-size: var(--font-size-base);
-    font-weight: 600;
-  }
-  .troca-item-sub {
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
+  .troca-exercicio-btn :global(svg) {
+    width: 16px;
+    height: 16px;
   }
   .descartar {
     width: 100%;
