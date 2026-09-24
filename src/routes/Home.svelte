@@ -9,6 +9,7 @@
     listOverrideSemana,
     segundaDaSemana,
     statusSemanalDoTreino,
+    getRegistrosPorTreinoPeriodo,
     type TreinoComExercicios,
     type StatusSemanalTreino,
   } from "../lib/treinoApi";
@@ -43,6 +44,10 @@
   /** Rotinas cujo dia FIXO é hoje, mas que essa semana foram reagendadas pra outro dia ou
    * canceladas — mostradas como card "fantasma" (ver CardProximoTreino) pra dar como reverter. */
   let fantasmasHoje = $state<{ treino: TreinoComExercicios; status: StatusSemanalTreino }[]>([]);
+  /** Rotinas com registro salvo hoje — mesmo critério de Rotinas.svelte (a única forma de gravar
+   * treino_registros é concluindo o treino), usado pra trocar "Iniciar Rotina" por "Concluído" no
+   * card da Início, igual já funciona lá. */
+  let concluidosHojeVal = $state<Set<string>>(new Set());
   let caloriasMeta = $state(0);
   let caloriasConsumido = $state(0);
   let proteinaMetaVal = $state(0);
@@ -71,7 +76,7 @@
 
       const precisaPeso = tipos.includes("peso_atual") || precisaDieta;
 
-      const [pesoAtual, pesoMedia, meta, metaSemanal, treinos, metasDia, itensDia, refeicoesDia, parametrosDieta, perfilDieta] =
+      const [pesoAtual, pesoMedia, meta, metaSemanal, treinos, metasDia, itensDia, refeicoesDia, parametrosDieta, perfilDieta, registrosHoje] =
         await Promise.all([
           tipos.includes("peso_atual") ? getUltimoPeso() : Promise.resolve(null),
           precisaPeso ? getPesoMedioAtual() : Promise.resolve(null),
@@ -83,6 +88,7 @@
           tipos.includes("refeicoes_dia") ? garantirRefeicoesPadraoDoDia(hoje) : Promise.resolve([]),
           precisaDieta ? getParametros() : Promise.resolve(new Map<string, LimiteParametro>(Object.entries(PARAMETROS_PADRAO))),
           precisaDieta ? getPerfilDietaEditavel() : Promise.resolve(null),
+          tipos.includes("proximo_treino") ? getRegistrosPorTreinoPeriodo(hoje, hoje) : Promise.resolve([]),
         ]);
 
       pesoAtualVal = pesoAtual;
@@ -97,9 +103,11 @@
           .filter((t) => t.dia_semana === diaSemanaHoje)
           .map((t) => ({ treino: t, status: statusSemanalDoTreino(t, overridesSemana) }))
           .filter((f) => f.status.tipo !== "normal");
+        concluidosHojeVal = new Set(registrosHoje.filter((r) => r.treino_id).map((r) => r.treino_id!));
       } else {
         treinosHoje = [];
         fantasmasHoje = [];
+        concluidosHojeVal = new Set();
       }
       caloriasMeta = metasDia?.calorias ?? 0;
       caloriasConsumido = itensDia.reduce((acc, i) => acc + i.calorias, 0);
@@ -182,7 +190,7 @@
       {#if tipo === "peso_atual"}
         <CardPesoAtual pesoAtual={pesoAtualVal} media={pesoMediaVal} metaSemanal={metaSemanalVal} pesoAlvo={pesoAlvoVal} />
       {:else if tipo === "proximo_treino"}
-        <CardProximoTreino treinos={treinosHoje} fantasmas={fantasmasHoje} data={hojeISO()} onMudou={carregar} />
+        <CardProximoTreino treinos={treinosHoje} fantasmas={fantasmasHoje} concluidosHoje={concluidosHojeVal} data={hojeISO()} onMudou={carregar} />
       {:else if tipo === "calorias_dia"}
         <CardCaloriasDia
           caloriasConsumido={caloriasConsumido}

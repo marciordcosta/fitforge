@@ -1,6 +1,7 @@
 <script lang="ts">
   import { navigate } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import TreinoAjusteDiaFluxo from "../../components/TreinoAjusteDiaFluxo.svelte";
   import { moverTreinoParaDia, labelDiaSemanaRelativo, type TreinoComExercicios, type StatusSemanalTreino } from "../../lib/treinoApi";
 
@@ -11,14 +12,27 @@
   let {
     treinos,
     fantasmas,
+    concluidosHoje,
     data,
     onMudou,
   }: {
     treinos: TreinoComExercicios[];
     fantasmas: { treino: TreinoComExercicios; status: StatusSemanalTreino }[];
+    concluidosHoje: Set<string>;
     data: string;
     onMudou: () => void;
   } = $props();
+
+  /** Rotina já concluída hoje pede confirmação pra reabrir (mesmo padrão do card destacado de
+   * Rotinas.svelte) — tudo aqui já é "hoje" por construção (treinos vem filtrado pelo dia efetivo),
+   * então nunca precisa do estado "Próxima rotina" que Rotinas.svelte tem pra dias futuros. */
+  let confirmandoReiniciar = $state<TreinoComExercicios | null>(null);
+
+  function confirmarReiniciar(): void {
+    const treino = confirmandoReiniciar;
+    confirmandoReiniciar = null;
+    if (treino) navigate(`/treino/log/${treino.id}`);
+  }
 
   function preview(t: TreinoComExercicios): string {
     const nomes = t.exercicios
@@ -60,6 +74,7 @@
       <TreinoAjusteDiaFluxo {data} {onMudou} />
     </div>
     {#each treinos as treino, i (treino.id)}
+      {@const concluidaHoje = concluidosHoje.has(treino.id)}
       <div
         class="treino-bloco"
         class:com-margem={i < treinos.length - 1 || fantasmas.length > 0}
@@ -72,7 +87,11 @@
           <h2>{treino.nome_treino}</h2>
         </div>
         <p class="preview">{preview(treino)}</p>
-        <Button variant="secondary" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+        {#if concluidaHoje}
+          <Button variant="secondary" onclick={(e) => { e.stopPropagation(); confirmandoReiniciar = treino; }}>Concluído</Button>
+        {:else}
+          <Button variant="secondary" onclick={(e) => { e.stopPropagation(); navigate(`/treino/log/${treino.id}`); }}>Iniciar Rotina</Button>
+        {/if}
       </div>
     {/each}
     {#each fantasmas as { treino, status }, i (treino.id)}
@@ -109,6 +128,16 @@
     </button>
   {/if}
 </div>
+
+{#if confirmandoReiniciar}
+  <ConfirmDialog
+    titulo="Deseja reiniciar a rotina?"
+    textoConfirmar="Reiniciar"
+    destrutivo={false}
+    onConfirmar={confirmarReiniciar}
+    onCancelar={() => (confirmandoReiniciar = null)}
+  />
+{/if}
 
 <style>
   .card {
