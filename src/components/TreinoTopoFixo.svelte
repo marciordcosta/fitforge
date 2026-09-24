@@ -2,14 +2,14 @@
   import { navigate } from "../lib/router.svelte";
   import { treinoLogSessao } from "../lib/treinoLogSessao.svelte";
 
-  /** Resumo fixo da rotina ao vivo (nome, duração, séries, concluir), sempre visível no topo de
-   * qualquer tela do app enquanto uma rotina está em andamento — exceto na própria tela da rotina
-   * (que já tem esse mesmo resumo fixo dentro dela, ver .header-fixo em TreinoLog.svelte — o visual
-   * aqui é deliberadamente idêntico, ponta a ponta, sem cantos/margens, pra parecer o MESMO topbar
-   * que só "acompanha" pra fora da tela, não um card novo). Não mostra nada sobre descanso: isso é
-   * exclusividade do TreinoMinimizado (barra/anel), pra nunca misturar os dois cronômetros. Tocar
-   * em qualquer parte, incluindo o ícone de concluir, só abre a rotina ao vivo — concluir de fato
-   * exige a tela (validação/confirmação já vivem só lá). */
+  /** Resumo fixo da rotina ao vivo (nome, duração, séries), sempre visível no topo de qualquer
+   * tela do app enquanto uma rotina está em andamento — exceto na própria tela da rotina (que já
+   * tem esse mesmo resumo fixo dentro dela, ver .header-fixo em TreinoLog.svelte — o visual aqui é
+   * deliberadamente idêntico, ponta a ponta, sem cantos/margens, pra parecer o MESMO topbar que só
+   * "acompanha" pra fora da tela, não um card novo). Não mostra nada sobre descanso: isso é
+   * exclusividade do TreinoMinimizado (barra/anel), pra nunca misturar os dois cronômetros. Sem o
+   * botão de concluir daqui (não dá pra validar/salvar fora da tela) — no lugar, um ponto pulsante
+   * só indicando "ao vivo". Tocar em qualquer parte abre a rotina ao vivo. */
 
   let agora = $state(Date.now());
   const timerId = setInterval(() => (agora = Date.now()), 1000);
@@ -55,12 +55,6 @@
   }
 </script>
 
-{#snippet iconCheck()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter">
-    <polyline points="4 12 10 18 20 6" />
-  </svg>
-{/snippet}
-
 {#if treinoLogSessao.atual}
   <div class="topo-fixo">
     <button class="topo-fixo-inner" onclick={abrirRotina} aria-label="Abrir rotina ao vivo">
@@ -76,7 +70,7 @@
         <span class="stat-label">Séries</span>
         <span class="stat-valor">{seriesTotal}/{seriesPlanejadas}</span>
       </span>
-      <span class="concluir-icone" aria-hidden="true">{@render iconCheck()}</span>
+      <span class="ponto" aria-hidden="true"></span>
     </button>
   </div>
 {/if}
@@ -138,19 +132,21 @@
     text-align: center;
     font-variant-numeric: tabular-nums;
   }
-  .concluir-icone {
+  .ponto {
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
+    background: var(--color-success);
+    animation: pulsar 1.6s ease-in-out infinite;
   }
-  .concluir-icone svg {
-    width: 18px;
-    height: 18px;
+  @keyframes pulsar {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
   }
 </style>
