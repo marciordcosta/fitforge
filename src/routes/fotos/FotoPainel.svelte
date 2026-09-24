@@ -245,6 +245,10 @@
   }
 
   function aoPointerUp(e: PointerEvent) {
+    // Mesma exceção do aoPointerDown: toque nas setas nunca alimenta inicioX/inicioY, então sem
+    // isso aqui um duplo toque nelas podia comparar contra coordenadas velhas de outro gesto e
+    // disparar alternarZoom por engano.
+    if ((e.target as HTMLElement).closest(".seta")) return;
     const tinhaDoisDedos = ponteirosAtivos.size === 2;
     ponteirosAtivos.delete(e.pointerId);
 

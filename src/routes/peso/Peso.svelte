@@ -2,7 +2,7 @@
   import { Chart } from "chart.js/auto";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
-  import { navigate, router } from "../../lib/router.svelte";
+  import { navigate, router, voltar } from "../../lib/router.svelte";
   import { toISODate, parseISODate, hojeISO } from "../../lib/dates";
   import {
     getPesosDoPeriodo,
@@ -746,7 +746,7 @@
 </div>
 
 {#if diaSelecionado !== null}
-  <PesoDiaSheet data={diaSelecionado} onFechar={() => window.history.back()} onSalvo={aoSalvar} />
+  <PesoDiaSheet data={diaSelecionado} onFechar={() => voltar("/peso")} onSalvo={aoSalvar} />
 {/if}
 
 {#if mostrarFiltro}

@@ -76,9 +76,13 @@ export async function getUrlAssinadaFoto(path: string): Promise<string> {
 }
 
 export async function excluirFotoDoDia(foto: FotoRegistro): Promise<void> {
-  await supabase.storage.from("fotos").remove([foto.path]);
+  // Linha do banco primeiro: se isso falhar (RLS, rede), nada é apagado e a foto continua
+  // acessível normalmente. Na ordem inversa, uma falha no delete do banco DEPOIS de já ter
+  // apagado o arquivo deixava a linha "pendurada" apontando pra um arquivo que não existe mais,
+  // aparecendo como miniatura em branco até o usuário notar e excluir de novo.
   const { error } = await supabase.from("fotos").delete().eq("id", foto.id);
   if (error) throw error;
+  await supabase.storage.from("fotos").remove([foto.path]);
 }
 
 /** Adiciona uma foto a um dia SEM substituir as que já existem — diferente de salvarFotoDoDia

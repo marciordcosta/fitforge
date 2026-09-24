@@ -79,7 +79,10 @@
   .topo-fixo {
     position: sticky;
     top: 0;
-    z-index: 20;
+    /* Acima das faixas de swipe entre módulos (z-index 45 em App.svelte) -- elas cobrem a tela
+       inteira de cima a baixo, então sem isso os 24px das pontas esquerda/direita dessa barra
+       (que é full-width) ficavam mortos pro toque, capturados pelo swipe em vez do botão. */
+    z-index: 46;
     background: var(--surface-card);
     border-bottom: 1px solid var(--surface-border);
   }
