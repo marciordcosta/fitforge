@@ -1,5 +1,6 @@
 <script lang="ts">
   import { parseISODate, hojeISO } from "../../lib/dates";
+  import { formatDuracaoTreino } from "../../lib/tempo";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { treinoLogSessao, type ExercicioSessao, type SetSessao } from "../../lib/treinoLogSessao.svelte";
   import Sheet from "../../components/Sheet.svelte";
@@ -30,6 +31,7 @@
   }
 
   let treinoNome = $state("");
+  let duracaoSeg = $state<number | null>(null);
   let sessao = $state<ExercicioSessaoHistorico[]>([]);
   /** Observação vigente NA DATA dessa sessão (não a atual) — resolvida por exercício a partir
    * de todas as versões salvas, igual ExercicioDetalhe.svelte faz por sessão do histórico. */
@@ -55,6 +57,7 @@
     loading = true;
     const historico = await getHistoricoDia(treinoId, data);
     treinoNome = historico.treinoNome;
+    duracaoSeg = historico.duracaoSeg;
     sessao = historico.exercicios.map((ex) => ({
       exercicioId: ex.exercicioId,
       exercicioNome: ex.exercicioNome,
@@ -247,7 +250,7 @@
       </button>
     {/if}
   </div>
-  <p class="data-label">{dataLabel}</p>
+  <p class="data-label">{dataLabel}{#if duracaoSeg != null} · ⏱ {formatDuracaoTreino(duracaoSeg)}{/if}</p>
 
   {#if loading}
     <p class="muted">Carregando…</p>

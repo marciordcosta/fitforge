@@ -11,6 +11,7 @@
     getRecordesExercicio,
     calcular1RM,
     salvarRegistrosDoDia,
+    salvarDuracaoSessao,
     salvarExerciciosRotina,
     updateDescansoTreinoExercicio,
     getObservacoesAtuais,
@@ -903,11 +904,19 @@
     );
   }
 
+  /** Tempo total da sessão, do início até agora — null se por algum motivo a sessão ao vivo já não
+   * estiver mais disponível (não deveria acontecer nesse ponto do fluxo, mas evita salvar lixo). */
+  function duracaoSegundosAtual(): number | null {
+    const inicio = treinoLogSessao.atual?.inicio;
+    return inicio != null ? Math.round((Date.now() - inicio) / 1000) : null;
+  }
+
   async function confirmarConcluirTreino() {
     mostrarConfirmConcluir = false;
     salvando = true;
     try {
       await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
+      await salvarDuracaoSessao(treinoId, hojeISO(), duracaoSegundosAtual());
       finalizado = true;
       treinoLogSessao.limpar();
       mostrarToast("Salvo");
@@ -923,6 +932,7 @@
     salvando = true;
     try {
       await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
+      await salvarDuracaoSessao(treinoId, hojeISO(), duracaoSegundosAtual());
       if (salvarNaRotina) {
         await salvarExerciciosRotina(
           treinoId,

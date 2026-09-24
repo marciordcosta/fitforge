@@ -1311,6 +1311,20 @@ export async function salvarRegistrosDoDia(
   );
 }
 
+/** Grava (substituindo qualquer duração já salva) o tempo total da sessão — chamado só ao concluir
+ * o treino ao vivo (TreinoLog.svelte), nunca ao editar peso/reps de um dia retroativamente em
+ * HistoricoDia.svelte, pra não sobrescrever a duração real com algo sem sentido. `null` só apaga a
+ * duração salva (sem gravar nada no lugar), usado por excluirRegistrosDoDia. */
+export async function salvarDuracaoSessao(treinoId: string | null, data: string, duracaoSeg: number | null): Promise<void> {
+  let delQuery = supabase.from("treino_sessoes").delete().eq("data", data);
+  delQuery = treinoId ? delQuery.eq("treino_id", treinoId) : delQuery.is("treino_id", null);
+  const { error: delError } = await delQuery;
+  if (delError) throw delError;
+  if (duracaoSeg == null) return;
+  const { error } = await supabase.from("treino_sessoes").insert({ user_id: uid(), treino_id: treinoId, data, duracao_seg: duracaoSeg });
+  if (error) throw error;
+}
+
 export interface DiaComTreino {
   data: string;
   treinoId: string | null;
@@ -1352,6 +1366,7 @@ export interface ExercicioRegistroDia {
 export interface HistoricoDia {
   treinoNome: string;
   exercicios: ExercicioRegistroDia[];
+  duracaoSeg: number | null;
 }
 
 /** Registro completo de uma sessão específica (rotina + data, ou avulsa se `treinoId` for null), agrupado por exercício e com nomes já resolvidos. */
@@ -1364,7 +1379,14 @@ export async function getHistoricoDia(treinoId: string | null, data: string): Pr
     .order("serie", { ascending: true });
   query = treinoId ? query.eq("treino_id", treinoId) : query.is("treino_id", null);
 
-  const [{ data: rows, error }, treino] = await Promise.all([query, treinoId ? getTreino(treinoId) : null]);
+  let duracaoQuery = supabase.from("treino_sessoes").select("duracao_seg").eq("data", data).limit(1);
+  duracaoQuery = treinoId ? duracaoQuery.eq("treino_id", treinoId) : duracaoQuery.is("treino_id", null);
+
+  const [{ data: rows, error }, treino, { data: duracaoRows }] = await Promise.all([
+    query,
+    treinoId ? getTreino(treinoId) : null,
+    duracaoQuery,
+  ]);
   if (error) throw error;
 
   const porExercicio = new Map<string, ExercicioRegistroDia>();
@@ -1390,6 +1412,7 @@ export async function getHistoricoDia(treinoId: string | null, data: string): Pr
   return {
     treinoNome: treinoId ? (treino?.nome_treino ?? "") : "Treino avulso",
     exercicios: Array.from(porExercicio.values()),
+    duracaoSeg: duracaoRows?.[0]?.duracao_seg ?? null,
   };
 }
 
@@ -1399,6 +1422,7 @@ export async function excluirRegistrosDoDia(treinoId: string | null, data: strin
   query = treinoId ? query.eq("treino_id", treinoId) : query.is("treino_id", null);
   const { error } = await query;
   if (error) throw error;
+  await salvarDuracaoSessao(treinoId, data, null);
 }
 
 /** Apaga só os registros de um exercício específico numa sessão (rotina + data, ou avulsa) — usado pra remover um dia registrado errado, sem mexer nos outros exercícios daquele dia. */
