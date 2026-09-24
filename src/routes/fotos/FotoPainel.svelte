@@ -46,68 +46,6 @@
     indice = indiceInicial;
   });
 
-  /** Dimensões reais (naturalWidth/Height) de cada foto já carregada, pra calcular o zoom padrão
-   * de cada uma — capturadas ao carregar a <img> (aoCarregarImagem), não dá pra saber antes disso.
-   * Podada sempre que o dia muda, senão cresce sem limite num painel reaproveitado entre trocas
-   * (comparação: trocar posição/substituir usa a mesma instância de FotoPainel indefinidamente). */
-  let dimensoesPorPath = $state(new Map<string, { w: number; h: number }>());
-
-  $effect(() => {
-    const pathsValidos = new Set(fotos.map((f) => f.path));
-    for (const path of dimensoesPorPath.keys()) {
-      if (!pathsValidos.has(path)) dimensoesPorPath.delete(path);
-    }
-  });
-
-  function registrarDimensao(path: string, img: HTMLImageElement): void {
-    if (!img.naturalWidth || !img.naturalHeight) return;
-    dimensoesPorPath.set(path, { w: img.naturalWidth, h: img.naturalHeight });
-  }
-
-  function aoCarregarImagem(path: string, e: Event): void {
-    registrarDimensao(path, e.currentTarget as HTMLImageElement);
-  }
-
-  /** A foto quase sempre já está no cache do navegador (mesma URL assinada já exibida como
-   * miniatura na galeria) — nesse caso `complete`/`naturalWidth` já vêm prontos assim que o
-   * elemento é inserido no DOM, bem antes do evento `load` disparar. Checar isso já na montagem
-   * (ação, roda logo após o elemento entrar no DOM) evita o "pulo" de abrir pequena e só ajustar
-   * o zoom um instante depois — o onload continua como reforço pra quando não está em cache. */
-  function medirAoMontar(node: HTMLImageElement, path: string) {
-    if (node.complete) registrarDimensao(path, node);
-  }
-
-  /** Muda toda vez que o painel é redimensionado (ex: encolhe pra 42% de altura ao abrir o picker
-   * de comparar/substituir) — só existe pra escalaPadrao reagir a isso, já que ler
-   * containerEl.clientWidth/Height direto num $derived não é rastreado pelo Svelte. */
-  let containerVersao = $state(0);
-
-  $effect(() => {
-    if (!containerEl) return;
-    const observador = new ResizeObserver(() => {
-      containerVersao++;
-    });
-    observador.observe(containerEl);
-    return () => observador.disconnect();
-  });
-
-  /** Zoom com que a foto ATUAL abre: o suficiente pra preencher a largura do painel sem sobrar
-   * espaço nas laterais (recorta topo/rodapé em vez disso) — nunca corta de verdade, o usuário
-   * sempre pode diminuir até ESCALA_MIN (foto inteira, sem cortes) se quiser ver uma borda que
-   * ficou fora. Sem a dimensão real ainda (foto acabou de aparecer, não carregou), fica em 1
-   * (foto inteira) até a imagem carregar e o zoom "assentar". Nunca passa de ESCALA_MAX, senão uma
-   * foto de proporção muito extrema abriria acima do teto que a pinça/duplo-toque respeitam. */
-  const escalaPadrao = $derived.by(() => {
-    containerVersao;
-    const foto = fotos[indice];
-    if (!foto || !containerEl) return 1;
-    const dim = dimensoesPorPath.get(foto.path);
-    if (!dim) return 1;
-    const aspectoPainel = containerEl.clientWidth / containerEl.clientHeight;
-    const aspectoFoto = dim.w / dim.h;
-    return Math.min(ESCALA_MAX, Math.max(1, aspectoPainel / aspectoFoto));
-  });
-
   function formatarDataCurta(iso: string): string {
     const [, m, d] = iso.split("-");
     return `${d}/${m}`;
@@ -158,26 +96,14 @@
   let pinchOrigemLocalX = 0;
   let pinchOrigemLocalY = 0;
 
-  /** true assim que o usuário pinça ou dá duplo toque nesta foto — a partir daí o zoom "assentado"
-   * (escalaPadrao) para de ser reaplicado automaticamente, senão qualquer recálculo dele (ex: outra
-   * dimensão chegando) desfaria o zoom manual que o usuário acabou de escolher. */
-  let usuarioAjustouZoom = $state(false);
-
-  /** Sempre que muda de foto no carrossel, não faz sentido carregar a posição/ajuste manual da
-   * anterior — volta a seguir a escalaPadrao (efeito abaixo) até o usuário mexer de novo. */
+  /** Sempre que muda de foto no carrossel, só a posição de pan volta ao centro — o zoom (`scale`)
+   * é preservado de propósito: o usuário ajusta a mão uma vez e ele continua igual ao passar pras
+   * próximas fotos, em vez de resetar pra foto inteira a cada troca. */
   $effect(() => {
     indice;
     panX = 0;
     panY = 0;
-    usuarioAjustouZoom = false;
     onIndiceChange?.(indice);
-  });
-
-  /** Mantém o zoom na escalaPadrao enquanto o usuário não mexeu manualmente nele — reage tanto à
-   * troca de foto quanto à dimensão real chegando depois (a foto pode "assentar" o zoom um instante
-   * depois de aparecer, se ainda não tinha carregado). */
-  $effect(() => {
-    if (!usuarioAjustouZoom) scale = escalaPadrao;
   });
 
   /** Desloca o trilho inteiro (um "filme" com todas as fotos lado a lado) em vez de trocar o
@@ -205,9 +131,8 @@
   }
 
   function alternarZoom(e: PointerEvent) {
-    usuarioAjustouZoom = true;
-    if (scale > escalaPadrao + 0.01) {
-      scale = escalaPadrao;
+    if (scale > ESCALA_MIN + 0.01) {
+      scale = ESCALA_MIN;
       panX = 0;
       panY = 0;
       return;
@@ -216,11 +141,9 @@
     const rect = containerEl.getBoundingClientRect();
     const toqueX = e.clientX - rect.left - rect.width / 2;
     const toqueY = e.clientY - rect.top - rect.height / 2;
-    // Generaliza a fórmula pro ponto de partida atual (escalaPadrao/pan já podem não ser 1/0,0)
-    // em vez de assumir que sempre começa "sem zoom nenhum".
     const origemLocalX = (toqueX - panX) / scale;
     const origemLocalY = (toqueY - panY) / scale;
-    const novaEscala = Math.min(ESCALA_MAX, Math.max(ZOOM_AMPLIADO, escalaPadrao + 1));
+    const novaEscala = ZOOM_AMPLIADO;
     scale = novaEscala;
     panX = toqueX - origemLocalX * novaEscala;
     panY = toqueY - origemLocalY * novaEscala;
@@ -236,7 +159,6 @@
   function aoRolarRoda(e: WheelEvent): void {
     e.preventDefault();
     if (!containerEl) return;
-    usuarioAjustouZoom = true;
     const fator = Math.exp(-e.deltaY * SENSIBILIDADE_RODA);
     const novaEscala = Math.min(ESCALA_MAX, Math.max(ESCALA_MIN, scale * fator));
     const ponto = pontoRelativoAoCentro(e.clientX, e.clientY);
@@ -249,7 +171,6 @@
   }
 
   function iniciarPinca(): void {
-    usuarioAjustouZoom = true;
     const [p1, p2] = [...ponteirosAtivos.values()];
     pinchDistanciaInicial = Math.hypot(p1.x - p2.x, p1.y - p2.y);
     pinchEscalaInicial = scale;
@@ -304,7 +225,7 @@
     if (!arrastando) return;
     const dx = e.clientX - inicioX;
     const dy = e.clientY - inicioY;
-    if (scale > escalaPadrao + 0.01) {
+    if (scale > ESCALA_MIN + 0.01) {
       panX = panInicialX + dx;
       panY = panInicialY + dy;
       limitarPan();
@@ -316,7 +237,7 @@
   function finalizarArrasto() {
     if (!arrastando) return;
     arrastando = false;
-    if (scale <= escalaPadrao + 0.01) {
+    if (scale <= ESCALA_MIN + 0.01) {
       if (deltaArrastoX <= -LIMIAR_TROCA_PX) proximaFoto();
       else if (deltaArrastoX >= LIMIAR_TROCA_PX) fotoAnterior();
     }
@@ -328,8 +249,8 @@
     ponteirosAtivos.delete(e.pointerId);
 
     if (tinhaDoisDedos) {
-      if (scale <= escalaPadrao + 0.02) {
-        scale = escalaPadrao;
+      if (scale <= ESCALA_MIN + 0.02) {
+        scale = ESCALA_MIN;
         panX = 0;
         panY = 0;
       } else {
@@ -338,7 +259,7 @@
       // sobrou 1 dedo na tela: continua o gesto como um arrastar normal (pan), sem soltar e
       // precisar tocar de novo — é o padrão de qualquer app de fotos.
       const restante = [...ponteirosAtivos.values()][0];
-      if (restante && scale > escalaPadrao + 0.01) {
+      if (restante && scale > ESCALA_MIN + 0.01) {
         arrastando = true;
         inicioX = restante.x;
         inicioY = restante.y;
@@ -379,7 +300,7 @@
   <div
     class="trilho"
     class:sem-transicao={arrastando}
-    style={`transform: translateX(calc(${-indice * 100}% + ${scale > escalaPadrao + 0.01 ? 0 : offsetTrilho()}px));`}
+    style={`transform: translateX(calc(${-indice * 100}% + ${scale > ESCALA_MIN + 0.01 ? 0 : offsetTrilho()}px));`}
   >
     {#each fotos as foto, i (foto.id)}
       <div class="slide">
@@ -390,8 +311,6 @@
             draggable="false"
             class:sem-transicao={arrastando}
             style={i === indice ? `transform: translate(${panX}px, ${panY}px) scale(${scale});` : ""}
-            use:medirAoMontar={foto.path}
-            onload={(e) => aoCarregarImagem(foto.path, e)}
           />
         {/if}
       </div>
@@ -461,8 +380,8 @@
   .foto-painel img {
     width: 100%;
     height: 100%;
-    /* contain, nunca cover: a foto inteira tem que continuar acessível (ver limitarPan/escalaPadrao
-       no script) — cortar de verdade esconderia detalhes importantes perto das bordas. */
+    /* contain, nunca cover: abre sempre com a foto inteira visível, sem cortes — o zoom é só
+       manual (duplo toque/pinça/roda, ver script). */
     object-fit: contain;
     touch-action: none;
     user-select: none;
