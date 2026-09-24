@@ -21,7 +21,7 @@
 <button type="button" class="card" onclick={() => navigate("/peso")}>
   <div class="quick-actions">
     <div class="quick-card">
-      <span class="quick-card-label">Peso hoje</span>
+      <span class="quick-card-label">Últ. registro</span>
       <span class="quick-card-valor">{formatKg(pesoAtual)}</span>
     </div>
     <div class="quick-card">
