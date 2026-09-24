@@ -858,8 +858,11 @@ export async function garantirRefeicoesPadraoDoDia(data: string): Promise<Refeic
 /** Se o dia ainda não tem nenhuma refeição, cria uma pra cada item do catálogo efetivo desse dia
  * da semana (respeitando a lista específica da Ondulatória, se houver) e retorna a lista já pronta.
  * Se já tiver refeições mas alguma foi criada antes de existir uma lista específica pro dia (ou de
- * uma mudança na Ondulatória) e não pertence mais à lista efetiva de hoje, remove — só quando ainda
- * está vazia, nunca uma que já tem alimento lançado. */
+ * uma mudança na Ondulatória, ou porque a refeição foi renomeada/excluída no catálogo depois) e não
+ * pertence mais à lista efetiva de hoje, remove — só quando ainda está vazia, nunca uma que já tem
+ * alimento lançado; nesse caso a linha órfã (nome antigo) fica, mas nunca é a que aparece pro
+ * usuário editar/ver dados errados, porque `garantirRefeicoesPadraoDoDiaImpl` sempre recria a
+ * versão atual do catálogo em seguida. */
 async function garantirRefeicoesPadraoDoDiaImpl(data: string): Promise<RefeicaoDia[]> {
   const existentes = await getRefeicoesDoDia(data);
   const diaSemana = parseISODate(data).getDay();
@@ -868,8 +871,11 @@ async function garantirRefeicoesPadraoDoDiaImpl(data: string): Promise<RefeicaoD
 
   if (existentes.length) {
     const nomesEfetivos = new Set(catalogoEfetivo.map((m) => m.nome));
-    const nomesCatalogoTodo = new Set(catalogo.map((m) => m.nome));
-    const extras = existentes.filter((r) => nomesCatalogoTodo.has(r.nome) && !nomesEfetivos.has(r.nome));
+    // Antes só removia se o nome antigo ainda existisse EM ALGUM LUGAR do catálogo (outro dia,
+    // outra Ondulatória) — uma refeição RENOMEADA no catálogo some de lá por completo, então essa
+    // trava nunca pegava esse caso: a linha do dia ficava travada pra sempre com o nome/valores de
+    // antes do renomear, nunca refletindo a edição feita em Gerenciar Refeições.
+    const extras = existentes.filter((r) => !nomesEfetivos.has(r.nome));
     if (extras.length) {
       const itensHoje = await getDiarioDoDia(data);
       const idsComItens = new Set(itensHoje.map((i) => i.refeicaoId));
