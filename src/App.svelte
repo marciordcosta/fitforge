@@ -33,8 +33,12 @@
     !router.path.startsWith("/treino/log/") && !router.path.startsWith("/fotos/comparar/"),
   );
 
-  /** Arrastar a tela pros lados troca de módulo (mesma ordem do BottomNav) — só entre os 5
-   * módulos principais, não em sub-telas (ex: dentro de um exercício ou de uma rotina). */
+  /** Arrastar a partir da borda esquerda/direita da tela troca de módulo (mesma ordem do
+   * BottomNav). Só nas bordas (não na tela inteira) de propósito: uma faixa fininha com
+   * touch-action: pan-y garante que o gesto sempre dispara (mesma técnica já usada no calendário
+   * de Peso e no histórico de treino, que funcionam) sem precisar desativar a rolagem horizontal
+   * nativa de nada mais no app (miniaturas de foto, anéis de macro/músculo etc. continuam intactos,
+   * já que a faixa de swipe nem os alcança). */
   const ABAS_SWIPE: { chave: string; caminho: string }[] = [
     { chave: "home", caminho: "/" },
     { chave: "peso", caminho: "/peso" },
@@ -42,85 +46,18 @@
     { chave: "treino", caminho: "/treino" },
     { chave: "fotos", caminho: "/fotos" },
   ];
-  const LIMIAR_SWIPE_ABAS_PX = 70;
+  const LIMIAR_SWIPE_ABAS_PX = 50;
 
   let swipeAbasInicioX: number | null = null;
-  let swipeAbasInicioY: number | null = null;
-  /** null = ainda indeciso (poucos px de movimento); "horizontal"/"vertical" = já decidiu, ver
-   * aoPointerMoveAbas. Precisa decidir cedo e chamar preventDefault assim que for "horizontal",
-   * senão o navegador às vezes já reivindica o gesto como rolagem nativa antes do pointerup — sem
-   * isso o swipe simplesmente não acontecia (a rolagem vertical nativa "engolia" o toque). */
-  let swipeAbasDecisao: "horizontal" | "vertical" | null = null;
-  const LIMIAR_DECISAO_SWIPE_ABAS_PX = 12;
 
-  /** Não inicia o swipe de módulo se o toque começou numa superfície que já tem seu próprio
-   * arrasto/rolagem horizontal — em vez de listar cada tela manualmente, reaproveita convenções já
-   * existentes: `touch-action: none|pan-y` é como todo arrasto horizontal próprio do app (o
-   * calendário de Peso, o visualizador de fotos) já se marca pra desativar o gesto nativo do
-   * navegador; e qualquer faixa com `overflow-x: auto/scroll` que realmente role (miniaturas de
-   * foto, anéis de macro etc.) também bloqueia. Sheets/diálogos abertos por cima também bloqueiam,
-   * senão um swipe passando por cima deles trocaria de módulo com o modal ainda aberto. */
-  function alvoBloqueiaSwipeAbas(alvo: EventTarget | null): boolean {
-    let el = alvo instanceof Element ? alvo : null;
-    while (el && el !== document.body) {
-      if (el instanceof HTMLElement) {
-        const estilo = getComputedStyle(el);
-        if (estilo.touchAction === "none" || estilo.touchAction === "pan-y") return true;
-        if ((estilo.overflowX === "auto" || estilo.overflowX === "scroll") && el.scrollWidth > el.clientWidth + 1) {
-          return true;
-        }
-        if (
-          el.classList.contains("sheet-overlay") ||
-          el.classList.contains("confirm-overlay") ||
-          el.classList.contains("alert-overlay")
-        ) {
-          return true;
-        }
-      }
-      el = el.parentElement;
-    }
-    return false;
-  }
-
-  function aoPointerDownAbas(e: PointerEvent): void {
-    // Mesma condição que já esconde BottomNav/TreinoMinimizado (rotina ao vivo, comparação de
-    // fotos): nessas telas cheias, um swipe lateral não deve trocar de módulo escondido atrás.
-    if (!mostrarFlutuantes) return;
-    if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (alvoBloqueiaSwipeAbas(e.target)) {
-      swipeAbasInicioX = null;
-      swipeAbasInicioY = null;
-      return;
-    }
+  function iniciarSwipeAbas(e: PointerEvent): void {
     swipeAbasInicioX = e.clientX;
-    swipeAbasInicioY = e.clientY;
-    swipeAbasDecisao = null;
   }
 
-  /** Decide, nos primeiros px de movimento, se o gesto é horizontal (troca de módulo) ou vertical
-   * (rolagem normal da página) — e só then chama preventDefault, e só pro caso horizontal, pra não
-   * atrapalhar a rolagem vertical nativa quando é isso que o usuário está fazendo. */
-  function aoPointerMoveAbas(e: PointerEvent): void {
-    if (swipeAbasInicioX == null || swipeAbasInicioY == null) return;
-    if (swipeAbasDecisao === "vertical") return;
+  function finalizarSwipeAbas(e: PointerEvent): void {
+    if (swipeAbasInicioX == null) return;
     const dx = e.clientX - swipeAbasInicioX;
-    const dy = e.clientY - swipeAbasInicioY;
-    if (swipeAbasDecisao == null) {
-      if (Math.abs(dx) < LIMIAR_DECISAO_SWIPE_ABAS_PX && Math.abs(dy) < LIMIAR_DECISAO_SWIPE_ABAS_PX) return;
-      swipeAbasDecisao = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
-      if (swipeAbasDecisao === "vertical") return;
-    }
-    e.preventDefault();
-  }
-
-  function aoPointerUpAbas(e: PointerEvent): void {
-    if (swipeAbasInicioX == null || swipeAbasInicioY == null) return;
-    const dx = e.clientX - swipeAbasInicioX;
-    const decisaoHorizontal = swipeAbasDecisao === "horizontal";
     swipeAbasInicioX = null;
-    swipeAbasInicioY = null;
-    swipeAbasDecisao = null;
-    if (!decisaoHorizontal) return;
     if (Math.abs(dx) < LIMIAR_SWIPE_ABAS_PX) return;
     const indiceAtual = ABAS_SWIPE.findIndex((a) => a.chave === abaAtiva);
     if (indiceAtual === -1) return;
@@ -129,10 +66,8 @@
     navigate(ABAS_SWIPE[proximo].caminho);
   }
 
-  function aoPointerCancelAbas(): void {
+  function cancelarSwipeAbas(): void {
     swipeAbasInicioX = null;
-    swipeAbasInicioY = null;
-    swipeAbasDecisao = null;
   }
 
   let blockedAlertShown = false;
@@ -166,20 +101,11 @@
   {#if mostrarFlutuantes && treinoLogSessao.atual}
     <TreinoTopoFixo />
   {/if}
-  <div
-    class="abas-swipe"
-    role="presentation"
-    onpointerdown={aoPointerDownAbas}
-    onpointermove={aoPointerMoveAbas}
-    onpointerup={aoPointerUpAbas}
-    onpointercancel={aoPointerCancelAbas}
-  >
-    <div hidden={abaAtiva !== "home"}><Home /></div>
-    <div hidden={abaAtiva !== "treino"}><Treino /></div>
-    <div hidden={abaAtiva !== "peso"}><Peso /></div>
-    <div hidden={abaAtiva !== "dieta"}><Dieta /></div>
-    <div hidden={abaAtiva !== "fotos"}><Fotos /></div>
-  </div>
+  <div hidden={abaAtiva !== "home"}><Home /></div>
+  <div hidden={abaAtiva !== "treino"}><Treino /></div>
+  <div hidden={abaAtiva !== "peso"}><Peso /></div>
+  <div hidden={abaAtiva !== "dieta"}><Dieta /></div>
+  <div hidden={abaAtiva !== "fotos"}><Fotos /></div>
   {#if abaAtiva === "configurar"}
     <HomeParametrizacao />
   {/if}
@@ -187,12 +113,40 @@
     {#if treinoLogSessao.atual}
       <TreinoMinimizado />
     {/if}
+    <div
+      class="swipe-borda esquerda"
+      role="presentation"
+      onpointerdown={iniciarSwipeAbas}
+      onpointerup={finalizarSwipeAbas}
+      onpointercancel={cancelarSwipeAbas}
+    ></div>
+    <div
+      class="swipe-borda direita"
+      role="presentation"
+      onpointerdown={iniciarSwipeAbas}
+      onpointerup={finalizarSwipeAbas}
+      onpointercancel={cancelarSwipeAbas}
+    ></div>
     <BottomNav />
   {/if}
   <Toast />
 {/if}
 
 <style>
+  .swipe-borda {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    z-index: 45;
+    touch-action: pan-y;
+  }
+  .swipe-borda.esquerda {
+    left: 0;
+  }
+  .swipe-borda.direita {
+    right: 0;
+  }
   .loading {
     min-height: 100vh;
     display: flex;
