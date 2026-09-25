@@ -30,6 +30,29 @@
     navigate("/");
   }
 
+  let enviandoRecuperacao = $state(false);
+
+  /** Manda o link de recuperação — funciona mesmo pra uma conta que só logou via Google
+   * até agora (nunca teve senha): o clique no link cria uma sessão de recovery
+   * (evento PASSWORD_RECOVERY, ver auth.svelte.ts) e deixa DEFINIR a primeira senha,
+   * não só redefinir uma já existente. Sempre abre no navegador comum (link de
+   * e-mail não sabe voltar pro app nativo) — depois de definir a senha lá, entra
+   * pelo app com email/senha normalmente. */
+  async function esqueciSenha() {
+    if (!ALLOWED_EMAILS.includes(email)) {
+      alert("Preenche o campo Email com o seu email antes de pedir o link.");
+      return;
+    }
+    enviandoRecuperacao = true;
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    enviandoRecuperacao = false;
+    if (error) {
+      alert("Erro ao enviar o link: " + error.message);
+      return;
+    }
+    alert("Link enviado pro seu email. Abra ele no navegador pra definir a senha.");
+  }
+
   /** No app nativo, o Google bloqueia login dele dentro da WebView embutida (detecta e
    * joga o fluxo pra fora, pro navegador do sistema, que não sabia voltar pro app —
    * era isso que abandonava o usuário no Chrome antes). O caminho certo pra app
@@ -77,6 +100,9 @@
         />
         <Button type="submit" disabled={loading}>Entrar</Button>
       </form>
+      <button type="button" class="link-esqueci" onclick={esqueciSenha} disabled={enviandoRecuperacao}>
+        Esqueci minha senha
+      </button>
       <div class="divider">ou</div>
       <Button variant="secondary" onclick={loginGoogle}>Entrar com Google</Button>
     </Card>
@@ -126,5 +152,20 @@
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
     margin: var(--space-2) 0;
+  }
+  .link-esqueci {
+    display: block;
+    margin: var(--space-3) auto 0;
+    border: none;
+    background: none;
+    color: var(--color-primary);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    padding: 0;
+  }
+  .link-esqueci:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

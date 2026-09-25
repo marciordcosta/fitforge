@@ -11,6 +11,7 @@
   import TreinoTopoFixo from "./components/TreinoTopoFixo.svelte";
   import Toast from "./components/Toast.svelte";
   import Login from "./routes/login/Login.svelte";
+  import RedefinirSenha from "./routes/login/RedefinirSenha.svelte";
   import Home from "./routes/Home.svelte";
   import HomeParametrizacao from "./routes/home/HomeParametrizacao.svelte";
   import Treino from "./routes/treino/Treino.svelte";
@@ -123,6 +124,8 @@
 
 {#if auth.loading}
   <div class="loading">Carregando…</div>
+{:else if auth.emRecuperacao}
+  <RedefinirSenha />
 {:else if router.path === "/login"}
   <Login />
 {:else if auth.user && auth.isAllowed}

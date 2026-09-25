@@ -17,6 +17,10 @@ export const OAUTH_REDIRECT_NATIVO = "com.marciocosta.fitforge://login-callback"
 
 let user = $state<User | null>(null);
 let loading = $state(true);
+/** Sessão criada a partir de um link de recuperação de senha (ver "Esqueci minha senha" em
+ * Login.svelte) — enquanto true, App.svelte mostra o formulário de nova senha em vez do resto do
+ * app, mesmo já "logado" tecnicamente (a sessão de recovery é uma sessão de verdade). */
+let emRecuperacao = $state(false);
 
 async function init(): Promise<void> {
   // getSession() lê a sessão já persistida localmente pelo supabase-js, sem rede —
@@ -43,8 +47,9 @@ async function init(): Promise<void> {
     // onAuthStateChange cobre qualquer mudança real assim que a rede voltar.
   });
 
-  supabase.auth.onAuthStateChange((_event, session) => {
+  supabase.auth.onAuthStateChange((event, session) => {
     user = session?.user ?? null;
+    if (event === "PASSWORD_RECOVERY") emRecuperacao = true;
   });
 }
 
@@ -80,6 +85,12 @@ export const auth = {
   },
   get isAllowed(): boolean {
     return !!user?.email && ALLOWED_EMAILS.includes(user.email);
+  },
+  get emRecuperacao(): boolean {
+    return emRecuperacao;
+  },
+  concluirRecuperacao(): void {
+    emRecuperacao = false;
   },
 };
 
