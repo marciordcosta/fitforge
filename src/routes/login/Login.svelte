@@ -1,9 +1,18 @@
 <script lang="ts">
+  import { Capacitor } from "@capacitor/core";
   import Card from "../../components/Card.svelte";
   import Button from "../../components/Button.svelte";
   import { supabase } from "../../lib/supabase";
   import { ALLOWED_EMAILS } from "../../lib/auth.svelte";
   import { navigate } from "../../lib/router.svelte";
+
+  /** O Google bloqueia ativamente login dele dentro de WebViews embarcadas (é assim que
+   * o app roda instalado como .apk) — detecta e joga o fluxo pra fora, pro navegador do
+   * sistema, que não sabe voltar pro app nativo depois. Sem isso, "Entrar com Google" no
+   * app instalado só abandonava o usuário no Chrome. Login por email/senha continua
+   * igual nos dois. Uma versão nativa de verdade do Google Sign-In (com deep link de
+   * volta) fica pra outra hora, se precisar. */
+  const mostrarGoogle = !Capacitor.isNativePlatform();
 
   let email = $state("");
   let senha = $state("");
@@ -57,8 +66,10 @@
         />
         <Button type="submit" disabled={loading}>Entrar</Button>
       </form>
-      <div class="divider">ou</div>
-      <Button variant="secondary" onclick={loginGoogle}>Entrar com Google</Button>
+      {#if mostrarGoogle}
+        <div class="divider">ou</div>
+        <Button variant="secondary" onclick={loginGoogle}>Entrar com Google</Button>
+      {/if}
     </Card>
   </div>
 </div>

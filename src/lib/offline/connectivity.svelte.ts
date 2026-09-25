@@ -16,24 +16,37 @@ function notificar(): void {
   for (const cb of ouvintes) cb();
 }
 
-if (Capacitor.isNativePlatform()) {
-  void Network.getStatus().then((status) => {
-    estaOnline = status.connected;
-  });
-  void Network.addListener("networkStatusChange", (status) => {
-    const ficouOnline = status.connected && !estaOnline;
-    estaOnline = status.connected;
-    if (ficouOnline) notificar();
-  });
-} else if (typeof window !== "undefined") {
-  estaOnline = navigator.onLine;
-  window.addEventListener("online", () => {
-    estaOnline = true;
-    notificar();
-  });
-  window.addEventListener("offline", () => {
-    estaOnline = false;
-  });
+// Tudo aqui dentro roda no carregamento do módulo (bem no boot do app) — qualquer
+// exceção não tratada nesse ponto pode travar o app inteiro numa tela em branco, então
+// tanto a checagem de plataforma quanto as chamadas do plugin nativo vão blindadas.
+try {
+  if (Capacitor.isNativePlatform()) {
+    Network.getStatus()
+      .then((status) => {
+        estaOnline = status.connected;
+      })
+      .catch(() => {
+        // Sem informação do plugin — assume online (comportamento anterior a essa
+        // infraestrutura) em vez de travar o app tentando de novo.
+      });
+    Network.addListener("networkStatusChange", (status) => {
+      const ficouOnline = status.connected && !estaOnline;
+      estaOnline = status.connected;
+      if (ficouOnline) notificar();
+    }).catch(() => {});
+  } else if (typeof window !== "undefined") {
+    estaOnline = navigator.onLine;
+    window.addEventListener("online", () => {
+      estaOnline = true;
+      notificar();
+    });
+    window.addEventListener("offline", () => {
+      estaOnline = false;
+    });
+  }
+} catch {
+  // Ambiente sem os globais esperados (SSR, teste, plugin não disponível) — mantém o
+  // valor padrão (online) em vez de derrubar o app.
 }
 
 export const conectividade = {
