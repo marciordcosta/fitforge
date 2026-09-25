@@ -879,9 +879,8 @@ export async function garantirRefeicoesPadraoDoDia(data: string): Promise<Refeic
  * Se já tiver refeições mas alguma foi criada antes de existir uma lista específica pro dia (ou de
  * uma mudança na Ondulatória, ou porque a refeição foi renomeada/excluída no catálogo depois) e não
  * pertence mais à lista efetiva de hoje, remove — só quando ainda está vazia, nunca uma que já tem
- * alimento lançado; nesse caso a linha órfã (nome antigo) fica, mas nunca é a que aparece pro
- * usuário editar/ver dados errados, porque `garantirRefeicoesPadraoDoDiaImpl` sempre recria a
- * versão atual do catálogo em seguida. */
+ * alimento lançado — e recria quem ficou faltando (removida agora, ou que nunca tinha sido criada
+ * ainda) na versão atual do catálogo, pra nunca devolver uma lista incompleta. */
 async function garantirRefeicoesPadraoDoDiaImpl(data: string): Promise<RefeicaoDia[]> {
   const existentes = await getRefeicoesDoDia(data);
   const diaSemana = parseISODate(data).getDay();
@@ -899,16 +898,26 @@ async function garantirRefeicoesPadraoDoDiaImpl(data: string): Promise<RefeicaoD
     // trava nunca pegava esse caso: a linha do dia ficava travada pra sempre com o nome/valores de
     // antes do renomear, nunca refletindo a edição feita em Gerenciar Refeições.
     const extras = existentes.filter((r) => !nomesEfetivos.has(r.nome));
+    let listaAtual = existentes;
     if (extras.length) {
       const itensHoje = await getDiarioDoDia(data);
       const idsComItens = new Set(itensHoje.map((i) => i.refeicaoId));
       const remover = extras.filter((r) => !idsComItens.has(r.id));
       if (remover.length) {
         await Promise.all(remover.map((r) => removerRefeicaoDia(r.id)));
-        return getRefeicoesDoDia(data);
+        listaAtual = await getRefeicoesDoDia(data);
       }
     }
-    return existentes;
+    // O que sobrou removido (linha órfã com item lançado, fica mesmo) mais o que nunca tinha sido
+    // criado pra hoje (dia mudou de Ondulatória, refeição nova no catálogo etc.) — sem isso, uma
+    // refeição removida acima simplesmente sumia da lista em vez de reaparecer com o nome novo.
+    const nomesAtuais = new Set(listaAtual.map((r) => r.nome));
+    const faltando = catalogoEfetivo.map((m, i) => ({ m, i })).filter(({ m }) => !nomesAtuais.has(m.nome));
+    if (faltando.length) {
+      await Promise.all(faltando.map(({ m, i }) => criarRefeicaoDia(data, m.nome, i)));
+      return getRefeicoesDoDia(data);
+    }
+    return listaAtual;
   }
 
   if (!catalogoEfetivo.length) return existentes;
