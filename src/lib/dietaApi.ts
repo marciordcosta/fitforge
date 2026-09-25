@@ -376,8 +376,12 @@ export async function getMetaRefeicaoPorNome(nome: string, data?: string): Promi
   let modelo: RefeicaoModelo | null;
   if (data != null) {
     const diaSemana = parseISODate(data).getDay();
-    const [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
-    modelo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia).find((m) => m.nome === nome) ?? null;
+    const [catalogo, modelosPorDia, metasDia] = await Promise.all([
+      listRefeicoesModelo(),
+      listRefeicoesModeloDia(),
+      listMetasDiaModelo(),
+    ]);
+    modelo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia, metasDia).find((m) => m.nome === nome) ?? null;
   } else {
     const { data: linhas, error } = await supabase
       .from("dieta_refeicoes_modelo")
@@ -799,19 +803,33 @@ export interface RefeicaoDia {
 /** Lista efetiva do catálogo pra esse dia da semana (Ondulatória): usa a lista/ordem específica
  * desse grupo de dias se houver (só as refeições incluídas nela); senão cai pro catálogo global
  * inteiro, na ordem global — mesma resolução de modelosDoDia em Gerenciar > Refeições. */
+/** `metasDia`: overrides de NOME por dia (Ondulatória, "renomear só pra esses dias" — ver
+ * MetaDiaModelo/nomeEfetivo em DietaRefeicoesGerenciar.svelte). Sem isso aqui, a lista efetiva
+ * sempre usava o nome global mesmo quando o dia tem um nome próprio configurado — Gerenciar
+ * Refeições mostrava o nome do dia, mas o Diário materializava/procurava a refeição pelo nome
+ * global, nunca batendo os dois. */
 function resolverCatalogoEfetivoDoDia(
   diaSemana: number,
   catalogo: RefeicaoModelo[],
   modelosPorDia: RefeicaoModeloDia[],
+  metasDia: MetaDiaModelo[] = [],
 ): RefeicaoModelo[] {
+  const nomePorModelo = new Map(
+    metasDia.filter((m) => m.diaSemana === diaSemana && m.nome != null).map((m) => [m.modeloId, m.nome as string]),
+  );
+  const comNomeEfetivo = (m: RefeicaoModelo): RefeicaoModelo => {
+    const nomeOverride = nomePorModelo.get(m.id);
+    return nomeOverride ? { ...m, nome: nomeOverride } : m;
+  };
   const linhasDoDia = modelosPorDia.filter((r) => r.diaSemana === diaSemana);
-  if (!linhasDoDia.length) return catalogo;
+  if (!linhasDoDia.length) return catalogo.map(comNomeEfetivo);
   const porId = new Map(catalogo.map((m) => [m.id, m]));
   return linhasDoDia
     .slice()
     .sort((a, b) => a.ordem - b.ordem)
     .map((r) => porId.get(r.modeloId))
-    .filter((m): m is RefeicaoModelo => !!m);
+    .filter((m): m is RefeicaoModelo => !!m)
+    .map(comNomeEfetivo);
 }
 
 /** Ordem própria de cada refeição DENTRO DO DIA (coluna `ordem`, arrastar/setas na Home) — fixada
@@ -867,8 +885,12 @@ export async function garantirRefeicoesPadraoDoDia(data: string): Promise<Refeic
 async function garantirRefeicoesPadraoDoDiaImpl(data: string): Promise<RefeicaoDia[]> {
   const existentes = await getRefeicoesDoDia(data);
   const diaSemana = parseISODate(data).getDay();
-  const [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
-  const catalogoEfetivo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia);
+  const [catalogo, modelosPorDia, metasDia] = await Promise.all([
+    listRefeicoesModelo(),
+    listRefeicoesModeloDia(),
+    listMetasDiaModelo(),
+  ]);
+  const catalogoEfetivo = resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia, metasDia);
 
   if (existentes.length) {
     const nomesEfetivos = new Set(catalogoEfetivo.map((m) => m.nome));
