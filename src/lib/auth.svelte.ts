@@ -56,11 +56,18 @@ void init();
 // appUrlOpen (intent-filter da MainActivity), não como navegação normal da página.
 if (Capacitor.isNativePlatform()) {
   CapApp.addListener("appUrlOpen", ({ url }) => {
-    if (!url.startsWith(OAUTH_REDIRECT_NATIVO)) return;
+    // TEMPORÁRIO — diagnóstico do login com Google (ver conversa): sem acesso a log
+    // real do celular, esses alerts mostram na tela exatamente onde o fluxo trava.
+    // Remover depois de confirmar que está funcionando.
+    if (!url.startsWith(OAUTH_REDIRECT_NATIVO)) {
+      alert("[debug] Deep link recebido, mas não é o de login:\n" + url);
+      return;
+    }
     void Browser.close();
-    void supabase.auth.exchangeCodeForSession(url).catch((e) => {
-      alert("Erro ao concluir login com Google: " + (e as Error).message);
-    });
+    supabase.auth.exchangeCodeForSession(url).then(
+      () => alert("[debug] Login com Google concluído!"),
+      (e) => alert("[debug] Erro ao concluir login com Google: " + (e as Error).message),
+    );
   });
 }
 
