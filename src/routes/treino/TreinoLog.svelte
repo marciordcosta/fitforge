@@ -3,6 +3,8 @@
   import { mostrarToast } from "../../lib/toast.svelte";
   import { hojeISO } from "../../lib/dates";
   import { formatMinSeg } from "../../lib/tempo";
+  import { conectividade } from "../../lib/offline/connectivity.svelte";
+  import { enfileirar } from "../../lib/offline/queue";
   import {
     getTreino,
     listTreinos,
@@ -13,6 +15,7 @@
     salvarRegistrosDoDia,
     salvarDuracaoSessao,
     salvarExerciciosRotina,
+    type ItemRotina,
     updateDescansoTreinoExercicio,
     getObservacoesAtuais,
     salvarObservacaoExercicio,
@@ -947,15 +950,46 @@
     return inicio != null ? Math.round((Date.now() - inicio) / 1000) : null;
   }
 
+  /** Salva a conclusão do treino (registros + duração + opcionalmente a atualização da
+   * rotina). Com sinal, tenta direto como sempre — se a tentativa falhar por queda de
+   * conexão no meio (não por um erro de verdade, ex: validação), ou se já estava
+   * offline antes de tentar, enfileira as mesmas 3 operações pra rodar sozinhas
+   * quando a conexão voltar (ver lib/offline/syncEngine.ts), sem bloquear o usuário
+   * esperando rede que não vai responder. Um erro que acontece mesmo com sinal
+   * (ex: validação do servidor) sobe pra quem chamou tratar como sempre. */
+  async function salvarOuEnfileirarConclusao(itensRotina: ItemRotina[] | null): Promise<void> {
+    const data = hojeISO();
+    const registros = registrosDoDiaAtual();
+    const duracao = duracaoSegundosAtual();
+
+    if (conectividade.online) {
+      try {
+        await salvarRegistrosDoDia(treinoId, data, registros);
+        await salvarDuracaoSessao(treinoId, data, duracao);
+        if (itensRotina) await salvarExerciciosRotina(treinoId, itensRotina);
+        mostrarToast("Salvo");
+        return;
+      } catch (e) {
+        if (conectividade.online) throw e;
+        // Caiu a conexão no meio da tentativa — cai pro enfileiramento abaixo.
+      }
+    }
+
+    await enfileirar("treino:salvarRegistrosDoDia", [treinoId, data, registros], `Registros de ${nomeTreino} em ${data}`);
+    await enfileirar("treino:salvarDuracaoSessao", [treinoId, data, duracao], `Duração de ${nomeTreino} em ${data}`);
+    if (itensRotina) {
+      await enfileirar("treino:salvarExerciciosRotina", [treinoId, itensRotina], `Atualização da rotina ${nomeTreino}`);
+    }
+    mostrarToast("Salvo — sincroniza quando voltar a conexão");
+  }
+
   async function confirmarConcluirTreino() {
     mostrarConfirmConcluir = false;
     salvando = true;
     try {
-      await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
-      await salvarDuracaoSessao(treinoId, hojeISO(), duracaoSegundosAtual());
+      await salvarOuEnfileirarConclusao(null);
       finalizado = true;
       treinoLogSessao.limpar();
-      mostrarToast("Salvo");
       voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);
@@ -967,12 +1001,8 @@
     mostrarEscolhaEstrutura = false;
     salvando = true;
     try {
-      await salvarRegistrosDoDia(treinoId, hojeISO(), registrosDoDiaAtual());
-      await salvarDuracaoSessao(treinoId, hojeISO(), duracaoSegundosAtual());
-      if (salvarNaRotina) {
-        await salvarExerciciosRotina(
-          treinoId,
-          sessao.map((ex) => ({
+      const itensRotina = salvarNaRotina
+        ? sessao.map((ex) => ({
             exercicio_id: ex.exercicio_id,
             descanso_seg: ex.descanso_seg,
             series: ex.sets.map((s) => ({
@@ -981,12 +1011,11 @@
               rep_min: s.repMin,
               rep_max: s.repMax,
             })),
-          })),
-        );
-      }
+          }))
+        : null;
+      await salvarOuEnfileirarConclusao(itensRotina);
       finalizado = true;
       treinoLogSessao.limpar();
-      mostrarToast("Salvo");
       voltar(origemPadrao);
     } catch (e) {
       mostrarAlerta("Erro ao salvar: " + (e as Error).message);

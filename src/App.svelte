@@ -3,6 +3,9 @@
   import { router, navigate } from "./lib/router.svelte";
   import { auth, logout } from "./lib/auth.svelte";
   import { treinoLogSessao } from "./lib/treinoLogSessao.svelte";
+  import { iniciarSyncEngine, configurarAvisoFalha } from "./lib/offline/syncEngine";
+  import { filaSincronizacao } from "./lib/offline/queue";
+  import { mostrarToast } from "./lib/toast.svelte";
   import BottomNav from "./components/BottomNav.svelte";
   import TreinoMinimizado from "./components/TreinoMinimizado.svelte";
   import TreinoTopoFixo from "./components/TreinoTopoFixo.svelte";
@@ -87,6 +90,14 @@
     abaAnterior = atual;
   });
 
+  // Fila de sincronização (offline/queue.ts): drena sozinha quando a conexão volta — ver
+  // lib/offline/syncEngine.ts. Uma operação que falha de verdade (não por falta de rede)
+  // depois de várias tentativas avisa aqui, num toast simples.
+  configurarAvisoFalha((descricao, erro) => {
+    mostrarToast(`Não sincronizou: ${descricao} — ${erro.message}`, 5000);
+  });
+  iniciarSyncEngine();
+
   let blockedAlertShown = false;
 
   $effect(() => {
@@ -146,6 +157,11 @@
     ></div>
     <BottomNav />
   {/if}
+  {#if filaSincronizacao.pendentes > 0}
+    <div class="pendente-sync" role="status">
+      {filaSincronizacao.pendentes} {filaSincronizacao.pendentes === 1 ? "alteração" : "alterações"} não sincronizada{filaSincronizacao.pendentes === 1 ? "" : "s"}
+    </div>
+  {/if}
   <Toast />
 {/if}
 
@@ -199,5 +215,22 @@
     align-items: center;
     justify-content: center;
     color: var(--surface-muted);
+  }
+  .pendente-sync {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--bottom-nav-height, 0px) + var(--space-4) + 44px);
+    transform: translateX(-50%);
+    background: var(--surface-card);
+    color: var(--surface-muted);
+    border: 1px solid var(--surface-border);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-float);
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 399;
+    white-space: nowrap;
+    pointer-events: none;
   }
 </style>

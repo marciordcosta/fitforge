@@ -4,6 +4,7 @@ import { DIAS_SEMANA_ABREV, segundaDaSemana } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
 import { parseISODate, somarDias } from "./dates";
 import { marcarDietaDesatualizada } from "./dietaInvalidacao.svelte";
+import { comCache } from "./offline/cache";
 
 function uid(): string {
   const id = auth.user?.id;
@@ -1032,13 +1033,15 @@ const ITEM_DIARIO_SELECT =
 
 /** Todos os itens logados num dia, de todas as refeições — usado pra montar a prévia dos cards na tela principal. */
 export async function getDiarioDoDia(data: string): Promise<ItemDiario[]> {
-  const { data: linhas, error } = await supabase
-    .from("diario_alimentos")
-    .select(ITEM_DIARIO_SELECT)
-    .eq("data", data)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (linhas ?? []).map((l) => mapItemDiario(l as Record<string, unknown>));
+  return comCache(`dieta:getDiarioDoDia:${data}`, async () => {
+    const { data: linhas, error } = await supabase
+      .from("diario_alimentos")
+      .select(ITEM_DIARIO_SELECT)
+      .eq("data", data)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (linhas ?? []).map((l) => mapItemDiario(l as Record<string, unknown>));
+  });
 }
 
 export async function getItemDiario(id: string): Promise<ItemDiario | null> {
@@ -1705,26 +1708,28 @@ export async function trocarCaloriasEntreDias(data: string, diaA: number, diaB: 
  * o override, que só se aplica a uma data concreta, não a um dia da semana abstrato).
  */
 export async function getMetasDoDia(data: string): Promise<MetasDiarias> {
-  const modo = await getModoCalorias();
-  if (modo === "ondulatoria") {
-    const semanaInicio = segundaDaSemana(data);
-    const overrides = await listOverrideSemanaDieta(semanaInicio);
-    if (overrides.length) {
-      const diaSemana = parseISODate(data).getDay();
-      const doDia = overrides.find((o) => o.diaSemana === diaSemana);
-      if (doDia) {
-        const perfil = await getPerfilDietaEditavel();
-        const { proteinaG } = await resolverProteinaGordura(perfil);
-        return {
-          calorias: doDia.calorias,
-          proteinaG,
-          gorduraG: doDia.gorduraG,
-          carboidratoG: carboidratoGDoDia(doDia.calorias, proteinaG, doDia.gorduraG),
-        };
+  return comCache(`dieta:getMetasDoDia:${data}`, async () => {
+    const modo = await getModoCalorias();
+    if (modo === "ondulatoria") {
+      const semanaInicio = segundaDaSemana(data);
+      const overrides = await listOverrideSemanaDieta(semanaInicio);
+      if (overrides.length) {
+        const diaSemana = parseISODate(data).getDay();
+        const doDia = overrides.find((o) => o.diaSemana === diaSemana);
+        if (doDia) {
+          const perfil = await getPerfilDietaEditavel();
+          const { proteinaG } = await resolverProteinaGordura(perfil);
+          return {
+            calorias: doDia.calorias,
+            proteinaG,
+            gorduraG: doDia.gorduraG,
+            carboidratoG: carboidratoGDoDia(doDia.calorias, proteinaG, doDia.gorduraG),
+          };
+        }
       }
     }
-  }
-  return getMetasDoDiaSemana(parseISODate(data).getDay());
+    return getMetasDoDiaSemana(parseISODate(data).getDay());
+  });
 }
 
 /** Mesma resolução de getMetasDoDia, mas recebendo o dia da semana (0-6) diretamente em vez de
@@ -1779,9 +1784,11 @@ export async function getMetasDoDiaSemana(diaSemana: number): Promise<MetasDiari
 // ---------------- Saldo calórico acumulado (Parametrização > Calorias > Acumular calorias) ----------------
 
 export async function getAcumularCalorias(): Promise<{ ativo: boolean; diaReset: number | null }> {
-  const { data, error } = await supabase.from("dieta_perfil").select("acumular_calorias, dia_reset_saldo_calorico").maybeSingle();
-  if (error) throw error;
-  return { ativo: data?.acumular_calorias ?? false, diaReset: (data?.dia_reset_saldo_calorico as number | null) ?? null };
+  return comCache("dieta:getAcumularCalorias", async () => {
+    const { data, error } = await supabase.from("dieta_perfil").select("acumular_calorias, dia_reset_saldo_calorico").maybeSingle();
+    if (error) throw error;
+    return { ativo: data?.acumular_calorias ?? false, diaReset: (data?.dia_reset_saldo_calorico as number | null) ?? null };
+  });
 }
 
 export async function salvarAcumularCalorias(ativo: boolean, diaReset: number | null): Promise<void> {
@@ -1797,9 +1804,11 @@ export async function salvarAcumularCalorias(ativo: boolean, diaReset: number | 
 /** Deltas de carboidrato (g) já aplicados às refeições NESSA data, por nome de refeição — vazio se
  * o saldo daquele dia ainda não foi diluído. */
 export async function getDeltasRefeicaoDoDia(data: string): Promise<Map<string, number>> {
-  const { data: linhas, error } = await supabase.from("dieta_saldo_refeicao").select("refeicao_nome, delta_carboidrato_g").eq("data", data);
-  if (error) throw error;
-  return new Map((linhas ?? []).map((l) => [l.refeicao_nome as string, l.delta_carboidrato_g as number]));
+  return comCache(`dieta:getDeltasRefeicaoDoDia:${data}`, async () => {
+    const { data: linhas, error } = await supabase.from("dieta_saldo_refeicao").select("refeicao_nome, delta_carboidrato_g").eq("data", data);
+    if (error) throw error;
+    return new Map((linhas ?? []).map((l) => [l.refeicao_nome as string, l.delta_carboidrato_g as number]));
+  });
 }
 
 /** Substitui de uma vez a diluição inteira de um dia (delete+insert, mesmo padrão do resto do
@@ -1882,34 +1891,36 @@ function diaDeResetMaisRecente(data: string, diaReset: number): string {
  * valor naquele ponto e ignora tudo antes dele, continuando a acumular normalmente dali em diante.
  */
 export async function getSaldoCaloricoEntrando(data: string): Promise<number> {
-  const { ativo, diaReset } = await getAcumularCalorias();
-  if (!ativo || diaReset == null) return 0;
-  if (parseISODate(data).getDay() === diaReset) return 0;
+  return comCache(`dieta:getSaldoCaloricoEntrando:${data}`, async () => {
+    const { ativo, diaReset } = await getAcumularCalorias();
+    if (!ativo || diaReset == null) return 0;
+    if (parseISODate(data).getDay() === diaReset) return 0;
 
-  const ontem = somarDias(data, -1);
-  const inicio = diaDeResetMaisRecente(ontem, diaReset);
-  const dias: string[] = [];
-  for (let d = inicio; d <= ontem; d = somarDias(d, 1)) dias.push(d);
-  if (!dias.length) return 0;
+    const ontem = somarDias(data, -1);
+    const inicio = diaDeResetMaisRecente(ontem, diaReset);
+    const dias: string[] = [];
+    for (let d = inicio; d <= ontem; d = somarDias(d, 1)) dias.push(d);
+    if (!dias.length) return 0;
 
-  const [metasPorDia, consumidoPorDia, diluidoPorDia, ajustesPorDia] = await Promise.all([
-    Promise.all(dias.map((d) => getMetasDoDia(d))),
-    getCaloriasConsumidasPorDia(inicio, data),
-    getSaldoDiluidoPorDia(inicio, data),
-    getAjustesPorDia(inicio, data),
-  ]);
+    const [metasPorDia, consumidoPorDia, diluidoPorDia, ajustesPorDia] = await Promise.all([
+      Promise.all(dias.map((d) => getMetasDoDia(d))),
+      getCaloriasConsumidasPorDia(inicio, data),
+      getSaldoDiluidoPorDia(inicio, data),
+      getAjustesPorDia(inicio, data),
+    ]);
 
-  let saldo = 0;
-  for (let i = 0; i < dias.length; i++) {
-    const d = dias[i];
-    const ajuste = ajustesPorDia.get(d);
-    if (ajuste != null) {
-      saldo = ajuste;
-    } else {
-      saldo += metasPorDia[i].calorias + (diluidoPorDia.get(d) ?? 0) - (consumidoPorDia.get(d) ?? 0);
+    let saldo = 0;
+    for (let i = 0; i < dias.length; i++) {
+      const d = dias[i];
+      const ajuste = ajustesPorDia.get(d);
+      if (ajuste != null) {
+        saldo = ajuste;
+      } else {
+        saldo += metasPorDia[i].calorias + (diluidoPorDia.get(d) ?? 0) - (consumidoPorDia.get(d) ?? 0);
+      }
     }
-  }
-  return saldo;
+    return saldo;
+  });
 }
 
 /** "Editar"/"Excluir" no card de saldo acumulado: corrige diretamente o saldo PENDENTE mostrado

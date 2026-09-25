@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { toISODate, parseISODate, hojeISO, somarDias } from "./dates";
+import { comCache } from "./offline/cache";
 
 export interface PesoRegistro {
   data: string;
@@ -30,15 +31,17 @@ export async function getPesoDoDia(data: string): Promise<number | null> {
 }
 
 export async function getPesosDoPeriodo(dataInicio: string, dataFim: string): Promise<PesoRegistro[]> {
-  const { data, error } = await supabase
-    .from("pesos")
-    .select("data, peso")
-    .eq("user_id", uid())
-    .gte("data", dataInicio)
-    .lte("data", dataFim)
-    .order("data", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  return comCache(`peso:getPesosDoPeriodo:${dataInicio}:${dataFim}`, async () => {
+    const { data, error } = await supabase
+      .from("pesos")
+      .select("data, peso")
+      .eq("user_id", uid())
+      .gte("data", dataInicio)
+      .lte("data", dataFim)
+      .order("data", { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  });
 }
 
 export async function salvarPeso(data: string, peso: number): Promise<void> {
@@ -136,22 +139,24 @@ export interface FotoGrupoData {
  * da aba Fotos. Um dia pode ter mais de uma foto (ordenadas por `ordem`), viram o carrossel na
  * tela de comparação. */
 export async function listFotosAgrupadas(): Promise<FotoGrupoData[]> {
-  const { data, error } = await supabase
-    .from("fotos")
-    .select("id, url, data_foto")
-    .eq("user_id", uid())
-    .order("data_foto", { ascending: false })
-    .order("ordem", { ascending: true });
-  if (error) throw error;
+  return comCache("peso:listFotosAgrupadas", async () => {
+    const { data, error } = await supabase
+      .from("fotos")
+      .select("id, url, data_foto")
+      .eq("user_id", uid())
+      .order("data_foto", { ascending: false })
+      .order("ordem", { ascending: true });
+    if (error) throw error;
 
-  const grupos: FotoGrupoData[] = [];
-  for (const linha of data ?? []) {
-    const item: FotoItem = { id: linha.id, path: linha.url, data: linha.data_foto };
-    const ultimo = grupos[grupos.length - 1];
-    if (ultimo && ultimo.data === item.data) ultimo.fotos.push(item);
-    else grupos.push({ data: item.data, fotos: [item] });
-  }
-  return grupos;
+    const grupos: FotoGrupoData[] = [];
+    for (const linha of data ?? []) {
+      const item: FotoItem = { id: linha.id, path: linha.url, data: linha.data_foto };
+      const ultimo = grupos[grupos.length - 1];
+      if (ultimo && ultimo.data === item.data) ultimo.fotos.push(item);
+      else grupos.push({ data: item.data, fotos: [item] });
+    }
+    return grupos;
+  });
 }
 
 /** Todas as fotos de um dia específico, na ordem salva — base do carrossel da tela de comparação
@@ -170,14 +175,16 @@ export async function getFotosDaData(data: string): Promise<FotoItem[]> {
 /** Dias com pelo menos uma foto dentro do período — usado pra marcar o indicador de foto na grade
  * do calendário de Peso, sem carregar as imagens em si (só as datas). */
 export async function getDiasComFoto(dataInicio: string, dataFim: string): Promise<Set<string>> {
-  const { data, error } = await supabase
-    .from("fotos")
-    .select("data_foto")
-    .eq("user_id", uid())
-    .gte("data_foto", dataInicio)
-    .lte("data_foto", dataFim);
-  if (error) throw error;
-  return new Set((data ?? []).map((l) => l.data_foto));
+  return comCache(`peso:getDiasComFoto:${dataInicio}:${dataFim}`, async () => {
+    const { data, error } = await supabase
+      .from("fotos")
+      .select("data_foto")
+      .eq("user_id", uid())
+      .gte("data_foto", dataInicio)
+      .lte("data_foto", dataFim);
+    if (error) throw error;
+    return new Set((data ?? []).map((l) => l.data_foto));
+  });
 }
 
 export async function getFotoPorId(id: string): Promise<FotoItem | null> {

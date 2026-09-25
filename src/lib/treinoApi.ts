@@ -1,6 +1,8 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { hojeISO, parseISODate, toISODate } from "./dates";
+import { comCache } from "./offline/cache";
+import { registrarOperacao } from "./offline/queue";
 
 export const PESOS_CONTRIBUICAO_PRESET = [1, 0.75, 0.5, 0.25] as const;
 
@@ -213,12 +215,14 @@ export async function deleteAgrupamentoMuscular(id: string): Promise<void> {
 const MUSCULO_SELECT = "id, nome, agrupamento_id, ordem, series_minimas, agrupamento:agrupamentos_musculares(id, nome, ordem)";
 
 export async function listMusculos(): Promise<Musculo[]> {
-  const { data, error } = await supabase
-    .from("musculos")
-    .select(MUSCULO_SELECT)
-    .order("ordem", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as unknown as Musculo[];
+  return comCache("treino:listMusculos", async () => {
+    const { data, error } = await supabase
+      .from("musculos")
+      .select(MUSCULO_SELECT)
+      .order("ordem", { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as unknown as Musculo[];
+  });
 }
 
 /**
@@ -759,14 +763,16 @@ function ordenarExercicios(treino: TreinoComExercicios): void {
 }
 
 export async function listTreinos(): Promise<TreinoComExercicios[]> {
-  const { data, error } = await supabase
-    .from("treinos")
-    .select(`id, nome_treino, dia_semana, ordem, composicao_atualizada_em, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
-    .order("ordem", { ascending: true });
-  if (error) throw error;
-  const treinos = (data ?? []) as unknown as TreinoComExercicios[];
-  treinos.forEach(ordenarExercicios);
-  return treinos;
+  return comCache("treino:listTreinos", async () => {
+    const { data, error } = await supabase
+      .from("treinos")
+      .select(`id, nome_treino, dia_semana, ordem, composicao_atualizada_em, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
+      .order("ordem", { ascending: true });
+    if (error) throw error;
+    const treinos = (data ?? []) as unknown as TreinoComExercicios[];
+    treinos.forEach(ordenarExercicios);
+    return treinos;
+  });
 }
 
 export async function getTreino(id: string): Promise<TreinoComExercicios | null> {
@@ -832,13 +838,15 @@ export interface TreinoOverrideDia {
  * do horário fixo — um dia dessa semana sem nenhuma linha aqui é um dia sem treino de propósito,
  * não "ainda não configurado". */
 export async function listOverrideSemana(semanaInicio: string): Promise<TreinoOverrideDia[]> {
-  const { data, error } = await supabase
-    .from("treino_semana_override")
-    .select("dia_semana, treino_id")
-    .eq("user_id", uid())
-    .eq("semana_inicio", semanaInicio);
-  if (error) throw error;
-  return (data ?? []).map((l) => ({ diaSemana: l.dia_semana as number, treinoId: l.treino_id as string }));
+  return comCache(`treino:listOverrideSemana:${semanaInicio}`, async () => {
+    const { data, error } = await supabase
+      .from("treino_semana_override")
+      .select("dia_semana, treino_id")
+      .eq("user_id", uid())
+      .eq("semana_inicio", semanaInicio);
+    if (error) throw error;
+    return (data ?? []).map((l) => ({ diaSemana: l.dia_semana as number, treinoId: l.treino_id as string }));
+  });
 }
 
 /** Substitui o override de UMA semana pelas linhas informadas (uma por combinação dia+treino; um
@@ -1337,6 +1345,19 @@ export async function salvarDuracaoSessao(treinoId: string | null, data: string,
   if (error) throw error;
 }
 
+// As 3 mutações do fluxo de finalizar treino (TreinoLog.svelte) registradas pra poder
+// rodar depois, via fila (offline/queue.ts), quando a tentativa direta falha por
+// falta de conexão — ver offline/syncEngine.ts.
+registrarOperacao("treino:salvarRegistrosDoDia", (...args: unknown[]) =>
+  salvarRegistrosDoDia(args[0] as string | null, args[1] as string, args[2] as Map<string, SetRegistro[]>),
+);
+registrarOperacao("treino:salvarDuracaoSessao", (...args: unknown[]) =>
+  salvarDuracaoSessao(args[0] as string | null, args[1] as string, args[2] as number | null),
+);
+registrarOperacao("treino:salvarExerciciosRotina", (...args: unknown[]) =>
+  salvarExerciciosRotina(args[0] as string, args[1] as ItemRotina[]),
+);
+
 export interface DiaComTreino {
   data: string;
   treinoId: string | null;
@@ -1345,28 +1366,30 @@ export interface DiaComTreino {
 
 /** Dias do período que têm ao menos um registro, com a rotina feita naquele dia (uma por dia; se houver mais de uma, pega a primeira). */
 export async function getDiasComTreino(dataInicio: string, dataFim: string): Promise<DiaComTreino[]> {
-  const { data, error } = await supabase
-    .from("treino_registros")
-    .select("data, treino_id, treinos(nome_treino)")
-    .gte("data", dataInicio)
-    .lte("data", dataFim);
-  if (error) throw error;
+  return comCache(`treino:getDiasComTreino:${dataInicio}:${dataFim}`, async () => {
+    const { data, error } = await supabase
+      .from("treino_registros")
+      .select("data, treino_id, treinos(nome_treino)")
+      .gte("data", dataInicio)
+      .lte("data", dataFim);
+    if (error) throw error;
 
-  const porDia = new Map<string, DiaComTreino>();
-  for (const r of data ?? []) {
-    if (porDia.has(r.data)) continue;
-    // O embed às vezes volta objeto, às vezes array (depende de como o PostgREST infere a
-    // relação) — cobre os dois formatos. Se o nome vier vazio mesmo com treino_id preenchido
-    // (linha órfã, nome em branco etc.), mostra "Treino" genérico em vez de sumir com o link.
-    const relacionado = r.treinos as unknown as { nome_treino: string } | { nome_treino: string }[] | null;
-    const nomeRelacionado = Array.isArray(relacionado) ? relacionado[0]?.nome_treino : relacionado?.nome_treino;
-    porDia.set(r.data, {
-      data: r.data,
-      treinoId: r.treino_id,
-      treinoNome: r.treino_id ? nomeRelacionado || "Treino" : "Treino avulso",
-    });
-  }
-  return Array.from(porDia.values());
+    const porDia = new Map<string, DiaComTreino>();
+    for (const r of data ?? []) {
+      if (porDia.has(r.data)) continue;
+      // O embed às vezes volta objeto, às vezes array (depende de como o PostgREST infere a
+      // relação) — cobre os dois formatos. Se o nome vier vazio mesmo com treino_id preenchido
+      // (linha órfã, nome em branco etc.), mostra "Treino" genérico em vez de sumir com o link.
+      const relacionado = r.treinos as unknown as { nome_treino: string } | { nome_treino: string }[] | null;
+      const nomeRelacionado = Array.isArray(relacionado) ? relacionado[0]?.nome_treino : relacionado?.nome_treino;
+      porDia.set(r.data, {
+        data: r.data,
+        treinoId: r.treino_id,
+        treinoNome: r.treino_id ? nomeRelacionado || "Treino" : "Treino avulso",
+      });
+    }
+    return Array.from(porDia.values());
+  });
 }
 
 export interface ExercicioRegistroDia {
@@ -1623,13 +1646,15 @@ export async function getRegistrosPorTreinoPeriodo(
   dataInicio: string,
   dataFim: string,
 ): Promise<{ treino_id: string | null; exercicio_id: string; data: string }[]> {
-  const { data, error } = await supabase
-    .from("treino_registros")
-    .select("treino_id, exercicio_id, data")
-    .gte("data", dataInicio)
-    .lte("data", dataFim);
-  if (error) throw error;
-  return data ?? [];
+  return comCache(`treino:getRegistrosPorTreinoPeriodo:${dataInicio}:${dataFim}`, async () => {
+    const { data, error } = await supabase
+      .from("treino_registros")
+      .select("treino_id, exercicio_id, data")
+      .gte("data", dataInicio)
+      .lte("data", dataFim);
+    if (error) throw error;
+    return data ?? [];
+  });
 }
 
 // ---------------- Parametrização (Distribuição): volume semanal e modo de fadiga por posição ----------------
@@ -1722,33 +1747,35 @@ export function classificarVolumeSemanal(v: number, p: ParametrosDistribuicao): 
 }
 
 export async function getParametrosDistribuicao(): Promise<ParametrosDistribuicao> {
-  const { data, error } = await supabase
-    .from("treino_parametros")
-    .select(
-      "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, campo_grade, grafico_campo, home_modo_grupos, destacar_exercicios_sem_rotina, ordenacao_home",
-    )
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return PARAMETROS_DISTRIBUICAO_PADRAO;
-  return {
-    seriesManutencaoMin: data.series_manutencao_min,
-    seriesManutencaoMax: data.series_manutencao_max,
-    seriesFocoMin: data.series_foco_min,
-    seriesFocoMax: data.series_foco_max,
-    fadigaModo: data.fadiga_modo === "gradual" ? "gradual" : "fases",
-    fadigaFasesCorteA: data.fadiga_fases_corte_a,
-    fadigaFasesCorteB: data.fadiga_fases_corte_b,
-    fadigaGradualC: data.fadiga_gradual_c,
-    fadigaGradualD: data.fadiga_gradual_d,
-    mostrarSeriesTotais: data.mostrar_series_totais,
-    mostrarSeriesPonderadas: data.mostrar_series_ponderadas,
-    mostrarSeriesAcumuladas: data.mostrar_series_acumuladas,
-    campoGrade: data.campo_grade === "total" || data.campo_grade === "ponderado" ? data.campo_grade : "destacada",
-    graficoCampo: data.grafico_campo === "total" || data.grafico_campo === "ponderado" ? data.grafico_campo : "destacada",
-    homeModoGrupos: data.home_modo_grupos === "proximo" ? "proximo" : "todos",
-    destacarExerciciosSemRotina: data.destacar_exercicios_sem_rotina ?? false,
-    ordenacaoHome: data.ordenacao_home === "pendente" ? "pendente" : "dia",
-  };
+  return comCache("treino:getParametrosDistribuicao", async () => {
+    const { data, error } = await supabase
+      .from("treino_parametros")
+      .select(
+        "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, campo_grade, grafico_campo, home_modo_grupos, destacar_exercicios_sem_rotina, ordenacao_home",
+      )
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return PARAMETROS_DISTRIBUICAO_PADRAO;
+    return {
+      seriesManutencaoMin: data.series_manutencao_min,
+      seriesManutencaoMax: data.series_manutencao_max,
+      seriesFocoMin: data.series_foco_min,
+      seriesFocoMax: data.series_foco_max,
+      fadigaModo: data.fadiga_modo === "gradual" ? "gradual" : "fases",
+      fadigaFasesCorteA: data.fadiga_fases_corte_a,
+      fadigaFasesCorteB: data.fadiga_fases_corte_b,
+      fadigaGradualC: data.fadiga_gradual_c,
+      fadigaGradualD: data.fadiga_gradual_d,
+      mostrarSeriesTotais: data.mostrar_series_totais,
+      mostrarSeriesPonderadas: data.mostrar_series_ponderadas,
+      mostrarSeriesAcumuladas: data.mostrar_series_acumuladas,
+      campoGrade: data.campo_grade === "total" || data.campo_grade === "ponderado" ? data.campo_grade : "destacada",
+      graficoCampo: data.grafico_campo === "total" || data.grafico_campo === "ponderado" ? data.grafico_campo : "destacada",
+      homeModoGrupos: data.home_modo_grupos === "proximo" ? "proximo" : "todos",
+      destacarExerciciosSemRotina: data.destacar_exercicios_sem_rotina ?? false,
+      ordenacaoHome: data.ordenacao_home === "pendente" ? "pendente" : "dia",
+    };
+  });
 }
 
 export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): Promise<void> {
