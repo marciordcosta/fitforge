@@ -80,6 +80,11 @@ body {
   background: var(--surface-bg);
   color: var(--surface-fg);
   font-family: var(--font-sans);
+  /* A animação de entrada das abas (App.svelte, .aba-entrada-*) desliza a aba nova uns
+     pixels a partir da borda (transform: translateX) — sem isso aqui, esse deslize cria
+     um overflow horizontal momentâneo, que abre/fecha uma barra de rolagem horizontal e
+     faz o menu fixo de baixo (position: fixed) "pular" verticalmente durante a animação. */
+  overflow-x: hidden;
 }
 
 * {
