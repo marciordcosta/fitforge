@@ -2,14 +2,20 @@
   import ActionSheet from "./ActionSheet.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import TreinoMudarDiaSheet from "../routes/treino/TreinoMudarDiaSheet.svelte";
-  import { cancelarTreinoDoDia } from "../lib/treinoApi";
+  import { cancelarTreinoDoDia, labelDiaSemanaRelativo } from "../lib/treinoApi";
+  import { hojeISO, parseISODate } from "../lib/dates";
 
   /** Texto "Não vai treinar hoje?" + o fluxo de mudar/cancelar o treino do dia (só essa semana) —
-   * usado no card do Home e no item "de hoje" de Rotinas.svelte, pra nunca ter duas implementações
-   * divergentes da mesma interação. A pergunta sobre ajustar a dieta (quando 1 rotina troca de dia
-   * e a dieta está em Ondulatória) mora dentro do próprio TreinoMudarDiaSheet — ele já sabe os 2
-   * dias envolvidos na troca, não precisa de um seletor de 7 dias separado. */
+   * usado no card do Home, no item "de hoje" e no card "Próxima rotina" de Rotinas.svelte, pra
+   * nunca ter duas implementações divergentes da mesma interação. `data` pode ser hoje ou um dia
+   * futuro dessa semana (card "Próxima rotina") — os textos se ajustam pro dia certo. A pergunta
+   * sobre ajustar a dieta (quando 1 rotina troca de dia e a dieta está em Ondulatória) mora dentro
+   * do próprio TreinoMudarDiaSheet — ele já sabe os 2 dias envolvidos na troca, não precisa de um
+   * seletor de 7 dias separado. */
   let { data, onMudou }: { data: string; onMudou: () => void } = $props();
+
+  const ehHoje = $derived(data === hojeISO());
+  const labelDia = $derived(labelDiaSemanaRelativo(parseISODate(data).getDay()).toLowerCase());
 
   let mostrarMenu = $state(false);
   let mostrarConfirmCancelar = $state(false);
@@ -39,24 +45,32 @@
   </svg>
 {/snippet}
 
-<button type="button" class="nao-vai-treinar" disabled={processando} onclick={() => (mostrarMenu = true)} aria-label="Não vai treinar hoje?">
+<button
+  type="button"
+  class="nao-vai-treinar"
+  disabled={processando}
+  onclick={() => (mostrarMenu = true)}
+  aria-label={ehHoje ? "Não vai treinar hoje?" : `Ajustar treino de ${labelDia}`}
+>
   {@render iconCalendario()}
 </button>
 
 {#if mostrarMenu}
   <ActionSheet
-    titulo="O que fazer hoje?"
+    titulo={ehHoje ? "O que fazer hoje?" : `O que fazer com o treino de ${labelDia}?`}
     onFechar={() => (mostrarMenu = false)}
     opcoes={[
       { label: "Mudar dia", subtitulo: "Reposicionar os treinos dessa semana", onSelect: () => (mostrarMudarDia = true) },
-      { label: "Cancelar treino de hoje", destructive: true, onSelect: () => (mostrarConfirmCancelar = true) },
+      { label: `Cancelar treino de ${ehHoje ? "hoje" : labelDia}`, destructive: true, onSelect: () => (mostrarConfirmCancelar = true) },
     ]}
   />
 {/if}
 
 {#if mostrarConfirmCancelar}
   <ConfirmDialog
-    titulo="Cancelar o treino de hoje? Só vale pra hoje — a semana que vem volta ao normal."
+    titulo={ehHoje
+      ? "Cancelar o treino de hoje? Só vale pra hoje — a semana que vem volta ao normal."
+      : `Cancelar o treino de ${labelDia}? Só vale pra essa semana — a semana que vem volta ao normal.`}
     textoConfirmar="Cancelar Treino"
     onConfirmar={confirmarCancelar}
     onCancelar={() => (mostrarConfirmCancelar = false)}

@@ -3,7 +3,7 @@
   import Button from "../../components/Button.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
-  import { toISODate, hojeISO } from "../../lib/dates";
+  import { toISODate, hojeISO, somarDias } from "../../lib/dates";
   import TreinoAjusteDiaFluxo from "../../components/TreinoAjusteDiaFluxo.svelte";
   import TreinoMudarDiaSheet from "./TreinoMudarDiaSheet.svelte";
   import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
@@ -507,9 +507,10 @@
         onclick={() => navigate(`/treino/rotina/${treino.id}/ver`)}
         onkeydown={(e) => e.key === "Enter" && navigate(`/treino/rotina/${treino.id}/ver`)}
       >
-        {#if destacada && ehHoje && !concluidaHoje}
+        {#if destacada && status.tipo === "normal" && !(ehHoje && concluidaHoje)}
+          {@const dataCard = somarDias(hojeISO(), (diaEfetivo! - hojeSemana + 7) % 7)}
           <div class="canto-superior" role="presentation" onclick={(e) => e.stopPropagation()}>
-            <TreinoAjusteDiaFluxo data={hojeISO()} onMudou={carregar} />
+            <TreinoAjusteDiaFluxo data={dataCard} onMudou={carregar} />
           </div>
         {/if}
         <div class="card-header">
