@@ -1,8 +1,19 @@
 import type { User } from "@supabase/supabase-js";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 import { supabase } from "./supabase";
 
 /** Fonte única da allowlist de e-mails permitidos. */
 export const ALLOWED_EMAILS = ["marciordcosta@gmail.com", "teste@teste.com"];
+
+/** Esquema customizado pro deep link de volta do login com Google no app nativo — só
+ * funciona depois de cadastrado em duas configurações fora deste repositório:
+ * 1) AndroidManifest.xml (intent-filter da MainActivity, já feito);
+ * 2) Painel do Supabase > Authentication > URL Configuration > Redirect URLs — precisa
+ *    adicionar essa URL exata lá manualmente, ninguém além do dono do projeto Supabase
+ *    consegue fazer isso. */
+export const OAUTH_REDIRECT_NATIVO = "com.marciocosta.fitforge://login-callback";
 
 let user = $state<User | null>(null);
 let loading = $state(true);
@@ -38,6 +49,20 @@ async function init(): Promise<void> {
 }
 
 void init();
+
+// Completa o login com Google no app nativo: o Browser.open (Login.svelte) abriu o
+// OAuth numa aba do navegador in-app, e o Google redireciona de volta pra
+// OAUTH_REDIRECT_NATIVO ao terminar — o Android entrega essa URL aqui via
+// appUrlOpen (intent-filter da MainActivity), não como navegação normal da página.
+if (Capacitor.isNativePlatform()) {
+  CapApp.addListener("appUrlOpen", ({ url }) => {
+    if (!url.startsWith(OAUTH_REDIRECT_NATIVO)) return;
+    void Browser.close();
+    void supabase.auth.exchangeCodeForSession(url).catch((e) => {
+      alert("Erro ao concluir login com Google: " + (e as Error).message);
+    });
+  });
+}
 
 export const auth = {
   get user(): User | null {

@@ -1,18 +1,11 @@
 <script lang="ts">
   import { Capacitor } from "@capacitor/core";
+  import { Browser } from "@capacitor/browser";
   import Card from "../../components/Card.svelte";
   import Button from "../../components/Button.svelte";
   import { supabase } from "../../lib/supabase";
-  import { ALLOWED_EMAILS } from "../../lib/auth.svelte";
+  import { ALLOWED_EMAILS, OAUTH_REDIRECT_NATIVO } from "../../lib/auth.svelte";
   import { navigate } from "../../lib/router.svelte";
-
-  /** O Google bloqueia ativamente login dele dentro de WebViews embarcadas (é assim que
-   * o app roda instalado como .apk) — detecta e joga o fluxo pra fora, pro navegador do
-   * sistema, que não sabe voltar pro app nativo depois. Sem isso, "Entrar com Google" no
-   * app instalado só abandonava o usuário no Chrome. Login por email/senha continua
-   * igual nos dois. Uma versão nativa de verdade do Google Sign-In (com deep link de
-   * volta) fica pra outra hora, se precisar. */
-  const mostrarGoogle = !Capacitor.isNativePlatform();
 
   let email = $state("");
   let senha = $state("");
@@ -37,7 +30,25 @@
     navigate("/");
   }
 
+  /** No app nativo, o Google bloqueia login dele dentro da WebView embutida (detecta e
+   * joga o fluxo pra fora, pro navegador do sistema, que não sabia voltar pro app —
+   * era isso que abandonava o usuário no Chrome antes). O caminho certo pra app
+   * instalado: abrir o OAuth numa aba de navegador in-app (Browser.open, não é
+   * embutido pro Google) e voltar pro app sozinho via deep link customizado — ver o
+   * listener appUrlOpen em auth.svelte.ts, que completa o login quando a URL chega. */
   async function loginGoogle() {
+    if (Capacitor.isNativePlatform()) {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: OAUTH_REDIRECT_NATIVO, skipBrowserRedirect: true },
+      });
+      if (error) {
+        alert("Erro ao iniciar login com Google: " + error.message);
+        return;
+      }
+      if (data?.url) await Browser.open({ url: data.url });
+      return;
+    }
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin + "/" },
@@ -66,10 +77,8 @@
         />
         <Button type="submit" disabled={loading}>Entrar</Button>
       </form>
-      {#if mostrarGoogle}
-        <div class="divider">ou</div>
-        <Button variant="secondary" onclick={loginGoogle}>Entrar com Google</Button>
-      {/if}
+      <div class="divider">ou</div>
+      <Button variant="secondary" onclick={loginGoogle}>Entrar com Google</Button>
     </Card>
   </div>
 </div>
