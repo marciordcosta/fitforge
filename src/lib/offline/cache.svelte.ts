@@ -19,6 +19,21 @@ function marcarAtualizado(namespace: string): void {
   versoes[namespace] = (versoes[namespace] ?? 0) + 1;
 }
 
+/** Chamado pelas funções de escrita (`*Api.ts`) depois de uma mutação bem-sucedida —
+ * sem isso, um `comCache()` logo em seguida (ex: o `carregar()` de sempre, chamado
+ * de novo após salvar) devolvia o valor em cache de ANTES da escrita na hora, e só
+ * mostrava o dado novo depois que a revalidação em segundo plano terminasse (ou, na
+ * prática, só depois de atualizar a página inteira). Apaga tudo daquele namespace —
+ * mais simples e seguro que tentar acertar a chave exata de cada função afetada — e
+ * já bump a versão, pra quem estiver observando recarregar também. */
+export async function invalidarNamespace(namespace: string): Promise<void> {
+  const db = await getDb();
+  const chaves = await db.getAllKeys("cache");
+  const doNamespace = chaves.filter((c) => c.startsWith(`${namespace}:`));
+  await Promise.all(doNamespace.map((c) => db.delete("cache", c)));
+  marcarAtualizado(namespace);
+}
+
 /** Stale-while-revalidate genérico: devolve o valor em cache na hora (se existir) e
  * busca fresco em paralelo, atualizando o cache e o contador de versão do
  * namespace quando a busca terminar. Sem cache local e offline, rejeita com uma

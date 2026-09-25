@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { hojeISO, parseISODate, toISODate } from "./dates";
-import { comCache } from "./offline/cache.svelte";
+import { comCache, invalidarNamespace } from "./offline/cache.svelte";
 import { registrarOperacao } from "./offline/queue.svelte";
 
 export const PESOS_CONTRIBUICAO_PRESET = [1, 0.75, 0.5, 0.25] as const;
@@ -795,6 +795,7 @@ export async function createTreino(nome: string, diaSemana: number | null = null
     .select("id")
     .single();
   if (error) throw error;
+  await invalidarNamespace("treino");
   return data.id;
 }
 
@@ -804,11 +805,13 @@ export async function renameTreino(id: string, nome: string, diaSemana: number |
     .update({ nome_treino: nome, dia_semana: diaSemana })
     .eq("id", id);
   if (error) throw error;
+  await invalidarNamespace("treino");
 }
 
 export async function deleteTreino(id: string): Promise<void> {
   const { error } = await supabase.from("treinos").delete().eq("id", id);
   if (error) throw error;
+  await invalidarNamespace("treino");
 }
 
 /** Atualiza a ordem das rotinas na tela inicial, na sequência dos ids informados. */
@@ -816,6 +819,7 @@ export async function atualizarOrdemTreinos(idsOrdenados: string[]): Promise<voi
   await Promise.all(
     idsOrdenados.map((id, ordem) => supabase.from("treinos").update({ ordem }).eq("id", id)),
   );
+  await invalidarNamespace("treino");
 }
 
 // ---------------- Override semanal (mudar/cancelar o treino de um dia só nessa semana) ----------------
@@ -860,17 +864,22 @@ export async function salvarOverrideSemana(semanaInicio: string, dias: TreinoOve
     .eq("user_id", usuario)
     .eq("semana_inicio", semanaInicio);
   if (errDel) throw errDel;
-  if (!dias.length) return;
+  if (!dias.length) {
+    await invalidarNamespace("treino");
+    return;
+  }
   const { error: errIns } = await supabase
     .from("treino_semana_override")
     .insert(dias.map((d) => ({ user_id: usuario, semana_inicio: semanaInicio, dia_semana: d.diaSemana, treino_id: d.treinoId })));
   if (errIns) throw errIns;
+  await invalidarNamespace("treino");
 }
 
 /** Remove o override de uma semana — ela volta a seguir o horário fixo normalmente. */
 export async function limparOverrideSemana(semanaInicio: string): Promise<void> {
   const { error } = await supabase.from("treino_semana_override").delete().eq("user_id", uid()).eq("semana_inicio", semanaInicio);
   if (error) throw error;
+  await invalidarNamespace("treino");
 }
 
 /** Converte o horário FIXO (treinos.dia_semana) numa lista de overrides — base pra "destravar"
@@ -976,7 +985,10 @@ export interface ItemRotina {
 export async function salvarExerciciosRotina(treinoId: string, itens: ItemRotina[]): Promise<void> {
   const { error: delError } = await supabase.from("treino_exercicios").delete().eq("treino_id", treinoId);
   if (delError) throw delError;
-  if (!itens.length) return;
+  if (!itens.length) {
+    await invalidarNamespace("treino");
+    return;
+  }
 
   for (let idx = 0; idx < itens.length; idx++) {
     const item = itens[idx];
@@ -1006,6 +1018,7 @@ export async function salvarExerciciosRotina(treinoId: string, itens: ItemRotina
       if (seriesError) throw seriesError;
     }
   }
+  await invalidarNamespace("treino");
 }
 
 /** Atualiza só o descanso de um exercício dentro de uma rotina (editável direto na tela de log). */
@@ -1329,6 +1342,7 @@ export async function salvarRegistrosDoDia(
       return reconciliarRecordesFuturos(id, data, melhores.melhor1rm, melhores.melhorVolume);
     }),
   );
+  await invalidarNamespace("treino");
 }
 
 /** Grava (substituindo qualquer duração já salva) o tempo total da sessão — chamado só ao concluir
@@ -1340,9 +1354,13 @@ export async function salvarDuracaoSessao(treinoId: string | null, data: string,
   delQuery = treinoId ? delQuery.eq("treino_id", treinoId) : delQuery.is("treino_id", null);
   const { error: delError } = await delQuery;
   if (delError) throw delError;
-  if (duracaoSeg == null) return;
+  if (duracaoSeg == null) {
+    await invalidarNamespace("treino");
+    return;
+  }
   const { error } = await supabase.from("treino_sessoes").insert({ user_id: uid(), treino_id: treinoId, data, duracao_seg: duracaoSeg });
   if (error) throw error;
+  await invalidarNamespace("treino");
 }
 
 // As 3 mutações do fluxo de finalizar treino (TreinoLog.svelte) registradas pra poder
@@ -1801,6 +1819,7 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
+  await invalidarNamespace("treino");
 }
 
 /** Fator de performance da série `n` (1-indexada) no modo Gradual — decaimento contínuo em vez

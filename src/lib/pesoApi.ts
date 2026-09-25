@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { toISODate, parseISODate, hojeISO, somarDias } from "./dates";
-import { comCache } from "./offline/cache.svelte";
+import { comCache, invalidarNamespace } from "./offline/cache.svelte";
 
 export interface PesoRegistro {
   data: string;
@@ -49,11 +49,13 @@ export async function salvarPeso(data: string, peso: number): Promise<void> {
     .from("pesos")
     .upsert({ user_id: uid(), data, peso }, { onConflict: "user_id,data" });
   if (error) throw error;
+  await invalidarNamespace("peso");
 }
 
 export async function excluirPeso(data: string): Promise<void> {
   const { error } = await supabase.from("pesos").delete().eq("user_id", uid()).eq("data", data);
   if (error) throw error;
+  await invalidarNamespace("peso");
 }
 
 /** Foto "atual" de um dia pra exibição no registro de peso: a mais recente adicionada (maior
@@ -86,6 +88,7 @@ export async function excluirFotoDoDia(foto: FotoRegistro): Promise<void> {
   const { error } = await supabase.from("fotos").delete().eq("id", foto.id);
   if (error) throw error;
   await supabase.storage.from("fotos").remove([foto.path]);
+  await invalidarNamespace("peso");
 }
 
 /** Adiciona uma foto a um dia SEM substituir as que já existem — diferente de salvarFotoDoDia
@@ -121,6 +124,7 @@ export async function adicionarFoto(data: string, arquivo: File, ordem?: number)
     .select("id, url, data_foto")
     .single();
   if (error) throw error;
+  await invalidarNamespace("peso");
   return { id: linha.id, path: linha.url, data: linha.data_foto };
 }
 

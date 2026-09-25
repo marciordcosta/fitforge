@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
-import { comCache } from "./offline/cache.svelte";
+import { comCache, invalidarNamespace } from "./offline/cache.svelte";
 
 function uid(): string {
   const id = auth.user?.id;
@@ -46,7 +46,11 @@ export async function salvarLayoutHome(tipos: HomeCardTipo[]): Promise<void> {
   const userId = uid();
   const { error: delErro } = await supabase.from("home_cards").delete().eq("user_id", userId);
   if (delErro) throw delErro;
-  if (!tipos.length) return;
+  if (!tipos.length) {
+    await invalidarNamespace("home");
+    return;
+  }
   const { error } = await supabase.from("home_cards").insert(tipos.map((tipo, i) => ({ user_id: userId, tipo, ordem: i })));
   if (error) throw error;
+  await invalidarNamespace("home");
 }

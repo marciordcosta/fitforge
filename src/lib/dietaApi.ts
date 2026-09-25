@@ -4,7 +4,7 @@ import { DIAS_SEMANA_ABREV, segundaDaSemana } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
 import { parseISODate, somarDias } from "./dates";
 import { marcarDietaDesatualizada } from "./dietaInvalidacao.svelte";
-import { comCache } from "./offline/cache.svelte";
+import { comCache, invalidarNamespace } from "./offline/cache.svelte";
 
 function uid(): string {
   const id = auth.user?.id;
@@ -1113,6 +1113,7 @@ export async function adicionarItemDiario(input: {
     gordura_saturada_g: round1((input.alimento.gorduraSaturadaG ?? 0) * fator),
   });
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 /** `alimento` vem sempre com a nutrição ATUAL do catálogo, não a de quando o item foi lançado —
@@ -1141,23 +1142,27 @@ export async function atualizarItemDiario(
   }
   const { error } = await supabase.from("diario_alimentos").update(update).eq("id", id);
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 /** Move um item já lançado pra outra refeição do mesmo dia, sem mexer em quantidade/macros. */
 export async function moverItemDiario(id: string, novaRefeicaoId: string): Promise<void> {
   const { error } = await supabase.from("diario_alimentos").update({ refeicao_id: novaRefeicaoId }).eq("id", id);
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 export async function removerItemDiario(id: string): Promise<void> {
   const { error } = await supabase.from("diario_alimentos").delete().eq("id", id);
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 /** Remove todos os itens já lançados nessa refeição — usado por "Substituir refeição" ao puxar a referência padrão. */
 export async function removerItensDaRefeicao(refeicaoId: string): Promise<void> {
   const { error } = await supabase.from("diario_alimentos").delete().eq("refeicao_id", refeicaoId);
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 // ---------------- Metas diárias ----------------
@@ -1295,6 +1300,7 @@ export async function salvarParametro(chave: string, min: number, max: number): 
     { onConflict: "user_id,chave" },
   );
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 /** Perfil de metas editável na tela de Gerenciar (aba Calorias) — as GRAMAS são o valor fixo (só
@@ -1395,6 +1401,7 @@ export async function salvarPerfilDieta(input: {
     { onConflict: "user_id" },
   );
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 /** Força a janela de carência do status de aderência à dieta a recomeçar agora, sem alterar
@@ -1419,6 +1426,7 @@ export async function salvarGkgFixo(macro: "proteina" | "gordura", fixo: boolean
     .update({ [coluna]: fixo })
     .eq("user_id", uid());
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 export type TipoDieta = "cutting" | "manutencao" | "bulking";
@@ -1615,11 +1623,13 @@ export async function definirCaloriasDias(
     { onConflict: "user_id,dia_semana" },
   );
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 export async function removerCaloriasDia(diaSemana: number): Promise<void> {
   const { error } = await supabase.from("dieta_calorias_dia").delete().eq("user_id", uid()).eq("dia_semana", diaSemana);
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 export async function definirModoCalorias(modo: "fixa" | "ondulatoria"): Promise<void> {
@@ -1686,11 +1696,15 @@ export async function salvarOverrideSemanaDieta(semanaInicio: string, dias: Diet
     .eq("user_id", usuario)
     .eq("semana_inicio", semanaInicio);
   if (errDel) throw errDel;
-  if (!dias.length) return;
+  if (!dias.length) {
+    await invalidarNamespace("dieta");
+    return;
+  }
   const { error: errIns } = await supabase.from("dieta_semana_override").insert(
     dias.map((d) => ({ user_id: usuario, semana_inicio: semanaInicio, dia_semana: d.diaSemana, calorias: d.calorias, gordura_g: d.gorduraG })),
   );
   if (errIns) throw errIns;
+  await invalidarNamespace("dieta");
 }
 
 /** Os 7 dias da semana com o perfil (calorias/gordura) que a Ondulatória normal dá hoje pra cada
@@ -1830,6 +1844,7 @@ export async function salvarAcumularCalorias(ativo: boolean, diaReset: number | 
       { onConflict: "user_id" },
     );
   if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 /** Deltas de carboidrato (g) já aplicados às refeições NESSA data, por nome de refeição — vazio se
@@ -1859,6 +1874,7 @@ export async function salvarDiluicaoSaldo(data: string, deltasCarboidratoG: Map<
     if (error) throw error;
   }
   marcarDietaDesatualizada();
+  await invalidarNamespace("dieta");
 }
 
 /** Total consumido por dia, num intervalo [inicio, fimExclusivo) — uma consulta só em vez de uma
@@ -1970,6 +1986,7 @@ export async function salvarAjusteSaldoCalorico(dataReferencia: string, novoSald
     );
   if (error) throw error;
   marcarDietaDesatualizada();
+  await invalidarNamespace("dieta");
 }
 
 export type StatusAdesaoDieta = "dentro_do_plano" | "ajustar_calorias" | "calibrando";
