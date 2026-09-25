@@ -4,7 +4,7 @@ import { DIAS_SEMANA_ABREV, segundaDaSemana } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
 import { parseISODate, somarDias } from "./dates";
 import { marcarDietaDesatualizada } from "./dietaInvalidacao.svelte";
-import { comCache } from "./offline/cache";
+import { comCache } from "./offline/cache.svelte";
 
 function uid(): string {
   const id = auth.user?.id;

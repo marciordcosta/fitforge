@@ -4,7 +4,7 @@
   import { hojeISO } from "../../lib/dates";
   import { formatMinSeg } from "../../lib/tempo";
   import { conectividade } from "../../lib/offline/connectivity.svelte";
-  import { enfileirar } from "../../lib/offline/queue";
+  import { enfileirar } from "../../lib/offline/queue.svelte";
   import {
     getTreino,
     listTreinos,

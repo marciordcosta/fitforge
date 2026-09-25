@@ -4,7 +4,7 @@
   import { auth, logout } from "./lib/auth.svelte";
   import { treinoLogSessao } from "./lib/treinoLogSessao.svelte";
   import { iniciarSyncEngine, configurarAvisoFalha } from "./lib/offline/syncEngine";
-  import { filaSincronizacao } from "./lib/offline/queue";
+  import { filaSincronizacao } from "./lib/offline/queue.svelte";
   import { mostrarToast } from "./lib/toast.svelte";
   import BottomNav from "./components/BottomNav.svelte";
   import TreinoMinimizado from "./components/TreinoMinimizado.svelte";

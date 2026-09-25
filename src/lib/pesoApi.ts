@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { toISODate, parseISODate, hojeISO, somarDias } from "./dates";
-import { comCache } from "./offline/cache";
+import { comCache } from "./offline/cache.svelte";
 
 export interface PesoRegistro {
   data: string;

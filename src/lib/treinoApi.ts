@@ -1,8 +1,8 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { hojeISO, parseISODate, toISODate } from "./dates";
-import { comCache } from "./offline/cache";
-import { registrarOperacao } from "./offline/queue";
+import { comCache } from "./offline/cache.svelte";
+import { registrarOperacao } from "./offline/queue.svelte";
 
 export const PESOS_CONTRIBUICAO_PRESET = [1, 0.75, 0.5, 0.25] as const;
 

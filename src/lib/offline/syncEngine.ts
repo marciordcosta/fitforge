@@ -1,5 +1,5 @@
 import { aoFicarOnline, conectividade } from "./connectivity.svelte";
-import { listarFila, removerDaFila, incrementarTentativas, operacaoRegistrada } from "./queue";
+import { listarFila, removerDaFila, incrementarTentativas, operacaoRegistrada } from "./queue.svelte";
 
 const MAX_TENTATIVAS = 5;
 

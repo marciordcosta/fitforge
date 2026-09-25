@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
-import { comCache } from "./offline/cache";
+import { comCache } from "./offline/cache.svelte";
 
 function uid(): string {
   const id = auth.user?.id;
