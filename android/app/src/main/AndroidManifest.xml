@@ -33,7 +33,7 @@
             </intent-filter>
 
             <!-- App Link de verdade (https, verificado via
-                 /.well-known/assetlinks.json no próprio site) -- caminho principal do
+                 /.well-known/assetlinks.json no próprio site): caminho principal do
                  deep link de volta do login com Google, mais confiável que o esquema
                  customizado acima pro Android entregar automaticamente pro app. -->
             <intent-filter android:autoVerify="true">
