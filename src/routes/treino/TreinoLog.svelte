@@ -1664,6 +1664,7 @@
     justify-content: space-between;
     gap: var(--space-4);
     padding: var(--space-3) var(--space-4);
+    padding-top: max(var(--space-3), env(safe-area-inset-top, 0px));
   }
   .voltar {
     flex-shrink: 1;

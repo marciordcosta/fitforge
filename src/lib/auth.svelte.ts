@@ -65,24 +65,15 @@ if (Capacitor.isNativePlatform()) {
     void Browser.close();
 
     // Esse projeto Supabase usa o fluxo implícito (tokens direto na URL, depois do "#"),
-    // não o PKCE ("?code=..."; foi o que os avisos de debug anteriores confirmaram —
-    // a URL real trazia access_token/refresh_token/provider_token, nunca "code").
+    // não o PKCE ("?code=...") — confirmado pelos avisos de debug durante o
+    // desenvolvimento: a URL real trazia access_token/refresh_token/provider_token.
     const hashIndex = url.indexOf("#");
-    if (hashIndex === -1) {
-      alert("[debug3] URL sem token nenhum:\n" + url);
-      return;
-    }
+    if (hashIndex === -1) return;
     const params = new URLSearchParams(url.slice(hashIndex + 1));
     const access_token = params.get("access_token");
     const refresh_token = params.get("refresh_token");
-    if (!access_token || !refresh_token) {
-      alert("[debug3] Faltou access_token ou refresh_token na URL.");
-      return;
-    }
-    supabase.auth.setSession({ access_token, refresh_token }).then(
-      (r) => alert("[debug3] Sessão: " + (r.data.session?.user.email ?? "(nenhuma)") + (r.error ? " | erro: " + r.error.message : "")),
-      (e) => alert("[debug3] setSession rejeitou: " + (e as Error).message),
-    );
+    if (!access_token || !refresh_token) return;
+    void supabase.auth.setSession({ access_token, refresh_token });
   });
 }
 
