@@ -70,7 +70,7 @@ if (Capacitor.isNativePlatform()) {
     }
     void Browser.close();
     supabase.auth.exchangeCodeForSession(url).then(
-      () => alert("[debug] Login com Google concluído!"),
+      (r) => alert("[debug] Login concluído! Email: " + (r.data.session?.user.email ?? "(nenhum)")),
       (e) => alert("[debug] Erro ao concluir login com Google: " + (e as Error).message),
     );
   });
