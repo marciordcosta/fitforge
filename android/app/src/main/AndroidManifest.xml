@@ -23,12 +23,24 @@
             </intent-filter>
 
             <!-- Deep link de volta do login com Google (ver OAUTH_REDIRECT_NATIVO em
-                 auth.svelte.ts): o Android entrega essa URL como appUrlOpen. -->
+                 auth.svelte.ts): o Android entrega essa URL como appUrlOpen. Esquema
+                 customizado, mantido como caminho alternativo. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="com.marciocosta.fitforge" />
+            </intent-filter>
+
+            <!-- App Link de verdade (https, verificado via
+                 /.well-known/assetlinks.json no próprio site) -- caminho principal do
+                 deep link de volta do login com Google, mais confiável que o esquema
+                 customizado acima pro Android entregar automaticamente pro app. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="fitforgehub.vercel.app" android:pathPrefix="/login-callback" />
             </intent-filter>
 
         </activity>

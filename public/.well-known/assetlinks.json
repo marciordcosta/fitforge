@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.marciocosta.fitforge",
+      "sha256_cert_fingerprints": [
+        "A5:9C:7F:A3:AE:A9:A0:1E:4C:C6:35:6C:90:92:3E:B6:EB:4C:E1:71:3C:80:45:2F:71:B1:40:B7:54:1F:4F:9D"
+      ]
+    }
+  }
+]

@@ -7,13 +7,13 @@ import { supabase } from "./supabase";
 /** Fonte única da allowlist de e-mails permitidos. */
 export const ALLOWED_EMAILS = ["marciordcosta@gmail.com", "teste@teste.com"];
 
-/** Esquema customizado pro deep link de volta do login com Google no app nativo — só
- * funciona depois de cadastrado em duas configurações fora deste repositório:
- * 1) AndroidManifest.xml (intent-filter da MainActivity, já feito);
- * 2) Painel do Supabase > Authentication > URL Configuration > Redirect URLs — precisa
- *    adicionar essa URL exata lá manualmente, ninguém além do dono do projeto Supabase
- *    consegue fazer isso. */
-export const OAUTH_REDIRECT_NATIVO = "com.marciocosta.fitforge://login-callback";
+/** App Link (https, verificado via /.well-known/assetlinks.json no próprio site) pro
+ * deep link de volta do login com Google no app nativo — mais confiável que um esquema
+ * customizado (com.marciocosta.fitforge://) pro Android entregar automaticamente pro
+ * app em vez de deixar preso no navegador. Já coberto pela entrada
+ * "https://fitforgehub.vercel.app/**" que já existe em Authentication > URL
+ * Configuration > Redirect URLs no Supabase — não precisa cadastrar nada novo lá. */
+export const OAUTH_REDIRECT_NATIVO = "https://fitforgehub.vercel.app/login-callback";
 
 let user = $state<User | null>(null);
 let loading = $state(true);
