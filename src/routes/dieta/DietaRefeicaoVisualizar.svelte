@@ -485,6 +485,7 @@
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-4);
+    padding-top: max(var(--space-4), env(safe-area-inset-top, 0px));
   }
   .header-fixo-inner h1 {
     flex: 1;

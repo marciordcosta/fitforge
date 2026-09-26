@@ -698,7 +698,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding-top: var(--space-2);
+    padding-top: max(var(--space-2), env(safe-area-inset-top, 0px));
     margin-top: calc(var(--space-2) * -1);
     padding-bottom: var(--space-2);
     margin-bottom: var(--space-2);

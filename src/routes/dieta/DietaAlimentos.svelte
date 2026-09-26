@@ -521,7 +521,7 @@
   .container {
     max-width: 480px;
     margin: 0 auto;
-    padding-top: var(--space-4);
+    padding-top: max(var(--space-4), env(safe-area-inset-top, 0px));
     padding-left: var(--space-4);
     padding-right: var(--space-4);
   }
