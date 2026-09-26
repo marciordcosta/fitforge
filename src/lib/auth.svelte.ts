@@ -61,14 +61,25 @@ void init();
 // appUrlOpen (intent-filter da MainActivity), não como navegação normal da página.
 if (Capacitor.isNativePlatform()) {
   CapApp.addListener("appUrlOpen", ({ url }) => {
-    if (!url.startsWith(OAUTH_REDIRECT_NATIVO)) return;
+    // TEMPORÁRIO — diagnóstico do login com Google (ver conversa): ainda não confirmado
+    // funcionando, então qualquer coisa fora do caminho feliz mostra na tela.
+    if (!url.startsWith(OAUTH_REDIRECT_NATIVO)) {
+      alert("[debug] Deep link não é o de login:\n" + url);
+      return;
+    }
     void Browser.close();
     // exchangeCodeForSession espera só o código (parâmetro "code" da URL), não a URL
     // inteira — passar a URL toda "funcionava" sem erro, mas nunca criava sessão
     // nenhuma (o código nunca batia com o verifier salvo).
     const code = new URL(url).searchParams.get("code");
-    if (!code) return;
-    void supabase.auth.exchangeCodeForSession(code);
+    if (!code) {
+      alert("[debug] URL sem parâmetro code:\n" + url);
+      return;
+    }
+    supabase.auth.exchangeCodeForSession(code).then(
+      (r) => alert("[debug2] Sessão: " + (r.data.session?.user.email ?? "(nenhuma)") + (r.error ? " | erro: " + r.error.message : "")),
+      (e) => alert("[debug2] exchangeCodeForSession rejeitou: " + (e as Error).message),
+    );
   });
 }
 
