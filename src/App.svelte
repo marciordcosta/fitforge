@@ -107,13 +107,15 @@
     if (auth.user && !auth.isAllowed) {
       if (!blockedAlertShown) {
         blockedAlertShown = true;
-        alert("Acesso não autorizado.");
+        alert("[debug] Acesso não autorizado. user=" + JSON.stringify(auth.user?.email) + " isAllowed=" + auth.isAllowed);
         void logout().then(() => navigate("/login"));
       }
       return;
     }
 
     if (!auth.user) {
+      // TEMPORÁRIO — diagnóstico do login com Google (ver conversa).
+      alert("[debug] auth.user está vazio aqui. router.path=" + router.path);
       if (router.path !== "/login") navigate("/login");
       return;
     }
