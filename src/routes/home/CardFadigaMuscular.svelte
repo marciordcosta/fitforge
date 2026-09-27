@@ -13,6 +13,7 @@
     type ParametrosDistribuicao,
   } from "../../lib/treinoApi";
   import { partesFadigaSemanal, partesParaSegmentos, CORES_FAIXA } from "../../lib/fadiga";
+  import { cacheInvalidacao } from "../../lib/offline/cache.svelte";
 
   /** Mesma lógica de Rotinas.svelte (o card "Grupos Musculares" da Home do treino) — replicada
    * aqui pra a Início não precisar carregar a tela inteira de Rotinas só por esse resumo. Ver
@@ -74,6 +75,18 @@
   }
 
   void carregar();
+
+  /** A aba Início fica sempre montada -- sem isso, esse resumo ficava com a contagem de antes de
+   * terminar uma rotina até recarregar a página (mesmo bug do card equivalente em
+   * Rotinas.svelte, ver o comentário lá). */
+  let versaoTreinoVista = cacheInvalidacao.versao("treino");
+  $effect(() => {
+    const versaoAtual = cacheInvalidacao.versao("treino");
+    if (versaoAtual !== versaoTreinoVista) {
+      versaoTreinoVista = versaoAtual;
+      void carregar();
+    }
+  });
 
   const feitoAoVivoPorMusculo = $derived.by(() => {
     const mapa = new Map<string, number>();

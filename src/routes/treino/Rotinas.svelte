@@ -24,6 +24,7 @@
     type ParametrosDistribuicao,
   } from "../../lib/treinoApi";
   import { partesFadigaSemanal, partesParaSegmentos, CORES_FAIXA } from "../../lib/fadiga";
+  import { cacheInvalidacao } from "../../lib/offline/cache.svelte";
 
   let treinos = $state<TreinoComExercicios[]>([]);
   let parametrosDistribuicao = $state<ParametrosDistribuicao>(PARAMETROS_DISTRIBUICAO_PADRAO);
@@ -199,6 +200,19 @@
   }
 
   void carregar();
+
+  /** A aba Treino fica sempre montada (ver App.svelte) -- sem isso, o anel de fadiga/séries
+   * feitas ficava com a contagem de antes de terminar uma rotina até recarregar a página: o
+   * carregar() só rodava uma vez, no primeiro mount, e nada aqui observava a invalidação do
+   * cache disparada por TreinoLog.svelte ao salvar. Mesmo padrão já usado no Diário. */
+  let versaoTreinoVista = cacheInvalidacao.versao("treino");
+  $effect(() => {
+    const versaoAtual = cacheInvalidacao.versao("treino");
+    if (versaoAtual !== versaoTreinoVista) {
+      versaoTreinoVista = versaoAtual;
+      void carregar();
+    }
+  });
 
   /** Séries concluídas na sessão ao vivo (ainda não salvas), contadas por músculo e ponderadas
    * pelo peso_contribuicao — soma em cima do que já está salvo. */
