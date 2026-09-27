@@ -5,7 +5,7 @@
   import {
     listTreinos,
     listMusculos,
-    getRegistrosPorTreinoPeriodo,
+    getVolumeRealizadoBruto,
     getParametrosDistribuicao,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type TreinoComExercicios,
@@ -37,10 +37,10 @@
     loading = true;
     erro = null;
     try {
-      const [treinosCarregados, musculosCarregados, registros, parametros] = await Promise.all([
+      const [treinosCarregados, musculosCarregados, volumeRealizado, parametros] = await Promise.all([
         listTreinos(),
         listMusculos(),
-        getRegistrosPorTreinoPeriodo(segundaISO(), hojeISO()),
+        getVolumeRealizadoBruto(segundaISO(), hojeISO()),
         getParametrosDistribuicao(),
       ]);
       musculos = musculosCarregados;
@@ -59,11 +59,11 @@
       }
       musculosPorExercicio = mapaMusculos;
 
+      // Vem da view v_musculo_volume_realizado (mesma fonte de Distribuição > Realizado) -- ver
+      // o comentário equivalente em Rotinas.svelte sobre por que não usar mapaMusculos aqui.
       const mapaFeito = new Map<string, number>();
-      for (const r of registros) {
-        for (const m of mapaMusculos.get(r.exercicio_id) ?? []) {
-          mapaFeito.set(m.musculo_id, (mapaFeito.get(m.musculo_id) ?? 0) + m.peso);
-        }
+      for (const v of volumeRealizado) {
+        mapaFeito.set(v.musculo_id, (mapaFeito.get(v.musculo_id) ?? 0) + Number(v.series_equivalentes));
       }
       feitoPorMusculoSalvo = mapaFeito;
       treinos = treinosCarregados;

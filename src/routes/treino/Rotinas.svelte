@@ -11,6 +11,7 @@
     listTreinos,
     listMusculos,
     getRegistrosPorTreinoPeriodo,
+    getVolumeRealizadoBruto,
     getParametrosDistribuicao,
     listOverrideSemana,
     segundaDaSemana,
@@ -140,10 +141,11 @@
     loading = true;
     erroCarregar = null;
     try {
-      const [treinosCarregados, musculosCarregados, registros, parametros, overridesSemana] = await Promise.all([
+      const [treinosCarregados, musculosCarregados, registros, volumeRealizado, parametros, overridesSemana] = await Promise.all([
         listTreinos(),
         listMusculos(),
         getRegistrosPorTreinoPeriodo(segundaISO(), hojeISO()),
+        getVolumeRealizadoBruto(segundaISO(), hojeISO()),
         getParametrosDistribuicao(),
         listOverrideSemana(segundaDaSemana(hojeISO())),
       ]);
@@ -168,7 +170,6 @@
       musculosPorExercicio = mapaMusculos;
 
       const mapaSeriesPorTreino = new Map<string, number>();
-      const mapaFeito = new Map<string, number>();
       const hoje = hojeISO();
       const concluidos = new Set<string>();
       for (const r of registros) {
@@ -176,13 +177,21 @@
           mapaSeriesPorTreino.set(r.treino_id, (mapaSeriesPorTreino.get(r.treino_id) ?? 0) + 1);
           if (r.data === hoje) concluidos.add(r.treino_id);
         }
-        for (const m of mapaMusculos.get(r.exercicio_id) ?? []) {
-          mapaFeito.set(m.musculo_id, (mapaFeito.get(m.musculo_id) ?? 0) + m.peso);
-        }
       }
       seriesPorTreino = mapaSeriesPorTreino;
-      feitoPorMusculoSalvo = mapaFeito;
       concluidosHoje = concluidos;
+
+      // Séries feitas por músculo vêm da view v_musculo_volume_realizado (mesma fonte da tela
+      // Distribuição > Realizado) -- não do mapeamento exercício->músculo das rotinas salvas
+      // (mapaMusculos acima). Esse mapeamento só cobre exercícios que ainda estão numa rotina
+      // salva; uma série registrada num exercício removido da rotina depois, ou lançada avulsa,
+      // ficava de fora da soma (mapaMusculos.get(...) ?? [] descartava silenciosamente),
+      // fazendo o anel mostrar menos séries feitas do que a Distribuição realmente contabiliza.
+      const mapaFeito = new Map<string, number>();
+      for (const v of volumeRealizado) {
+        mapaFeito.set(v.musculo_id, (mapaFeito.get(v.musculo_id) ?? 0) + Number(v.series_equivalentes));
+      }
+      feitoPorMusculoSalvo = mapaFeito;
 
       const destacadaEscolhida = escolherDestacada(treinosCarregados, diaEfetivoPorTreino, statusPorTreino);
       destacadaId = destacadaEscolhida?.id ?? null;
