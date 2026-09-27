@@ -98,17 +98,20 @@
 
   void carregar();
 
-  async function selecionarFoto(e: Event) {
+  async function selecionarFotos(e: Event) {
     const input = e.target as HTMLInputElement;
-    const arquivo = input.files?.[0];
-    if (!arquivo) return;
+    const arquivos = input.files ? Array.from(input.files) : [];
+    if (!arquivos.length) return;
     salvando = true;
     try {
       // Adiciona sem apagar as fotos que já estavam aqui — mantém o histórico pra galeria/comparação.
-      const novaFoto = await adicionarFoto(data, arquivo, fotos.length);
-      const urlNova = (await getUrlsAssinadas([novaFoto.path])).get(novaFoto.path) ?? "";
-      fotos = [...fotos, novaFoto];
-      urlsFotos = new Map(urlsFotos).set(novaFoto.path, urlNova);
+      // Base calculada uma vez só, fora do map — passar `ordem` explícito evita que os uploads em
+      // paralelo leiam a mesma contagem antes de qualquer um confirmar (ordem duplicada).
+      const baseOrdem = fotos.length;
+      const novasFotos = await Promise.all(arquivos.map((arquivo, i) => adicionarFoto(data, arquivo, baseOrdem + i)));
+      const urlsNovas = await getUrlsAssinadas(novasFotos.map((f) => f.path));
+      fotos = [...fotos, ...novasFotos];
+      urlsFotos = new Map([...urlsFotos, ...urlsNovas]);
     } catch (err) {
       alert("Erro ao salvar foto: " + (err as Error).message);
     } finally {
@@ -218,8 +221,8 @@
         {/if}
       </div>
     {/if}
-    <input bind:this={inputCamera} type="file" accept="image/*" capture="environment" class="foto-input" onchange={selecionarFoto} />
-    <input bind:this={inputGaleria} type="file" accept="image/*" class="foto-input" onchange={selecionarFoto} />
+    <input bind:this={inputCamera} type="file" accept="image/*" capture="environment" class="foto-input" onchange={selecionarFotos} />
+    <input bind:this={inputGaleria} type="file" accept="image/*" multiple class="foto-input" onchange={selecionarFotos} />
   </div>
 
   <div class="acoes">
