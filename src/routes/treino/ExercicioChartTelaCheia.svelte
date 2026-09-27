@@ -305,6 +305,14 @@
     const datas = Array.from(datasSet).sort();
     const indicePorData = new Map(datas.map((d, i) => [d, i]));
 
+    /** Rodapé do tooltip com a observação da marcação, só quando o ponto tocado/clicado é um dia
+     * marcado — ver o mesmo comentário em ExercicioChart.svelte (a versão compacta) pra contexto. */
+    function tooltipMarcador(items: { dataIndex: number }[]): string[] {
+      const data = datas[items[0]?.dataIndex];
+      const m = data ? marcadores.find((mk) => mk.data === data) : undefined;
+      return m ? [`🚩 ${m.observacao}`] : [];
+    }
+
     function serie(hist: HistoricoPonto[]): (number | null)[] {
       const arr = new Array<number | null>(datas.length).fill(null);
       for (const h of hist) {
@@ -395,7 +403,7 @@
             labels: { color: "#9aa0ab", boxWidth: 12, font: { size: 11 } },
             onClick: mostrarMedia ? aoClicarLegenda : Chart.defaults.plugins.legend.onClick,
           },
-          tooltip: { callbacks: { label: tooltipValorReal, afterLabel: tooltipSeries } },
+          tooltip: { callbacks: { label: tooltipValorReal, afterLabel: tooltipSeries, footer: tooltipMarcador } },
         },
         scales: {
           x: {

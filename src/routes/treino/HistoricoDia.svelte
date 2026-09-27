@@ -15,6 +15,9 @@
     getRecordesExercicio,
     listObservacoesExerciciosEmLote,
     observacaoParaHistorico,
+    listMarcadoresExercicio,
+    salvarMarcadorExercicio,
+    removerMarcadorExercicio,
     type SetRegistro,
   } from "../../lib/treinoApi";
 
@@ -36,6 +39,13 @@
   /** Observação vigente NA DATA dessa sessão (não a atual) — resolvida por exercício a partir
    * de todas as versões salvas, igual ExercicioDetalhe.svelte faz por sessão do histórico. */
   let observacoesPorExercicio = $state<Map<string, string | null>>(new Map());
+  /** Marcação (ex: troca de equipamento) desse exercício NESSE DIA específico — mesma que aparece
+   * destacada no gráfico de progressão (ExercicioChart.svelte). Editável aqui pra cobrir o caso de
+   * lançar/corrigir um treino retroativamente (TreinoLog.svelte só marca o dia de hoje). */
+  let marcadoresPorExercicio = $state<Map<string, string>>(new Map());
+  let marcandoExIdx = $state<number | null>(null);
+  let observacaoMarcador = $state("");
+  let salvandoMarcador = $state(false);
   let loading = $state(true);
   let salvando = $state(false);
   let salvo = $state(false);
@@ -67,10 +77,58 @@
     observacoesPorExercicio = new Map(
       sessao.map((ex) => [ex.exercicioId, observacaoParaHistorico(observacoesPorId.get(ex.exercicioId) ?? [], data)]),
     );
+    const marcadoresPorId = await Promise.all(
+      sessao.map(async (ex) => {
+        const marcadores = await listMarcadoresExercicio(ex.exercicioId);
+        return [ex.exercicioId, marcadores.find((m) => m.data === data)?.observacao ?? null] as const;
+      }),
+    );
+    marcadoresPorExercicio = new Map(
+      marcadoresPorId.filter((par): par is [string, string] => par[1] != null),
+    );
     loading = false;
   }
 
   void carregar();
+
+  function abrirMarcarExercicio(exIdx: number) {
+    marcandoExIdx = exIdx;
+    observacaoMarcador = marcadoresPorExercicio.get(sessao[exIdx].exercicioId) ?? "";
+  }
+
+  async function confirmarMarcarExercicio() {
+    if (marcandoExIdx == null || !observacaoMarcador.trim()) return;
+    const exercicioId = sessao[marcandoExIdx].exercicioId;
+    salvandoMarcador = true;
+    try {
+      await salvarMarcadorExercicio(exercicioId, data, observacaoMarcador.trim());
+      marcadoresPorExercicio = new Map(marcadoresPorExercicio).set(exercicioId, observacaoMarcador.trim());
+      marcandoExIdx = null;
+      observacaoMarcador = "";
+    } catch (err) {
+      alert("Erro ao marcar exercício: " + (err as Error).message);
+    } finally {
+      salvandoMarcador = false;
+    }
+  }
+
+  async function removerMarcacaoAtual() {
+    if (marcandoExIdx == null) return;
+    const exercicioId = sessao[marcandoExIdx].exercicioId;
+    salvandoMarcador = true;
+    try {
+      await removerMarcadorExercicio(exercicioId, data);
+      const novoMapa = new Map(marcadoresPorExercicio);
+      novoMapa.delete(exercicioId);
+      marcadoresPorExercicio = novoMapa;
+      marcandoExIdx = null;
+      observacaoMarcador = "";
+    } catch (err) {
+      alert("Erro ao remover marcação: " + (err as Error).message);
+    } finally {
+      salvandoMarcador = false;
+    }
+  }
 
   function adicionarSerie(exIdx: number) {
     const ex = sessao[exIdx];
@@ -263,6 +321,13 @@
     {#each sessao as ex, exIdx (ex.exercicioId)}
       <div class="exercicio-card">
         <h2>{ex.exercicioNome}</h2>
+        {#if marcadoresPorExercicio.get(ex.exercicioId)}
+          <button class="marcador-btn marcador-definido" onclick={() => abrirMarcarExercicio(exIdx)}>
+            🚩 {marcadoresPorExercicio.get(ex.exercicioId)}
+          </button>
+        {:else}
+          <button class="marcador-btn" onclick={() => abrirMarcarExercicio(exIdx)}>🚩 Marcar exercício</button>
+        {/if}
         <div class="tabela">
           <div class="linha cabecalho">
             <span>Série</span>
@@ -288,6 +353,9 @@
         <h2 class="sessao-nome" class:destaque={ex.exercicioId === destaqueExercicioId}>{ex.exercicioNome}</h2>
         {#if observacoesPorExercicio.get(ex.exercicioId)}
           <p class="sessao-observacao">📝 {observacoesPorExercicio.get(ex.exercicioId)}</p>
+        {/if}
+        {#if marcadoresPorExercicio.get(ex.exercicioId)}
+          <p class="sessao-marcador">🚩 {marcadoresPorExercicio.get(ex.exercicioId)}</p>
         {/if}
         <div class="sessao-tabela">
           <div class="sessao-linha sessao-cabecalho">
@@ -330,6 +398,28 @@
     <Button onclick={confirmarSalvarComoRotina} disabled={salvandoRotina || !nomeRotina.trim()}>
       {salvandoRotina ? "Salvando…" : "Salvar"}
     </Button>
+  </Sheet>
+{/if}
+
+{#if marcandoExIdx !== null}
+  <Sheet titulo="Marcar Exercício" onFechar={() => (marcandoExIdx = null)}>
+    <p class="marcador-ajuda">
+      Registra uma observação em {dataLabel} pra {sessao[marcandoExIdx].exercicioNome} — aparece no histórico e
+      no gráfico de progressão, pra não confundir uma troca de equipamento (ou algo assim) com progresso ou
+      regressão de verdade.
+    </p>
+    <textarea
+      class="marcador-input"
+      placeholder="Ex: Troquei pra máquina nova, peso não é comparável"
+      bind:value={observacaoMarcador}
+      rows="3"
+    ></textarea>
+    <Button onclick={confirmarMarcarExercicio} disabled={salvandoMarcador || !observacaoMarcador.trim()}>
+      {salvandoMarcador ? "Salvando…" : "Salvar"}
+    </Button>
+    {#if marcadoresPorExercicio.get(sessao[marcandoExIdx].exercicioId)}
+      <Button variant="danger" onclick={removerMarcacaoAtual} disabled={salvandoMarcador}>Remover marcação</Button>
+    {/if}
   </Sheet>
 {/if}
 
@@ -449,6 +539,43 @@
     color: var(--color-primary);
     margin: 0 0 var(--space-2);
   }
+  .marcador-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px dashed var(--surface-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+  .marcador-btn.marcador-definido {
+    border-style: solid;
+    border-color: rgba(251, 191, 36, 0.4);
+    color: var(--color-warning, #fbbf24);
+  }
+  .marcador-ajuda {
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .marcador-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    resize: none;
+  }
   .tabela {
     display: flex;
     flex-direction: column;
@@ -548,6 +675,11 @@
     margin: 0 0 var(--space-2);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
+  }
+  .sessao-marcador {
+    margin: 0 0 var(--space-2);
+    font-size: var(--font-size-sm);
+    color: var(--color-warning, #fbbf24);
   }
   .nome-input {
     box-sizing: border-box;

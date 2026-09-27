@@ -93,10 +93,6 @@
 
   const historicoFiltrado = $derived(filtroQtd == null ? historicoComAoVivo : historicoComAoVivo.slice(-filtroQtd));
 
-  /** Datas com marcador (ex: troca de equipamento) que caem dentro do período exibido no gráfico —
-   * comparações de peso/1RM/volume antes e depois dessas datas podem não refletir progresso real. */
-  const marcadoresNoFiltro = $derived(marcadores.filter((m) => historicoFiltrado.some((h) => h.data === m.data)));
-
   function formatData(iso: string): string {
     const [y, m, d] = iso.split("-");
     return `${d}/${m}/${y.slice(2)}`;
@@ -119,6 +115,17 @@
     const n = ctx.dataset.seriesData?.[ctx.dataIndex];
     if (n == null) return "";
     return `${n} ${n === 1 ? "série" : "séries"}`;
+  }
+
+  /** Rodapé do tooltip com a observação da marcação (ex: troca de equipamento) só quando o ponto
+   * tocado/clicado é um dia marcado — em vez do balão fixo de antes (que ficava sempre visível
+   * acima do gráfico e lotava a tela com várias marcações ao longo das semanas), a marcação
+   * agora só aparece nesse tooltip, sob demanda. O ponto em si continua destacado em dourado
+   * (ver pointBackgroundColor abaixo) pra sinalizar que há uma marcação ali. */
+  function tooltipMarcador(items: { dataIndex: number }[]): string[] {
+    const data = historicoFiltrado[items[0]?.dataIndex]?.data;
+    const m = data ? marcadores.find((mk) => mk.data === data) : undefined;
+    return m ? [`🚩 ${m.observacao}`] : [];
   }
 
   /** Posição em pixel do ponto ao vivo (último ponto, quando é "hoje" ao vivo) — atualizada a
@@ -192,7 +199,11 @@
           legend: modoTodos
             ? { display: true, position: "bottom", labels: { color: "#9aa0ab", boxWidth: 10, font: { size: 9 } } }
             : { display: false },
-          tooltip: { callbacks: modoTodos ? { label: tooltipValorReal, afterLabel: tooltipSeries } : { afterLabel: tooltipSeries } },
+          tooltip: {
+            callbacks: modoTodos
+              ? { label: tooltipValorReal, afterLabel: tooltipSeries, footer: tooltipMarcador }
+              : { afterLabel: tooltipSeries, footer: tooltipMarcador },
+          },
         },
         scales: {
           x: {
@@ -246,13 +257,6 @@
       {@render iconExpandir()}
     </button>
   </div>
-  {#if marcadoresNoFiltro.length}
-    <div class="marcador-alerta">
-      {#each marcadoresNoFiltro as m (m.data)}
-        <p>🚩 {formatData(m.data)}: {m.observacao}</p>
-      {/each}
-    </div>
-  {/if}
   <div class="chart-wrap">
     <canvas bind:this={canvas}></canvas>
     {#if pontoAoVivoPos}
@@ -308,21 +312,6 @@
   .icone-topo.ativo {
     background: var(--color-primary);
     color: var(--color-primary-fg);
-  }
-  .marcador-alerta {
-    background: rgba(251, 191, 36, 0.12);
-    border: 1px solid rgba(251, 191, 36, 0.4);
-    border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-3);
-    margin-bottom: var(--space-2);
-  }
-  .marcador-alerta p {
-    margin: 0;
-    font-size: var(--font-size-sm);
-    color: #fbbf24;
-  }
-  .marcador-alerta p + p {
-    margin-top: var(--space-1);
   }
   .chart-wrap {
     position: relative;
