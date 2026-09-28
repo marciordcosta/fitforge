@@ -22,6 +22,19 @@
   };
   const DIAS_SEMANA_ABREV = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+  /** Qual visualização do gráfico (Peso.svelte) abre por padrão -- "diário" (peso bruto de cada
+   * dia) ou "média" (móvel de 7 dias). Preferência só de exibição, sem relação com a meta em si
+   * (por isso fica fora do fluxo de "Salvar Meta": grava direto no toque, como metaVisivel já faz
+   * em Peso.svelte, em vez de ficar bloqueada por precisar de peso alvo definido). */
+  const CHAVE_MODO_GRAFICO_PADRAO = "fitforge_peso_modo_grafico_padrao";
+  let modoGraficoPadrao = $state<"diario" | "media">(
+    typeof localStorage !== "undefined" && localStorage.getItem(CHAVE_MODO_GRAFICO_PADRAO) === "media" ? "media" : "diario",
+  );
+  function selecionarModoGraficoPadrao(m: "diario" | "media"): void {
+    modoGraficoPadrao = m;
+    if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_MODO_GRAFICO_PADRAO, m);
+  }
+
   let tipoDieta = $state<TipoDieta>("manutencao");
   /** Sempre a magnitude (sem sinal) — o sinal é aplicado na hora de salvar, conforme o tipo de
    * dieta. `percentualMin` é o ritmo usado pra calcular a meta de cada semana; `percentualMax` só
@@ -203,6 +216,15 @@
         </span>
       </div>
     {/if}
+
+    <div class="campo">
+      <label for="meta-grafico-padrao">Visualização padrão do gráfico</label>
+      <div class="referencia-opcoes" id="meta-grafico-padrao">
+        <button type="button" class:ativo={modoGraficoPadrao === "diario"} onclick={() => selecionarModoGraficoPadrao("diario")}>Diário</button>
+        <button type="button" class:ativo={modoGraficoPadrao === "media"} onclick={() => selecionarModoGraficoPadrao("media")}>Média</button>
+      </div>
+      <span class="campo-dica">Qual visualização o gráfico mostra quando abre</span>
+    </div>
 
     <div class="campo">
       <label for="meta-peso">Peso alvo (kg)</label>

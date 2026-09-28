@@ -106,8 +106,13 @@
   let mostrarFiltro = $state(false);
   let mostrarGraficoCheio = $state(false);
 
-  /** "diário" = peso bruto de cada dia; "média" = média móvel dos últimos 7 dias em cada dia (padrão de mercado — MacroFactor, Trendweight etc.), padrão do app. */
-  let modoGrafico = $state<"diario" | "media">("diario");
+  /** "diário" = peso bruto de cada dia; "média" = média móvel dos últimos 7 dias em cada dia (padrão de mercado — MacroFactor, Trendweight etc.). Qual dos dois abre por padrão é configurável
+   * em "Meta" > "Visualização padrão do gráfico" (PesoMetaFormSheet.svelte), guardado direto no
+   * dispositivo (mesma chave lida ali). */
+  const CHAVE_MODO_GRAFICO_PADRAO = "fitforge_peso_modo_grafico_padrao";
+  let modoGrafico = $state<"diario" | "media">(
+    typeof localStorage !== "undefined" && localStorage.getItem(CHAVE_MODO_GRAFICO_PADRAO) === "media" ? "media" : "diario",
+  );
 
   function selecionarModoGrafico(m: "diario" | "media") {
     modoGrafico = m;
