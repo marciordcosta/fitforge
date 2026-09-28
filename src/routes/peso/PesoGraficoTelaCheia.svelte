@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Chart } from "chart.js/auto";
   import type { PesoRegistro } from "../../lib/pesoApi";
+  import { parseISODate } from "../../lib/dates";
+  import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
 
   let {
     pontosGrafico,
@@ -111,7 +113,14 @@
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pontosGrafico.map((p, i) => (pontosComData && !pontosComData[i] ? "" : formatDataCurta(p.data))),
+        labels: pontosGrafico.map((p, i) => {
+          if (pontosComData && !pontosComData[i]) return "";
+          const dataLabel = formatDataCurta(p.data);
+          // Dia da semana numa segunda linha, só no filtro "1 semana" — mesma regra do gráfico
+          // compacto (Peso.svelte); Chart.js renderiza um array de strings como linhas empilhadas.
+          if (!mostrarPontos) return dataLabel;
+          return [dataLabel, DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()]];
+        }),
         datasets: [
           {
             data: pontosGrafico.map((p) => p.peso),
@@ -142,7 +151,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { top: 20 } },
+        layout: { padding: { top: 28 } },
         plugins: {
           legend: { display: false },
           tooltip: {

@@ -22,7 +22,7 @@
     type PesoMeta,
     type PesoMetaHistorico,
   } from "../../lib/pesoApi";
-  import { getDiasComTreino, listTreinos } from "../../lib/treinoApi";
+  import { getDiasComTreino, listTreinos, DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
   import PesoGraficoTelaCheia from "./PesoGraficoTelaCheia.svelte";
@@ -501,6 +501,12 @@
         const p = pontosDados[i];
         if (!p) return;
         ctx.fillText(formatDataCurta(dataExibicao(p)), ponto.x, y);
+        // Dia da semana embaixo da data — só no filtro "1 semana" (mostrarPontos), onde há espaço
+        // de sobra entre os 7 pontos; em filtros maiores viraria poluição visual.
+        if (mostrarPontos) {
+          const diaSemana = parseISODate(dataExibicao(p)).getDay();
+          ctx.fillText(DIAS_SEMANA_ABREV[diaSemana], ponto.x, y + 12);
+        }
       });
       ctx.restore();
     },
@@ -550,7 +556,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { top: 14, bottom: 22, left: 10, right: 14 } },
+        layout: { padding: { top: 28, bottom: 34, left: 10, right: 14 } },
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -866,7 +872,7 @@
   .quick-actions {
     display: flex;
     gap: var(--space-2);
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-6);
   }
   .observacao-meta {
     display: block;
