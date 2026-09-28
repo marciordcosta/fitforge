@@ -195,9 +195,9 @@
   });
 </script>
 
-<div class="tela-cheia">
+<div class="tela-cheia" onclick={onFechar} role="presentation">
   <button class="fechar" onclick={onFechar} aria-label="Fechar">✕</button>
-  <div class="grafico-wrap">
+  <div class="grafico-wrap" onclick={(e) => e.stopPropagation()} role="presentation">
     <canvas bind:this={canvas}></canvas>
   </div>
 </div>
