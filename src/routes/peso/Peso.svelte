@@ -452,6 +452,14 @@
           ctx.fillStyle = "#fff";
           const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
           ctx.fillText(texto, ponto.x, yDiff);
+        } else {
+          // Sem meta ativa (ou sem meta cadastrada) não há o que comparar em % — mostra o peso
+          // real do ponto (bruto ou média, conforme o modo selecionado) em vez de nada.
+          const p = pontosGrafico[i];
+          if (p) {
+            ctx.fillStyle = "#fff";
+            ctx.fillText(formatPeso(p.peso), ponto.x, yDiff);
+          }
         }
         // Só o último ponto da linha reta da meta ganha o rótulo com o valor (76.3kg) — um
         // número em cada ponto poluía o gráfico, já que a linha é reta e o valor de cada ponto
