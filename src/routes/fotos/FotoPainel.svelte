@@ -55,11 +55,28 @@
     return v == null ? "—" : `${v.toFixed(1).replace(".", ",")} kg`;
   }
 
+  /** Setas nas pontas (não o arrasto, que mantém a resistência de borda de propósito): o
+   * carrossel roda em loop — da última volta pra primeira, e vice-versa. O pulo em si (não a
+   * troca normal entre vizinhas) some sem deslizar por cima de todas as fotos no meio: desliga a
+   * transição só nesse frame (2x requestAnimationFrame garante que o "teleporte" já pintou antes
+   * de reativar), senão a troca da última pra primeira parecia rebobinar o carrossel inteiro. */
+  let pulando = $state(false);
+
+  function irParaFoto(novoIndice: number, semTransicao: boolean) {
+    if (semTransicao) {
+      pulando = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => (pulando = false)));
+    }
+    indice = novoIndice;
+  }
+
   function proximaFoto() {
-    if (indice < fotos.length - 1) indice += 1;
+    const ultima = indice === fotos.length - 1;
+    irParaFoto(ultima ? 0 : indice + 1, ultima);
   }
   function fotoAnterior() {
-    if (indice > 0) indice -= 1;
+    const primeira = indice === 0;
+    irParaFoto(primeira ? fotos.length - 1 : indice - 1, primeira);
   }
 
   // ---- Zoom (duplo toque ou pinça com 2 dedos) + arrastar (pan quando ampliado, trocar de foto
@@ -303,7 +320,7 @@
 >
   <div
     class="trilho"
-    class:sem-transicao={arrastando}
+    class:sem-transicao={arrastando || pulando}
     style={`transform: translateX(calc(${-indice * 100}% + ${scale > ESCALA_MIN + 0.01 ? 0 : offsetTrilho()}px));`}
   >
     {#each fotos as foto, i (foto.id)}
@@ -345,12 +362,8 @@
         <span class="ponto" class:ativo={i === indice}></span>
       {/each}
     </div>
-    {#if indice > 0}
-      <button type="button" class="seta seta-esq" onclick={fotoAnterior} aria-label="Foto anterior">‹</button>
-    {/if}
-    {#if indice < fotos.length - 1}
-      <button type="button" class="seta seta-dir" onclick={proximaFoto} aria-label="Próxima foto">›</button>
-    {/if}
+    <button type="button" class="seta seta-esq" onclick={fotoAnterior} aria-label="Foto anterior">‹</button>
+    <button type="button" class="seta seta-dir" onclick={proximaFoto} aria-label="Próxima foto">›</button>
   {/if}
 </div>
 
