@@ -465,11 +465,14 @@
       padding-top: max(var(--space-3), env(safe-area-inset-top, 0px));
     }
     .trocar-btn {
+      /* Não no centro vertical (top: 50%): ali ficava bem em cima das setas do carrossel de cada
+         foto (FotoPainel.svelte, também centralizadas), fácil de tocar sem querer em vez da seta.
+         Perto do rodapé em vez disso, longe das setas e da faixa de infos que fica no topo. */
       left: 50%;
       right: auto;
-      top: 50%;
-      bottom: auto;
-      transform: translate(-50%, -50%);
+      top: auto;
+      bottom: var(--space-5);
+      transform: translateX(-50%);
     }
     /* Lado a lado, as fotos trocam de posição esquerda/direita, não em cima/embaixo -- o ícone
        (uma seta duplo-sentido vertical) só precisa girar 90° pra continuar fazendo sentido. */
