@@ -88,6 +88,22 @@
           ctx.fillStyle = "#fff";
           const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
           ctx.fillText(texto, ponto.x, yDiff);
+        } else {
+          // Sem meta ativa (ou sem meta cadastrada) — mostra o peso real em vez de nada, igual Peso.svelte.
+          const p = pontosGrafico[i];
+          if (p) {
+            ctx.fillStyle = "#fff";
+            ctx.fillText(formatPeso(p.peso), ponto.x, yDiff);
+          }
+        }
+        // Dia da semana embaixo do próprio ponto — só no filtro "1 semana", igual Peso.svelte.
+        if (mostrarPontos) {
+          const p = pontosGrafico[i];
+          if (p) {
+            const yDia = Math.min(ponto.y + 15, c.chartArea.bottom - 4);
+            ctx.fillStyle = "#9aa0ab";
+            ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()], ponto.x, yDia);
+          }
         }
         // Só o último ponto da linha reta da meta ganha o rótulo com o valor — igual Peso.svelte.
         if (i !== pontos.length - 1) return;
@@ -113,14 +129,7 @@
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pontosGrafico.map((p, i) => {
-          if (pontosComData && !pontosComData[i]) return "";
-          const dataLabel = formatDataCurta(p.data);
-          // Dia da semana numa segunda linha, só no filtro "1 semana" — mesma regra do gráfico
-          // compacto (Peso.svelte); Chart.js renderiza um array de strings como linhas empilhadas.
-          if (!mostrarPontos) return dataLabel;
-          return [dataLabel, DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()]];
-        }),
+        labels: pontosGrafico.map((p, i) => (pontosComData && !pontosComData[i] ? "" : formatDataCurta(p.data))),
         datasets: [
           {
             data: pontosGrafico.map((p) => p.peso),

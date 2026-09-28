@@ -466,6 +466,18 @@
             ctx.fillText(formatPeso(p.peso), ponto.x, yDiff);
           }
         }
+        // Dia da semana embaixo do próprio ponto — só no filtro "1 semana" (mostrarPontos), onde
+        // há espaço de sobra entre os 7 pontos; em filtros maiores viraria poluição visual. Trava
+        // no fundo da área do gráfico pra nunca sobrepor a data do eixo (pluginDatasEixo), que
+        // desenha um pouco abaixo dela.
+        if (mostrarPontos) {
+          const p = pontosGrafico[i];
+          if (p) {
+            const yDia = Math.min(ponto.y + 13, c.chartArea.bottom - 4);
+            ctx.fillStyle = "#9aa0ab";
+            ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()], ponto.x, yDia);
+          }
+        }
         // Só o último ponto da linha reta da meta ganha o rótulo com o valor (76.3kg) — um
         // número em cada ponto poluía o gráfico, já que a linha é reta e o valor de cada ponto
         // intermediário já dá pra inferir visualmente.
@@ -501,12 +513,6 @@
         const p = pontosDados[i];
         if (!p) return;
         ctx.fillText(formatDataCurta(dataExibicao(p)), ponto.x, y);
-        // Dia da semana embaixo da data — só no filtro "1 semana" (mostrarPontos), onde há espaço
-        // de sobra entre os 7 pontos; em filtros maiores viraria poluição visual.
-        if (mostrarPontos) {
-          const diaSemana = parseISODate(dataExibicao(p)).getDay();
-          ctx.fillText(DIAS_SEMANA_ABREV[diaSemana], ponto.x, y + 12);
-        }
       });
       ctx.restore();
     },
@@ -556,7 +562,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { top: 28, bottom: 34, left: 10, right: 14 } },
+        layout: { padding: { top: 28, bottom: 22, left: 10, right: 14 } },
         plugins: {
           legend: { display: false },
           tooltip: {
