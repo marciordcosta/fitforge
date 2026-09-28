@@ -372,10 +372,15 @@
     return pontosGrafico.map((_, i) => (total - 1 - i) % 7 === 0);
   });
 
-  /** Só mostra os detalhes por ponto (%, valor da meta, pontos marcados na linha) com até 1 mês
-   * de período — em filtros maiores vira poluição visual (dezenas de rótulos/pontos
-   * sobrepostos). Acima disso a linha fica só a linha, mais fina e sem pontos. */
+  /** Só mostra os detalhes por ponto (%, valor da meta) com até 1 mês de período — em filtros
+   * maiores vira poluição visual (dezenas de rótulos sobrepostos). Acima disso a linha fica só a
+   * linha, mais fina. */
   const detalhesPorPonto = $derived(periodo.dias != null && periodo.dias <= 30);
+
+  /** As bolinhas em cada ponto da linha só valem a pena em "1 semana" — com mais dias os pontos
+   * ficam próximos demais e a linha vira uma sequência de bolinhas coladas, sem definição. Acima
+   * de 1 semana, só a linha (sem ponto nenhum). */
+  const mostrarPontos = $derived(periodo.dias != null && periodo.dias <= 7);
 
   /** Datas do eixo: no máximo 8, sempre em intervalos iguais — diferente de pontosComRotulo (que
    * rotula a cada 7 dias e cresce sem limite em períodos muito longos, tipo "Tudo" com anos de
@@ -523,7 +528,7 @@
             pointBackgroundColor: pontos.map((p) => corPonto(p.data)),
             pointBorderColor: pontos.map((p) => corPonto(p.data)),
             tension: 0.3,
-            pointRadius: detalhesPorPonto ? 3 : 0,
+            pointRadius: mostrarPontos ? 3 : 0,
             borderWidth: detalhesPorPonto ? 3 : 1.5,
           },
           ...(metaLinha
@@ -782,6 +787,7 @@
     metaAlvoPorPonto={metaVisivel ? metaAlvoPorPonto : null}
     {pontosComData}
     {detalhesPorPonto}
+    {mostrarPontos}
     onFechar={() => (mostrarGraficoCheio = false)}
   />
 {/if}

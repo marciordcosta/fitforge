@@ -12,6 +12,7 @@
     metaAlvoPorPonto,
     pontosComData,
     detalhesPorPonto,
+    mostrarPontos,
     onFechar,
   }: {
     pontosGrafico: PesoRegistro[];
@@ -23,8 +24,10 @@
     metaAlvoPorPonto: (number | null)[] | null;
     /** No máximo 8 datas no eixo, em intervalos iguais — mesma lista calculada em Peso.svelte. */
     pontosComData: boolean[] | null;
-    /** Só com até 1 mês de período: pontos marcados na linha e rótulos de %/meta por ponto. */
+    /** Só com até 1 mês de período: rótulos de %/meta por ponto. */
     detalhesPorPonto: boolean;
+    /** Só com até 1 semana de período: bolinha em cada ponto da linha — mesma regra de Peso.svelte. */
+    mostrarPontos: boolean;
     onFechar: () => void;
   } = $props();
 
@@ -117,7 +120,7 @@
             pointBackgroundColor: pontosGrafico.map((p) => corPonto(p.data)),
             pointBorderColor: pontosGrafico.map((p) => corPonto(p.data)),
             tension: 0.3,
-            pointRadius: detalhesPorPonto ? 4 : 0,
+            pointRadius: mostrarPontos ? 4 : 0,
             borderWidth: detalhesPorPonto ? 3 : 1.5,
           },
           ...(metaLinha
