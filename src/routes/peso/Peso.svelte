@@ -580,6 +580,11 @@
         scales: {
           x: { display: false },
           y: {
+            // Só no filtro "1 semana" (mostrarPontos): reserva uma folga abaixo do menor valor,
+            // senão o ponto mais baixo ficava colado na base da área do gráfico, sem espaço pro
+            // dia da semana embaixo dele — mesmo com o clamp, o texto saía quase em cima da data
+            // do eixo (pluginDatasEixo), ilegível.
+            grace: mostrarPontos ? "12%" : undefined,
             ticks: {
               color: "#9aa0ab",
               font: { size: 10 },

@@ -177,7 +177,12 @@
         },
         scales: {
           x: { ticks: { color: "#9aa0ab" }, grid: { display: false } },
-          y: { ticks: { color: "#9aa0ab" }, grid: { color: "rgba(255, 255, 255, 0.08)" } },
+          y: {
+            // Mesma folga do gráfico compacto (Peso.svelte) — ver o comentário lá.
+            grace: mostrarPontos ? "12%" : undefined,
+            ticks: { color: "#9aa0ab" },
+            grid: { color: "rgba(255, 255, 255, 0.08)" },
+          },
         },
       },
       plugins: [pluginRotulosMeta],
