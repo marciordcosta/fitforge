@@ -2950,7 +2950,6 @@
     {:else}
       <div class="lista-exercicios-musculo">
         {#each modalMusculoRotina.itens as item (item.treinoExercicioId)}
-          {@const tendEx = tendenciaExercicio(item.exercicioId)}
           {@const variacaoPct = variacaoExercicioPct(item.exercicioId)}
           <button
             class="exercicio-musculo-item exercicio-musculo-item-btn"
@@ -2972,12 +2971,7 @@
                 <span class="exercicio-musculo-rotina">{item.treinoNome} · {item.posicao}º exercício</span>
               {/if}
             </span>
-            <span
-              class="serie-texto-musculo"
-              class:valor-subindo={tendEx === "subindo"}
-              class:valor-estavel={tendEx === "estavel"}
-              class:valor-caindo={tendEx === "caindo"}
-            >{item.series} {item.series === 1 ? "série" : "séries"}</span>
+            <span class="serie-texto-musculo">{item.series} {item.series === 1 ? "série" : "séries"}</span>
           </button>
         {/each}
       </div>
