@@ -1034,6 +1034,34 @@
   const subtelaAberta = $derived(
     mostrarPicker || mostrarCriarAvulso || substituindoExIdx !== null || trocandoExIdx !== null || reordenando,
   );
+
+  interface ResumoExercicioConclusao {
+    nome: string;
+    trofeus: number;
+    regressoes: number;
+  }
+
+  /** Resumo mostrado no modal "Salvando rotina…" (ver salvando abaixo) -- só os exercícios com
+   * algo pra destacar: troféu (já calculado ao vivo em cada série, ver prPeso/pr1rm/prVolume) ou
+   * regressão (peso ou, no mesmo peso, repetições abaixo do último registro daquele exercício —
+   * mesma base de comparação que "anteriorPeso/anteriorReps" já usa em outros lugares da tela). */
+  const resumoConclusao = $derived.by((): ResumoExercicioConclusao[] => {
+    return sessao
+      .map((ex) => {
+        let trofeus = 0;
+        let regressoes = 0;
+        for (const s of ex.sets) {
+          if (!s.concluida) continue;
+          if (s.prPeso || s.pr1rm || s.prVolume) trofeus++;
+          const regrediu =
+            (s.peso != null && s.anteriorPeso != null && s.peso < s.anteriorPeso) ||
+            (s.peso === s.anteriorPeso && s.repeticoes != null && s.anteriorReps != null && s.repeticoes < s.anteriorReps);
+          if (regrediu) regressoes++;
+        }
+        return { nome: ex.nome, trofeus, regressoes };
+      })
+      .filter((r) => r.trofeus > 0 || r.regressoes > 0);
+  });
 </script>
 
 <div class="header-fixo">
@@ -1491,6 +1519,35 @@
   <AlertDialog mensagem={alertaMsg} onFechar={() => (alertaMsg = null)} />
 {/if}
 
+{#if salvando}
+  <!-- Salvar (registros + duração +, às vezes, a rotina) é sequencial e pode levar alguns
+       segundos -- sem isso, a tela ficava "congelada" (só o botão desabilitado) e dava a
+       impressão de erro. Esse resumo aparece na hora, cobrindo a tela toda, até o salvamento
+       terminar (sucesso segue pra fora da rotina; erro fecha e mostra o alerta de sempre). -->
+  <div class="salvando-overlay" role="presentation">
+    <div class="salvando-card">
+      <p class="salvando-treino">{nomeTreino}</p>
+      {#if resumoConclusao.length}
+        <div class="salvando-resumo">
+          {#each resumoConclusao as r (r.nome)}
+            <div class="salvando-resumo-linha">
+              <span class="salvando-resumo-nome">{r.nome}</span>
+              <span class="salvando-resumo-icones">
+                {#if r.trofeus}<span title="Recordes nessa sessão">🏆{r.trofeus > 1 ? ` ×${r.trofeus}` : ""}</span>{/if}
+                {#if r.regressoes}<span title="Abaixo do último registro">📉{r.regressoes > 1 ? ` ×${r.regressoes}` : ""}</span>{/if}
+              </span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+      <div class="salvando-rodape">
+        <span class="salvando-spinner" aria-hidden="true"></span>
+        <span>Salvando rotina…</span>
+      </div>
+    </div>
+  </div>
+{/if}
+
 {#if descansoEditandoIdx !== null}
   {@const idxDescanso = descansoEditandoIdx}
   <DescansoPicker
@@ -1578,6 +1635,86 @@
     margin: 0 auto;
     padding: var(--space-4);
     padding-bottom: var(--space-6);
+  }
+  .salvando-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    z-index: 300;
+  }
+  .salvando-card {
+    width: 100%;
+    max-width: 320px;
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-4);
+    box-shadow: var(--shadow-float);
+    text-align: center;
+  }
+  .salvando-treino {
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    color: var(--surface-fg);
+  }
+  .salvando-resumo {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .salvando-resumo-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface-bg);
+    text-align: left;
+  }
+  .salvando-resumo-nome {
+    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .salvando-resumo-icones {
+    flex-shrink: 0;
+    display: flex;
+    gap: var(--space-2);
+    font-size: 13px;
+  }
+  .salvando-rodape {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+  }
+  .salvando-spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--surface-border);
+    border-top-color: var(--color-primary);
+    animation: salvando-girar 0.7s linear infinite;
+  }
+  @keyframes salvando-girar {
+    to {
+      transform: rotate(360deg);
+    }
   }
   /* Alerta central (não bottom-sheet) pra escolha de "concluir como" — mesmo motivo/estilo do
      ConfirmDialog, só que com 2 opções reais + subtítulo em vez de confirmar/cancelar. */
