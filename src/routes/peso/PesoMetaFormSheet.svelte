@@ -4,7 +4,7 @@
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { navigate } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
-  import { getMeta, getUltimoPeso, salvarMeta, excluirMeta, type DiaSemana, type ModoMedia } from "../../lib/pesoApi";
+  import { getMeta, getUltimoPeso, salvarMeta, excluirMeta, type DiaSemana } from "../../lib/pesoApi";
   import { getTipoDieta, type TipoDieta } from "../../lib/dietaApi";
 
   let {
@@ -44,9 +44,6 @@
   /** Dia da semana em que a meta reseta e recalcula (0=domingo..6=sábado) — ver
    * calcularLinhaMetaPorDia em pesoApi.ts. */
   let diaResetSemana = $state<DiaSemana>(1);
-  /** Como "a média" é calculada pra alimentar a meta e o card "Peso média" — ver ModoMedia em
-   * pesoApi.ts. */
-  let modoMedia = $state<ModoMedia>("diario");
   let pesoAlvo = $state<number | null>(null);
   let carregando = $state(true);
   let salvando = $state(false);
@@ -81,9 +78,8 @@
       percentualMin = metaAtual?.tipo === "percentual" && metaAtual.percentualMin != null ? Math.abs(metaAtual.percentualMin) : null;
       percentualMax = metaAtual?.tipo === "percentual" && metaAtual.percentualMax != null ? Math.abs(metaAtual.percentualMax) : null;
       diaResetSemana = metaAtual?.diaResetSemana ?? 1;
-      modoMedia = metaAtual?.modoMedia ?? "diario";
       clampPercentuais();
-      original = JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo, diaResetSemana, modoMedia });
+      original = JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo, diaResetSemana });
     } finally {
       carregando = false;
     }
@@ -95,7 +91,7 @@
   const podeSalvar = $derived(pesoAlvo != null && (!precisaPercentual || (percentualMin != null && percentualMax != null)));
 
   function sujo(): boolean {
-    return !carregando && JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo, diaResetSemana, modoMedia }) !== original;
+    return !carregando && JSON.stringify({ tipoDieta, percentualMin, percentualMax, pesoAlvo, diaResetSemana }) !== original;
   }
 
   /** Sheet sem botão de voltar dedicado — fechar (toque fora, arrastar pra baixo) é o próprio
@@ -113,17 +109,10 @@
     salvando = true;
     try {
       if (tipoDieta === "manutencao") {
-        await salvarMeta("manutencao", null, null, pesoAlvo, diaResetSemana, modoMedia);
+        await salvarMeta("manutencao", null, null, pesoAlvo, diaResetSemana);
       } else {
         const sinal = tipoDieta === "bulking" ? 1 : -1;
-        await salvarMeta(
-          "percentual",
-          sinal * Math.abs(percentualMin!),
-          sinal * Math.abs(percentualMax!),
-          pesoAlvo,
-          diaResetSemana,
-          modoMedia,
-        );
+        await salvarMeta("percentual", sinal * Math.abs(percentualMin!), sinal * Math.abs(percentualMax!), pesoAlvo, diaResetSemana);
       }
       mostrarToast("Salvo");
       onSalvo();
@@ -199,21 +188,6 @@
           {/each}
         </div>
         <span class="campo-dica">Nesse dia, a meta da próxima semana é recalculada em cima da sua média atual</span>
-      </div>
-
-      <div class="campo">
-        <label for="meta-modo-media">Como calcular a média de peso</label>
-        <div class="referencia-opcoes" id="meta-modo-media">
-          <button type="button" class:ativo={modoMedia === "diario"} onclick={() => (modoMedia = "diario")}>Diário</button>
-          <button type="button" class:ativo={modoMedia === "semanal"} onclick={() => (modoMedia = "semanal")}>Semanal</button>
-        </div>
-        <span class="campo-dica">
-          {#if modoMedia === "diario"}
-            Média móvel dos últimos 7 dias, recalculada todo dia
-          {:else}
-            Média da semana em andamento (só os dias já pesados desde o último reset), reinicia a cada início de semana
-          {/if}
-        </span>
       </div>
     {/if}
 

@@ -241,12 +241,6 @@ export async function getUltimoPeso(): Promise<number | null> {
  * daquele dia — ver calcularLinhaMetaPorDia. */
 export type DiaSemana = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
-/** Como "a média" é calculada pra alimentar a meta (e o card "Peso média" da tela de Peso):
- * "diario" = móvel dos últimos 7 dias (janela corrida, recalcula todo dia) — o padrão de sempre.
- * "semanal" = bloco fechado por semana (do dia de reset até o dia de reset seguinte) — reinicia
- * do zero a cada início de semana, mostrando a média PARCIAL dos dias já pesados nela. */
-export type ModoMedia = "diario" | "semanal";
-
 /** Meta única por usuário. Para "percentual", o sinal indica a direção: positivo = ganho,
  * negativo = perda — sempre semanal (cutting = negativo, bulking = positivo, derivado do Tipo de
  * Dieta em Dieta > Parâmetros, não escolhido aqui). A meta da semana usa sempre `percentualMin`
@@ -261,13 +255,12 @@ export interface PesoMeta {
   percentualMax: number | null;
   pesoAlvo: number | null;
   diaResetSemana: DiaSemana;
-  modoMedia: ModoMedia;
 }
 
 export async function getMeta(): Promise<PesoMeta | null> {
   const { data, error } = await supabase
     .from("peso_metas")
-    .select("tipo, percentual_min, percentual_max, peso_alvo, dia_reset_semana, modo_media")
+    .select("tipo, percentual_min, percentual_max, peso_alvo, dia_reset_semana")
     .eq("user_id", uid())
     .maybeSingle();
   if (error) throw error;
@@ -278,7 +271,6 @@ export async function getMeta(): Promise<PesoMeta | null> {
     percentualMax: data.percentual_max,
     pesoAlvo: data.peso_alvo,
     diaResetSemana: (data.dia_reset_semana as DiaSemana | null) ?? 1,
-    modoMedia: (data.modo_media as ModoMedia | null) ?? "diario",
   };
 }
 
@@ -288,7 +280,6 @@ export async function salvarMeta(
   percentualMax: number | null,
   pesoAlvo: number | null,
   diaResetSemana: DiaSemana,
-  modoMedia: ModoMedia,
 ): Promise<void> {
   const { error } = await supabase.from("peso_metas").upsert({
     user_id: uid(),
@@ -297,7 +288,6 @@ export async function salvarMeta(
     percentual_max: tipo === "percentual" ? percentualMax : null,
     peso_alvo: pesoAlvo,
     dia_reset_semana: tipo === "percentual" ? diaResetSemana : null,
-    modo_media: tipo === "percentual" ? modoMedia : null,
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
@@ -311,7 +301,6 @@ export async function salvarMeta(
       percentual_max: tipo === "percentual" ? percentualMax : null,
       peso_alvo: pesoAlvo,
       dia_reset_semana: tipo === "percentual" ? diaResetSemana : null,
-      modo_media: tipo === "percentual" ? modoMedia : null,
       vigente_desde: hojeISO(),
     },
     { onConflict: "user_id,vigente_desde" },
@@ -334,7 +323,7 @@ export interface PesoMetaHistorico extends PesoMeta {
 export async function listMetaHistorico(): Promise<PesoMetaHistorico[]> {
   const { data, error } = await supabase
     .from("peso_metas_historico")
-    .select("tipo, percentual_min, percentual_max, peso_alvo, dia_reset_semana, modo_media, vigente_desde")
+    .select("tipo, percentual_min, percentual_max, peso_alvo, dia_reset_semana, vigente_desde")
     .eq("user_id", uid())
     .order("vigente_desde", { ascending: true });
   if (error) throw error;
@@ -344,7 +333,6 @@ export async function listMetaHistorico(): Promise<PesoMetaHistorico[]> {
     percentualMax: l.percentual_max as number | null,
     pesoAlvo: l.peso_alvo as number | null,
     diaResetSemana: (l.dia_reset_semana as DiaSemana | null) ?? 1,
-    modoMedia: (l.modo_media as ModoMedia | null) ?? "diario",
     vigenteDesde: l.vigente_desde as string,
   }));
 }
@@ -419,14 +407,6 @@ export async function getPesoMedioAtual(): Promise<number | null> {
   return janela.reduce((acc, p) => acc + p.peso, 0) / janela.length;
 }
 
-function inicioDaSemana(data: string, diaReset: DiaSemana): string {
-  let d = parseISODate(data);
-  while (d.getDay() !== diaReset) {
-    d = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
-  }
-  return toISODate(d);
-}
-
 function proximoComWeekday(data: string, diaReset: DiaSemana): string {
   let d = parseISODate(data);
   while (d.getDay() !== diaReset) {
@@ -436,25 +416,12 @@ function proximoComWeekday(data: string, diaReset: DiaSemana): string {
 }
 
 /** Um ponto por dia com peso registrado; a média usa os até 7 dias anteriores (janela corrida,
- * recalcula todo dia) — usada quando `modoMedia` é "diario". */
+ * recalcula todo dia). */
 export function calcularMediaMovelSerie(lista: PesoRegistro[]): PesoRegistro[] {
   const ordenada = [...lista].sort((a, b) => a.data.localeCompare(b.data));
   return ordenada.map((p) => {
     const limite = somarDias(p.data, -6);
     const janela = ordenada.filter((q) => q.data >= limite && q.data <= p.data);
-    const media = janela.reduce((acc, q) => acc + q.peso, 0) / janela.length;
-    return { data: p.data, peso: media };
-  });
-}
-
-/** Um ponto por dia com peso registrado; a média é da SEMANA FECHADA em andamento (do dia
- * `diaReset` mais recente até a data), reiniciando a cada novo início de semana — usada quando
- * `modoMedia` é "semanal". Com só 1 registro na semana, a média é esse próprio valor. */
-export function calcularMediaSemanalSerie(lista: PesoRegistro[], diaReset: DiaSemana): PesoRegistro[] {
-  const ordenada = [...lista].sort((a, b) => a.data.localeCompare(b.data));
-  return ordenada.map((p) => {
-    const inicio = inicioDaSemana(p.data, diaReset);
-    const janela = ordenada.filter((q) => q.data >= inicio && q.data <= p.data);
     const media = janela.reduce((acc, q) => acc + q.peso, 0) / janela.length;
     return { data: p.data, peso: media };
   });
@@ -482,8 +449,7 @@ interface SegmentoMeta {
  * segmento cada um lê, então calculam os limites de semana uma vez só.
  *
  * A cada início de semana (o dia configurado em `diaResetSemana`), a meta da semana é recalculada
- * do zero: pega a média vigente naquele dia (móvel ou de semana fechada, conforme `modoMedia`) e
- * aplica o ritmo MÍNIMO (`percentualMin`) uma única vez pra achar o alvo do FIM da semana — nunca
+ * do zero: pega a média móvel dos últimos 7 dias vigente naquele dia e aplica o ritmo MÍNIMO (`percentualMin`) uma única vez pra achar o alvo do FIM da semana — nunca
  * acumula "dívida" de semanas anteriores nem reage dia a dia. O início da semana é sempre onde a
  * semana ANTERIOR terminou (não a média real daquele dia), pra a linha nunca dar salto, só mudar
  * de inclinação. Na primeira semana de uma configuração de meta (sem semana anterior pra herdar),
@@ -501,22 +467,11 @@ function calcularSegmentosPorDia(pesos: PesoRegistro[], historico: PesoMetaHisto
   if (!datas.length) return mapa;
 
   const movelPorData = new Map(calcularMediaMovelSerie(pesos).map((p) => [p.data, p.peso]));
-  const semanalCache = new Map<DiaSemana, Map<string, number>>();
-  function serieDoModo(modo: ModoMedia, diaReset: DiaSemana): Map<string, number> {
-    if (modo === "diario") return movelPorData;
-    let cache = semanalCache.get(diaReset);
-    if (!cache) {
-      cache = new Map(calcularMediaSemanalSerie(pesos, diaReset).map((p) => [p.data, p.peso]));
-      semanalCache.set(diaReset, cache);
-    }
-    return cache;
-  }
   /** Média mais recente conhecida NA data ou antes dela — o dia de reset é um dia fixo da semana,
    * quase nunca coincide com um registro de peso de verdade. */
-  function mediaAteData(modo: ModoMedia, diaReset: DiaSemana, data: string): number | null {
-    const serieDados = serieDoModo(modo, diaReset);
+  function mediaAteData(data: string): number | null {
     let melhor: { data: string; peso: number } | null = null;
-    for (const [d, v] of serieDados) {
+    for (const [d, v] of movelPorData) {
       if (d <= data && (!melhor || d > melhor.data)) melhor = { data: d, peso: v };
     }
     return melhor?.peso ?? null;
@@ -538,7 +493,7 @@ function calcularSegmentosPorDia(pesos: PesoRegistro[], historico: PesoMetaHisto
       continue;
     }
 
-    const { diaResetSemana, modoMedia, percentualMin, pesoAlvo } = era.config;
+    const { diaResetSemana, percentualMin, pesoAlvo } = era.config;
 
     // Limites de semana: começa em era.inicio, depois o 1º dia com o weekday configurado, daí em diante de 7 em 7.
     const limites: string[] = [era.inicio];
@@ -554,7 +509,7 @@ function calcularSegmentosPorDia(pesos: PesoRegistro[], historico: PesoMetaHisto
     const fimPorLimite = new Map<string, number>();
     let continuidade: number | null = null;
     for (const limite of limites) {
-      const mediaNoLimite = mediaAteData(modoMedia, diaResetSemana, limite);
+      const mediaNoLimite = mediaAteData(limite);
       if (mediaNoLimite == null) continue;
       const inicioValor = continuidade ?? mediaNoLimite;
       const fimValor = limitarPeloAlvo(mediaNoLimite * (1 + percentualMin / 100), percentualMin, pesoAlvo);
@@ -631,11 +586,11 @@ export async function getMetaSemanal(): Promise<number | null> {
   return ultima != null ? (mapa.get(ultima) ?? null) : null;
 }
 
-/** Observação de "ajustar rota" (dieta/treino/cardio): compara a média vigente de HOJE (conforme
- * `modoMedia`) com o ponto de hoje na linha de meta — se o desvio (pra qualquer lado) passar do
- * `percentualMax` configurado, a rota precisa mudar (indo rápido ou devagar demais pro ritmo
- * máximo tolerado, nos três tipos de dieta). null sem meta percentual configurada, sem peso
- * suficiente, ou se o desvio está dentro da tolerância (nada a avisar). */
+/** Observação de "ajustar rota" (dieta/treino/cardio): compara a média móvel de HOJE com o ponto
+ * de hoje na linha de meta — se o desvio (pra qualquer lado) passar do `percentualMax`
+ * configurado, a rota precisa mudar (indo rápido ou devagar demais pro ritmo máximo tolerado, nos
+ * três tipos de dieta). null sem meta percentual configurada, sem peso suficiente, ou se o desvio
+ * está dentro da tolerância (nada a avisar). */
 export async function getObservacaoMeta(): Promise<{ desvioPct: number; direcao: "acima" | "abaixo" } | null> {
   const meta = await getMeta();
   if (!meta || meta.tipo !== "percentual" || meta.percentualMax == null) return null;
@@ -650,8 +605,7 @@ export async function getObservacaoMeta(): Promise<{ desvioPct: number; direcao:
 
   const metaAtiva = metaNaData(historico, hoje);
   if (!metaAtiva || metaAtiva.percentualMax == null) return null;
-  const serieMedia =
-    metaAtiva.modoMedia === "semanal" ? calcularMediaSemanalSerie(registros, metaAtiva.diaResetSemana) : calcularMediaMovelSerie(registros);
+  const serieMedia = calcularMediaMovelSerie(registros);
   const mediaHoje = serieMedia.length ? serieMedia[serieMedia.length - 1].peso : null;
   if (mediaHoje == null || metaHoje === 0) return null;
 

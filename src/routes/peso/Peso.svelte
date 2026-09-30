@@ -13,7 +13,6 @@
     getUltimoPeso,
     getPesoMedioAtual,
     calcularMediaMovelSerie,
-    calcularMediaSemanalSerie,
     calcularLinhaMetaPorDia,
     calcularMetaFimSemanaPorDia,
     getObservacaoMeta,
@@ -303,19 +302,9 @@
    * período/filtro do gráfico. */
   const pesoAtualTexto = $derived(ultimoPeso != null ? `${formatPeso(ultimoPeso)} kg` : "—");
 
-  /** Card "Peso média": conforme `modoMedia` da meta atual — "diario" usa a móvel de 7 dias
-   * (histórico completo, mesmo critério de sempre); "semanal" usa a média da semana em andamento
-   * (parcial, reinicia a cada início de semana). Sem meta configurada, cai no comportamento
-   * "diario" de sempre. */
-  const pesoMedioCardValor = $derived.by(() => {
-    if (meta?.modoMedia === "semanal" && pesosCompletos.length) {
-      const serie = calcularMediaSemanalSerie(pesosCompletos, meta.diaResetSemana);
-      return serie.length ? serie[serie.length - 1].peso : null;
-    }
-    return pesoMedioAtual;
-  });
-  const mediaAtualTexto = $derived(pesoMedioCardValor != null ? `${formatPeso(pesoMedioCardValor)} kg` : "—");
-  const mediaAtualLabel = $derived(meta?.modoMedia === "semanal" ? "Média semanal" : "Média diária");
+  /** Card "Peso média": móvel dos últimos 7 dias (histórico completo, mesmo critério de sempre). */
+  const mediaAtualTexto = $derived(pesoMedioAtual != null ? `${formatPeso(pesoMedioAtual)} kg` : "—");
+  const mediaAtualLabel = "Média diária";
 
   /** "Meta Semanal" por dia — fonte única compartilhada com o card (calcularLinhaMetaPorDia em
    * pesoApi.ts). Roda sobre TODO o histórico (`pesosCompletos`), não sobre o período visível —
