@@ -99,10 +99,9 @@
     }
   }
 
-  /** Quantas sessões (dias distintos de treino_registros) cada rotina teve DEPOIS da última vez
-   * que sua composição foi editada — "registros" no rodapé do card, zera sozinho a cada Salvar
-   * (o backend atualiza treinos.composicao_atualizada_em via trigger, cobrindo qualquer forma de
-   * editar a rotina, não só o editor completo). */
+  /** Quantas sessões (dias distintos de treino_registros) cada rotina teve DEPOIS do último reset
+   * manual da contagem — "registros" no rodapé do card. Não zera sozinho ao editar a rotina; só
+   * via zerarRegistrosRotina, em Parametrização (uma rotina ou todas de uma vez). */
   let registrosPorTreino = $state<Map<string, number>>(new Map());
 
   async function carregarRegistrosPorTreino(treinosCarregados: TreinoComExercicios[]): Promise<void> {
@@ -111,7 +110,7 @@
       return;
     }
     const dataMinima = toISODate(
-      new Date(Math.min(...treinosCarregados.map((t) => new Date(t.composicao_atualizada_em).getTime()))),
+      new Date(Math.min(...treinosCarregados.map((t) => new Date(t.registros_zerados_em).getTime()))),
     );
     const registros = await getRegistrosPorTreinoDesde(dataMinima);
     const diasPorTreino = new Map<string, Set<string>>();
@@ -123,7 +122,7 @@
     }
     const mapa = new Map<string, number>();
     for (const t of treinosCarregados) {
-      const desde = toISODate(new Date(t.composicao_atualizada_em));
+      const desde = toISODate(new Date(t.registros_zerados_em));
       const dias = diasPorTreino.get(t.id);
       const count = dias ? Array.from(dias).filter((d) => d >= desde).length : 0;
       mapa.set(t.id, count);
@@ -1352,8 +1351,6 @@
     const atualizado = await getTreino(treinoId);
     if (!atualizado) return;
     treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
-    // Trocar/mover exercício muda treino_exercicios de verdade (não é rascunho) — o trigger no
-    // banco já reseta composicao_atualizada_em, só falta recontar os "registros" com o novo valor.
     void carregarRegistrosPorTreino(treinos);
     if (modalMusculoRotina?.multiRotina) {
       // `treinos` já está atualizado acima — recalcula juntando todas as rotinas de novo.
@@ -1936,7 +1933,6 @@
       metasMusculo = mapaMetas;
       const atualizado = await getTreino(treinoId);
       if (atualizado) treinos = treinos.map((t) => (t.id === treinoId ? atualizado : t));
-      // O trigger no banco já resetou composicao_atualizada_em — recontar os "registros" do rodapé.
       void carregarRegistrosPorTreino(treinos);
       // Refresca cada rotina de destino envolvida (uma só vez por rotina, mesmo com vários pendentes).
       const destinosUnicos = [...new Set(pendentes.map((p) => p.destinoTreinoId))];

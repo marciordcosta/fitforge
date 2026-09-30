@@ -2,16 +2,20 @@
   import { voltar } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
   import Button from "../../components/Button.svelte";
+  import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import {
     getParametrosDistribuicao,
     salvarParametrosDistribuicao,
     fatorPerformanceGradual,
+    listTreinos,
+    zerarRegistrosRotina,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type ParametrosDistribuicao,
     type FadigaModo,
     type GraficoCampo,
     type HomeModoGrupos,
     type OrdenacaoHome,
+    type TreinoComExercicios,
   } from "../../lib/treinoApi";
 
   let carregando = $state(true);
@@ -35,6 +39,11 @@
   let homeModoGrupos = $state<HomeModoGrupos>(PARAMETROS_DISTRIBUICAO_PADRAO.homeModoGrupos);
   let destacarExerciciosSemRotina = $state(PARAMETROS_DISTRIBUICAO_PADRAO.destacarExerciciosSemRotina);
   let ordenacaoHome = $state<OrdenacaoHome>(PARAMETROS_DISTRIBUICAO_PADRAO.ordenacaoHome);
+
+  let treinos = $state<TreinoComExercicios[]>([]);
+  let zerandoId = $state<string | null>(null);
+  let confirmandoZerarTodas = $state(false);
+  let confirmandoZerarId = $state<string | null>(null);
 
   const OPCOES_ORDENACAO_HOME: { valor: OrdenacaoHome; label: string; desc: string }[] = [
     { valor: "dia", label: "Por dia", desc: "Sempre sobe a rotina do dia mais próximo, feita ou não essa semana" },
@@ -88,7 +97,8 @@
     carregando = true;
     erro = null;
     try {
-      const p = await getParametrosDistribuicao();
+      const [p, treinosCarregados] = await Promise.all([getParametrosDistribuicao(), listTreinos()]);
+      treinos = treinosCarregados;
       seriesManutencaoMin = p.seriesManutencaoMin;
       seriesManutencaoMax = p.seriesManutencaoMax;
       seriesFocoMin = p.seriesFocoMin;
@@ -114,6 +124,24 @@
   }
 
   void carregar();
+
+  /** Zera a contagem de "registros" (rodapé do card, em Rotinas/Distribuição) — de uma rotina só
+   * (`id`) ou de todas (null). Só reinicia o QUE É CONTADO a partir de agora; não apaga nenhum
+   * registro de treino de verdade. */
+  async function zerarRegistros(id: string | null): Promise<void> {
+    confirmandoZerarTodas = false;
+    confirmandoZerarId = null;
+    zerandoId = id ?? "todas";
+    try {
+      await zerarRegistrosRotina(id);
+      treinos = await listTreinos();
+      mostrarToast("Contagem de registros zerada");
+    } catch (err) {
+      alert("Erro ao zerar contagem: " + (err as Error).message);
+    } finally {
+      zerandoId = null;
+    }
+  }
 
   /** Sem isso, dava pra configurar Foco menor/igual a Manutenção e a faixa "moderado" (entre os
    * dois) ficava vazia/invertida — a classificação de cor passava a saltar de "manutenção" direto
@@ -337,9 +365,54 @@
       </label>
     </div>
 
+    <div class="param-card">
+      <p class="param-card-titulo">Contagem de registros</p>
+      <p class="param-card-desc">
+        "Registros" no rodapé do card de cada rotina conta as sessões feitas desde o último reset manual — editar a rotina não zera mais sozinho.
+      </p>
+      <button
+        type="button"
+        class="zerar-todas-btn"
+        onclick={() => (confirmandoZerarTodas = true)}
+        disabled={zerandoId != null || !treinos.length}
+      >
+        Zerar todas as rotinas
+      </button>
+      {#if treinos.length}
+        <ul class="zerar-lista">
+          {#each treinos as treino (treino.id)}
+            <li class="zerar-linha">
+              <span class="zerar-nome">{treino.nome_treino}</span>
+              <button type="button" class="zerar-btn" onclick={() => (confirmandoZerarId = treino.id)} disabled={zerandoId != null}>
+                Zerar
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+
     <Button onclick={salvar} disabled={salvando}>Salvar</Button>
   {/if}
 </div>
+
+{#if confirmandoZerarTodas}
+  <ConfirmDialog
+    titulo="Zerar a contagem de registros de todas as rotinas?"
+    textoConfirmar="Zerar todas"
+    onConfirmar={() => zerarRegistros(null)}
+    onCancelar={() => (confirmandoZerarTodas = false)}
+  />
+{/if}
+
+{#if confirmandoZerarId}
+  <ConfirmDialog
+    titulo={`Zerar a contagem de registros de "${treinos.find((t) => t.id === confirmandoZerarId)?.nome_treino ?? ""}"?`}
+    textoConfirmar="Zerar"
+    onConfirmar={() => zerarRegistros(confirmandoZerarId)}
+    onCancelar={() => (confirmandoZerarId = null)}
+  />
+{/if}
 
 <style>
   .container {
@@ -576,5 +649,57 @@
   }
   .preview-cabecalho span {
     color: var(--surface-muted);
+  }
+  .zerar-todas-btn {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-fg);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .zerar-todas-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .zerar-lista {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+  }
+  .zerar-linha {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--surface-border);
+  }
+  .zerar-nome {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-sm);
+  }
+  .zerar-btn {
+    flex-shrink: 0;
+    padding: 4px var(--space-2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: none;
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .zerar-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 </style>
