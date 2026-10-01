@@ -68,6 +68,16 @@
   let naoEncontrada = $state(false);
   let alertaMsg = $state<string | null>(null);
 
+  /** Altura real do topbar (.header-fixo), medida em runtime -- usada como padding-top do
+   * .container logo abaixo. Necessário porque o topbar virou position:fixed (ver comentário na
+   * CSS de .header-fixo): um position:fixed sai do fluxo normal, então sem essa compensação o
+   * conteúdo começava escondido atrás dele. */
+  let headerFixoEl = $state<HTMLDivElement | undefined>();
+  let headerFixoAltura = $state(0);
+  $effect(() => {
+    if (headerFixoEl) headerFixoAltura = headerFixoEl.offsetHeight;
+  });
+
   function mostrarAlerta(msg: string): void {
     alertaMsg = msg;
   }
@@ -1083,7 +1093,7 @@
   });
 </script>
 
-<div class="header-fixo">
+<div class="header-fixo" bind:this={headerFixoEl}>
   <div class="header-fixo-inner">
     <div class="stat-inline stat-treino">
       <span class="stat-label">Treino</span>
@@ -1108,7 +1118,7 @@
   </div>
 </div>
 
-<div class="container">
+<div class="container" style={headerFixoAltura ? `padding-top: ${headerFixoAltura}px` : undefined}>
   {#if loading}
     <p class="muted">Carregando…</p>
   {:else if naoEncontrada}
@@ -1803,8 +1813,14 @@
     cursor: pointer;
   }
   .header-fixo {
-    position: sticky;
+    /* fixed, não sticky: essa tela fica aninhada dentro de .aba-entrada (App.svelte), que recebe
+       uma animação de transform (translateX) a cada troca/reentrada de aba -- isso quebra
+       position:sticky permanentemente em alguns WebViews Android (bug conhecido do Chromium: um
+       ancestral com transform muda o containing block do sticky). fixed não tem esse problema. */
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 20;
     background: var(--surface-card);
     border-bottom: 1px solid var(--surface-border);

@@ -12,6 +12,8 @@
     getHistoricoDetalhadoExercicio,
     distribuicaoMusculosExercicio,
     listMarcadoresExercicio,
+    salvarMarcadorExercicio,
+    removerMarcadorExercicio,
     listObservacoesExercicio,
     observacaoParaHistorico,
     type Exercicio,
@@ -23,6 +25,8 @@
   import ExercicioChart from "./ExercicioChart.svelte";
   import ExercicioCampos from "./ExercicioCampos.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import Sheet from "../../components/Sheet.svelte";
+  import Button from "../../components/Button.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
 
   /** `onFechar` (opcional): quando informado, o "voltar" fecha esse componente no lugar (ele foi
@@ -62,6 +66,50 @@
   let mostrarConfirmExcluir = $state(false);
   let mostrarConfirmExcluirHistoricoDepois = $state(false);
   let sessaoParaExcluir = $state<SessaoHistorico | null>(null);
+
+  /** Marcar/editar/remover observação pontual (ex: troca de equipamento) direto no histórico do
+   * exercício — mesmo fluxo de HistoricoDia.svelte, só que aqui cobre qualquer data do histórico
+   * (lá só o dia aberto). */
+  let sessaoParaMarcar = $state<SessaoHistorico | null>(null);
+  let observacaoMarcador = $state("");
+  let salvandoMarcador = $state(false);
+
+  function abrirMarcarSessao(sessao: SessaoHistorico): void {
+    sessaoParaMarcar = sessao;
+    observacaoMarcador = marcadoresPorData.get(sessao.data) ?? "";
+  }
+
+  async function confirmarMarcarSessao(): Promise<void> {
+    if (!sessaoParaMarcar || !observacaoMarcador.trim()) return;
+    const data = sessaoParaMarcar.data;
+    salvandoMarcador = true;
+    try {
+      await salvarMarcadorExercicio(exercicioId, data, observacaoMarcador.trim());
+      marcadores = [...marcadores.filter((m) => m.data !== data), { data, observacao: observacaoMarcador.trim() }];
+      sessaoParaMarcar = null;
+      observacaoMarcador = "";
+    } catch (e) {
+      alert("Erro ao marcar exercício: " + (e as Error).message);
+    } finally {
+      salvandoMarcador = false;
+    }
+  }
+
+  async function removerMarcacaoSessaoAtual(): Promise<void> {
+    if (!sessaoParaMarcar) return;
+    const data = sessaoParaMarcar.data;
+    salvandoMarcador = true;
+    try {
+      await removerMarcadorExercicio(exercicioId, data);
+      marcadores = marcadores.filter((m) => m.data !== data);
+      sessaoParaMarcar = null;
+      observacaoMarcador = "";
+    } catch (e) {
+      alert("Erro ao remover marcação: " + (e as Error).message);
+    } finally {
+      salvandoMarcador = false;
+    }
+  }
 
   async function carregar() {
     loading = true;
@@ -250,7 +298,10 @@
             </button>
           </div>
           {#if marcadoresPorData.has(sessao.data)}
-            <p class="sessao-marcador">🚩 {marcadoresPorData.get(sessao.data)}</p>
+            <button class="sessao-marcador sessao-marcador-btn" onclick={() => abrirMarcarSessao(sessao)}
+            >🚩 {marcadoresPorData.get(sessao.data)}</button>
+          {:else}
+            <button class="sessao-marcador-add" onclick={() => abrirMarcarSessao(sessao)}>🚩 Marcar exercício</button>
           {/if}
           {#if observacaoDaSessao(sessao.data)}
             <p class="sessao-observacao">📝 {observacaoDaSessao(sessao.data)}</p>
@@ -307,6 +358,28 @@
     onConfirmar={confirmarExcluirSessao}
     onCancelar={() => (sessaoParaExcluir = null)}
   />
+{/if}
+
+{#if sessaoParaMarcar}
+  <Sheet titulo="Marcar Exercício" onFechar={() => (sessaoParaMarcar = null)}>
+    <p class="marcador-ajuda">
+      Registra uma observação em {formatData(sessaoParaMarcar.data)} — aparece no histórico e no gráfico de
+      progressão, pra não confundir uma troca de equipamento (ou algo assim) com progresso ou regressão de
+      verdade. A tendência de progressão desse exercício também passa a contar a partir dessa data.
+    </p>
+    <textarea
+      class="marcador-input"
+      placeholder="Ex: Troquei pra máquina nova, peso não é comparável"
+      bind:value={observacaoMarcador}
+      rows="3"
+    ></textarea>
+    <Button onclick={confirmarMarcarSessao} disabled={salvandoMarcador || !observacaoMarcador.trim()}>
+      {salvandoMarcador ? "Salvando…" : "Salvar"}
+    </Button>
+    {#if marcadoresPorData.has(sessaoParaMarcar.data)}
+      <Button variant="danger" onclick={removerMarcacaoSessaoAtual} disabled={salvandoMarcador}>Remover marcação</Button>
+    {/if}
+  </Sheet>
 {/if}
 
 <style>
@@ -456,6 +529,48 @@
     margin: 0 0 var(--space-2);
     font-size: var(--font-size-sm);
     color: var(--color-warning, #fbbf24);
+  }
+  .sessao-marcador-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .sessao-marcador-add {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0 0 var(--space-2);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+    cursor: pointer;
+  }
+  .marcador-ajuda {
+    margin: 0 0 var(--space-3);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .marcador-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--surface-card);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    margin-bottom: var(--space-3);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    resize: none;
   }
   .sessao-observacao {
     margin: 0 0 var(--space-2);
