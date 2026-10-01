@@ -119,16 +119,23 @@
 
   /** "Mostrar detalhes" (Meta > Parametrização do gráfico) — marcado (padrão) mantém o
    * comportamento de sempre (detalhesPorPonto decide sozinho pelo período); desmarcado força só a
-   * linha (peso e meta), sem rótulo nenhum, não importa o período. Mesma chave/convenção de
-   * CHAVE_MODO_GRAFICO_PADRAO: lida uma vez na montagem, guardada direto no dispositivo. */
+   * linha (peso e meta), sem rótulo nenhum, não importa o período. Diferente de
+   * CHAVE_MODO_GRAFICO_PADRAO (que só semeia o estado inicial, de propósito): essa regra vale pra
+   * CADA cálculo enquanto a tela de Peso estiver aberta, então precisa ser $state e relida quando
+   * o modal de Meta fecha — senão mudar a config não refletia até recarregar a página inteira. */
   const CHAVE_MOSTRAR_DETALHES = "fitforge_peso_mostrar_detalhes";
-  const mostrarDetalhesPref =
-    typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_MOSTRAR_DETALHES) !== "false" : true;
+  function lerMostrarDetalhesPref(): boolean {
+    return typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_MOSTRAR_DETALHES) !== "false" : true;
+  }
+  let mostrarDetalhesPref = $state(lerMostrarDetalhesPref());
 
-  /** "Acumulada" (padrão) ou "Média" pro card "Variação" — ver Meta > Parametrização do gráfico. */
+  /** "Acumulada" (padrão) ou "Média" pro card "Variação" — ver Meta > Parametrização do gráfico.
+   * Mesmo motivo de mostrarDetalhesPref: $state, relida ao fechar o modal de Meta. */
   const CHAVE_TIPO_VARIACAO = "fitforge_peso_tipo_variacao";
-  const tipoVariacaoPref: "acumulada" | "media" =
-    typeof localStorage !== "undefined" && localStorage.getItem(CHAVE_TIPO_VARIACAO) === "media" ? "media" : "acumulada";
+  function lerTipoVariacaoPref(): "acumulada" | "media" {
+    return typeof localStorage !== "undefined" && localStorage.getItem(CHAVE_TIPO_VARIACAO) === "media" ? "media" : "acumulada";
+  }
+  let tipoVariacaoPref = $state<"acumulada" | "media">(lerTipoVariacaoPref());
 
   let meta = $state<PesoMeta | null>(null);
   let metaHistorico = $state<PesoMetaHistorico[]>([]);
@@ -852,7 +859,14 @@
 {/if}
 
 {#if mostrarFormMeta}
-  <PesoMetaFormSheet onFechar={() => (mostrarFormMeta = false)} onSalvo={aoSalvarMeta} />
+  <PesoMetaFormSheet
+    onFechar={() => {
+      mostrarFormMeta = false;
+      mostrarDetalhesPref = lerMostrarDetalhesPref();
+      tipoVariacaoPref = lerTipoVariacaoPref();
+    }}
+    onSalvo={aoSalvarMeta}
+  />
 {/if}
 
 {#if mostrarGraficoCheio}
