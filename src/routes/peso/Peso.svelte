@@ -356,36 +356,22 @@
   });
 
   /** "Acumulada" (padrão) = direto do primeiro pro último registro do período inteiro.
-   * "Média" = o período quebrado em blocos de 7 dias (a partir do registro mais antigo), a
-   * variação % calculada DENTRO de cada bloco (mesma conta de "Acumulada", só que por semana) e
-   * depois a média simples dessas variações semanais — configurável em Meta > Parametrização do
-   * gráfico. Blocos com menos de 2 registros não entram na média (nada pra comparar). */
+   * "Média" = a mesma variação acumulada dividida pelo número de semanas do período (dias entre
+   * o primeiro e o último registro ÷ 7, fracionário) — dá o ritmo médio real por semana,
+   * configurável em Meta > Parametrização do gráfico. */
   function variacaoPct(primeiro: number, ultimo: number): number | null {
     if (primeiro === 0) return null;
     return ((ultimo - primeiro) / primeiro) * 100;
   }
 
   function variacaoMediaSemanal(pontos: PesoRegistro[]): number | null {
-    if (!pontos.length) return null;
-    const blocos: PesoRegistro[][] = [];
-    let atual: PesoRegistro[] = [];
-    let inicioBloco = pontos[0].data;
-    for (const p of pontos) {
-      if (Math.round((parseISODate(p.data).getTime() - parseISODate(inicioBloco).getTime()) / 86_400_000) >= 7) {
-        if (atual.length) blocos.push(atual);
-        atual = [];
-        inicioBloco = p.data;
-      }
-      atual.push(p);
-    }
-    if (atual.length) blocos.push(atual);
-
-    const variacoes = blocos
-      .filter((b) => b.length >= 2)
-      .map((b) => variacaoPct(b[0].peso, b[b.length - 1].peso))
-      .filter((v): v is number => v != null);
-    if (!variacoes.length) return null;
-    return variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
+    if (pontos.length < 2) return null;
+    const acumulada = variacaoPct(pontos[0].peso, pontos[pontos.length - 1].peso);
+    if (acumulada == null) return null;
+    const dias = (parseISODate(pontos[pontos.length - 1].data).getTime() - parseISODate(pontos[0].data).getTime()) / 86_400_000;
+    const semanas = dias / 7;
+    if (semanas <= 0) return null;
+    return acumulada / semanas;
   }
 
   /** Variação % de peso no período do filtro aplicado no gráfico (periodo) — sempre a partir dos

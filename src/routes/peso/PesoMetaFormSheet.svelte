@@ -274,7 +274,7 @@
         {#if tipoVariacao === "acumulada"}
           Direto do primeiro pro último registro do período
         {:else}
-          Média da variação de cada semana (blocos de 7 dias) dentro do período
+          Variação acumulada do período dividida pelo número de semanas
         {/if}
       </span>
     </div>
