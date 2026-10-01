@@ -1,0 +1,80 @@
+<script lang="ts">
+  export interface OpcaoAlerta {
+    label: string;
+    destrutivo?: boolean;
+    onSelect: () => void;
+  }
+
+  /** Mesmo visual/mecânica de ConfirmDialog (alerta centralizado, não bottom sheet), mas com N
+   * opções em vez de uma só — cada opção já é a própria confirmação, sem abrir outro modal depois
+   * de escolhida. Usado quando "excluir" (ou outra ação) tem mais de um alvo possível (ex: excluir
+   * a refeição inteira vs. só a meta dela) e cada alvo é igualmente direto, sem aviso extra. */
+  let {
+    titulo,
+    opcoes,
+    textoCancelar = "Cancelar",
+    onCancelar,
+  }: {
+    titulo: string;
+    opcoes: OpcaoAlerta[];
+    textoCancelar?: string;
+    onCancelar: () => void;
+  } = $props();
+</script>
+
+<div class="confirm-overlay" role="presentation" onclick={onCancelar}>
+  <div class="confirm-card" role="presentation" onclick={(e) => e.stopPropagation()}>
+    <p class="confirm-titulo">{titulo}</p>
+    {#each opcoes as opcao, i (i)}
+      <button class="confirm-btn" class:destructive={opcao.destrutivo} onclick={opcao.onSelect}>{opcao.label}</button>
+    {/each}
+    <button class="confirm-btn" onclick={onCancelar}>{textoCancelar}</button>
+  </div>
+</div>
+
+<style>
+  .confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    /* Acima de qualquer tela cheia (fotos, comparação, gráficos em tela cheia usam z-index 300) --
+       senão o diálogo abre escondido atrás delas, parecendo que o botão "não faz nada". */
+    z-index: 350;
+  }
+  .confirm-card {
+    width: 100%;
+    max-width: 320px;
+    background: var(--surface-card);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5) var(--space-4) var(--space-4);
+    box-shadow: var(--shadow-float);
+  }
+  .confirm-titulo {
+    text-align: center;
+    font-size: var(--font-size-base);
+    margin: 0 0 var(--space-4);
+  }
+  .confirm-btn {
+    display: block;
+    width: 100%;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--surface-border);
+    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: var(--space-2);
+  }
+  .confirm-btn:last-child {
+    margin-bottom: 0;
+  }
+  .confirm-btn.destructive {
+    color: var(--color-danger);
+  }
+</style>

@@ -6,6 +6,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
+  import AlertEscolha from "../../components/AlertEscolha.svelte";
   import DietaQuantidadeDialog from "./DietaQuantidadeDialog.svelte";
   import {
     listRefeicoesModelo,
@@ -414,12 +415,10 @@
     itemEditando = item;
   }
 
-  /** Menu com as duas opções de exclusão (refeição inteira ou só a meta) — cada uma abre seu
-   * próprio ConfirmDialog de confirmação, já existentes. */
+  /** Menu com as duas opções de exclusão (refeição inteira ou só a meta) — alerta centralizado
+   * (AlertEscolha), escolher a opção já executa direto, sem outro modal de confirmação depois. */
   let mostrarMenuExcluir = $state(false);
-  let confirmandoRemoverMeta = $state(false);
   let removendoMeta = $state(false);
-  let confirmandoExcluirRefeicao = $state(false);
   let excluindoRefeicao = $state(false);
 
   /** Diferente de "Remover Meta" (limpa a lista de alimentos/macros, o card continua existindo):
@@ -624,12 +623,26 @@
 </div>
 
 {#if mostrarMenuExcluir}
-  <ActionSheet
+  <AlertEscolha
     titulo="Excluir"
-    onFechar={() => (mostrarMenuExcluir = false)}
+    onCancelar={() => (mostrarMenuExcluir = false)}
     opcoes={[
-      { label: "Excluir Refeição", icon: iconLixeira, destructive: true, onSelect: () => (confirmandoExcluirRefeicao = true) },
-      { label: "Excluir Meta", icon: iconLixeira, destructive: true, onSelect: () => (confirmandoRemoverMeta = true) },
+      {
+        label: "Excluir Refeição",
+        destrutivo: true,
+        onSelect: () => {
+          mostrarMenuExcluir = false;
+          excluirRefeicaoCompleta();
+        },
+      },
+      {
+        label: "Excluir Meta",
+        destrutivo: true,
+        onSelect: () => {
+          mostrarMenuExcluir = false;
+          removerMetaCompleta();
+        },
+      },
     ]}
   />
 {/if}
@@ -672,25 +685,6 @@
   />
 {/if}
 
-{#if confirmandoRemoverMeta}
-  <ConfirmDialog
-    titulo="Excluir a meta e os alimentos dessa refeição?"
-    textoConfirmar="Excluir Meta"
-    onConfirmar={removerMetaCompleta}
-    onCancelar={() => (confirmandoRemoverMeta = false)}
-  />
-{/if}
-
-{#if confirmandoExcluirRefeicao}
-  <ConfirmDialog
-    titulo={diasSemana?.length
-      ? `Excluir "${nomeAtual}" desse(s) dia(s)? Ela continua existindo nos outros dias, se houver.`
-      : `Excluir "${nomeAtual}" do catálogo? Essa ação não pode ser desfeita.`}
-    textoConfirmar="Excluir Refeição"
-    onConfirmar={excluirRefeicaoCompleta}
-    onCancelar={() => (confirmandoExcluirRefeicao = false)}
-  />
-{/if}
 
 <style>
   .container {
