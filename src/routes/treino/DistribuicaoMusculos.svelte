@@ -1227,29 +1227,50 @@
     return pesos;
   }
 
-  /** Tendência de um músculo dentro da rotina aberta no editor — média PONDERADA (pesosFadigaPorExercicio)
-   * da variação dos exercícios que o trabalham (mesma regra de tendenciaExercicio): um exercício
-   * de fim de treino ainda entra na conta, só que com menos peso. Texto discreto embaixo do nome. */
-  function tendenciaMusculoEditor(musculoId: string): "subindo" | "estavel" | "caindo" | null {
-    if (!modalEditorRotina) return null;
-    const pesos = pesosFadigaPorExercicio(modalEditorRotina);
+  /** Tendência de um músculo em um conjunto de rotinas — média PONDERADA (pesosFadigaPorExercicio)
+   * da variação dos exercícios que o trabalham em TODAS as rotinas da lista (mesma regra de
+   * tendenciaExercicio): um exercício de fim de treino ainda entra na conta, só que com menos
+   * peso. Base compartilhada por tendenciaMusculoEditor (1 rotina, a aberta no editor),
+   * tendenciaMusculoRotina (1 rotina, no card da tela principal) e tendenciaMusculoSemanal (todas
+   * as rotinas, no card "Distribuição Semanal"). */
+  function tendenciaMusculoPonderada(treinosList: TreinoComExercicios[], musculoId: string): "subindo" | "estavel" | "caindo" | null {
     let somaPonderada = 0;
     let somaPesos = 0;
-    for (const te of modalEditorRotina.exercicios) {
-      if (!te.exercicio?.musculos.some((m) => m.musculo_id === musculoId)) continue;
-      const pontos = historicoPorExercicio.get(te.exercicio_id);
-      if (!pontos) continue;
-      const v = variacaoExercicio(pontos);
-      if (v == null) continue;
-      const peso = pesos.get(te.id) ?? 1;
-      somaPonderada += v * peso;
-      somaPesos += peso;
+    for (const treino of treinosList) {
+      const pesos = pesosFadigaPorExercicio(treino);
+      for (const te of treino.exercicios) {
+        if (!te.exercicio?.musculos.some((m) => m.musculo_id === musculoId)) continue;
+        const pontos = historicoPorExercicio.get(te.exercicio_id);
+        if (!pontos) continue;
+        const v = variacaoExercicio(pontos);
+        if (v == null) continue;
+        const peso = pesos.get(te.id) ?? 1;
+        somaPonderada += v * peso;
+        somaPesos += peso;
+      }
     }
     if (somaPesos === 0) return null;
     const media = somaPonderada / somaPesos;
     if (media > 0.02) return "subindo";
     if (media < -0.02) return "caindo";
     return "estavel";
+  }
+
+  /** Tendência de um músculo dentro da rotina aberta no editor — texto discreto embaixo do nome. */
+  function tendenciaMusculoEditor(musculoId: string): "subindo" | "estavel" | "caindo" | null {
+    if (!modalEditorRotina) return null;
+    return tendenciaMusculoPonderada([modalEditorRotina], musculoId);
+  }
+
+  /** Tendência de um músculo dentro de UMA rotina específica — card da rotina na tela principal
+   * da Distribuição. */
+  function tendenciaMusculoRotina(treino: TreinoComExercicios, musculoId: string): "subindo" | "estavel" | "caindo" | null {
+    return tendenciaMusculoPonderada([treino], musculoId);
+  }
+
+  /** Tendência de um músculo somando TODAS as rotinas da semana — card "Distribuição Semanal". */
+  function tendenciaMusculoSemanal(musculoId: string): "subindo" | "estavel" | "caindo" | null {
+    return tendenciaMusculoPonderada(treinos, musculoId);
   }
 
   function textoTendencia(t: "subindo" | "estavel" | "caindo" | null): string | null {
@@ -2363,6 +2384,20 @@
   </div>
 {/snippet}
 
+{#snippet nomeComTendencia(nome: string, tendencia: "subindo" | "estavel" | "caindo" | null, aoClicar: () => void)}
+  <button class="nome-btn nome-btn-tendencia" onclick={aoClicar}>
+    <span class="nome-btn-texto">{nome}</span>
+    {#if textoTendencia(tendencia)}
+      <span
+        class="editor-tendencia-texto"
+        class:valor-subindo={tendencia === "subindo"}
+        class:valor-estavel={tendencia === "estavel"}
+        class:valor-caindo={tendencia === "caindo"}
+      >{textoTendencia(tendencia)}</span>
+    {/if}
+  </button>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -2398,7 +2433,7 @@
                       <span class="chevron-grupo" class:aberto>›</span>
                     </button>
                   {:else}
-                    <button class="nome-btn" onclick={() => linha.musculo && abrirExercicios(linha.musculo)}>{linha.nome}</button>
+                    {@render nomeComTendencia(linha.nome, linha.musculo ? tendenciaMusculoSemanal(linha.musculo.id) : null, () => linha.musculo && abrirExercicios(linha.musculo))}
                   {/if}
                   {@render barraFadiga(linha.partes, linha.partes.a + linha.partes.b + linha.partes.c)}
                   {@render caixasSeries(linha.bruto, linha.valor, valorAcumulado(linha), ordemSemanal, (campo) => (ordemSemanal = campo))}
@@ -2406,7 +2441,7 @@
                 {#if aberto && linha.subItens}
                   {#each linha.subItens as sub (sub.musculo.id)}
                     <div class="item item-sub">
-                      <button class="nome-btn" onclick={() => abrirExercicios(sub.musculo)}>{sub.musculo.nome}</button>
+                      {@render nomeComTendencia(sub.musculo.nome, tendenciaMusculoSemanal(sub.musculo.id), () => abrirExercicios(sub.musculo))}
                       {@render barraFadiga(sub.partes, sub.partes.a + sub.partes.b + sub.partes.c)}
                       {@render caixasSeries(sub.bruto, sub.valor, valorAcumulado(sub), ordemSemanal, (campo) => (ordemSemanal = campo))}
                     </div>
@@ -2490,7 +2525,7 @@
                           <span class="chevron-grupo" class:aberto>›</span>
                         </button>
                       {:else}
-                        <button class="nome-btn" onclick={() => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo)}>{linha.nome}</button>
+                        {@render nomeComTendencia(linha.nome, linha.musculo ? tendenciaMusculoRotina(treino, linha.musculo.id) : null, () => linha.musculo && abrirExerciciosDaRotina(treino, linha.musculo))}
                       {/if}
                       {@render barraFadiga(linha.partes, linha.valor)}
                       {@render caixasSeries(linha.bruto, linha.valor, valorAcumulado(linha), ordemTreino, (campo) => (ordemSemanal = campo), metaLinha?.valor ?? null, metaLinha?.tipo ?? null)}
@@ -2499,7 +2534,7 @@
                       {#each linha.subItens as sub (sub.musculo.id)}
                         {@const metaSub = metasMusculo.get(chaveMeta(treino.id, sub.musculo.id)) ?? null}
                         <div class="item item-sub">
-                          <button class="nome-btn" onclick={() => abrirExerciciosDaRotina(treino, sub.musculo)}>{sub.musculo.nome}</button>
+                          {@render nomeComTendencia(sub.musculo.nome, tendenciaMusculoRotina(treino, sub.musculo.id), () => abrirExerciciosDaRotina(treino, sub.musculo))}
                           {@render barraFadiga(sub.partes, sub.valor)}
                           {@render caixasSeries(sub.bruto, sub.valor, valorAcumulado(sub), ordemTreino, (campo) => (ordemSemanal = campo), metaSub?.valor ?? null, metaSub?.tipo ?? null)}
                         </div>
@@ -3605,6 +3640,23 @@
     font-size: var(--font-size-sm);
     color: var(--surface-fg);
     text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Nome + tendência (Progredindo/Estagnado/Regredindo) empilhados -- a trunca/nowrap do
+     .nome-btn base vale só pro texto do nome (.nome-btn-texto), não pro botão inteiro. */
+  .nome-btn-tendencia {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    min-width: 0;
+    overflow: visible;
+    white-space: normal;
+  }
+  .nome-btn-texto {
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
