@@ -117,6 +117,14 @@
     modoGrafico = m;
   }
 
+  /** "Mostrar detalhes" (Meta > Parametrização do gráfico) — marcado (padrão) mantém o
+   * comportamento de sempre (detalhesPorPonto decide sozinho pelo período); desmarcado força só a
+   * linha (peso e meta), sem rótulo nenhum, não importa o período. Mesma chave/convenção de
+   * CHAVE_MODO_GRAFICO_PADRAO: lida uma vez na montagem, guardada direto no dispositivo. */
+  const CHAVE_MOSTRAR_DETALHES = "fitforge_peso_mostrar_detalhes";
+  const mostrarDetalhesPref =
+    typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_MOSTRAR_DETALHES) !== "false" : true;
+
   let meta = $state<PesoMeta | null>(null);
   let metaHistorico = $state<PesoMetaHistorico[]>([]);
   let mostrarFormMeta = $state(false);
@@ -334,7 +342,19 @@
     return metaSemanalValor != null ? `${formatPeso(metaSemanalValor)} kg` : "Sem meta";
   });
 
-  const pesoAlvoTexto = $derived(meta?.pesoAlvo != null ? `${formatPeso(meta.pesoAlvo)} kg` : "Sem meta");
+  /** Variação % de peso entre o primeiro e o último registro do período do filtro aplicado no
+   * gráfico (periodo) — sempre a partir dos pesos reais registrados, independente do modo
+   * diário/média escolhido pro desenho da linha. null sem pelo menos 2 registros no período. */
+  const variacaoPeriodo = $derived.by(() => {
+    if (pesosGrafico.length < 2) return null;
+    const primeiro = pesosGrafico[0].peso;
+    const ultimo = pesosGrafico[pesosGrafico.length - 1].peso;
+    if (primeiro === 0) return null;
+    return ((ultimo - primeiro) / primeiro) * 100;
+  });
+  const variacaoPeriodoTexto = $derived(
+    variacaoPeriodo == null ? "—" : `${variacaoPeriodo > 0 ? "+" : ""}${variacaoPeriodo.toFixed(1).replace(".", ",")}%`,
+  );
 
   /** Recorte de metaAlvoCompletoPorData pros dias efetivamente exibidos no período/filtro
    * escolhido — mesma ordem/tamanho de mediaMovelGrafico, pra alinhar com pontosGrafico. */
@@ -368,8 +388,9 @@
 
   /** Só mostra os detalhes por ponto (%, valor da meta) com até 1 mês de período — em filtros
    * maiores vira poluição visual (dezenas de rótulos sobrepostos). Acima disso a linha fica só a
-   * linha, mais fina. */
-  const detalhesPorPonto = $derived(periodo.dias != null && periodo.dias <= 30);
+   * linha, mais fina. Também desliga de vez (qualquer período) se "Mostrar detalhes" estiver
+   * desmarcado em Meta > Parametrização do gráfico. */
+  const detalhesPorPonto = $derived(mostrarDetalhesPref && periodo.dias != null && periodo.dias <= 30);
 
   /** As bolinhas em cada ponto da linha só valem a pena em "1 semana" — com mais dias os pontos
    * ficam próximos demais e a linha vira uma sequência de bolinhas coladas, sem definição. Acima
@@ -703,10 +724,10 @@
       <span class="quick-card-label">Meta semanal</span>
       <span class="quick-card-valor">{metaSemanalTexto}</span>
     </button>
-    <button class="quick-card quick-card-btn" onclick={() => (mostrarFormMeta = true)}>
-      <span class="quick-card-label">Meta Alvo</span>
-      <span class="quick-card-valor">{pesoAlvoTexto}</span>
-    </button>
+    <div class="quick-card">
+      <span class="quick-card-label">Variação</span>
+      <span class="quick-card-valor">{variacaoPeriodoTexto}</span>
+    </div>
   </div>
 
   {#if observacaoMeta}

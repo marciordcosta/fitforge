@@ -35,6 +35,19 @@
     if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_MODO_GRAFICO_PADRAO, m);
   }
 
+  /** "Mostrar detalhes" no gráfico (Peso.svelte) — marcado (padrão) mantém o comportamento de
+   * sempre (peso/% aparecem nos pontos conforme o período escolhido); desmarcado força só a linha
+   * (peso e meta), nunca mostra os rótulos por ponto. Mesma convenção de modoGraficoPadrao: grava
+   * direto no toque, sem passar pelo fluxo de "Salvar Meta". */
+  const CHAVE_MOSTRAR_DETALHES = "fitforge_peso_mostrar_detalhes";
+  let mostrarDetalhes = $state(
+    typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_MOSTRAR_DETALHES) !== "false" : true,
+  );
+  function alternarMostrarDetalhes(v: boolean): void {
+    mostrarDetalhes = v;
+    if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_MOSTRAR_DETALHES, String(v));
+  }
+
   let tipoDieta = $state<TipoDieta>("manutencao");
   /** Sempre a magnitude (sem sinal) — o sinal é aplicado na hora de salvar, conforme o tipo de
    * dieta. `percentualMin` é o ritmo usado pra calcular a meta de cada semana; `percentualMax` só
@@ -201,6 +214,14 @@
     </div>
 
     <div class="campo">
+      <label class="campo-checkbox-linha">
+        <input type="checkbox" checked={mostrarDetalhes} onchange={(e) => alternarMostrarDetalhes(e.currentTarget.checked)} />
+        Mostrar detalhes
+      </label>
+      <span class="campo-dica">Peso e % nos pontos do gráfico (conforme o período). Desmarcado, fica só a linha (peso e meta).</span>
+    </div>
+
+    <div class="campo">
       <label for="meta-peso">Peso alvo (kg)</label>
       <input id="meta-peso" type="number" inputmode="decimal" step="0.1" placeholder="-" bind:value={pesoAlvo} />
     </div>
@@ -261,6 +282,18 @@
   .campo-dica {
     font-size: 12px;
     color: var(--surface-muted);
+  }
+  .campo-checkbox-linha {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+  }
+  .campo-checkbox-linha input {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    accent-color: var(--color-primary);
   }
   .campo-dica-dupla {
     display: block;

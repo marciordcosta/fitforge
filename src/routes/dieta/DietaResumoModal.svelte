@@ -1,6 +1,15 @@
 <script lang="ts">
   import { getMetasDiarias } from "../../lib/dietaApi";
-  import { getUltimoPeso, getPesoMedioAtual, getMeta, getMetaSemanal, getDiasParaObjetivo, formatDiasObjetivo } from "../../lib/pesoApi";
+  import {
+    getUltimoPeso,
+    getPesoMedioAtual,
+    getMeta,
+    getMetaSemanal,
+    getDiasParaObjetivo,
+    formatDiasObjetivo,
+    getPesosDoPeriodo,
+  } from "../../lib/pesoApi";
+  import { hojeISO, somarDias } from "../../lib/dates";
 
   let { onFechar }: { onFechar: () => void } = $props();
 
@@ -17,16 +26,21 @@
   let pesoAlvo = $state<number | null>(null);
   let temMeta = $state(false);
   let diasObjetivo = $state<number | null>(null);
+  /** Variação % de peso nos últimos 7 dias (primeiro vs último registro da janela) — mesmo
+   * critério do card "Variação" da tela de Peso, só que com período fixo de 1 semana (esse modal
+   * não tem o filtro de período de lá). null sem pelo menos 2 registros na janela. */
+  let variacaoSemana = $state<number | null>(null);
 
   async function carregar(): Promise<void> {
     loading = true;
-    const [media, ultimoPeso, mediaPeso, meta, metaSemanal, dias] = await Promise.all([
+    const [media, ultimoPeso, mediaPeso, meta, metaSemanal, dias, pesosSemana] = await Promise.all([
       getMetasDiarias(),
       getUltimoPeso(),
       getPesoMedioAtual(),
       getMeta(),
       getMetaSemanal(),
       getDiasParaObjetivo(),
+      getPesosDoPeriodo(somarDias(hojeISO(), -6), hojeISO()),
     ]);
     metaCalorias = media.calorias;
     metaProteina = media.proteinaG;
@@ -38,6 +52,11 @@
     metaSemanaPeso = metaSemanal;
     pesoAlvo = meta?.pesoAlvo ?? null;
     diasObjetivo = dias;
+    if (pesosSemana.length >= 2 && pesosSemana[0].peso !== 0) {
+      variacaoSemana = ((pesosSemana[pesosSemana.length - 1].peso - pesosSemana[0].peso) / pesosSemana[0].peso) * 100;
+    } else {
+      variacaoSemana = null;
+    }
     loading = false;
   }
 
@@ -60,6 +79,10 @@
 
   function formatKg(v: number | null): string {
     return v == null ? "—" : `${v.toFixed(1).replace(".", ",")} kg`;
+  }
+
+  function formatVariacao(v: number | null): string {
+    return v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(1).replace(".", ",")}%`;
   }
 
   const textoObjetivo = $derived(
@@ -114,6 +137,10 @@
         <div class="resumo-linha">
           <span class="resumo-label">Meta da semana</span>
           <span class="resumo-valor">{formatKg(metaSemanaPeso)}</span>
+        </div>
+        <div class="resumo-linha">
+          <span class="resumo-label">Variação</span>
+          <span class="resumo-valor">{formatVariacao(variacaoSemana)}</span>
         </div>
         <div class="resumo-linha">
           <span class="resumo-label">Meta alvo</span>
