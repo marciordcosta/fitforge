@@ -379,24 +379,23 @@
               {exibicaoRefeicao === "barras" ? "Uma barra por macro, com os valores" : "Os nomes dos alimentos lançados, sem números"}
             </p>
           </div>
-          {#if exibicaoRefeicao === "barras"}
-            <div class="param-linha param-tipo-dieta">
-              <p class="param-nome">Barras das refeições correspondem a</p>
-              <div class="tipo-dieta-opcoes">
-                {#each OPCOES_BASE_REFEICAO as opcao (opcao.valor)}
-                  <button type="button" class:ativo={barraBase === opcao.valor} onclick={() => (barraBase = opcao.valor)}>{opcao.label}</button>
-                {/each}
-              </div>
+          <div class="param-linha param-tipo-dieta">
+            <p class="param-nome">Barras das refeições correspondem a</p>
+            <div class="tipo-dieta-opcoes">
+              {#each OPCOES_BASE_REFEICAO as opcao (opcao.valor)}
+                <button type="button" class:ativo={barraBase === opcao.valor} onclick={() => (barraBase = opcao.valor)}>{opcao.label}</button>
+              {/each}
             </div>
-            <div class="param-linha param-tipo-dieta">
-              <p class="param-nome">Valores das refeições (valores das barras)</p>
-              <div class="formato-valor-opcoes">
-                {#each OPCOES_FORMATO_VALOR as opcao (opcao.valor)}
-                  <button type="button" class:ativo={valoresFormato === opcao.valor} onclick={() => (valoresFormato = opcao.valor)}>{opcao.label}</button>
-                {/each}
-              </div>
+          </div>
+          <div class="param-linha param-tipo-dieta">
+            <p class="param-nome">Valores das refeições (valores das barras)</p>
+            <div class="formato-valor-opcoes">
+              {#each OPCOES_FORMATO_VALOR as opcao (opcao.valor)}
+                <button type="button" class:ativo={valoresFormato === opcao.valor} onclick={() => (valoresFormato = opcao.valor)}>{opcao.label}</button>
+              {/each}
             </div>
-          {/if}
+            <p class="param-dica">Vale pra toda tela com barra de macro (refeição, item, receita, editar meta) — não só a home.</p>
+          </div>
         </div>
       {/if}
     </div>
