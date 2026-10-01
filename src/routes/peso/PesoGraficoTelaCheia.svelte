@@ -15,7 +15,7 @@
     pontosComData,
     mostrarPesoVariacao,
     mostrarDiaSemanaGrafico,
-    informarTreinoPref,
+    informarTreino,
     destacarRegistro,
     onFechar,
   }: {
@@ -32,7 +32,7 @@
      * período em Peso.svelte — aqui só consome o resultado pronto. */
     mostrarPesoVariacao: boolean;
     mostrarDiaSemanaGrafico: boolean;
-    informarTreinoPref: boolean;
+    informarTreino: boolean;
     destacarRegistro: boolean;
     onFechar: () => void;
   } = $props();
@@ -134,7 +134,7 @@
     if (!canvas) return;
     chart?.destroy();
     const corPonto = (data: string) =>
-      informarTreinoPref && modo === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO;
+      informarTreino && modo === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO;
     chart = new Chart(canvas, {
       type: "line",
       data: {

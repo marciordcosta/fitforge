@@ -446,6 +446,10 @@
   /** "Destacar registro (ponto) no gráfico" — a bolinha em cada ponto da linha. */
   const destacarRegistro = $derived(destacarRegistroPref && periodoNoFiltro);
 
+  /** "Informar treino no gráfico" — destaque de cor no ponto dos dias com treino (além de só
+   * valer no modo Diário, também respeita o filtro de período como os outros 3 itens). */
+  const informarTreino = $derived(informarTreinoPref && periodoNoFiltro);
+
   /** Datas do eixo: no máximo 8, sempre em intervalos iguais — diferente de pontosComRotulo (que
    * rotula a cada 7 dias e cresce sem limite em períodos muito longos, tipo "Tudo" com anos de
    * dados). */
@@ -597,7 +601,7 @@
     const pontos = pontosGrafico;
     if (!pontos.length) return;
     const corPonto = (data: string) =>
-      informarTreinoPref && modoGrafico === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO;
+      informarTreino && modoGrafico === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO;
     chart = new Chart(canvas, {
       type: "line",
       data: {
@@ -900,7 +904,7 @@
     {pontosComData}
     {mostrarPesoVariacao}
     {mostrarDiaSemanaGrafico}
-    {informarTreinoPref}
+    {informarTreino}
     {destacarRegistro}
     onFechar={() => (mostrarGraficoCheio = false)}
   />
