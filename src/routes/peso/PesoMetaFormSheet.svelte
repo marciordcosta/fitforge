@@ -248,7 +248,7 @@
     <div class="campo">
       <label class="campo-checkbox-linha">
         <input type="checkbox" checked={mostrarDetalhes} onchange={(e) => alternarMostrarDetalhes(e.currentTarget.checked)} />
-        Detalhes no gráfico
+        <span>Detalhes no gráfico</span>
       </label>
       <span class="campo-dica">Peso e % nos pontos do gráfico (conforme o período). Desmarcado, fica só a linha (peso e meta).</span>
     </div>
