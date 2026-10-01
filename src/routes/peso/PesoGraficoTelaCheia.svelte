@@ -162,18 +162,14 @@
                 {
                   data: metaLinha,
                   borderColor: COR_META,
-                  backgroundColor: COR_TREINO,
+                  backgroundColor: COR_META,
                   borderDash: [6, 4],
                   borderWidth: 1.5,
-                  // Pontinhos vermelhos (cor sólida) ao longo da linha de meta — sem eles, quando
-                  // sincronizada com o peso real, a linha de peso (mais grossa e sólida) engolia
-                  // visualmente a linha tracejada da meta por baixo.
-                  pointRadius: 2,
-                  pointBackgroundColor: COR_TREINO,
-                  pointBorderColor: COR_TREINO,
+                  pointRadius: 0,
                   spanGaps: true,
                   tension: 0,
-                  // Sempre desenhada por cima da linha de peso (ver comentário acima).
+                  // Sempre desenhada por cima da linha de peso (ver comentário acima) — o tracejado
+                  // vermelho fica visível por cima da linha sólida, mesmo nos pontos sincronizados.
                   order: 1,
                 },
               ]
