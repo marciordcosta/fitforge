@@ -239,6 +239,7 @@
   /** Só os alimentos — a refeição em si continua existindo (vazia) pro dia, diferente de
    * descartarRefeicao (que apaga o "slot" inteiro). */
   async function excluirTodosAlimentos(): Promise<void> {
+    confirmandoExcluirAlimentos = false;
     processando = true;
     try {
       await Promise.all(itens.map((item) => removerItemDiario(item.id)));
