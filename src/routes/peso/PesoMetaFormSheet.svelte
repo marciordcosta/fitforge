@@ -298,7 +298,6 @@
         <input type="checkbox" checked={informarTreino} onchange={(e) => alternarInformarTreino(e.currentTarget.checked)} />
         Informar treino no gráfico
       </label>
-      <span class="campo-dica">Destaca na cor o ponto dos dias com treino registrado (só no modo Diário)</span>
     </div>
 
     <div class="campo">
