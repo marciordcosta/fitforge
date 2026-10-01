@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import Sheet from "./Sheet.svelte";
+  import Button from "./Button.svelte";
 
   interface Opcao {
     valor: number;
@@ -89,7 +90,17 @@
   }
 </script>
 
-<Sheet {titulo} {onFechar}>
+{#snippet totalCalTitulo()}
+  <p class="total-cal-titulo">
+    {#if formatarRodape}
+      {formatarRodape(caloriasTotais)}
+    {:else}
+      ≈ {caloriasTotais} kcal
+    {/if}
+  </p>
+{/snippet}
+
+<Sheet {titulo} {onFechar} acaoTituloDireita={totalCalTitulo}>
   <div class="colunas">
     {#each colunas as coluna, idx (coluna.chave)}
       <div class="coluna">
@@ -122,39 +133,15 @@
       </div>
     {/each}
   </div>
-  <div class="rodape">
-    <button class="feito" onclick={confirmar}>Feito</button>
-    <p class="total-cal">
-      {#if formatarRodape}
-        {formatarRodape(caloriasTotais)}
-      {:else}
-        ≈ <strong>{caloriasTotais}</strong> kcal
-      {/if}
-    </p>
-  </div>
+  <Button onclick={confirmar}>Feito</Button>
 </Sheet>
 
 <style>
-  .rodape {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-  .total-cal {
-    flex: 1;
+  .total-cal-titulo {
     margin: 0;
-    box-sizing: border-box;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    text-align: center;
-    color: #fff;
-    font-size: var(--font-size-lg);
-    font-weight: 700;
-  }
-  .total-cal strong {
-    color: var(--surface-fg);
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-base);
+    color: var(--surface-muted);
+    white-space: nowrap;
   }
   .colunas {
     display: flex;
@@ -222,16 +209,5 @@
   .roda-item.ativo {
     color: var(--surface-fg);
     font-weight: 700;
-  }
-  .feito {
-    flex: 1;
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: none;
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    cursor: pointer;
   }
 </style>
