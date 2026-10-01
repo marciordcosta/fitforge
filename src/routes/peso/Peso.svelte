@@ -20,6 +20,7 @@
     type PesoMetaHistorico,
   } from "../../lib/pesoApi";
   import { getDiasComTreino, listTreinos, DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
+  import { cacheInvalidacao } from "../../lib/offline/cache.svelte";
   import {
     lerMostrarDiaSemana,
     lerMostrarPesoVariacao,
@@ -234,6 +235,22 @@
   }
 
   void carregarGrafico();
+
+  /** A aba Peso fica sempre montada (ver App.svelte) -- sem isso, registrar um peso novo (ex: o
+   * de hoje) não refletia aqui até recarregar a página inteira: carregar/carregarGrafico/
+   * carregarMeta só rodavam uma vez, no primeiro mount, e nada aqui observava a invalidação do
+   * cache disparada por salvarPeso (invalidarNamespace("peso")) -- a linha de meta, por exemplo,
+   * ficava parada no último dia visto antes do registro. Mesmo padrão já usado em Rotinas.svelte. */
+  let versaoPesoVista = cacheInvalidacao.versao("peso");
+  $effect(() => {
+    const versaoAtual = cacheInvalidacao.versao("peso");
+    if (versaoAtual !== versaoPesoVista) {
+      versaoPesoVista = versaoAtual;
+      void carregar();
+      void carregarGrafico();
+      void carregarMeta();
+    }
+  });
 
   /** Sentido da última troca de mês (1 = avançou, -1 = voltou) — só pra animação da grade saber
    * de que lado deslizar (ver `direcaoMes` no template). */
