@@ -1456,20 +1456,34 @@ export type BaseReferenciaRefeicao = "refeicao" | "diaria";
  * gramas são sempre contra a meta DAQUELA refeição, não têm variante diária). */
 export type FormatoValorRefeicao = "percentual_refeicao" | "percentual_diario" | "restante_acima" | "meta_refeicao";
 
+/** Como o card de cada refeição na home mostra o progresso: "barras" é o de sempre (uma barra por
+ * macro, ver valoresFormato); "resumo" troca as barras por uma linha de texto com os nomes dos
+ * alimentos lançados naquela refeição — sem número nenhum, só a descrição do que foi comido. */
+export type ExibicaoRefeicaoHome = "barras" | "resumo";
+
 export interface PreferenciasRefeicoesHome {
   barraBase: BaseReferenciaRefeicao;
   valoresFormato: FormatoValorRefeicao;
+  exibicao: ExibicaoRefeicaoHome;
 }
 
-const PREFERENCIAS_REFEICOES_PADRAO: PreferenciasRefeicoesHome = { barraBase: "refeicao", valoresFormato: "restante_acima" };
+const PREFERENCIAS_REFEICOES_PADRAO: PreferenciasRefeicoesHome = {
+  barraBase: "refeicao",
+  valoresFormato: "restante_acima",
+  exibicao: "barras",
+};
 
 export async function getPreferenciasRefeicoesHome(): Promise<PreferenciasRefeicoesHome> {
-  const { data, error } = await supabase.from("dieta_perfil").select("refeicoes_barra_base, refeicoes_valores_base").maybeSingle();
+  const { data, error } = await supabase
+    .from("dieta_perfil")
+    .select("refeicoes_barra_base, refeicoes_valores_base, refeicoes_exibicao")
+    .maybeSingle();
   if (error) throw error;
   if (!data) return PREFERENCIAS_REFEICOES_PADRAO;
   return {
     barraBase: (data.refeicoes_barra_base as BaseReferenciaRefeicao | null) ?? "refeicao",
     valoresFormato: (data.refeicoes_valores_base as FormatoValorRefeicao | null) ?? "restante_acima",
+    exibicao: (data.refeicoes_exibicao as ExibicaoRefeicaoHome | null) ?? "barras",
   };
 }
 
@@ -1479,6 +1493,7 @@ export async function salvarPreferenciasRefeicoesHome(prefs: PreferenciasRefeico
       user_id: uid(),
       refeicoes_barra_base: prefs.barraBase,
       refeicoes_valores_base: prefs.valoresFormato,
+      refeicoes_exibicao: prefs.exibicao,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },

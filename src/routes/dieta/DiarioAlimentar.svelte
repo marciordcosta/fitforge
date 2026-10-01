@@ -280,7 +280,7 @@
     }
   }
   let pesoAtual = $state(76);
-  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima" });
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras" });
   const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
 
   function parametro(chave: string): LimiteParametro {
@@ -1016,7 +1016,11 @@
               {#if metaAtual}<span class="card-header-cal">{totais.calorias.toFixed(0)} de {arredondarDezena(metaAtual.calorias)} cal</span>{/if}
             </span>
           </div>
-          {#if metaAtual}
+          {#if prefsRefeicoes.exibicao === "resumo"}
+            <p class="resumo-alimentos" class:resumo-vazio={!temItens}>
+              {temItens ? itens.filter((i) => i.refeicaoId === refeicao.id).map((i) => i.nome).join(", ") : "Nenhum alimento ainda"}
+            </p>
+          {:else if metaAtual}
             {@const metaBarra = {
               calorias: arredondarDezena(metaCardPara("calorias", metaAtual, prefsRefeicoes.barraBase)),
               carboidratoG: metaCardPara("carboidratoG", metaAtual, prefsRefeicoes.barraBase),
@@ -1540,6 +1544,16 @@
     margin: 0 0 var(--space-2);
     font-size: 12px;
     color: var(--surface-muted);
+  }
+  .resumo-alimentos {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--surface-fg);
+    line-height: 1.4;
+  }
+  .resumo-alimentos.resumo-vazio {
+    color: var(--surface-muted);
+    font-style: italic;
   }
   .pct-grid {
     display: flex;

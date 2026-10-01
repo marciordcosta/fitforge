@@ -23,6 +23,7 @@
     type TipoDieta,
     type BaseReferenciaRefeicao,
     type FormatoValorRefeicao,
+    type ExibicaoRefeicaoHome,
   } from "../../lib/dietaApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
@@ -37,6 +38,7 @@
   let tipoDieta = $state<TipoDieta>("manutencao");
   let barraBase = $state<BaseReferenciaRefeicao>("refeicao");
   let valoresFormato = $state<FormatoValorRefeicao>("restante_acima");
+  let exibicaoRefeicao = $state<ExibicaoRefeicaoHome>("barras");
   /** "Manter g/kg fixo": por padrão (desmarcado) as GRAMAS de cada macro ficam fixas até a
    * próxima edição em Gerenciar > Calorias, e é a proporção g/kg exibida que acompanha o peso.
    * Marcado inverte isso pra esse macro — a proporção fica fixa e as gramas acompanham o peso
@@ -56,6 +58,11 @@
     { valor: "cutting", label: "Cutting" },
     { valor: "manutencao", label: "Manutenção" },
     { valor: "bulking", label: "Bulking" },
+  ];
+
+  const OPCOES_EXIBICAO_REFEICAO: { valor: ExibicaoRefeicaoHome; label: string }[] = [
+    { valor: "barras", label: "Barras" },
+    { valor: "resumo", label: "Resumo" },
   ];
 
   const OPCOES_BASE_REFEICAO: { valor: BaseReferenciaRefeicao; label: string }[] = [
@@ -113,6 +120,7 @@
       tipoDieta = tipo;
       barraBase = prefsRefeicoes.barraBase;
       valoresFormato = prefsRefeicoes.valoresFormato;
+      exibicaoRefeicao = prefsRefeicoes.exibicao;
       proteinaGkgFixo = perfil.proteinaGkgFixo;
       gorduraGkgFixo = perfil.gorduraGkgFixo;
       acumularCalorias = acumular.ativo;
@@ -122,6 +130,7 @@
         tipoDieta,
         barraBase,
         valoresFormato,
+        exibicaoRefeicao,
         proteinaGkgFixo,
         gorduraGkgFixo,
         acumularCalorias,
@@ -144,6 +153,7 @@
         tipoDieta,
         barraBase,
         valoresFormato,
+        exibicaoRefeicao,
         proteinaGkgFixo,
         gorduraGkgFixo,
         acumularCalorias,
@@ -178,7 +188,7 @@
         }),
       );
       await salvarTipoDieta(tipoDieta);
-      await salvarPreferenciasRefeicoesHome({ barraBase, valoresFormato });
+      await salvarPreferenciasRefeicoesHome({ barraBase, valoresFormato, exibicao: exibicaoRefeicao });
       await Promise.all([
         salvarGkgFixo("proteina", proteinaGkgFixo),
         salvarGkgFixo("gordura", gorduraGkgFixo),
@@ -359,21 +369,34 @@
       {#if abertaExibicao}
         <div class="param-card-body">
           <div class="param-linha param-tipo-dieta">
-            <p class="param-nome">Barras das refeições correspondem a</p>
+            <p class="param-nome">Refeições da home mostram</p>
             <div class="tipo-dieta-opcoes">
-              {#each OPCOES_BASE_REFEICAO as opcao (opcao.valor)}
-                <button type="button" class:ativo={barraBase === opcao.valor} onclick={() => (barraBase = opcao.valor)}>{opcao.label}</button>
+              {#each OPCOES_EXIBICAO_REFEICAO as opcao (opcao.valor)}
+                <button type="button" class:ativo={exibicaoRefeicao === opcao.valor} onclick={() => (exibicaoRefeicao = opcao.valor)}>{opcao.label}</button>
               {/each}
             </div>
+            <p class="param-dica">
+              {exibicaoRefeicao === "barras" ? "Uma barra por macro, com os valores" : "Os nomes dos alimentos lançados, sem números"}
+            </p>
           </div>
-          <div class="param-linha param-tipo-dieta">
-            <p class="param-nome">Valores das refeições (home)</p>
-            <div class="formato-valor-opcoes">
-              {#each OPCOES_FORMATO_VALOR as opcao (opcao.valor)}
-                <button type="button" class:ativo={valoresFormato === opcao.valor} onclick={() => (valoresFormato = opcao.valor)}>{opcao.label}</button>
-              {/each}
+          {#if exibicaoRefeicao === "barras"}
+            <div class="param-linha param-tipo-dieta">
+              <p class="param-nome">Barras das refeições correspondem a</p>
+              <div class="tipo-dieta-opcoes">
+                {#each OPCOES_BASE_REFEICAO as opcao (opcao.valor)}
+                  <button type="button" class:ativo={barraBase === opcao.valor} onclick={() => (barraBase = opcao.valor)}>{opcao.label}</button>
+                {/each}
+              </div>
             </div>
-          </div>
+            <div class="param-linha param-tipo-dieta">
+              <p class="param-nome">Valores das refeições (valores das barras)</p>
+              <div class="formato-valor-opcoes">
+                {#each OPCOES_FORMATO_VALOR as opcao (opcao.valor)}
+                  <button type="button" class:ativo={valoresFormato === opcao.valor} onclick={() => (valoresFormato = opcao.valor)}>{opcao.label}</button>
+                {/each}
+              </div>
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
@@ -506,6 +529,11 @@
   }
   .param-tipo-dieta .param-nome {
     margin: 0 0 var(--space-2);
+  }
+  .param-dica {
+    margin: var(--space-2) 0 0;
+    font-size: 12px;
+    color: var(--surface-muted);
   }
   .tipo-dieta-opcoes {
     display: flex;

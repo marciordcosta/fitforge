@@ -43,7 +43,7 @@
   let itens = $state<ItemDiario[]>([]);
   let metaRefeicao = $state<MetasDiarias | null>(null);
   let metaDiaria = $state<MetasDiarias | null>(null);
-  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima" });
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras" });
   let modeloRefeicao = $state<RefeicaoModelo | null>(null);
   /** Só mostra o botão "Refeição Padrão" quando a lista de alimentos efetiva desse dia (override do
    * dia se houver, senão a global) realmente tem algum item — senão o botão aparece sem ter nada
