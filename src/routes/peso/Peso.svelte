@@ -641,6 +641,13 @@
   }
 </script>
 
+{#snippet iconMeta()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+  </svg>
+{/snippet}
 {#snippet iconFiltro()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -674,6 +681,9 @@
   <div class="header">
     <h1>Peso <span class="modo-label">{textoObjetivo ?? (modoGrafico === "media" ? "Média" : "Diário")}</span></h1>
     <div class="header-acoes">
+      <button class="icon-btn" onclick={() => (mostrarFormMeta = true)} aria-label="Configurar meta">
+        {@render iconMeta()}
+      </button>
       <button class="icon-btn" onclick={() => (mostrarFiltro = true)} aria-label="Filtro de período">
         {@render iconFiltro()}
       </button>
