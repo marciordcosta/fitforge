@@ -231,14 +231,6 @@
     </div>
 
     <div class="campo">
-      <label class="campo-checkbox-linha">
-        <input type="checkbox" checked={mostrarDetalhes} onchange={(e) => alternarMostrarDetalhes(e.currentTarget.checked)} />
-        Mostrar detalhes
-      </label>
-      <span class="campo-dica">Peso e % nos pontos do gráfico (conforme o período). Desmarcado, fica só a linha (peso e meta).</span>
-    </div>
-
-    <div class="campo">
       <label for="meta-tipo-variacao">Variação</label>
       <div class="referencia-opcoes" id="meta-tipo-variacao">
         <button type="button" class:ativo={tipoVariacao === "acumulada"} onclick={() => selecionarTipoVariacao("acumulada")}>Acumulada</button>
@@ -251,6 +243,14 @@
           Média da variação de cada semana (blocos de 7 dias) dentro do período
         {/if}
       </span>
+    </div>
+
+    <div class="campo">
+      <label class="campo-checkbox-linha">
+        <input type="checkbox" checked={mostrarDetalhes} onchange={(e) => alternarMostrarDetalhes(e.currentTarget.checked)} />
+        Detalhes no gráfico
+      </label>
+      <span class="campo-dica">Peso e % nos pontos do gráfico (conforme o período). Desmarcado, fica só a linha (peso e meta).</span>
     </div>
 
     <Button onclick={salvar} disabled={salvando || !podeSalvar}>Salvar Meta</Button>
