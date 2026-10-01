@@ -8,8 +8,6 @@
     getPesosDoPeriodo,
     getMeta,
     listMetaHistorico,
-    getDiasParaObjetivo,
-    formatDiasObjetivo,
     getUltimoPeso,
     getPesoMedioAtual,
     calcularMediaMovelSerie,
@@ -140,8 +138,6 @@
   let meta = $state<PesoMeta | null>(null);
   let metaHistorico = $state<PesoMetaHistorico[]>([]);
   let mostrarFormMeta = $state(false);
-  /** "X dias/meses para o objetivo" — só existe pra meta percentual (ver getDiasParaObjetivo). */
-  let textoObjetivo = $state<string | null>(null);
 
   const CHAVE_META_VISIVEL = "fitforge_peso_meta_visivel";
   let metaVisivel = $state(typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_META_VISIVEL) === "1" : false);
@@ -172,10 +168,9 @@
   let observacaoMeta = $state<{ desvioPct: number; direcao: "acima" | "abaixo" } | null>(null);
 
   async function carregarMeta() {
-    const [metaCarregada, historico, dias, ultimo, media, pesosTudo, observacao] = await Promise.all([
+    const [metaCarregada, historico, ultimo, media, pesosTudo, observacao] = await Promise.all([
       getMeta(),
       listMetaHistorico(),
-      getDiasParaObjetivo(),
       getUltimoPeso(),
       getPesoMedioAtual(),
       getPesosDoPeriodo("1900-01-01", hojeISO()),
@@ -183,7 +178,6 @@
     ]);
     meta = metaCarregada;
     metaHistorico = historico;
-    textoObjetivo = dias != null ? `${formatDiasObjetivo(dias)} para o objetivo` : null;
     ultimoPeso = ultimo;
     pesoMedioAtual = media;
     pesosCompletos = pesosTudo;
@@ -726,7 +720,7 @@
 
 <div class="container has-bottom-nav">
   <div class="header">
-    <h1>Peso <span class="modo-label">{textoObjetivo ?? (modoGrafico === "media" ? "Média" : "Diário")}</span></h1>
+    <h1>Peso <span class="modo-label">{modoGrafico === "media" ? "Média" : "Diário"}</span></h1>
     <div class="header-acoes">
       <button class="icon-btn" onclick={() => (mostrarFormMeta = true)} aria-label="Configurar meta">
         {@render iconMeta()}
