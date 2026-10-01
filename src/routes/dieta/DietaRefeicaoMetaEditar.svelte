@@ -162,6 +162,21 @@
     return Math.min(100, pct);
   }
 
+  /** Mesma lógica de DietaListaItens.svelte — a barra continua representando % das calorias da
+   * refeição; só a cor do preenchimento vira 3 segmentos (carb/gordura/proteína) quando
+   * corBarraItens === "macros". */
+  function segmentosMacro(item: ReceitaItem): { cor: string; kcal: number }[] {
+    const carbKcal = item.carboidratoG * 4;
+    const gordKcal = item.gorduraG * 9;
+    const protKcal = item.proteinaG * 4;
+    if (carbKcal + gordKcal + protKcal <= 0) return [{ cor: "var(--color-secondary)", kcal: 1 }];
+    return [
+      { cor: COR_CARBO, kcal: carbKcal },
+      { cor: COR_GORDURA, kcal: gordKcal },
+      { cor: COR_PROTEINA, kcal: protKcal },
+    ];
+  }
+
   function abrirDetalheItem(item: ReceitaItem): void {
     if (!receita) return;
     navigate(`/dieta/alimento/${item.alimentoId}/${hojeISO()}/receita/${receita.id}?origem=${encodeURIComponent(caminhoProprio())}`);
@@ -569,9 +584,19 @@
                 <strong class="item-qtd-valor">{item.quantidade}{item.unidade}</strong>
                 <span class="item-qtd-detalhe">· {item.calorias.toFixed(0)} kcal · {pctItem.toFixed(0)}% da refeição</span>
               </p>
-              <div class="item-barra-wrap">
-                <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
-              </div>
+              {#if prefsRefeicoes.mostrarBarraItens}
+                <div class="item-barra-wrap">
+                  {#if prefsRefeicoes.corBarraItens === "macros"}
+                    <div class="item-barra-fill" style={`width:${larguraBarra(pctItem)}%;`}>
+                      {#each segmentosMacro(item) as seg, i (i)}
+                        <div style={`flex:${seg.kcal} 0 0; background:${seg.cor};`}></div>
+                      {/each}
+                    </div>
+                  {:else}
+                    <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
+                  {/if}
+                </div>
+              {/if}
             </div>
             <span
               class="item-detalhe"
@@ -883,6 +908,13 @@
     height: 100%;
     border-radius: 3px;
     background: var(--color-secondary);
+  }
+  .item-barra-fill {
+    display: flex;
+    height: 100%;
+  }
+  .item-barra-fill > div {
+    height: 100%;
   }
   .item-detalhe {
     flex-shrink: 0;
