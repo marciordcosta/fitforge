@@ -24,6 +24,7 @@
     type BaseReferenciaRefeicao,
     type FormatoValorRefeicao,
     type ExibicaoRefeicaoHome,
+    type CorBarraItens,
   } from "../../lib/dietaApi";
   import { DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
@@ -39,6 +40,8 @@
   let barraBase = $state<BaseReferenciaRefeicao>("refeicao");
   let valoresFormato = $state<FormatoValorRefeicao>("restante_acima");
   let exibicaoRefeicao = $state<ExibicaoRefeicaoHome>("barras");
+  let mostrarBarraItens = $state(true);
+  let corBarraItens = $state<CorBarraItens>("calorias");
   /** "Manter g/kg fixo": por padrão (desmarcado) as GRAMAS de cada macro ficam fixas até a
    * próxima edição em Gerenciar > Calorias, e é a proporção g/kg exibida que acompanha o peso.
    * Marcado inverte isso pra esse macro — a proporção fica fixa e as gramas acompanham o peso
@@ -63,6 +66,11 @@
   const OPCOES_EXIBICAO_REFEICAO: { valor: ExibicaoRefeicaoHome; label: string }[] = [
     { valor: "barras", label: "Barras" },
     { valor: "resumo", label: "Resumo" },
+  ];
+
+  const OPCOES_COR_BARRA_ITENS: { valor: CorBarraItens; label: string }[] = [
+    { valor: "calorias", label: "Calorias" },
+    { valor: "macros", label: "Macros" },
   ];
 
   const OPCOES_BASE_REFEICAO: { valor: BaseReferenciaRefeicao; label: string }[] = [
@@ -121,6 +129,8 @@
       barraBase = prefsRefeicoes.barraBase;
       valoresFormato = prefsRefeicoes.valoresFormato;
       exibicaoRefeicao = prefsRefeicoes.exibicao;
+      mostrarBarraItens = prefsRefeicoes.mostrarBarraItens;
+      corBarraItens = prefsRefeicoes.corBarraItens;
       proteinaGkgFixo = perfil.proteinaGkgFixo;
       gorduraGkgFixo = perfil.gorduraGkgFixo;
       acumularCalorias = acumular.ativo;
@@ -131,6 +141,8 @@
         barraBase,
         valoresFormato,
         exibicaoRefeicao,
+        mostrarBarraItens,
+        corBarraItens,
         proteinaGkgFixo,
         gorduraGkgFixo,
         acumularCalorias,
@@ -154,6 +166,8 @@
         barraBase,
         valoresFormato,
         exibicaoRefeicao,
+        mostrarBarraItens,
+        corBarraItens,
         proteinaGkgFixo,
         gorduraGkgFixo,
         acumularCalorias,
@@ -188,7 +202,13 @@
         }),
       );
       await salvarTipoDieta(tipoDieta);
-      await salvarPreferenciasRefeicoesHome({ barraBase, valoresFormato, exibicao: exibicaoRefeicao });
+      await salvarPreferenciasRefeicoesHome({
+        barraBase,
+        valoresFormato,
+        exibicao: exibicaoRefeicao,
+        mostrarBarraItens,
+        corBarraItens,
+      });
       await Promise.all([
         salvarGkgFixo("proteina", proteinaGkgFixo),
         salvarGkgFixo("gordura", gorduraGkgFixo),
@@ -395,6 +415,24 @@
               {/each}
             </div>
             <p class="param-dica">Vale pra toda tela com barra de macro (refeição, item, receita, editar meta) — não só a home.</p>
+          </div>
+          <div class="param-linha">
+            <label class="param-gkg-fixo">
+              <input type="checkbox" checked={mostrarBarraItens} onchange={(e) => (mostrarBarraItens = e.currentTarget.checked)} />
+              Mostrar barra nos alimentos
+            </label>
+            <p class="param-ajuda">A barrinha embaixo de cada alimento, na lista de itens de uma refeição.</p>
+            {#if mostrarBarraItens}
+              <p class="param-nome dia-reset-titulo">Visualizar como</p>
+              <div class="tipo-dieta-opcoes">
+                {#each OPCOES_COR_BARRA_ITENS as opcao (opcao.valor)}
+                  <button type="button" class:ativo={corBarraItens === opcao.valor} onclick={() => (corBarraItens = opcao.valor)}>{opcao.label}</button>
+                {/each}
+              </div>
+              <p class="param-dica">
+                {corBarraItens === "calorias" ? "Cor única — % das calorias da refeição" : "Dividida por macro (carb/gordura/proteína), mesma largura"}
+              </p>
+            {/if}
           </div>
         </div>
       {/if}

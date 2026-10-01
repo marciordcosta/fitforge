@@ -65,7 +65,7 @@
   let alimento = $state<Alimento | null>(null);
   let metas = $state<MetasDiarias | null>(null);
   let metaRefeicao = $state<MetasDiarias | null>(null);
-  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras" });
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras", mostrarBarraItens: true, corBarraItens: "calorias" });
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let dataResolvida = $state(untrack(() => data ?? ""));

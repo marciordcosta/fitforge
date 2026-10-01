@@ -92,7 +92,7 @@
   let receita = $state<Receita | null>(null);
   let contexto = $state<ContextoMetaCatalogo | null>(null);
   let metasDia = $state<MetasDiarias | null>(null);
-  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras" });
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras", mostrarBarraItens: true, corBarraItens: "calorias" });
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
   let erro = $state<string | null>(null);

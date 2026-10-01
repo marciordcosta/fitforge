@@ -23,11 +23,19 @@
     refeicaoId,
     dataRefeicao,
     onMudou,
+    mostrarBarra = true,
+    corBarra = "calorias",
   }: {
     itens: ItemDiario[];
     refeicaoId: string;
     dataRefeicao: string;
     onMudou: () => void;
+    /** Parametrização > Exibição das Refeições > "Mostrar barra nos alimentos" — default true
+     * cobre as telas que ainda não carregaram a preferência na hora de montar a lista. */
+    mostrarBarra?: boolean;
+    /** "calorias" = cor única (de sempre); "macros" = preenchimento dividido em 3 cores, cada
+     * segmento proporcional às calorias que carb/gordura/proteína contribuem nesse item. */
+    corBarra?: "calorias" | "macros";
   } = $props();
 
   const totalCalorias = $derived(itens.reduce((acc, i) => acc + i.calorias, 0));
@@ -37,6 +45,27 @@
   }
   function larguraBarra(pct: number): number {
     return Math.min(100, pct);
+  }
+
+  const COR_CARBO = "#5eead4";
+  const COR_GORDURA = "#f9a8d4";
+  const COR_PROTEINA = "#fbbf24";
+
+  /** A barra continua representando % das calorias da refeição (ver larguraBarra) — só a cor do
+   * preenchimento vira 3 segmentos (carb/gordura/proteína), proporcionais às calorias que cada
+   * macro contribui NESSE item, nas mesmas cores usadas no resto da tela. Sem nenhuma caloria vinda
+   * de macro (ex: alimento sem tabela nutricional detalhada), cai pra um segmento só na cor padrão
+   * — 3 segmentos de flex 0 ficariam todos com largura zero, a barra pareceria vazia à toa. */
+  function segmentosMacro(item: ItemDiario): { cor: string; kcal: number }[] {
+    const carbKcal = item.carboidratoG * 4;
+    const gordKcal = item.gorduraG * 9;
+    const protKcal = item.proteinaG * 4;
+    if (carbKcal + gordKcal + protKcal <= 0) return [{ cor: "var(--color-secondary)", kcal: 1 }];
+    return [
+      { cor: COR_CARBO, kcal: carbKcal },
+      { cor: COR_GORDURA, kcal: gordKcal },
+      { cor: COR_PROTEINA, kcal: protKcal },
+    ];
   }
 
   let itemEditando = $state<ItemDiario | null>(null);
@@ -218,9 +247,19 @@
           <strong class="item-qtd-valor">{item.quantidade}{item.unidade}</strong>
           <span class="item-qtd-detalhe">· {item.calorias.toFixed(0)} kcal · {pctItem.toFixed(0)}% da refeição</span>
         </p>
-        <div class="item-barra-wrap">
-          <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
-        </div>
+        {#if mostrarBarra}
+          <div class="item-barra-wrap">
+            {#if corBarra === "macros"}
+              <div class="item-barra-fill" style={`width:${larguraBarra(pctItem)}%;`}>
+                {#each segmentosMacro(item) as seg, i (i)}
+                  <div style={`flex:${seg.kcal} 0 0; background:${seg.cor};`}></div>
+                {/each}
+              </div>
+            {:else}
+              <div class="item-barra" style={`width:${larguraBarra(pctItem)}%;`}></div>
+            {/if}
+          </div>
+        {/if}
       </div>
       <span
         class="item-detalhe"
@@ -330,6 +369,13 @@
     height: 100%;
     border-radius: 3px;
     background: var(--color-secondary);
+  }
+  .item-barra-fill {
+    display: flex;
+    height: 100%;
+  }
+  .item-barra-fill > div {
+    height: 100%;
   }
   .item-detalhe {
     flex-shrink: 0;

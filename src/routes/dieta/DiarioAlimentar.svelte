@@ -280,7 +280,7 @@
     }
   }
   let pesoAtual = $state(76);
-  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras" });
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras", mostrarBarraItens: true, corBarraItens: "calorias" });
   const defParametro = new Map(DEFINICOES_PARAMETROS.map((d) => [d.chave, d]));
 
   function parametro(chave: string): LimiteParametro {
@@ -1060,7 +1060,14 @@
               onpointerdown={(e) => e.stopPropagation()}
               oncontextmenu={(e) => e.stopPropagation()}
             >
-              <DietaListaItens itens={itensRefeicao} refeicaoId={refeicao.id} dataRefeicao={dataAtual} onMudou={carregar} />
+              <DietaListaItens
+                itens={itensRefeicao}
+                refeicaoId={refeicao.id}
+                dataRefeicao={dataAtual}
+                onMudou={carregar}
+                mostrarBarra={prefsRefeicoes.mostrarBarraItens}
+                corBarra={prefsRefeicoes.corBarraItens}
+              />
             </div>
           {/if}
           <button

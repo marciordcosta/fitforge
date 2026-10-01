@@ -39,7 +39,7 @@
 
   let receita = $state<Receita | null>(null);
   let metas = $state<MetasDiarias | null>(null);
-  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras" });
+  let prefsRefeicoes = $state<PreferenciasRefeicoesHome>({ barraBase: "refeicao", valoresFormato: "restante_acima", exibicao: "barras", mostrarBarraItens: true, corBarraItens: "calorias" });
   let ehMetaPadrao = $state(false);
   let refeicao = $state<RefeicaoDia | null>(null);
   let opcoesRefeicao = $state<RefeicaoDia[]>([]);

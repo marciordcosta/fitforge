@@ -1461,22 +1461,35 @@ export type FormatoValorRefeicao = "percentual_refeicao" | "percentual_diario" |
  * alimentos lançados naquela refeição — sem número nenhum, só a descrição do que foi comido. */
 export type ExibicaoRefeicaoHome = "barras" | "resumo";
 
+/** "calorias" = a barrinha embaixo de cada alimento (mostrarBarraItens) é uma cor única, de
+ * sempre; "macros" = o preenchimento (mesma largura, continua representando % das calorias da
+ * refeição) vira 3 segmentos coloridos — carb/gordura/proteína, proporcionais às calorias que
+ * cada macro contribui NESSE item, nas mesmas cores usadas no resto da tela. */
+export type CorBarraItens = "calorias" | "macros";
+
 export interface PreferenciasRefeicoesHome {
   barraBase: BaseReferenciaRefeicao;
   valoresFormato: FormatoValorRefeicao;
   exibicao: ExibicaoRefeicaoHome;
+  /** Barrinha de progresso embaixo de cada alimento, na lista de itens de uma refeição
+   * (DietaListaItens.svelte, usada tanto na tela da refeição quanto nos cards expandidos do
+   * Diário) — liga/desliga só isso, independente das outras configs de barra acima. */
+  mostrarBarraItens: boolean;
+  corBarraItens: CorBarraItens;
 }
 
 const PREFERENCIAS_REFEICOES_PADRAO: PreferenciasRefeicoesHome = {
   barraBase: "refeicao",
   valoresFormato: "restante_acima",
   exibicao: "barras",
+  mostrarBarraItens: true,
+  corBarraItens: "calorias",
 };
 
 export async function getPreferenciasRefeicoesHome(): Promise<PreferenciasRefeicoesHome> {
   const { data, error } = await supabase
     .from("dieta_perfil")
-    .select("refeicoes_barra_base, refeicoes_valores_base, refeicoes_exibicao")
+    .select("refeicoes_barra_base, refeicoes_valores_base, refeicoes_exibicao, mostrar_barra_itens, cor_barra_itens")
     .maybeSingle();
   if (error) throw error;
   if (!data) return PREFERENCIAS_REFEICOES_PADRAO;
@@ -1484,6 +1497,8 @@ export async function getPreferenciasRefeicoesHome(): Promise<PreferenciasRefeic
     barraBase: (data.refeicoes_barra_base as BaseReferenciaRefeicao | null) ?? "refeicao",
     valoresFormato: (data.refeicoes_valores_base as FormatoValorRefeicao | null) ?? "restante_acima",
     exibicao: (data.refeicoes_exibicao as ExibicaoRefeicaoHome | null) ?? "barras",
+    mostrarBarraItens: (data.mostrar_barra_itens as boolean | null) ?? true,
+    corBarraItens: (data.cor_barra_itens as CorBarraItens | null) ?? "calorias",
   };
 }
 
@@ -1494,6 +1509,8 @@ export async function salvarPreferenciasRefeicoesHome(prefs: PreferenciasRefeico
       refeicoes_barra_base: prefs.barraBase,
       refeicoes_valores_base: prefs.valoresFormato,
       refeicoes_exibicao: prefs.exibicao,
+      mostrar_barra_itens: prefs.mostrarBarraItens,
+      cor_barra_itens: prefs.corBarraItens,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" },
