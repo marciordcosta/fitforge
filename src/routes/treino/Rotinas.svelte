@@ -104,14 +104,20 @@
   }
 
   /** Rotinas com dia efetivo essa semana sobem pro topo, ordenadas pelo dia mais próximo; sem dia
-   * essa semana, mantém a ordenação manual. */
+   * essa semana, mantém a ordenação manual. "Ontem" (dia que já passou, mostrado como tal só pra
+   * ficar mais natural de ler — ver labelDiaSemanaRelativo) sai do cálculo cíclico comum e vai
+   * SEMPRE por último, de propósito: matematicamente o delta cíclico de "ontem" (6) já é o maior
+   * possível entre 0 e 6, então nunca deveria precisar desse reforço, mas na prática ficava
+   * aparecendo no meio da lista — mais seguro tratar como categoria própria do que confiar só na
+   * conta. */
   function ordenarPorDia(lista: TreinoComExercicios[], diaEfetivo: Map<string, number | null>): TreinoComExercicios[] {
     const hoje = new Date().getDay();
-    const comDia = lista
-      .filter((t) => diaEfetivo.get(t.id) != null)
-      .sort((a, b) => ((diaEfetivo.get(a.id)! - hoje + 7) % 7) - ((diaEfetivo.get(b.id)! - hoje + 7) % 7));
+    const delta = (dia: number) => (dia - hoje + 7) % 7;
+    const comDia = lista.filter((t) => diaEfetivo.get(t.id) != null && delta(diaEfetivo.get(t.id)!) !== 6);
+    comDia.sort((a, b) => delta(diaEfetivo.get(a.id)!) - delta(diaEfetivo.get(b.id)!));
+    const ontem = lista.filter((t) => diaEfetivo.get(t.id) != null && delta(diaEfetivo.get(t.id)!) === 6);
     const semDia = lista.filter((t) => diaEfetivo.get(t.id) == null);
-    return [...comDia, ...semDia];
+    return [...comDia, ...semDia, ...ontem];
   }
 
   /** Parametrização "Por rotina pendente": pula rotinas já executadas essa semana (têm série

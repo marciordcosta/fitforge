@@ -73,6 +73,10 @@
       exercicioNome: ex.exercicioNome,
       sets: ex.sets.map((s) => ({ ...s })),
     }));
+    // Dia sem nenhuma série ainda (lançamento retroativo do zero, ver getHistoricoDia em
+    // treinoApi.ts e HistoricoCalendario.svelte) — abre direto em edição, senão cairia na view
+    // read-only mostrando cada exercício sem nenhuma linha, sem jeito óbvio de preencher.
+    if (sessao.length && sessao.every((ex) => ex.sets.length === 0)) modoEdicao = true;
     const observacoesPorId = await listObservacoesExerciciosEmLote(sessao.map((ex) => ex.exercicioId));
     observacoesPorExercicio = new Map(
       sessao.map((ex) => [ex.exercicioId, observacaoParaHistorico(observacoesPorId.get(ex.exercicioId) ?? [], data)]),

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
   import { toISODate, hojeISO } from "../../lib/dates";
-  import { getDiasComTreino, type DiaComTreino } from "../../lib/treinoApi";
+  import { getDiasComTreino, listTreinos, type DiaComTreino, type TreinoComExercicios } from "../../lib/treinoApi";
+  import ActionSheet from "../../components/ActionSheet.svelte";
 
   const MESES = [
     "Janeiro",
@@ -21,8 +22,14 @@
 
   let mesBase = $state(new Date());
   let dias = $state<DiaComTreino[]>([]);
+  let treinos = $state<TreinoComExercicios[]>([]);
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
+  /** Dia vazio (sem nada lançado ainda) tocado, pra escolher qual rotina lançar retroativamente
+   * nele — null quando o menu de escolha está fechado. */
+  let escolhendoRotinaPara = $state<string | null>(null);
+
+  void listTreinos().then((t) => (treinos = t));
 
   const mesLabel = $derived(`${MESES[mesBase.getMonth()]} ${mesBase.getFullYear()}`);
   const mesInicio = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth(), 1));
@@ -123,6 +130,14 @@
                 <span class="treino-nome">{cel.treino.treinoNome}</span>
               </button>
             </div>
+          {:else if cel.iso <= hojeISO() && treinos.length}
+            <div class="celula">
+              <button class="dia-btn dia-btn-vazio" onclick={() => (escolhendoRotinaPara = cel.iso)} aria-label={`Lançar treino em ${cel.dia}`}>
+                <span class="dia-numero-wrap">
+                  <span class="dia-numero" class:hoje={cel.iso === hojeISO()}>{cel.dia}</span>
+                </span>
+              </button>
+            </div>
           {:else}
             <div class="celula">
               <span class="dia-numero-wrap">
@@ -135,6 +150,15 @@
     {/if}
   </div>
 </div>
+
+{#if escolhendoRotinaPara}
+  {@const data = escolhendoRotinaPara}
+  <ActionSheet
+    titulo="Lançar treino nesse dia"
+    onFechar={() => (escolhendoRotinaPara = null)}
+    opcoes={treinos.map((t) => ({ label: t.nome_treino, onSelect: () => navigate(`/treino/historico/${t.id}/${data}`) }))}
+  />
+{/if}
 
 <style>
   .container {
@@ -268,6 +292,10 @@
   }
   .dia-numero.hoje {
     color: var(--color-primary);
+  }
+  .dia-btn-vazio .dia-numero-wrap {
+    border-radius: 50%;
+    border: 1px dashed var(--surface-border);
   }
   .treino-nome {
     font-size: 10px;

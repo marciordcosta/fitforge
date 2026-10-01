@@ -1463,9 +1463,16 @@ export async function getHistoricoDia(treinoId: string | null, data: string): Pr
     });
   }
 
+  // Dia sem nenhum registro ainda (lançamento retroativo do zero, ver HistoricoCalendario.svelte)
+  // — parte dos exercícios ATUAIS da rotina, com séries vazias, em vez de uma lista vazia.
+  const exercicios =
+    porExercicio.size === 0 && treino
+      ? treino.exercicios.map((te) => ({ exercicioId: te.exercicio_id, exercicioNome: te.exercicio?.nome ?? "", sets: [] }))
+      : Array.from(porExercicio.values());
+
   return {
     treinoNome: treinoId ? (treino?.nome_treino ?? "") : "Treino avulso",
-    exercicios: Array.from(porExercicio.values()),
+    exercicios,
     duracaoSeg: duracaoRows?.[0]?.duracao_seg ?? null,
   };
 }
