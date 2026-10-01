@@ -1323,6 +1323,9 @@ export interface PerfilDietaEditavel {
    * mesmo total) — usado pra dar carência ao status de aderência à dieta (getStatusAdesaoDieta).
    * null = nunca rastreado (perfil de antes dessa coluna existir, ou nunca mexeu nas calorias). */
   caloriasAjustadasEm: string | null;
+  /** Quantos dias depois de caloriasAjustadasEm o chip de aderência fica em "Calibrando…" antes
+   * de voltar a dar veredito (Parametrização > Calorias) — padrão 14. */
+  janelaCalibracaoDias: number;
 }
 
 const PERFIL_PADRAO: PerfilDietaEditavel = {
@@ -1334,13 +1337,14 @@ const PERFIL_PADRAO: PerfilDietaEditavel = {
   proteinaGkgFixo: false,
   gorduraGkgFixo: false,
   caloriasAjustadasEm: null,
+  janelaCalibracaoDias: 14,
 };
 
 export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
   const { data, error } = await supabase
     .from("dieta_perfil")
     .select(
-      "peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg, proteina_gkg_fixo, gordura_gkg_fixo, calorias_ajustadas_em",
+      "peso_atual, meta_calorias, proteina_g_kg, gordura_g_kg, carboidrato_g_kg, proteina_gkg_fixo, gordura_gkg_fixo, calorias_ajustadas_em, janela_calibracao_dias",
     )
     .maybeSingle();
   if (error) throw error;
@@ -1354,7 +1358,18 @@ export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
     proteinaGkgFixo: data.proteina_gkg_fixo ?? false,
     gorduraGkgFixo: data.gordura_gkg_fixo ?? false,
     caloriasAjustadasEm: data.calorias_ajustadas_em,
+    janelaCalibracaoDias: data.janela_calibracao_dias ?? 14,
   };
+}
+
+/** Só a janela de calibração (Parametrização > Calorias) — dedicada pra não arriscar sobrescrever
+ * peso/calorias/macros com um valor desatualizado (essa tela não tem esses campos carregados). */
+export async function salvarJanelaCalibracaoDias(dias: number): Promise<void> {
+  const { error } = await supabase
+    .from("dieta_perfil")
+    .upsert({ user_id: uid(), janela_calibracao_dias: dias, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) throw error;
+  await invalidarNamespace("dieta");
 }
 
 /** Grava o perfil de metas — se `metaCalorias` mudou de valor de fato (±1 kcal de tolerância)
@@ -2025,9 +2040,9 @@ export type StatusAdesaoDieta = "dentro_do_plano" | "ajustar_calorias" | "calibr
 
 /** Compara o ritmo real de variação de peso (getTaxaVariacaoSemanal, pesoApi.ts) com o ritmo
  * esperado pela meta (peso_metas.percentual_min — o ritmo padrão/conservador da banda, sempre
- * semanal). Só avalia depois de ~14 dias do
- * último ajuste real nas calorias (dieta_perfil.calorias_ajustadas_em) — antes disso a média de
- * peso ainda não "enxergou" o ajuste recente, e mostrar um veredito seria enganoso
+ * semanal). Só avalia depois de perfil.janelaCalibracaoDias (Parametrização > Calorias, padrão
+ * 14) do último ajuste real nas calorias (dieta_perfil.calorias_ajustadas_em) — antes disso a
+ * média de peso ainda não "enxergou" o ajuste recente, e mostrar um veredito seria enganoso
  * ("calibrando"). Banda de tolerância generosa (40%-160% do ritmo esperado, mesmo sinal) — uma
  * semana de ruído normal não deve disparar "ajustar calorias" à toa. null = sem meta definida ou
  * sem pesagens suficientes pra calcular uma tendência (chip escondido por quem chama). */
@@ -2037,7 +2052,7 @@ export async function getStatusAdesaoDieta(): Promise<StatusAdesaoDieta | null> 
 
   if (perfil.caloriasAjustadasEm) {
     const dias = Math.floor((Date.now() - new Date(perfil.caloriasAjustadasEm).getTime()) / 86_400_000);
-    if (dias < 14) return "calibrando";
+    if (dias < perfil.janelaCalibracaoDias) return "calibrando";
   }
 
   if (meta.tipo === "manutencao") {

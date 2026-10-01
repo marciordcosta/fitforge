@@ -15,6 +15,7 @@
     salvarGkgFixo,
     getAcumularCalorias,
     salvarAcumularCalorias,
+    salvarJanelaCalibracaoDias,
     DEFINICOES_PARAMETROS,
     PARAMETROS_PADRAO,
     gramasDoParametro,
@@ -53,6 +54,9 @@
   /** Dia da semana (0=domingo..6=sábado) em que o saldo acumulado reinicia — null enquanto
    * acumularCalorias está desmarcado. */
   let diaResetSaldoCalorico = $state<number | null>(null);
+  /** Dias de carência (Parametrização > Calorias) antes do chip "Dentro do plano"/"Ajustar
+   * calorias" (Diário) sair do "Calibrando…" depois de mudar a meta de calorias. */
+  let janelaCalibracaoDias = $state(14);
   let abertaExibicao = $state(false);
   let confirmandoDescartar = $state(false);
   let original = "";
@@ -135,6 +139,7 @@
       gorduraGkgFixo = perfil.gorduraGkgFixo;
       acumularCalorias = acumular.ativo;
       diaResetSaldoCalorico = acumular.diaReset;
+      janelaCalibracaoDias = perfil.janelaCalibracaoDias;
       original = JSON.stringify({
         valores,
         tipoDieta,
@@ -147,6 +152,7 @@
         gorduraGkgFixo,
         acumularCalorias,
         diaResetSaldoCalorico,
+        janelaCalibracaoDias,
       });
     } catch (err) {
       erro = (err as Error).message;
@@ -172,6 +178,7 @@
         gorduraGkgFixo,
         acumularCalorias,
         diaResetSaldoCalorico,
+        janelaCalibracaoDias,
       }) !== original
     );
   }
@@ -213,6 +220,7 @@
         salvarGkgFixo("proteina", proteinaGkgFixo),
         salvarGkgFixo("gordura", gorduraGkgFixo),
         salvarAcumularCalorias(acumularCalorias, acumularCalorias ? diaResetSaldoCalorico : null),
+        salvarJanelaCalibracaoDias(janelaCalibracaoDias),
       ]);
       mostrarToast("Salvo");
       guardaSaida.resolverSaida(() => voltar("/dieta"));
@@ -295,6 +303,26 @@
                     {/each}
                   </div>
                 {/if}
+              </div>
+              <div class="param-linha">
+                <div class="param-linha-topo">
+                  <p class="param-nome">Janela de calibração</p>
+                  <div class="param-campos">
+                    <input
+                      class="param-input"
+                      type="number"
+                      inputmode="numeric"
+                      min="0"
+                      step="1"
+                      aria-label="Janela de calibração em dias"
+                      bind:value={janelaCalibracaoDias}
+                    />
+                    <span class="param-unidade">dias</span>
+                  </div>
+                </div>
+                <p class="param-ajuda">
+                  Quantos dias depois de mudar a meta de calorias o chip de aderência (Diário) fica em "Calibrando…" antes de dar um veredito.
+                </p>
               </div>
             {/if}
             {#each definicoesDaCategoria(categoria) as def (def.chave)}
