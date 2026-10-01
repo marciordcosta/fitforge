@@ -4136,6 +4136,7 @@
     border: none;
     border-bottom: 1px solid var(--surface-border);
     font-family: inherit;
+    color: var(--surface-fg);
     cursor: pointer;
     text-align: left;
   }
@@ -4219,6 +4220,7 @@
     font-weight: 600;
     font-size: var(--font-size-sm);
     white-space: nowrap;
+    color: var(--surface-fg);
   }
   .picker-lista-mover {
     list-style: none;
