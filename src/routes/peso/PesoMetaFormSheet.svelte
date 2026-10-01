@@ -170,6 +170,11 @@
       <span class="tipo-dieta-link">Mudar</span>
     </button>
 
+    <div class="campo">
+      <label for="meta-peso">Peso alvo (kg)</label>
+      <input id="meta-peso" type="number" inputmode="decimal" step="0.1" placeholder="-" bind:value={pesoAlvo} />
+    </div>
+
     {#if precisaPercentual}
       <div class="campo campo-dupla">
         <div>
@@ -248,11 +253,6 @@
       </span>
     </div>
 
-    <div class="campo">
-      <label for="meta-peso">Peso alvo (kg)</label>
-      <input id="meta-peso" type="number" inputmode="decimal" step="0.1" placeholder="-" bind:value={pesoAlvo} />
-    </div>
-
     <Button onclick={salvar} disabled={salvando || !podeSalvar}>Salvar Meta</Button>
     {#if temMetaSalva}
       <button class="limpar-btn" onclick={limpar} disabled={salvando}>Limpar Meta</button>
@@ -304,7 +304,7 @@
   }
   .campo label {
     font-size: var(--font-size-sm);
-    color: var(--surface-muted);
+    color: var(--surface-fg);
   }
   .campo-dica {
     font-size: 12px;
