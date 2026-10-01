@@ -378,7 +378,8 @@
     color: var(--surface-muted);
   }
   .campo-checkbox-linha {
-    display: flex;
+    display: grid;
+    grid-template-columns: 18px 1fr;
     align-items: center;
     gap: var(--space-2);
     color: var(--surface-fg);
@@ -388,7 +389,6 @@
   .campo-checkbox-linha input {
     width: 18px;
     height: 18px;
-    flex-shrink: 0;
     accent-color: var(--color-primary);
   }
   .campo-dica-dupla {
