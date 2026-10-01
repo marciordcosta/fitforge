@@ -1020,6 +1020,13 @@
             <p class="resumo-alimentos" class:resumo-vazio={!temItens}>
               {temItens ? itens.filter((i) => i.refeicaoId === refeicao.id).map((i) => i.nome).join(", ") : "Nenhum alimento ainda"}
             </p>
+            {#if temItens}
+              <p class="resumo-macros">
+                <span style={`color:${COR_CARBO}`}>Carb {totais.carboidratoG.toFixed(0)}g</span>
+                · <span style={`color:${COR_GORDURA}`}>Gorduras {totais.gorduraG.toFixed(0)}g</span>
+                · <span style={`color:${COR_PROTEINA}`}>Proteínas {totais.proteinaG.toFixed(0)}g</span>
+              </p>
+            {/if}
           {:else if metaAtual}
             {@const metaBarra = {
               calorias: arredondarDezena(metaCardPara("calorias", metaAtual, prefsRefeicoes.barraBase)),
@@ -1561,6 +1568,11 @@
   .resumo-alimentos.resumo-vazio {
     color: var(--surface-muted);
     font-style: italic;
+  }
+  .resumo-macros {
+    margin: var(--space-1) 0 0;
+    font-size: 12px;
+    color: var(--surface-muted);
   }
   .pct-grid {
     display: flex;
