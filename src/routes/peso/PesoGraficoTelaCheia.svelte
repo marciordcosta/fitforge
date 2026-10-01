@@ -153,18 +153,28 @@
             // Espessura fixa em todos os filtros — só as bolinhas (destacarRegistro) diferenciam o
             // semanal dos demais. Mesmo valor de Peso.svelte (meio-termo entre 3 e 1.5).
             borderWidth: 2.25,
+            // order mais baixo = desenhado primeiro = atrás. A linha de peso fica sempre atrás da
+            // linha de meta (abaixo), pra não cobrir a meta quando as duas estiverem sincronizadas.
+            order: 0,
           },
           ...(metaLinha
             ? [
                 {
                   data: metaLinha,
                   borderColor: COR_META,
-                  backgroundColor: COR_META,
+                  backgroundColor: COR_TREINO,
                   borderDash: [6, 4],
                   borderWidth: 1.5,
-                  pointRadius: 0,
+                  // Pontinhos vermelhos (cor sólida) ao longo da linha de meta — sem eles, quando
+                  // sincronizada com o peso real, a linha de peso (mais grossa e sólida) engolia
+                  // visualmente a linha tracejada da meta por baixo.
+                  pointRadius: 2,
+                  pointBackgroundColor: COR_TREINO,
+                  pointBorderColor: COR_TREINO,
                   spanGaps: true,
                   tension: 0,
+                  // Sempre desenhada por cima da linha de peso (ver comentário acima).
+                  order: 1,
                 },
               ]
             : []),
