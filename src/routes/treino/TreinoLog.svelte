@@ -1,7 +1,7 @@
 <script lang="ts">
   import { navigate, voltar } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
-  import { hojeISO } from "../../lib/dates";
+  import { hojeISO, parseISODate } from "../../lib/dates";
   import { formatMinSeg } from "../../lib/tempo";
   import { conectividade } from "../../lib/offline/connectivity.svelte";
   import { enfileirar } from "../../lib/offline/queue.svelte";
@@ -41,7 +41,15 @@
   import TreinoMinimizado from "../../components/TreinoMinimizado.svelte";
   import { treinoLogSessao, type SetSessao, type ExercicioSessao } from "../../lib/treinoLogSessao.svelte";
 
-  let { treinoId }: { treinoId: string } = $props();
+  let { treinoId, data: dataProp }: { treinoId: string; data?: string } = $props();
+
+  /** Data que essa sessão grava — hoje no fluxo normal (ao vivo), ou uma data passada quando vem
+   * do calendário de Histórico pra lançar um treino retroativo (ver HistoricoCalendario.svelte).
+   * `retroativo` desliga só o que não faz sentido fora de uma sessão ao vivo de verdade: o
+   * cronômetro de descanso entre séries e a contagem de duração total — o resto (preencher
+   * peso/reps, recordes, concluir série, concluir treino) funciona IDÊNTICO. */
+  const data = $derived(dataProp ?? hojeISO());
+  const retroativo = $derived(data !== hojeISO());
 
   /** "Iniciar Rotina" é tocado a partir de 3 telas diferentes (Rotinas, Ver Rotina, Histórico do
    * dia) — quem navega pra cá complementa com ?origem= informando a real; "/treino" (a lista) é
@@ -89,6 +97,10 @@
     return formatDuracao(total);
   });
 
+  /** Substitui "Duração" no cabeçalho quando retroativo — não há tempo real rodando, mas é útil
+   * confirmar de relance pra qual dia essas séries estão indo. */
+  const dataLabel = $derived(parseISODate(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }));
+
   const seriesTotal = $derived(sessao.reduce((acc, ex) => acc + ex.sets.filter((s) => s.concluida).length, 0));
   const seriesPlanejadas = $derived(sessao.reduce((acc, ex) => acc + ex.sets.length, 0));
 
@@ -96,7 +108,10 @@
     loading = true;
     naoEncontrada = false;
 
-    const salva = treinoLogSessao.atual;
+    // Sessão retroativa nunca lê nem escreve o slot global de "treino ao vivo" (ver $effect de
+    // persistência abaixo) — ela não tem cronômetro/duração de verdade pra fazer sentido continuar
+    // depois de fechar o app, e colidiria com uma sessão ao vivo de verdade da MESMA rotina.
+    const salva = retroativo ? null : treinoLogSessao.atual;
     if (salva && salva.treinoId === treinoId) {
       // Sessão persistida no localStorage de ANTES do campo virar recordesBase (era "recordes")
       // não teria essa chave — sem essa checagem, retomar uma sessão assim quebrava a marcação de
@@ -127,7 +142,7 @@
       exerciciosOrdenados.map(async (te) => {
         const [anterior, recordes] = await Promise.all([
           getUltimoRegistro(te.exercicio_id, fonte === "ultima_rotina" ? treinoId : undefined),
-          getRecordesExercicio(te.exercicio_id, hojeISO()),
+          getRecordesExercicio(te.exercicio_id, data),
         ]);
         const nSets = Math.max(te.series.length, 1);
         const sets: SetSessao[] = Array.from({ length: nSets }, (_, i) => {
@@ -188,7 +203,7 @@
   let finalizado = $state(false);
 
   $effect(() => {
-    if (loading || naoEncontrada || finalizado) return;
+    if (loading || naoEncontrada || finalizado || retroativo) return;
     treinoLogSessao.iniciar({ treinoId, nomeTreino, inicio, sessao, houveAlteracaoEstrutura });
   });
 
@@ -469,7 +484,9 @@
       return;
     }
 
-    if (ex.descanso_seg) {
+    // Retroativo não conta descanso de verdade (não está rolando ao vivo) — mantém o valor
+    // configurado só como informação (descansoLabel), sem nunca iniciar o cronômetro.
+    if (!retroativo && ex.descanso_seg) {
       // Só um exercício tem descanso "pendente" por vez — limpa qualquer outro que tenha ficado
       // esquecido (venceu e nunca foi pulado, ex: o usuário seguiu pra outro exercício sem tocar
       // em "Pular"). Sem isso, esse antigo ressurgia do nada quando o usuário pulasse ESTE aqui,
@@ -568,7 +585,7 @@
     const observacao = ex.observacao?.trim() ?? "";
     for (let tentativa = 1; tentativa <= 2; tentativa++) {
       try {
-        await salvarObservacaoExercicio(ex.exercicio_id, observacao, hojeISO());
+        await salvarObservacaoExercicio(ex.exercicio_id, observacao, data);
         return;
       } catch (e) {
         if (tentativa === 2) {
@@ -588,7 +605,7 @@
   let reordenando = $state(false);
   let buscaSubstituir = $state("");
 
-  /** "Marcar Exercício": registra uma observação (ex: troca de equipamento) no dia de hoje pra esse
+  /** "Marcar Exercício": registra uma observação (ex: troca de equipamento) nessa data pra esse
    * exercício — aparece no histórico e no gráfico de progressão, alertando que uma mudança de peso
    * em volta dessa data pode não ser progresso/regressão real. */
   let marcandoExIdx = $state<number | null>(null);
@@ -604,7 +621,7 @@
     if (marcandoExIdx == null || !observacaoMarcador.trim()) return;
     salvandoMarcador = true;
     try {
-      await salvarMarcadorExercicio(sessao[marcandoExIdx].exercicio_id, hojeISO(), observacaoMarcador.trim());
+      await salvarMarcadorExercicio(sessao[marcandoExIdx].exercicio_id, data, observacaoMarcador.trim());
       marcandoExIdx = null;
       observacaoMarcador = "";
     } catch (err) {
@@ -631,7 +648,7 @@
     const fonte = await getHistoricoFonte();
     const [anterior, recordes, observacoesNovoEx] = await Promise.all([
       getUltimoRegistro(novoExercicioId, fonte === "ultima_rotina" ? treinoId : undefined),
-      getRecordesExercicio(novoExercicioId, hojeISO()),
+      getRecordesExercicio(novoExercicioId, data),
       getObservacoesAtuais([novoExercicioId]),
     ]);
     ex.exercicio_id = novoExercicioId;
@@ -774,7 +791,7 @@
     const fonte = await getHistoricoFonte();
     const [anterior, recordes] = await Promise.all([
       getUltimoRegistro(ex.id, fonte === "ultima_rotina" ? treinoId : undefined),
-      getRecordesExercicio(ex.id, hojeISO()),
+      getRecordesExercicio(ex.id, data),
     ]);
     const nSets = Math.max(anterior.length, 3);
     const sets: SetSessao[] = Array.from({ length: nSets }, (_, i) => {
@@ -936,8 +953,11 @@
   }
 
   /** Tempo total da sessão, do início até agora — null se por algum motivo a sessão ao vivo já não
-   * estiver mais disponível (não deveria acontecer nesse ponto do fluxo, mas evita salvar lixo). */
+   * estiver mais disponível (não deveria acontecer nesse ponto do fluxo, mas evita salvar lixo), OU
+   * se é um lançamento retroativo: não tem duração real pra registrar (e nunca escreveu nesse slot
+   * global — lê-lo aqui pegaria, por acidente, a duração de uma sessão ao vivo de OUTRA rotina). */
   function duracaoSegundosAtual(): number | null {
+    if (retroativo) return null;
     const inicio = treinoLogSessao.atual?.inicio;
     return inicio != null ? Math.round((Date.now() - inicio) / 1000) : null;
   }
@@ -950,7 +970,6 @@
    * esperando rede que não vai responder. Um erro que acontece mesmo com sinal
    * (ex: validação do servidor) sobe pra quem chamou tratar como sempre. */
   async function salvarOuEnfileirarConclusao(itensRotina: ItemRotina[] | null): Promise<void> {
-    const data = hojeISO();
     const registros = registrosDoDiaAtual();
     const duracao = duracaoSegundosAtual();
 
@@ -1071,8 +1090,13 @@
       <button class="voltar" onclick={() => voltar(origemPadrao)}>▾ {nomeTreino}</button>
     </div>
     <div class="stat-inline">
-      <span class="stat-label">Duração</span>
-      <span class="stat-valor duracao">{duracaoLabel}</span>
+      {#if retroativo}
+        <span class="stat-label">Data</span>
+        <span class="stat-valor">{dataLabel}</span>
+      {:else}
+        <span class="stat-label">Duração</span>
+        <span class="stat-valor duracao">{duracaoLabel}</span>
+      {/if}
     </div>
     <div class="stat-inline">
       <span class="stat-label">Séries</span>

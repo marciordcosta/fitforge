@@ -35,6 +35,8 @@
   <RotinaVisualizar treinoId={segmentos[1]} />
 {:else if segmentos[0] === "rotina" && segmentos[1]}
   <RotinaEditor treinoId={segmentos[1]} />
+{:else if segmentos[0] === "log" && segmentos[1] && segmentos[2]}
+  <TreinoLog treinoId={segmentos[1]} data={segmentos[2]} />
 {:else if segmentos[0] === "log" && segmentos[1]}
   <TreinoLog treinoId={segmentos[1]} />
 {:else if segmentos[0] === "exercicios" && segmentos[1] === "novo" && segmentos[2] === "voltar"}

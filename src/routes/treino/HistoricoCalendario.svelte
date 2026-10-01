@@ -156,7 +156,10 @@
   <ActionSheet
     titulo="Lançar treino nesse dia"
     onFechar={() => (escolhendoRotinaPara = null)}
-    opcoes={treinos.map((t) => ({ label: t.nome_treino, onSelect: () => navigate(`/treino/historico/${t.id}/${data}`) }))}
+    opcoes={treinos.map((t) => ({
+      label: t.nome_treino,
+      onSelect: () => navigate(`/treino/log/${t.id}/${data}?origem=/treino/historico`),
+    }))}
   />
 {/if}
 
