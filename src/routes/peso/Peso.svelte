@@ -587,6 +587,9 @@
     const pontos = pontosGrafico;
     if (!pontos.length) return;
     const corPonto = (data: string) => (informarTreino && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO);
+    // Com "Destacar registro" desligado, as bolinhas somem — exceto nos dias de treino quando
+    // "Informar treino" está ligado, que continuam marcados mesmo assim.
+    const raioPonto = (data: string) => (destacarRegistro || (informarTreino && diasComTreinoGrafico.has(data)) ? 3 : 0);
     chart = new Chart(canvas, {
       type: "line",
       data: {
@@ -599,7 +602,7 @@
             pointBackgroundColor: pontos.map((p) => corPonto(p.data)),
             pointBorderColor: pontos.map((p) => corPonto(p.data)),
             tension: 0.3,
-            pointRadius: destacarRegistro ? 3 : 0,
+            pointRadius: pontos.map((p) => raioPonto(p.data)),
             // Espessura fixa em todos os filtros — só as bolinhas (destacarRegistro) diferenciam o
             // semanal dos demais. Valor é o meio-termo entre o que era "detalhado" (3) e "liso"
             // (1.5) antes de virar fixo.
