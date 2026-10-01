@@ -599,7 +599,10 @@
             pointBorderColor: pontos.map((p) => corPonto(p.data)),
             tension: 0.3,
             pointRadius: mostrarPontos ? 3 : 0,
-            borderWidth: detalhesPorPonto ? 3 : 1.5,
+            // Espessura fixa em todos os filtros — só as bolinhas (mostrarPontos) diferenciam o
+            // semanal dos demais. Valor é o meio-termo entre o que era "detalhado" (3) e "liso"
+            // (1.5) antes de virar fixo.
+            borderWidth: 2.25,
           },
           ...(metaLinha
             ? [
@@ -608,7 +611,7 @@
                   borderColor: COR_META,
                   backgroundColor: COR_META,
                   borderDash: [6, 4],
-                  borderWidth: detalhesPorPonto ? 2 : 1,
+                  borderWidth: 1.5,
                   pointRadius: 0,
                   spanGaps: true,
                   tension: 0,
