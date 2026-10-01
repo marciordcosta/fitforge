@@ -624,9 +624,10 @@
             // semanal dos demais. Valor é o meio-termo entre o que era "detalhado" (3) e "liso"
             // (1.5) antes de virar fixo.
             borderWidth: 2.25,
-            // order mais baixo = desenhado primeiro = atrás. A linha de peso fica sempre atrás da
-            // linha de meta (abaixo), pra não cobrir a meta quando as duas estiverem sincronizadas.
-            order: 0,
+            // Chart.js desenha ordem MAIOR primeiro (atrás) e ordem MENOR por último (na frente) --
+            // a linha de peso fica sempre atrás da linha de meta, pra não cobrir a meta quando as
+            // duas estiverem sincronizadas.
+            order: 1,
           },
           ...(metaLinha
             ? [
@@ -641,7 +642,7 @@
                   tension: 0,
                   // Sempre desenhada por cima da linha de peso (ver comentário acima) — o tracejado
                   // vermelho fica visível por cima da linha sólida, mesmo nos pontos sincronizados.
-                  order: 1,
+                  order: 0,
                 },
               ]
             : []),
