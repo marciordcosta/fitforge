@@ -1017,9 +1017,11 @@
             </span>
           </div>
           {#if prefsRefeicoes.exibicao === "resumo"}
-            <p class="resumo-alimentos resumo-nomes" class:resumo-vazio={!temItens}>
-              {temItens ? itens.filter((i) => i.refeicaoId === refeicao.id).map((i) => i.nome).join(", ") : "Nenhum alimento ainda"}
-            </p>
+            {#if !refeicoesExpandidas}
+              <p class="resumo-alimentos resumo-nomes" class:resumo-vazio={!temItens}>
+                {temItens ? itens.filter((i) => i.refeicaoId === refeicao.id).map((i) => i.nome).join(", ") : "Nenhum alimento ainda"}
+              </p>
+            {/if}
             {#if temItens}
               <p class="resumo-alimentos resumo-macros">
                 Carb {totais.carboidratoG.toFixed(0)}g · Gorduras {totais.gorduraG.toFixed(0)}g · Proteínas {totais.proteinaG.toFixed(0)}g
@@ -1576,6 +1578,7 @@
   }
   .resumo-macros {
     margin-top: var(--space-1);
+    margin-bottom: var(--space-3);
   }
   .pct-grid {
     display: flex;

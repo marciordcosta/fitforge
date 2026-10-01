@@ -5,6 +5,8 @@
    * previne o reload padrão do <a> e usa router.navigate().
    */
   import { router, navigate } from "../lib/router.svelte";
+  import { getOrdemModulos, type NavModulo } from "../lib/homeApi";
+  import { cacheInvalidacao } from "../lib/offline/cache.svelte";
 
   interface NavItem {
     href: string;
@@ -12,13 +14,26 @@
     icon: "home" | "dumbbell" | "chart" | "photo" | "meal";
   }
 
-  const items: NavItem[] = [
-    { href: "/", label: "Início", icon: "home" },
-    { href: "/peso", label: "Peso", icon: "chart" },
-    { href: "/dieta", label: "Dieta", icon: "meal" },
-    { href: "/treino", label: "Treino", icon: "dumbbell" },
-    { href: "/fotos", label: "Fotos", icon: "photo" },
-  ];
+  const ITEM_INICIO: NavItem = { href: "/", label: "Início", icon: "home" };
+  const ITEM_POR_MODULO: Record<NavModulo, NavItem> = {
+    peso: { href: "/peso", label: "Peso", icon: "chart" },
+    dieta: { href: "/dieta", label: "Dieta", icon: "meal" },
+    treino: { href: "/treino", label: "Treino", icon: "dumbbell" },
+    fotos: { href: "/fotos", label: "Fotos", icon: "photo" },
+  };
+
+  /** "Início" sempre primeira, fixa — o resto segue a ordem/visibilidade de Cards da Início >
+   * Módulos (Parametrização). Recarrega sozinho quando essa preferência muda (ver
+   * invalidarNamespace("home") em homeApi.ts) — a barra fica sempre montada (App.svelte), então
+   * sem isso só refletiria a mudança depois de um reload da página inteira. */
+  let items = $state<NavItem[]>([ITEM_INICIO, ...Object.values(ITEM_POR_MODULO)]);
+
+  $effect(() => {
+    cacheInvalidacao.versao("home");
+    void getOrdemModulos().then((modulos) => {
+      items = [ITEM_INICIO, ...modulos.map((m) => ITEM_POR_MODULO[m])];
+    });
+  });
 
   function isActive(href: string): boolean {
     return href === "/" ? router.path === "/" : router.path.startsWith(href);

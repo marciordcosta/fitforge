@@ -54,3 +54,51 @@ export async function salvarLayoutHome(tipos: HomeCardTipo[]): Promise<void> {
   if (error) throw error;
   await invalidarNamespace("home");
 }
+
+// ---------------- Ordem/visibilidade dos módulos na barra inferior (BottomNav.svelte) ----------------
+
+export type NavModulo = "peso" | "dieta" | "treino" | "fotos";
+
+export interface NavModuloDefinicao {
+  modulo: NavModulo;
+  titulo: string;
+}
+
+/** "Início" nunca entra aqui — é sempre a primeira aba, fixa, não configurável. */
+export const CATALOGO_MODULOS: NavModuloDefinicao[] = [
+  { modulo: "peso", titulo: "Peso" },
+  { modulo: "dieta", titulo: "Dieta" },
+  { modulo: "treino", titulo: "Treino" },
+  { modulo: "fotos", titulo: "Fotos" },
+];
+
+const MODULOS_VALIDOS = new Set<string>(CATALOGO_MODULOS.map((m) => m.modulo));
+
+/** Ordem/seleção ativa dos módulos na barra inferior. Sem nenhuma linha salva ainda (primeiro
+ * acesso) — todos os módulos, na ordem do catálogo (mesma ordem de sempre da barra). */
+export async function getOrdemModulos(): Promise<NavModulo[]> {
+  return comCache("home:getOrdemModulos", async () => {
+    const { data, error } = await supabase
+      .from("nav_modulos")
+      .select("modulo, ordem")
+      .eq("user_id", uid())
+      .order("ordem", { ascending: true });
+    if (error) throw error;
+    if (!data.length) return CATALOGO_MODULOS.map((m) => m.modulo);
+    return data.map((d) => d.modulo as NavModulo).filter((m) => MODULOS_VALIDOS.has(m));
+  });
+}
+
+/** Substitui a lista inteira (ordem = posição no array) — mesmo padrão de salvarLayoutHome. */
+export async function salvarOrdemModulos(modulos: NavModulo[]): Promise<void> {
+  const userId = uid();
+  const { error: delErro } = await supabase.from("nav_modulos").delete().eq("user_id", userId);
+  if (delErro) throw delErro;
+  if (!modulos.length) {
+    await invalidarNamespace("home");
+    return;
+  }
+  const { error } = await supabase.from("nav_modulos").insert(modulos.map((modulo, i) => ({ user_id: userId, modulo, ordem: i })));
+  if (error) throw error;
+  await invalidarNamespace("home");
+}
