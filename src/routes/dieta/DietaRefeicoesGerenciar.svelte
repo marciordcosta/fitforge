@@ -587,6 +587,11 @@
     return pesoAtual > 0 ? `${(valorGramas / pesoAtual).toFixed(2)} g/kg` : "0.00 g/kg";
   }
 
+  /** g/kg discreto ao lado do valor em gramas na grade "Calorias" dos blocos (ver mostrarCaloriasBlocos). */
+  function gkgDiscreto(valorGramas: number): string {
+    return pesoAtual > 0 ? `${(valorGramas / pesoAtual).toFixed(2)} g/kg` : "";
+  }
+
   function colunasMacros() {
     return [
       { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesMacro(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: carboidratoGInput ?? 0, kcalPorGrama: 4, secundario: secundarioMacro },
@@ -1934,7 +1939,9 @@
             <td class="grade-col-rotulo">Proteína (g)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>{proteinaGInput ?? 0}</button>
+                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>
+                  {proteinaGInput ?? 0} <span class="grade-valor-gkg">{gkgDiscreto(proteinaGInput ?? 0)}</span>
+                </button>
               </td>
             {/each}
           </tr>
@@ -1942,7 +1949,9 @@
             <td class="grade-col-rotulo">Gordura (g)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>{Math.round(bloco.gorduraG)}</button>
+                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>
+                  {Math.round(bloco.gorduraG)} <span class="grade-valor-gkg">{gkgDiscreto(bloco.gorduraG)}</span>
+                </button>
               </td>
             {/each}
           </tr>
@@ -1950,7 +1959,9 @@
             <td class="grade-col-rotulo">Carboidrato (g)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>{Math.round(bloco.carboidratoG)}</button>
+                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>
+                  {Math.round(bloco.carboidratoG)} <span class="grade-valor-gkg">{gkgDiscreto(bloco.carboidratoG)}</span>
+                </button>
               </td>
             {/each}
           </tr>
@@ -2523,6 +2534,10 @@
     text-overflow: ellipsis;
   }
   .grade-valor-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
     border: none;
     background: none;
     font-family: inherit;
@@ -2531,6 +2546,11 @@
     color: var(--surface-fg);
     cursor: pointer;
     padding: var(--space-1) var(--space-2);
+  }
+  .grade-valor-gkg {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--surface-muted);
   }
   .distribuicao-header {
     display: flex;
