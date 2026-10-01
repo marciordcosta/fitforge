@@ -6,6 +6,20 @@
   import { mostrarToast } from "../../lib/toast.svelte";
   import { getMeta, getUltimoPeso, salvarMeta, excluirMeta, type DiaSemana } from "../../lib/pesoApi";
   import { getTipoDieta, type TipoDieta } from "../../lib/dietaApi";
+  import {
+    lerMostrarDiaSemana,
+    gravarMostrarDiaSemana,
+    lerMostrarPesoVariacao,
+    gravarMostrarPesoVariacao,
+    lerInformarTreino,
+    gravarInformarTreino,
+    lerDestacarRegistro,
+    gravarDestacarRegistro,
+    lerFiltrosAplicados,
+    gravarFiltrosAplicados,
+    FILTROS_PERIODO_OPCOES,
+    type FiltroPeriodo,
+  } from "../../lib/pesoGraficoPrefs";
 
   let {
     onFechar,
@@ -35,17 +49,37 @@
     if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_MODO_GRAFICO_PADRAO, m);
   }
 
-  /** "Mostrar detalhes" no gráfico (Peso.svelte) — marcado (padrão) mantém o comportamento de
-   * sempre (peso/% aparecem nos pontos conforme o período escolhido); desmarcado força só a linha
-   * (peso e meta), nunca mostra os rótulos por ponto. Mesma convenção de modoGraficoPadrao: grava
-   * direto no toque, sem passar pelo fluxo de "Salvar Meta". */
-  const CHAVE_MOSTRAR_DETALHES = "fitforge_peso_mostrar_detalhes";
-  let mostrarDetalhes = $state(
-    typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_MOSTRAR_DETALHES) !== "false" : true,
-  );
-  function alternarMostrarDetalhes(v: boolean): void {
-    mostrarDetalhes = v;
-    if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_MOSTRAR_DETALHES, String(v));
+  /** 4 itens de exibição do gráfico (Peso.svelte) — cada um independente, só valem nos filtros de
+   * período marcados em filtrosAplicados (ver pesoGraficoPrefs.ts). Mesma convenção de
+   * modoGraficoPadrao: gravam direto no toque, sem passar pelo fluxo de "Salvar Meta". */
+  let mostrarDiaSemana = $state(lerMostrarDiaSemana());
+  let mostrarPesoVariacao = $state(lerMostrarPesoVariacao());
+  let informarTreino = $state(lerInformarTreino());
+  let destacarRegistro = $state(lerDestacarRegistro());
+  let filtrosAplicados = $state<Set<FiltroPeriodo>>(lerFiltrosAplicados());
+
+  function alternarMostrarDiaSemana(v: boolean): void {
+    mostrarDiaSemana = v;
+    gravarMostrarDiaSemana(v);
+  }
+  function alternarMostrarPesoVariacao(v: boolean): void {
+    mostrarPesoVariacao = v;
+    gravarMostrarPesoVariacao(v);
+  }
+  function alternarInformarTreino(v: boolean): void {
+    informarTreino = v;
+    gravarInformarTreino(v);
+  }
+  function alternarDestacarRegistro(v: boolean): void {
+    destacarRegistro = v;
+    gravarDestacarRegistro(v);
+  }
+  function alternarFiltroAplicado(valor: FiltroPeriodo): void {
+    const novo = new Set(filtrosAplicados);
+    if (novo.has(valor)) novo.delete(valor);
+    else novo.add(valor);
+    filtrosAplicados = novo;
+    gravarFiltrosAplicados(novo);
   }
 
   /** Card "Variação" (Peso.svelte): "Acumulada" (padrão) é direto do primeiro pro último registro
@@ -247,10 +281,43 @@
 
     <div class="campo">
       <label class="campo-checkbox-linha">
-        <input type="checkbox" checked={mostrarDetalhes} onchange={(e) => alternarMostrarDetalhes(e.currentTarget.checked)} />
-        <span>Detalhes no gráfico</span>
+        <input type="checkbox" checked={mostrarPesoVariacao} onchange={(e) => alternarMostrarPesoVariacao(e.currentTarget.checked)} />
+        <span>Adicionar peso/variação no gráfico</span>
       </label>
-      <span class="campo-dica">Peso e % nos pontos do gráfico (conforme o período). Desmarcado, fica só a linha (peso e meta).</span>
+    </div>
+
+    <div class="campo">
+      <label class="campo-checkbox-linha">
+        <input type="checkbox" checked={mostrarDiaSemana} onchange={(e) => alternarMostrarDiaSemana(e.currentTarget.checked)} />
+        <span>Adicionar dia da semana no gráfico</span>
+      </label>
+    </div>
+
+    <div class="campo">
+      <label class="campo-checkbox-linha">
+        <input type="checkbox" checked={informarTreino} onchange={(e) => alternarInformarTreino(e.currentTarget.checked)} />
+        <span>Informar treino no gráfico</span>
+      </label>
+      <span class="campo-dica">Destaca na cor o ponto dos dias com treino registrado (só no modo Diário)</span>
+    </div>
+
+    <div class="campo">
+      <label class="campo-checkbox-linha">
+        <input type="checkbox" checked={destacarRegistro} onchange={(e) => alternarDestacarRegistro(e.currentTarget.checked)} />
+        <span>Destacar registro (ponto) no gráfico</span>
+      </label>
+    </div>
+
+    <div class="campo">
+      <label for="meta-filtros-aplicados">Filtros que serão aplicados</label>
+      <div class="filtros-grid" id="meta-filtros-aplicados">
+        {#each FILTROS_PERIODO_OPCOES as opcao (opcao.valor)}
+          <button type="button" class:ativo={filtrosAplicados.has(opcao.valor)} onclick={() => alternarFiltroAplicado(opcao.valor)}>
+            {opcao.label}
+          </button>
+        {/each}
+      </div>
+      <span class="campo-dica">Os 4 itens acima só aparecem nos filtros marcados aqui</span>
     </div>
 
     <Button onclick={salvar} disabled={salvando || !podeSalvar}>Salvar Meta</Button>
@@ -368,6 +435,27 @@
     cursor: pointer;
   }
   .referencia-opcoes button.ativo {
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
+  }
+  .filtros-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+  }
+  .filtros-grid button {
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .filtros-grid button.ativo {
     background: var(--color-secondary);
     color: var(--surface-bg);
     border-color: var(--color-secondary);

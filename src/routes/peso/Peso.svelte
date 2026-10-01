@@ -20,6 +20,14 @@
     type PesoMetaHistorico,
   } from "../../lib/pesoApi";
   import { getDiasComTreino, listTreinos, DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
+  import {
+    lerMostrarDiaSemana,
+    lerMostrarPesoVariacao,
+    lerInformarTreino,
+    lerDestacarRegistro,
+    lerFiltrosAplicados,
+    type FiltroPeriodo,
+  } from "../../lib/pesoGraficoPrefs";
   import PesoDiaSheet from "./PesoDiaSheet.svelte";
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
   import PesoGraficoTelaCheia from "./PesoGraficoTelaCheia.svelte";
@@ -115,20 +123,19 @@
     modoGrafico = m;
   }
 
-  /** "Mostrar detalhes" (Meta > Parametrização do gráfico) — marcado (padrão) mantém o
-   * comportamento de sempre (detalhesPorPonto decide sozinho pelo período); desmarcado força só a
-   * linha (peso e meta), sem rótulo nenhum, não importa o período. Diferente de
-   * CHAVE_MODO_GRAFICO_PADRAO (que só semeia o estado inicial, de propósito): essa regra vale pra
-   * CADA cálculo enquanto a tela de Peso estiver aberta, então precisa ser $state e relida quando
-   * o modal de Meta fecha — senão mudar a config não refletia até recarregar a página inteira. */
-  const CHAVE_MOSTRAR_DETALHES = "fitforge_peso_mostrar_detalhes";
-  function lerMostrarDetalhesPref(): boolean {
-    return typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_MOSTRAR_DETALHES) !== "false" : true;
-  }
-  let mostrarDetalhesPref = $state(lerMostrarDetalhesPref());
+  /** 4 itens de exibição do gráfico + filtros em que valem (Meta > Parametrização do gráfico, ver
+   * pesoGraficoPrefs.ts). Diferente de CHAVE_MODO_GRAFICO_PADRAO (que só semeia o estado inicial,
+   * de propósito): essas regras valem pra CADA cálculo enquanto a tela de Peso estiver aberta,
+   * então precisam ser $state e relidas quando o modal de Meta fecha — senão mudar a config não
+   * refletia até recarregar a página inteira. */
+  let mostrarDiaSemanaPref = $state(lerMostrarDiaSemana());
+  let mostrarPesoVariacaoPref = $state(lerMostrarPesoVariacao());
+  let informarTreinoPref = $state(lerInformarTreino());
+  let destacarRegistroPref = $state(lerDestacarRegistro());
+  let filtrosAplicadosPref = $state<Set<FiltroPeriodo>>(lerFiltrosAplicados());
 
   /** "Acumulada" (padrão) ou "Média" pro card "Variação" — ver Meta > Parametrização do gráfico.
-   * Mesmo motivo de mostrarDetalhesPref: $state, relida ao fechar o modal de Meta. */
+   * Mesmo motivo das prefs de exibição acima: $state, relida ao fechar o modal de Meta. */
   const CHAVE_TIPO_VARIACAO = "fitforge_peso_tipo_variacao";
   function lerTipoVariacaoPref(): "acumulada" | "media" {
     return typeof localStorage !== "undefined" && localStorage.getItem(CHAVE_TIPO_VARIACAO) === "media" ? "media" : "acumulada";
@@ -423,16 +430,21 @@
     return pontosGrafico.map((_, i) => (total - 1 - i) % 7 === 0);
   });
 
-  /** Só mostra os detalhes por ponto (%, valor da meta) com até 1 mês de período — em filtros
-   * maiores vira poluição visual (dezenas de rótulos sobrepostos). Acima disso a linha fica só a
-   * linha, mais fina. Também desliga de vez (qualquer período) se "Mostrar detalhes" estiver
-   * desmarcado em Meta > Parametrização do gráfico. */
-  const detalhesPorPonto = $derived(mostrarDetalhesPref && periodo.dias != null && periodo.dias <= 30);
+  /** Se o filtro de período atual está marcado em "Filtros que serão aplicados" (Meta >
+   * Parametrização do gráfico) — fora dele, nenhum dos 4 itens de exibição aparece, não importa o
+   * estado do checkbox de cada um (eles só valem DENTRO dos filtros marcados aqui). */
+  const periodoNoFiltro = $derived(filtrosAplicadosPref.has(periodo.valor as FiltroPeriodo));
 
-  /** As bolinhas em cada ponto da linha só valem a pena em "1 semana" — com mais dias os pontos
-   * ficam próximos demais e a linha vira uma sequência de bolinhas coladas, sem definição. Acima
-   * de 1 semana, só a linha (sem ponto nenhum). */
-  const mostrarPontos = $derived(periodo.dias != null && periodo.dias <= 7);
+  /** "Adicionar peso/variação no gráfico" — valor (kg ou %) em cada ponto; fora disso, a linha
+   * mantém só o valor inicial e final (mais fina), pra não virar poluição visual em filtros
+   * longos com dezenas de pontos. */
+  const mostrarPesoVariacao = $derived(mostrarPesoVariacaoPref && periodoNoFiltro);
+
+  /** "Adicionar dia da semana no gráfico" — texto (Qui, Sex...) embaixo de cada ponto. */
+  const mostrarDiaSemanaGrafico = $derived(mostrarDiaSemanaPref && periodoNoFiltro);
+
+  /** "Destacar registro (ponto) no gráfico" — a bolinha em cada ponto da linha. */
+  const destacarRegistro = $derived(destacarRegistroPref && periodoNoFiltro);
 
   /** Datas do eixo: no máximo 8, sempre em intervalos iguais — diferente de pontosComRotulo (que
    * rotula a cada 7 dias e cresce sem limite em períodos muito longos, tipo "Tudo" com anos de
@@ -476,9 +488,13 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      if (!detalhesPorPonto) {
-        // Filtro longo: sem rótulo por ponto (poluía), mas mantém o valor inicial e final de
-        // cada linha (peso/média em branco, meta em vermelho), pra não perder a referência.
+      const rotulo = pontosComRotulo;
+
+      // ---- "Adicionar peso/variação no gráfico" ----
+      if (!mostrarPesoVariacao) {
+        // Desligado (checkbox ou fora do filtro aplicado): sem rótulo por ponto (poluía), mas
+        // mantém o valor inicial e final de cada linha (peso/média em branco, meta em vermelho),
+        // pra não perder a referência.
         const extremos = pontos.length > 1 ? [0, pontos.length - 1] : [0];
         for (const i of extremos) {
           const ponto = pontos[i];
@@ -490,59 +506,60 @@
           const alvo = alvos?.[i];
           if (alvo != null && escalaY) {
             const yLinha = escalaY.getPixelForValue(alvo) - 9;
-            if (Math.abs(yLinha - yPeso) < 12) continue;
+            if (Math.abs(yLinha - yPeso) >= 12) {
+              ctx.fillStyle = COR_TREINO;
+              ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
+            }
+          }
+        }
+      } else {
+        const diffs = diffMetaPorPonto;
+        pontos.forEach((ponto, i) => {
+          if (rotulo && !rotulo[i]) return;
+          const diff = diffs?.[i];
+          const yDiff = ponto.y - 11;
+          if (diff != null) {
+            ctx.fillStyle = "#fff";
+            const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
+            ctx.fillText(texto, ponto.x, yDiff);
+          } else {
+            // Sem meta ativa (ou sem meta cadastrada) não há o que comparar em % — mostra o peso
+            // real do ponto (bruto ou média, conforme o modo selecionado) em vez de nada.
+            const p = pontosGrafico[i];
+            if (p) {
+              ctx.fillStyle = "#fff";
+              ctx.fillText(formatPeso(p.peso), ponto.x, yDiff);
+            }
+          }
+          // Só o último ponto da linha reta da meta ganha o rótulo com o valor (76.3kg) — um
+          // número em cada ponto poluía o gráfico, já que a linha é reta e o valor de cada ponto
+          // intermediário já dá pra inferir visualmente.
+          if (i !== pontos.length - 1) return;
+          const alvo = alvos?.[i];
+          if (alvo != null && escalaY) {
+            const yLinha = escalaY.getPixelForValue(alvo) - 9;
+            // Perto demais do rótulo do peso real (ex: primeiro ponto, onde a meta parte do mesmo valor) — pula pra não sobrepor.
+            if (diff != null && Math.abs(yLinha - yDiff) < 12) return;
             ctx.fillStyle = COR_TREINO;
             ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
           }
-        }
-        ctx.restore();
-        return;
+        });
       }
 
-      const diffs = diffMetaPorPonto;
-      const rotulo = pontosComRotulo;
-      pontos.forEach((ponto, i) => {
-        if (rotulo && !rotulo[i]) return;
-        const diff = diffs?.[i];
-        const yDiff = ponto.y - 11;
-        if (diff != null) {
-          ctx.fillStyle = "#fff";
-          const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
-          ctx.fillText(texto, ponto.x, yDiff);
-        } else {
-          // Sem meta ativa (ou sem meta cadastrada) não há o que comparar em % — mostra o peso
-          // real do ponto (bruto ou média, conforme o modo selecionado) em vez de nada.
+      // ---- "Adicionar dia da semana no gráfico" (independente do item acima) ----
+      if (mostrarDiaSemanaGrafico) {
+        // Trava no fundo da área do gráfico pra nunca sobrepor a data do eixo (pluginDatasEixo),
+        // que desenha um pouco abaixo dela.
+        pontos.forEach((ponto, i) => {
+          if (rotulo && !rotulo[i]) return;
           const p = pontosGrafico[i];
-          if (p) {
-            ctx.fillStyle = "#fff";
-            ctx.fillText(formatPeso(p.peso), ponto.x, yDiff);
-          }
-        }
-        // Dia da semana embaixo do próprio ponto — só no filtro "1 semana" (mostrarPontos), onde
-        // há espaço de sobra entre os 7 pontos; em filtros maiores viraria poluição visual. Trava
-        // no fundo da área do gráfico pra nunca sobrepor a data do eixo (pluginDatasEixo), que
-        // desenha um pouco abaixo dela.
-        if (mostrarPontos) {
-          const p = pontosGrafico[i];
-          if (p) {
-            const yDia = Math.min(ponto.y + 13, c.chartArea.bottom - 4);
-            ctx.fillStyle = "#9aa0ab";
-            ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()], ponto.x, yDia);
-          }
-        }
-        // Só o último ponto da linha reta da meta ganha o rótulo com o valor (76.3kg) — um
-        // número em cada ponto poluía o gráfico, já que a linha é reta e o valor de cada ponto
-        // intermediário já dá pra inferir visualmente.
-        if (i !== pontos.length - 1) return;
-        const alvo = alvos?.[i];
-        if (alvo != null && escalaY) {
-          const yLinha = escalaY.getPixelForValue(alvo) - 9;
-          // Perto demais do rótulo do peso real (ex: primeiro ponto, onde a meta parte do mesmo valor) — pula pra não sobrepor.
-          if (diff != null && Math.abs(yLinha - yDiff) < 12) return;
-          ctx.fillStyle = COR_TREINO;
-          ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
-        }
-      });
+          if (!p) return;
+          const yDia = Math.min(ponto.y + 13, c.chartArea.bottom - 4);
+          ctx.fillStyle = "#9aa0ab";
+          ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()], ponto.x, yDia);
+        });
+      }
+
       ctx.restore();
     },
   };
@@ -579,7 +596,8 @@
     chart = null;
     const pontos = pontosGrafico;
     if (!pontos.length) return;
-    const corPonto = (data: string) => (modoGrafico === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO);
+    const corPonto = (data: string) =>
+      informarTreinoPref && modoGrafico === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO;
     chart = new Chart(canvas, {
       type: "line",
       data: {
@@ -592,8 +610,8 @@
             pointBackgroundColor: pontos.map((p) => corPonto(p.data)),
             pointBorderColor: pontos.map((p) => corPonto(p.data)),
             tension: 0.3,
-            pointRadius: mostrarPontos ? 3 : 0,
-            // Espessura fixa em todos os filtros — só as bolinhas (mostrarPontos) diferenciam o
+            pointRadius: destacarRegistro ? 3 : 0,
+            // Espessura fixa em todos os filtros — só as bolinhas (destacarRegistro) diferenciam o
             // semanal dos demais. Valor é o meio-termo entre o que era "detalhado" (3) e "liso"
             // (1.5) antes de virar fixo.
             borderWidth: 2.25,
@@ -635,11 +653,11 @@
         scales: {
           x: { display: false },
           y: {
-            // Só no filtro "1 semana" (mostrarPontos): reserva uma folga abaixo do menor valor,
-            // senão o ponto mais baixo ficava colado na base da área do gráfico, sem espaço pro
-            // dia da semana embaixo dele — mesmo com o clamp, o texto saía quase em cima da data
-            // do eixo (pluginDatasEixo), ilegível.
-            grace: mostrarPontos ? "12%" : undefined,
+            // Com "dia da semana" ligado: reserva uma folga abaixo do menor valor, senão o ponto
+            // mais baixo ficava colado na base da área do gráfico, sem espaço pro dia da semana
+            // embaixo dele — mesmo com o clamp, o texto saía quase em cima da data do eixo
+            // (pluginDatasEixo), ilegível.
+            grace: mostrarDiaSemanaGrafico ? "12%" : undefined,
             ticks: {
               color: "#9aa0ab",
               font: { size: 10 },
@@ -859,7 +877,11 @@
   <PesoMetaFormSheet
     onFechar={() => {
       mostrarFormMeta = false;
-      mostrarDetalhesPref = lerMostrarDetalhesPref();
+      mostrarDiaSemanaPref = lerMostrarDiaSemana();
+      mostrarPesoVariacaoPref = lerMostrarPesoVariacao();
+      informarTreinoPref = lerInformarTreino();
+      destacarRegistroPref = lerDestacarRegistro();
+      filtrosAplicadosPref = lerFiltrosAplicados();
       tipoVariacaoPref = lerTipoVariacaoPref();
     }}
     onSalvo={aoSalvarMeta}
@@ -876,8 +898,10 @@
     {diffMetaPorPonto}
     metaAlvoPorPonto={metaVisivel ? metaAlvoPorPonto : null}
     {pontosComData}
-    {detalhesPorPonto}
-    {mostrarPontos}
+    {mostrarPesoVariacao}
+    {mostrarDiaSemanaGrafico}
+    {informarTreinoPref}
+    {destacarRegistro}
     onFechar={() => (mostrarGraficoCheio = false)}
   />
 {/if}

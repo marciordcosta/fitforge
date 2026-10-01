@@ -13,8 +13,10 @@
     diffMetaPorPonto,
     metaAlvoPorPonto,
     pontosComData,
-    detalhesPorPonto,
-    mostrarPontos,
+    mostrarPesoVariacao,
+    mostrarDiaSemanaGrafico,
+    informarTreinoPref,
+    destacarRegistro,
     onFechar,
   }: {
     pontosGrafico: PesoRegistro[];
@@ -26,10 +28,12 @@
     metaAlvoPorPonto: (number | null)[] | null;
     /** No máximo 8 datas no eixo, em intervalos iguais — mesma lista calculada em Peso.svelte. */
     pontosComData: boolean[] | null;
-    /** Só com até 1 mês de período: rótulos de %/meta por ponto. */
-    detalhesPorPonto: boolean;
-    /** Só com até 1 semana de período: bolinha em cada ponto da linha — mesma regra de Peso.svelte. */
-    mostrarPontos: boolean;
+    /** 4 itens de exibição do gráfico (Meta > Parametrização), já resolvidos pelo filtro de
+     * período em Peso.svelte — aqui só consome o resultado pronto. */
+    mostrarPesoVariacao: boolean;
+    mostrarDiaSemanaGrafico: boolean;
+    informarTreinoPref: boolean;
+    destacarRegistro: boolean;
     onFechar: () => void;
   } = $props();
 
@@ -58,7 +62,8 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      if (!detalhesPorPonto) {
+      // ---- "Adicionar peso/variação no gráfico" ----
+      if (!mostrarPesoVariacao) {
         const extremos = pontos.length > 1 ? [0, pontos.length - 1] : [0];
         for (const i of extremos) {
           const ponto = pontos[i];
@@ -70,51 +75,54 @@
           const alvo = metaAlvoPorPonto?.[i];
           if (alvo != null && escalaY) {
             const yLinha = escalaY.getPixelForValue(alvo) - 12;
-            if (Math.abs(yLinha - yPeso) < 14) continue;
+            if (Math.abs(yLinha - yPeso) >= 14) {
+              ctx.fillStyle = COR_TREINO;
+              ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
+            }
+          }
+        }
+      } else {
+        pontos.forEach((ponto, i) => {
+          const diff = diffMetaPorPonto?.[i];
+          // Suprimido por período maior que 1 semana (ver pontosComRotulo em Peso.svelte) — não anota esse ponto.
+          if (diffMetaPorPonto != null && diff == null) return;
+          const yDiff = ponto.y - 14;
+          if (diff != null) {
+            ctx.fillStyle = "#fff";
+            const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
+            ctx.fillText(texto, ponto.x, yDiff);
+          } else {
+            // Sem meta ativa (ou sem meta cadastrada) — mostra o peso real em vez de nada, igual Peso.svelte.
+            const p = pontosGrafico[i];
+            if (p) {
+              ctx.fillStyle = "#fff";
+              ctx.fillText(formatPeso(p.peso), ponto.x, yDiff);
+            }
+          }
+          // Só o último ponto da linha reta da meta ganha o rótulo com o valor — igual Peso.svelte.
+          if (i !== pontos.length - 1) return;
+          const alvo = metaAlvoPorPonto?.[i];
+          if (alvo != null && escalaY) {
+            const yLinha = escalaY.getPixelForValue(alvo) - 12;
+            if (diff != null && Math.abs(yLinha - yDiff) < 14) return;
             ctx.fillStyle = COR_TREINO;
             ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
           }
-        }
-        ctx.restore();
-        return;
+        });
       }
 
-      pontos.forEach((ponto, i) => {
-        const diff = diffMetaPorPonto?.[i];
-        // Suprimido por período maior que 1 semana (ver pontosComRotulo em Peso.svelte) — não anota esse ponto.
-        if (diffMetaPorPonto != null && diff == null) return;
-        const yDiff = ponto.y - 14;
-        if (diff != null) {
-          ctx.fillStyle = "#fff";
-          const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
-          ctx.fillText(texto, ponto.x, yDiff);
-        } else {
-          // Sem meta ativa (ou sem meta cadastrada) — mostra o peso real em vez de nada, igual Peso.svelte.
+      // ---- "Adicionar dia da semana no gráfico" (independente do item acima) ----
+      if (mostrarDiaSemanaGrafico) {
+        pontos.forEach((ponto, i) => {
+          const diff = diffMetaPorPonto?.[i];
+          if (diffMetaPorPonto != null && diff == null) return;
           const p = pontosGrafico[i];
-          if (p) {
-            ctx.fillStyle = "#fff";
-            ctx.fillText(formatPeso(p.peso), ponto.x, yDiff);
-          }
-        }
-        // Dia da semana embaixo do próprio ponto — só no filtro "1 semana", igual Peso.svelte.
-        if (mostrarPontos) {
-          const p = pontosGrafico[i];
-          if (p) {
-            const yDia = Math.min(ponto.y + 15, c.chartArea.bottom - 4);
-            ctx.fillStyle = "#9aa0ab";
-            ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()], ponto.x, yDia);
-          }
-        }
-        // Só o último ponto da linha reta da meta ganha o rótulo com o valor — igual Peso.svelte.
-        if (i !== pontos.length - 1) return;
-        const alvo = metaAlvoPorPonto?.[i];
-        if (alvo != null && escalaY) {
-          const yLinha = escalaY.getPixelForValue(alvo) - 12;
-          if (diff != null && Math.abs(yLinha - yDiff) < 14) return;
-          ctx.fillStyle = COR_TREINO;
-          ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
-        }
-      });
+          if (!p) return;
+          const yDia = Math.min(ponto.y + 15, c.chartArea.bottom - 4);
+          ctx.fillStyle = "#9aa0ab";
+          ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()], ponto.x, yDia);
+        });
+      }
       ctx.restore();
     },
   };
@@ -125,7 +133,8 @@
   function desenhar() {
     if (!canvas) return;
     chart?.destroy();
-    const corPonto = (data: string) => (modo === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO);
+    const corPonto = (data: string) =>
+      informarTreinoPref && modo === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO;
     chart = new Chart(canvas, {
       type: "line",
       data: {
@@ -138,8 +147,8 @@
             pointBackgroundColor: pontosGrafico.map((p) => corPonto(p.data)),
             pointBorderColor: pontosGrafico.map((p) => corPonto(p.data)),
             tension: 0.3,
-            pointRadius: mostrarPontos ? 4 : 0,
-            // Espessura fixa em todos os filtros — só as bolinhas (mostrarPontos) diferenciam o
+            pointRadius: destacarRegistro ? 4 : 0,
+            // Espessura fixa em todos os filtros — só as bolinhas (destacarRegistro) diferenciam o
             // semanal dos demais. Mesmo valor de Peso.svelte (meio-termo entre 3 e 1.5).
             borderWidth: 2.25,
           },
@@ -181,7 +190,7 @@
           x: { ticks: { color: "#9aa0ab" }, grid: { display: false } },
           y: {
             // Mesma folga do gráfico compacto (Peso.svelte) — ver o comentário lá.
-            grace: mostrarPontos ? "12%" : undefined,
+            grace: mostrarDiaSemanaGrafico ? "12%" : undefined,
             ticks: { color: "#9aa0ab" },
             grid: { color: "rgba(255, 255, 255, 0.08)" },
           },
