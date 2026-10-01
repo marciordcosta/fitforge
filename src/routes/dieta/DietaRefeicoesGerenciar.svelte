@@ -2504,7 +2504,6 @@
   .grade-tabela td {
     padding: var(--space-2);
     text-align: center;
-    white-space: nowrap;
   }
   .grade-tabela th:not(:first-child),
   .grade-tabela td:not(:first-child) {
@@ -2524,6 +2523,7 @@
     background: var(--surface-card);
     padding-left: 0;
     padding-right: var(--space-3);
+    white-space: nowrap;
   }
   .grade-bloco-nome {
     font-size: var(--font-size-sm);
@@ -2532,11 +2532,13 @@
     max-width: 96px;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .grade-valor-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
     gap: 1px;
     border: none;
     background: none;
@@ -2546,10 +2548,12 @@
     color: var(--surface-fg);
     cursor: pointer;
     padding: var(--space-1) var(--space-2);
+    box-sizing: border-box;
   }
   .grade-valor-gkg {
     font-size: 10px;
     font-weight: 400;
+    white-space: nowrap;
     color: var(--surface-muted);
   }
   .distribuicao-header {
