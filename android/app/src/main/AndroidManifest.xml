@@ -59,4 +59,10 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Sem isso, o getUserMedia do scanner de código de barras (DietaScanear.svelte, via
+         @zxing/browser) falha direto com "Permission denied": o WebChromeClient do Capacitor
+         pede essa permissão em runtime (ver onPermissionRequest em BridgeWebChromeClient), mas
+         sem ela declarada aqui o Android nega sem nem mostrar o diálogo. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>
