@@ -1017,14 +1017,12 @@
             </span>
           </div>
           {#if prefsRefeicoes.exibicao === "resumo"}
-            <p class="resumo-alimentos" class:resumo-vazio={!temItens}>
+            <p class="resumo-alimentos resumo-nomes" class:resumo-vazio={!temItens}>
               {temItens ? itens.filter((i) => i.refeicaoId === refeicao.id).map((i) => i.nome).join(", ") : "Nenhum alimento ainda"}
             </p>
             {#if temItens}
-              <p class="resumo-macros">
-                <span style={`color:${COR_CARBO}`}>Carb {totais.carboidratoG.toFixed(0)}g</span>
-                · <span style={`color:${COR_GORDURA}`}>Gorduras {totais.gorduraG.toFixed(0)}g</span>
-                · <span style={`color:${COR_PROTEINA}`}>Proteínas {totais.proteinaG.toFixed(0)}g</span>
+              <p class="resumo-alimentos resumo-macros">
+                Carb {totais.carboidratoG.toFixed(0)}g · Gorduras {totais.gorduraG.toFixed(0)}g · Proteínas {totais.proteinaG.toFixed(0)}g
               </p>
             {/if}
           {:else if metaAtual}
@@ -1561,18 +1559,23 @@
   }
   .resumo-alimentos {
     margin: 0;
-    font-size: var(--font-size-sm);
-    color: var(--surface-fg);
+    font-size: var(--font-size-base);
+    color: var(--surface-muted);
     line-height: 1.4;
   }
   .resumo-alimentos.resumo-vazio {
-    color: var(--surface-muted);
     font-style: italic;
   }
+  .resumo-nomes {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
   .resumo-macros {
-    margin: var(--space-1) 0 0;
-    font-size: 12px;
-    color: var(--surface-muted);
+    margin-top: var(--space-1);
   }
   .pct-grid {
     display: flex;
