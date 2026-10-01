@@ -28,6 +28,7 @@
     getVolumeRealizadoBruto,
     getUltimoRegistro,
     getHistoricoExercicio,
+    listMarcadoresExercicio,
     salvarExerciciosRotina,
     trocarExercicioTreinoExercicio,
     adicionarTreinoExercicio,
@@ -49,6 +50,7 @@
     type Exercicio,
     type ParametrosDistribuicao,
     type ClasseVolumeSemanal,
+    type MarcadorExercicio,
   } from "../../lib/treinoApi";
 
   let aba = $state<"planejado" | "realizado">("planejado");
@@ -78,7 +80,14 @@
 
   /** 1RM histórico de cada exercício usado em alguma rotina — carregado uma vez, em paralelo,
    * pra alimentar a setinha de tendência de cada músculo sem precisar reconsultar por linha. */
-  let historicoPorExercicio = $state<Map<string, { melhor1rm: number }[]>>(new Map());
+  let historicoPorExercicio = $state<Map<string, { data: string; melhor1rm: number }[]>>(new Map());
+
+  /** Marcadores (observações pontuais no gráfico, ex: troca de equipamento) de cada exercício —
+   * carregado junto do histórico. Usado pra cortar o histórico considerado na tendência: a
+   * contagem de progressão/estagnação/regressão reinicia a partir do marcador mais recente, já
+   * que ele normalmente sinaliza uma mudança significativa no exercício (ver
+   * pontosDesdeUltimoMarcador). */
+  let marcadoresPorExercicio = $state<Map<string, MarcadorExercicio[]>>(new Map());
 
   /** Busca em lotes pequenos (não tudo de uma vez via Promise.all) — muitas rotinas/exercícios
    * juntos saturavam o limite de conexões simultâneas do navegador, deixando outras requisições
@@ -92,10 +101,17 @@
     const TAMANHO_LOTE = 4;
     for (let i = 0; i < lista.length; i += TAMANHO_LOTE) {
       const lote = lista.slice(i, i + TAMANHO_LOTE);
-      const resultados = await Promise.all(lote.map(async (id) => [id, await getHistoricoExercicio(id)] as const));
+      const resultados = await Promise.all(
+        lote.map(async (id) => [id, await getHistoricoExercicio(id), await listMarcadoresExercicio(id)] as const),
+      );
       const mapa = new Map(historicoPorExercicio);
-      for (const [id, pontos] of resultados) mapa.set(id, pontos);
+      const mapaMarcadores = new Map(marcadoresPorExercicio);
+      for (const [id, pontos, marcadores] of resultados) {
+        mapa.set(id, pontos);
+        mapaMarcadores.set(id, marcadores);
+      }
       historicoPorExercicio = mapa;
+      marcadoresPorExercicio = mapaMarcadores;
     }
   }
 
@@ -1177,12 +1193,21 @@
     return (mediaRecente - mediaAnterior) / mediaAnterior;
   }
 
+  /** Corta o histórico pra começar no marcador (observação pontual no gráfico, ex: troca de
+   * equipamento) mais recente — sem isso, uma mudança de peso causada por ela entraria na conta
+   * de progresso/regressão como se fosse evolução real. Sem marcador, devolve a lista inteira. */
+  function pontosDesdeUltimoMarcador<T extends { data: string }>(pontos: T[], marcadores: MarcadorExercicio[] | undefined): T[] {
+    if (!marcadores || !marcadores.length) return pontos;
+    const ultimaData = marcadores[marcadores.length - 1].data;
+    return pontos.filter((p) => p.data >= ultimaData);
+  }
+
   /** Tendência de um exercício específico (não agregada por músculo) — mostrada como texto
    * discreto embaixo do nome no editor completo da rotina. */
   function tendenciaExercicio(exercicioId: string): "subindo" | "estavel" | "caindo" | null {
     const pontos = historicoPorExercicio.get(exercicioId);
     if (!pontos) return null;
-    const v = variacaoExercicio(pontos);
+    const v = variacaoExercicio(pontosDesdeUltimoMarcador(pontos, marcadoresPorExercicio.get(exercicioId)));
     if (v == null) return null;
     if (v > 0.02) return "subindo";
     if (v < -0.02) return "caindo";
@@ -1242,7 +1267,7 @@
         if (!te.exercicio?.musculos.some((m) => m.musculo_id === musculoId)) continue;
         const pontos = historicoPorExercicio.get(te.exercicio_id);
         if (!pontos) continue;
-        const v = variacaoExercicio(pontos);
+        const v = variacaoExercicio(pontosDesdeUltimoMarcador(pontos, marcadoresPorExercicio.get(te.exercicio_id)));
         if (v == null) continue;
         const peso = pesos.get(te.id) ?? 1;
         somaPonderada += v * peso;
@@ -1305,7 +1330,7 @@
   function variacaoExercicioPct(exercicioId: string): number | null {
     const pontos = historicoPorExercicio.get(exercicioId);
     if (!pontos) return null;
-    return variacaoExercicio(pontos);
+    return variacaoExercicio(pontosDesdeUltimoMarcador(pontos, marcadoresPorExercicio.get(exercicioId)));
   }
 
   /** Tendência do músculo = média da variação de 1RM de cada exercício que o trabalha (nessa
@@ -1323,10 +1348,12 @@
     try {
       const variacoes: number[] = [];
       for (const item of itens) {
-        // Reaproveita o histórico já pré-carregado (carregarHistoricoTodos) — só busca de novo
-        // se esse exercício não estava no cache (ex: acabou de ser adicionado à rotina).
+        // Reaproveita o histórico/marcadores já pré-carregados (carregarHistoricoTodos) — só
+        // busca de novo se esse exercício não estava no cache (ex: acabou de ser adicionado à
+        // rotina).
         const pontos = historicoPorExercicio.get(item.exercicioId) ?? (await getHistoricoExercicio(item.exercicioId));
-        const v = variacaoExercicio(pontos);
+        const marcadores = marcadoresPorExercicio.get(item.exercicioId) ?? (await listMarcadoresExercicio(item.exercicioId));
+        const v = variacaoExercicio(pontosDesdeUltimoMarcador(pontos, marcadores));
         if (v != null) variacoes.push(v);
       }
       if (meuToken !== tokenTendencia) return;
