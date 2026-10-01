@@ -48,6 +48,18 @@
     if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_MOSTRAR_DETALHES, String(v));
   }
 
+  /** Card "Variação" (Peso.svelte): "Acumulada" (padrão) é direto do primeiro pro último registro
+   * do período; "Média" quebra o período em blocos de 7 dias e tira a média das variações de cada
+   * bloco. Mesma convenção das outras duas prefs dessa tela: grava direto no toque. */
+  const CHAVE_TIPO_VARIACAO = "fitforge_peso_tipo_variacao";
+  let tipoVariacao = $state<"acumulada" | "media">(
+    typeof localStorage !== "undefined" && localStorage.getItem(CHAVE_TIPO_VARIACAO) === "media" ? "media" : "acumulada",
+  );
+  function selecionarTipoVariacao(v: "acumulada" | "media"): void {
+    tipoVariacao = v;
+    if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_TIPO_VARIACAO, v);
+  }
+
   let tipoDieta = $state<TipoDieta>("manutencao");
   /** Sempre a magnitude (sem sinal) — o sinal é aplicado na hora de salvar, conforme o tipo de
    * dieta. `percentualMin` é o ritmo usado pra calcular a meta de cada semana; `percentualMax` só
@@ -219,6 +231,21 @@
         Mostrar detalhes
       </label>
       <span class="campo-dica">Peso e % nos pontos do gráfico (conforme o período). Desmarcado, fica só a linha (peso e meta).</span>
+    </div>
+
+    <div class="campo">
+      <label for="meta-tipo-variacao">Variação</label>
+      <div class="referencia-opcoes" id="meta-tipo-variacao">
+        <button type="button" class:ativo={tipoVariacao === "acumulada"} onclick={() => selecionarTipoVariacao("acumulada")}>Acumulada</button>
+        <button type="button" class:ativo={tipoVariacao === "media"} onclick={() => selecionarTipoVariacao("media")}>Média</button>
+      </div>
+      <span class="campo-dica">
+        {#if tipoVariacao === "acumulada"}
+          Direto do primeiro pro último registro do período
+        {:else}
+          Média da variação de cada semana (blocos de 7 dias) dentro do período
+        {/if}
+      </span>
     </div>
 
     <div class="campo">

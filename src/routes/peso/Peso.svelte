@@ -125,6 +125,11 @@
   const mostrarDetalhesPref =
     typeof localStorage !== "undefined" ? localStorage.getItem(CHAVE_MOSTRAR_DETALHES) !== "false" : true;
 
+  /** "Acumulada" (padrão) ou "Média" pro card "Variação" — ver Meta > Parametrização do gráfico. */
+  const CHAVE_TIPO_VARIACAO = "fitforge_peso_tipo_variacao";
+  const tipoVariacaoPref: "acumulada" | "media" =
+    typeof localStorage !== "undefined" && localStorage.getItem(CHAVE_TIPO_VARIACAO) === "media" ? "media" : "acumulada";
+
   let meta = $state<PesoMeta | null>(null);
   let metaHistorico = $state<PesoMetaHistorico[]>([]);
   let mostrarFormMeta = $state(false);
@@ -342,15 +347,46 @@
     return metaSemanalValor != null ? `${formatPeso(metaSemanalValor)} kg` : "Sem meta";
   });
 
-  /** Variação % de peso entre o primeiro e o último registro do período do filtro aplicado no
-   * gráfico (periodo) — sempre a partir dos pesos reais registrados, independente do modo
-   * diário/média escolhido pro desenho da linha. null sem pelo menos 2 registros no período. */
-  const variacaoPeriodo = $derived.by(() => {
-    if (pesosGrafico.length < 2) return null;
-    const primeiro = pesosGrafico[0].peso;
-    const ultimo = pesosGrafico[pesosGrafico.length - 1].peso;
+  /** "Acumulada" (padrão) = direto do primeiro pro último registro do período inteiro.
+   * "Média" = o período quebrado em blocos de 7 dias (a partir do registro mais antigo), a
+   * variação % calculada DENTRO de cada bloco (mesma conta de "Acumulada", só que por semana) e
+   * depois a média simples dessas variações semanais — configurável em Meta > Parametrização do
+   * gráfico. Blocos com menos de 2 registros não entram na média (nada pra comparar). */
+  function variacaoPct(primeiro: number, ultimo: number): number | null {
     if (primeiro === 0) return null;
     return ((ultimo - primeiro) / primeiro) * 100;
+  }
+
+  function variacaoMediaSemanal(pontos: PesoRegistro[]): number | null {
+    if (!pontos.length) return null;
+    const blocos: PesoRegistro[][] = [];
+    let atual: PesoRegistro[] = [];
+    let inicioBloco = pontos[0].data;
+    for (const p of pontos) {
+      if (Math.round((parseISODate(p.data).getTime() - parseISODate(inicioBloco).getTime()) / 86_400_000) >= 7) {
+        if (atual.length) blocos.push(atual);
+        atual = [];
+        inicioBloco = p.data;
+      }
+      atual.push(p);
+    }
+    if (atual.length) blocos.push(atual);
+
+    const variacoes = blocos
+      .filter((b) => b.length >= 2)
+      .map((b) => variacaoPct(b[0].peso, b[b.length - 1].peso))
+      .filter((v): v is number => v != null);
+    if (!variacoes.length) return null;
+    return variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
+  }
+
+  /** Variação % de peso no período do filtro aplicado no gráfico (periodo) — sempre a partir dos
+   * pesos reais registrados, independente do modo diário/média escolhido pro desenho da linha.
+   * null sem pelo menos 2 registros no período. */
+  const variacaoPeriodo = $derived.by(() => {
+    if (pesosGrafico.length < 2) return null;
+    if (tipoVariacaoPref === "media") return variacaoMediaSemanal(pesosGrafico);
+    return variacaoPct(pesosGrafico[0].peso, pesosGrafico[pesosGrafico.length - 1].peso);
   });
   const variacaoPeriodoTexto = $derived(
     variacaoPeriodo == null ? "—" : `${variacaoPeriodo > 0 ? "+" : ""}${variacaoPeriodo.toFixed(1).replace(".", ",")}%`,
@@ -643,9 +679,10 @@
 
 {#snippet iconMeta()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="9" />
-    <circle cx="12" cy="12" r="5" />
-    <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="3" />
+    <path
+      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+    />
   </svg>
 {/snippet}
 {#snippet iconFiltro()}
