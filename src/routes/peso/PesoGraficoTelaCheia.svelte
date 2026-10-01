@@ -133,8 +133,7 @@
   function desenhar() {
     if (!canvas) return;
     chart?.destroy();
-    const corPonto = (data: string) =>
-      informarTreino && modo === "diario" && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO;
+    const corPonto = (data: string) => (informarTreino && diasComTreinoGrafico.has(data) ? COR_TREINO : COR_PESO);
     chart = new Chart(canvas, {
       type: "line",
       data: {
