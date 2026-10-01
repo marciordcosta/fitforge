@@ -282,21 +282,21 @@
     <div class="campo">
       <label class="campo-checkbox-linha">
         <input type="checkbox" checked={mostrarPesoVariacao} onchange={(e) => alternarMostrarPesoVariacao(e.currentTarget.checked)} />
-        <span>Adicionar peso/variação no gráfico</span>
+        Adicionar peso/variação no gráfico
       </label>
     </div>
 
     <div class="campo">
       <label class="campo-checkbox-linha">
         <input type="checkbox" checked={mostrarDiaSemana} onchange={(e) => alternarMostrarDiaSemana(e.currentTarget.checked)} />
-        <span>Adicionar dia da semana no gráfico</span>
+        Adicionar dia da semana no gráfico
       </label>
     </div>
 
     <div class="campo">
       <label class="campo-checkbox-linha">
         <input type="checkbox" checked={informarTreino} onchange={(e) => alternarInformarTreino(e.currentTarget.checked)} />
-        <span>Informar treino no gráfico</span>
+        Informar treino no gráfico
       </label>
       <span class="campo-dica">Destaca na cor o ponto dos dias com treino registrado (só no modo Diário)</span>
     </div>
@@ -304,7 +304,7 @@
     <div class="campo">
       <label class="campo-checkbox-linha">
         <input type="checkbox" checked={destacarRegistro} onchange={(e) => alternarDestacarRegistro(e.currentTarget.checked)} />
-        <span>Destacar registro (ponto) no gráfico</span>
+        Destacar registro (ponto) no gráfico
       </label>
     </div>
 
@@ -381,6 +381,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    color: var(--surface-fg);
+    font-size: var(--font-size-sm);
     cursor: pointer;
   }
   .campo-checkbox-linha input {
