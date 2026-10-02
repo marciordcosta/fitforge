@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { hojeISO, parseISODate, toISODate } from "./dates";
-import { comCache, invalidarNamespace } from "./offline/cache.svelte";
+import { comCache, invalidarNamespace, atualizarCache } from "./offline/cache.svelte";
 import { registrarOperacao } from "./offline/queue.svelte";
 
 export const PESOS_CONTRIBUICAO_PRESET = [1, 0.75, 0.5, 0.25] as const;
@@ -1838,7 +1838,11 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
-  await invalidarNamespace("treino");
+  // Só essa chave muda de verdade aqui -- invalidarNamespace("treino") apagaria também
+  // listTreinos/listMusculos/listMetasMusculo etc. (intactos), forçando a Distribuição a
+  // rebuscar tudo da rede ao voltar da Parametrização (reflow/"tela em movimento" visível
+  // enquanto recarrega do zero). Como já sabemos o valor novo certinho (p), grava direto.
+  await atualizarCache("treino:getParametrosDistribuicao", p);
 }
 
 /** Fator de performance da série `n` (1-indexada) no modo Gradual — decaimento contínuo em vez

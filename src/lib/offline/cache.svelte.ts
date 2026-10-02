@@ -19,6 +19,19 @@ function marcarAtualizado(namespace: string): void {
   versoes[namespace] = (versoes[namespace] ?? 0) + 1;
 }
 
+/** Escreve o valor direto no cache de UMA chave (sem apagar o resto do namespace) e avisa quem
+ * observa — usado quando a função de escrita já SABE o novo valor certinho (ex: salvou um objeto
+ * de parâmetros inteiro), então não precisa de outra ida à rede só pra reler o que acabou de
+ * gravar. Evita o remount caro de invalidarNamespace quando só UMA chave do namespace mudou de
+ * verdade (ex: salvarParametrosDistribuicao — não precisa também forçar listTreinos/listMusculos
+ * a rebuscar, já que esses não mudaram). */
+export async function atualizarCache<T>(chave: string, valor: T): Promise<void> {
+  const namespace = chave.split(":")[0];
+  const db = await getDb();
+  await db.put("cache", { valor, salvoEm: Date.now() }, chave);
+  marcarAtualizado(namespace);
+}
+
 /** Chamado pelas funções de escrita (`*Api.ts`) depois de uma mutação bem-sucedida —
  * sem isso, um `comCache()` logo em seguida (ex: o `carregar()` de sempre, chamado
  * de novo após salvar) devolvia o valor em cache de ANTES da escrita na hora, e só
