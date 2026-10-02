@@ -2421,6 +2421,8 @@
         class:valor-estavel={tendencia === "estavel"}
         class:valor-caindo={tendencia === "caindo"}
       >{textoTendencia(tendencia)}</span>
+    {:else}
+      <span class="editor-tendencia-texto valor-sem-info">Sem info</span>
     {/if}
   </button>
 {/snippet}
@@ -2999,6 +3001,8 @@
       <p class="tendencia-musculo muted">Verificando progressão…</p>
     {:else if tendenciaMusculo}
       <p class="tendencia-musculo tendencia-{tendenciaMusculo.status}">{TEXTO_TENDENCIA[tendenciaMusculo.status]}</p>
+    {:else}
+      <p class="tendencia-musculo tendencia-sem-info">Sem info</p>
     {/if}
     {#if statusAjusteMusculo}
       <p class="status-ajuste status-ajuste-{statusAjusteMusculo.tipo}">{statusAjusteMusculo.texto}</p>
@@ -3354,6 +3358,8 @@
                       class:valor-estavel={tendMusculo === "estavel"}
                       class:valor-caindo={tendMusculo === "caindo"}
                     >{textoTendencia(tendMusculo)}</span>
+                  {:else}
+                    <span class="editor-tendencia-texto valor-sem-info">Sem info</span>
                   {/if}
                   {#if alertaItem}
                     <span class="editor-alerta-texto">⚠ {alertaItem}</span>
@@ -4093,6 +4099,9 @@
   .tendencia-caindo {
     color: var(--color-negative);
   }
+  .tendencia-sem-info {
+    color: var(--surface-muted);
+  }
   .resumo-musculo {
     display: flex;
     gap: var(--space-2);
@@ -4496,6 +4505,9 @@
   }
   .editor-tendencia-texto.valor-caindo {
     color: var(--color-negative);
+  }
+  .editor-tendencia-texto.valor-sem-info {
+    color: var(--surface-muted);
   }
   /* Sinal combinado (volume + tendência) — cor de atenção própria, distinta de qualquer outra
      usada aqui (não é erro/vermelho, nem progresso/verde: é "vale olhar"). */
