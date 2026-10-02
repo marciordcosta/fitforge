@@ -1,6 +1,7 @@
 <script lang="ts">
   import { voltar } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
+  import { toISODate } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import {
@@ -9,6 +10,7 @@
     fatorPerformanceGradual,
     listTreinos,
     zerarRegistrosRotina,
+    getRegistrosPorTreinoDesde,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type ParametrosDistribuicao,
     type FadigaModo,
@@ -41,6 +43,10 @@
   let ordenacaoHome = $state<OrdenacaoHome>(PARAMETROS_DISTRIBUICAO_PADRAO.ordenacaoHome);
 
   let treinos = $state<TreinoComExercicios[]>([]);
+  /** Quantas sessões cada rotina teve desde o último reset manual -- mesma conta do rodapé do
+   * card em Rotinas/Distribuição (ver carregarRegistrosPorTreino em DistribuicaoMusculos.svelte),
+   * mostrada aqui do lado do botão "Zerar" pra saber o que vai ser zerado antes de confirmar. */
+  let registrosPorTreino = $state<Map<string, number>>(new Map());
   let zerandoId = $state<string | null>(null);
   let confirmandoZerarTodas = $state(false);
   let confirmandoZerarId = $state<string | null>(null);
@@ -93,12 +99,40 @@
     return v.toFixed(2);
   }
 
+  /** Mesma conta de carregarRegistrosPorTreino em DistribuicaoMusculos.svelte. */
+  async function carregarRegistrosPorTreino(treinosCarregados: TreinoComExercicios[]): Promise<void> {
+    if (!treinosCarregados.length) {
+      registrosPorTreino = new Map();
+      return;
+    }
+    const dataMinima = toISODate(
+      new Date(Math.min(...treinosCarregados.map((t) => new Date(t.registros_zerados_em).getTime()))),
+    );
+    const registros = await getRegistrosPorTreinoDesde(dataMinima);
+    const diasPorTreino = new Map<string, Set<string>>();
+    for (const r of registros) {
+      if (!r.treino_id) continue;
+      const dias = diasPorTreino.get(r.treino_id) ?? new Set<string>();
+      dias.add(r.data);
+      diasPorTreino.set(r.treino_id, dias);
+    }
+    const mapa = new Map<string, number>();
+    for (const t of treinosCarregados) {
+      const desde = toISODate(new Date(t.registros_zerados_em));
+      const dias = diasPorTreino.get(t.id);
+      const count = dias ? Array.from(dias).filter((d) => d >= desde).length : 0;
+      mapa.set(t.id, count);
+    }
+    registrosPorTreino = mapa;
+  }
+
   async function carregar() {
     carregando = true;
     erro = null;
     try {
       const [p, treinosCarregados] = await Promise.all([getParametrosDistribuicao(), listTreinos()]);
       treinos = treinosCarregados;
+      void carregarRegistrosPorTreino(treinosCarregados);
       seriesManutencaoMin = p.seriesManutencaoMin;
       seriesManutencaoMax = p.seriesManutencaoMax;
       seriesFocoMin = p.seriesFocoMin;
@@ -135,6 +169,7 @@
     try {
       await zerarRegistrosRotina(id);
       treinos = await listTreinos();
+      void carregarRegistrosPorTreino(treinos);
       mostrarToast("Contagem de registros zerada");
     } catch (err) {
       alert("Erro ao zerar contagem: " + (err as Error).message);
@@ -383,6 +418,9 @@
           {#each treinos as treino (treino.id)}
             <li class="zerar-linha">
               <span class="zerar-nome">{treino.nome_treino}</span>
+              <span class="zerar-registros">
+                {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
+              </span>
               <button type="button" class="zerar-btn" onclick={() => (confirmandoZerarId = treino.id)} disabled={zerandoId != null}>
                 Zerar
               </button>
@@ -685,6 +723,12 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--font-size-sm);
+  }
+  .zerar-registros {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--surface-muted);
+    white-space: nowrap;
   }
   .zerar-btn {
     flex-shrink: 0;
