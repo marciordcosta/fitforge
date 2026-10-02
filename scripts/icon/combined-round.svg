@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <defs>
+    <clipPath id="circulo">
+      <circle cx="54" cy="54" r="54" />
+    </clipPath>
+  </defs>
+  <g clip-path="url(#circulo)">
+    <rect x="0" y="0" width="108" height="108" fill="#111318" />
+    <rect x="46" y="49" width="16" height="10" rx="5" fill="#5eead4" />
+    <rect x="34" y="32" width="12" height="44" rx="6" fill="#5eead4" />
+    <rect x="62" y="32" width="12" height="44" rx="6" fill="#5eead4" />
+    <rect x="27" y="42" width="7" height="24" rx="3.5" fill="#5eead4" />
+    <rect x="74" y="42" width="7" height="24" rx="3.5" fill="#5eead4" />
+  </g>
+</svg>
