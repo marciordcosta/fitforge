@@ -362,11 +362,7 @@
 
 {#if sessaoParaMarcar}
   <Sheet titulo="Marcar Exercício" onFechar={() => (sessaoParaMarcar = null)}>
-    <p class="marcador-ajuda">
-      Registra uma observação em {formatData(sessaoParaMarcar.data)} — aparece no histórico e no gráfico de
-      progressão, pra não confundir uma troca de equipamento (ou algo assim) com progresso ou regressão de
-      verdade. A tendência de progressão desse exercício também passa a contar a partir dessa data.
-    </p>
+    <p class="marcador-ajuda">Marca um novo início no histórico do exercício.</p>
     <textarea
       class="marcador-input"
       placeholder="Ex: Troquei pra máquina nova, peso não é comparável"

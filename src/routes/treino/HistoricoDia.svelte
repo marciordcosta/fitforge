@@ -407,11 +407,7 @@
 
 {#if marcandoExIdx !== null}
   <Sheet titulo="Marcar Exercício" onFechar={() => (marcandoExIdx = null)}>
-    <p class="marcador-ajuda">
-      Registra uma observação em {dataLabel} pra {sessao[marcandoExIdx].exercicioNome} — aparece no histórico e
-      no gráfico de progressão, pra não confundir uma troca de equipamento (ou algo assim) com progresso ou
-      regressão de verdade.
-    </p>
+    <p class="marcador-ajuda">Marca um novo início no histórico do exercício.</p>
     <textarea
       class="marcador-input"
       placeholder="Ex: Troquei pra máquina nova, peso não é comparável"
