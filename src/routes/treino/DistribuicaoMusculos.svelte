@@ -82,11 +82,9 @@
    * pra alimentar a setinha de tendência de cada músculo sem precisar reconsultar por linha. */
   let historicoPorExercicio = $state<Map<string, { data: string; melhor1rm: number }[]>>(new Map());
 
-  /** Marcadores (observações pontuais no gráfico, ex: troca de equipamento) de cada exercício —
-   * carregado junto do histórico. Usado pra cortar o histórico considerado na tendência: a
-   * contagem de progressão/estagnação/regressão reinicia a partir do marcador mais recente, já
-   * que ele normalmente sinaliza uma mudança significativa no exercício (ver
-   * pontosDesdeUltimoMarcador). */
+  /** Marcadores (observações pontuais no gráfico) de cada exercício — carregado junto do
+   * histórico. Usado pra ajustar o histórico considerado na tendência conforme o tipo de cada
+   * marcador (ver pontosParaTendencia e TipoMarcadorExercicio em treinoApi.ts). */
   let marcadoresPorExercicio = $state<Map<string, MarcadorExercicio[]>>(new Map());
 
   /** Busca em lotes pequenos (não tudo de uma vez via Promise.all) — muitas rotinas/exercícios
@@ -1193,13 +1191,20 @@
     return (mediaRecente - mediaAnterior) / mediaAnterior;
   }
 
-  /** Corta o histórico pra começar no marcador (observação pontual no gráfico, ex: troca de
-   * equipamento) mais recente — sem isso, uma mudança de peso causada por ela entraria na conta
-   * de progresso/regressão como se fosse evolução real. Sem marcador, devolve a lista inteira. */
-  function pontosDesdeUltimoMarcador<T extends { data: string }>(pontos: T[], marcadores: MarcadorExercicio[] | undefined): T[] {
+  /** Aplica os marcadores (observação pontual no gráfico) à conta de tendência de progressão,
+   * conforme o tipo de cada um — ver TipoMarcadorExercicio em treinoApi.ts:
+   * - "desconsiderar": esse dia some só da conta (continua no histórico/gráfico normalmente).
+   * - "reiniciar": corta tudo ANTES do marcador mais recente desse tipo (ex: troca de
+   *   equipamento) — sem isso, uma mudança de peso causada por ela entraria na conta como se
+   *   fosse evolução real.
+   * - "apenas_marcar": sem efeito nenhum aqui, só visual.
+   * Sem marcador, devolve a lista inteira. */
+  function pontosParaTendencia<T extends { data: string }>(pontos: T[], marcadores: MarcadorExercicio[] | undefined): T[] {
     if (!marcadores || !marcadores.length) return pontos;
-    const ultimaData = marcadores[marcadores.length - 1].data;
-    return pontos.filter((p) => p.data >= ultimaData);
+    const datasDesconsiderar = new Set(marcadores.filter((m) => m.tipo === "desconsiderar").map((m) => m.data));
+    const marcadoresReiniciar = marcadores.filter((m) => m.tipo === "reiniciar");
+    const ultimaDataReiniciar = marcadoresReiniciar.length ? marcadoresReiniciar[marcadoresReiniciar.length - 1].data : null;
+    return pontos.filter((p) => !datasDesconsiderar.has(p.data) && (ultimaDataReiniciar == null || p.data >= ultimaDataReiniciar));
   }
 
   /** Tendência de um exercício específico (não agregada por músculo) — mostrada como texto
@@ -1207,7 +1212,7 @@
   function tendenciaExercicio(exercicioId: string): "subindo" | "estavel" | "caindo" | null {
     const pontos = historicoPorExercicio.get(exercicioId);
     if (!pontos) return null;
-    const v = variacaoExercicio(pontosDesdeUltimoMarcador(pontos, marcadoresPorExercicio.get(exercicioId)));
+    const v = variacaoExercicio(pontosParaTendencia(pontos, marcadoresPorExercicio.get(exercicioId)));
     if (v == null) return null;
     if (v > 0.02) return "subindo";
     if (v < -0.02) return "caindo";
@@ -1267,7 +1272,7 @@
         if (!te.exercicio?.musculos.some((m) => m.musculo_id === musculoId)) continue;
         const pontos = historicoPorExercicio.get(te.exercicio_id);
         if (!pontos) continue;
-        const v = variacaoExercicio(pontosDesdeUltimoMarcador(pontos, marcadoresPorExercicio.get(te.exercicio_id)));
+        const v = variacaoExercicio(pontosParaTendencia(pontos, marcadoresPorExercicio.get(te.exercicio_id)));
         if (v == null) continue;
         const peso = pesos.get(te.id) ?? 1;
         somaPonderada += v * peso;
@@ -1330,7 +1335,7 @@
   function variacaoExercicioPct(exercicioId: string): number | null {
     const pontos = historicoPorExercicio.get(exercicioId);
     if (!pontos) return null;
-    return variacaoExercicio(pontosDesdeUltimoMarcador(pontos, marcadoresPorExercicio.get(exercicioId)));
+    return variacaoExercicio(pontosParaTendencia(pontos, marcadoresPorExercicio.get(exercicioId)));
   }
 
   /** Tendência do músculo = média da variação de 1RM de cada exercício que o trabalha (nessa
@@ -1353,7 +1358,7 @@
         // rotina).
         const pontos = historicoPorExercicio.get(item.exercicioId) ?? (await getHistoricoExercicio(item.exercicioId));
         const marcadores = marcadoresPorExercicio.get(item.exercicioId) ?? (await listMarcadoresExercicio(item.exercicioId));
-        const v = variacaoExercicio(pontosDesdeUltimoMarcador(pontos, marcadores));
+        const v = variacaoExercicio(pontosParaTendencia(pontos, marcadores));
         if (v != null) variacoes.push(v);
       }
       if (meuToken !== tokenTendencia) return;

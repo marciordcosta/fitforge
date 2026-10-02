@@ -19,6 +19,7 @@
     salvarMarcadorExercicio,
     removerMarcadorExercicio,
     type SetRegistro,
+    type TipoMarcadorExercicio,
   } from "../../lib/treinoApi";
 
   let {
@@ -42,9 +43,10 @@
   /** Marcação (ex: troca de equipamento) desse exercício NESSE DIA específico — mesma que aparece
    * destacada no gráfico de progressão (ExercicioChart.svelte). Editável aqui pra cobrir o caso de
    * lançar/corrigir um treino retroativamente (TreinoLog.svelte só marca o dia de hoje). */
-  let marcadoresPorExercicio = $state<Map<string, string>>(new Map());
+  let marcadoresPorExercicio = $state<Map<string, { observacao: string; tipo: TipoMarcadorExercicio }>>(new Map());
   let marcandoExIdx = $state<number | null>(null);
   let observacaoMarcador = $state("");
+  let tipoMarcador = $state<TipoMarcadorExercicio>("apenas_marcar");
   let salvandoMarcador = $state(false);
   let loading = $state(true);
   let salvando = $state(false);
@@ -84,11 +86,12 @@
     const marcadoresPorId = await Promise.all(
       sessao.map(async (ex) => {
         const marcadores = await listMarcadoresExercicio(ex.exercicioId);
-        return [ex.exercicioId, marcadores.find((m) => m.data === data)?.observacao ?? null] as const;
+        const marcador = marcadores.find((m) => m.data === data);
+        return [ex.exercicioId, marcador ? { observacao: marcador.observacao, tipo: marcador.tipo } : null] as const;
       }),
     );
     marcadoresPorExercicio = new Map(
-      marcadoresPorId.filter((par): par is [string, string] => par[1] != null),
+      marcadoresPorId.filter((par): par is [string, { observacao: string; tipo: TipoMarcadorExercicio }] => par[1] != null),
     );
     loading = false;
   }
@@ -97,7 +100,9 @@
 
   function abrirMarcarExercicio(exIdx: number) {
     marcandoExIdx = exIdx;
-    observacaoMarcador = marcadoresPorExercicio.get(sessao[exIdx].exercicioId) ?? "";
+    const existente = marcadoresPorExercicio.get(sessao[exIdx].exercicioId);
+    observacaoMarcador = existente?.observacao ?? "";
+    tipoMarcador = existente?.tipo ?? "apenas_marcar";
   }
 
   async function confirmarMarcarExercicio() {
@@ -105,8 +110,8 @@
     const exercicioId = sessao[marcandoExIdx].exercicioId;
     salvandoMarcador = true;
     try {
-      await salvarMarcadorExercicio(exercicioId, data, observacaoMarcador.trim());
-      marcadoresPorExercicio = new Map(marcadoresPorExercicio).set(exercicioId, observacaoMarcador.trim());
+      await salvarMarcadorExercicio(exercicioId, data, observacaoMarcador.trim(), tipoMarcador);
+      marcadoresPorExercicio = new Map(marcadoresPorExercicio).set(exercicioId, { observacao: observacaoMarcador.trim(), tipo: tipoMarcador });
       marcandoExIdx = null;
       observacaoMarcador = "";
     } catch (err) {
@@ -327,7 +332,7 @@
         <h2>{ex.exercicioNome}</h2>
         {#if marcadoresPorExercicio.get(ex.exercicioId)}
           <button class="marcador-btn marcador-definido" onclick={() => abrirMarcarExercicio(exIdx)}>
-            🚩 {marcadoresPorExercicio.get(ex.exercicioId)}
+            🚩 {marcadoresPorExercicio.get(ex.exercicioId)?.observacao}
           </button>
         {:else}
           <button class="marcador-btn" onclick={() => abrirMarcarExercicio(exIdx)}>🚩 Marcar exercício</button>
@@ -359,7 +364,7 @@
           <p class="sessao-observacao">📝 {observacoesPorExercicio.get(ex.exercicioId)}</p>
         {/if}
         {#if marcadoresPorExercicio.get(ex.exercicioId)}
-          <p class="sessao-marcador">🚩 {marcadoresPorExercicio.get(ex.exercicioId)}</p>
+          <p class="sessao-marcador">🚩 {marcadoresPorExercicio.get(ex.exercicioId)?.observacao}</p>
         {/if}
         <div class="sessao-tabela">
           <div class="sessao-linha sessao-cabecalho">
@@ -407,7 +412,23 @@
 
 {#if marcandoExIdx !== null}
   <Sheet titulo="Marcar Exercício" onFechar={() => (marcandoExIdx = null)}>
-    <p class="marcador-ajuda">Marca um novo início no histórico do exercício.</p>
+    <div class="tipo-marcador-opcoes">
+      <button type="button" class:ativo={tipoMarcador === "apenas_marcar"} onclick={() => (tipoMarcador = "apenas_marcar")}
+      >Apenas marcar</button>
+      <button type="button" class:ativo={tipoMarcador === "desconsiderar"} onclick={() => (tipoMarcador = "desconsiderar")}
+      >Desconsiderar</button>
+      <button type="button" class:ativo={tipoMarcador === "reiniciar"} onclick={() => (tipoMarcador = "reiniciar")}
+      >Reiniciar histórico</button>
+    </div>
+    <p class="marcador-tipo-dica">
+      {#if tipoMarcador === "desconsiderar"}
+        Fica no histórico e no gráfico normalmente, mas esse dia não entra na conta de progressão.
+      {:else if tipoMarcador === "reiniciar"}
+        A conta de progressão passa a considerar só sessões a partir dessa data em diante (ex: troca de equipamento/técnica).
+      {:else}
+        Só aparece a bandeirinha no histórico e no gráfico — sem efeito na conta de progressão.
+      {/if}
+    </p>
     <textarea
       class="marcador-input"
       placeholder="Ex: Troquei pra máquina nova, peso não é comparável"
@@ -557,7 +578,29 @@
     border-color: rgba(251, 191, 36, 0.4);
     color: var(--color-warning, #fbbf24);
   }
-  .marcador-ajuda {
+  .tipo-marcador-opcoes {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .tipo-marcador-opcoes button {
+    flex: 1;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tipo-marcador-opcoes button.ativo {
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
+  }
+  .marcador-tipo-dica {
     margin: 0 0 var(--space-3);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);

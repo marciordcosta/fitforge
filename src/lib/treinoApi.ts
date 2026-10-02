@@ -632,17 +632,30 @@ export async function getRecordesExercicio(exercicioId: string, antesDe?: string
   };
 }
 
+/** "desconsiderar": o dia continua no histórico/gráfico normalmente, mas esse ponto específico
+ * não entra na conta de tendência de progressão (ex: dia ruim isolado) -- some só da média, não
+ * da visualização. "reiniciar": mesmo efeito de sempre -- a conta de tendência passa a considerar
+ * só sessões a partir dessa data em diante (ex: troca de equipamento/técnica). "apenas_marcar":
+ * só a bandeirinha no histórico/gráfico, sem nenhum efeito na conta. */
+export type TipoMarcadorExercicio = "desconsiderar" | "reiniciar" | "apenas_marcar";
+
 export interface MarcadorExercicio {
   data: string;
   observacao: string;
+  tipo: TipoMarcadorExercicio;
 }
 
-/** Marca um dia específico de um exercício com uma observação (ex: troca de equipamento/máquina) —
- * usado pra não confundir uma mudança de peso causada por isso com progresso ou regressão de
- * verdade ao olhar o histórico/gráfico. Upsert: marcar de novo no mesmo dia substitui a observação. */
-export async function salvarMarcadorExercicio(exercicioId: string, data: string, observacao: string): Promise<void> {
+/** Marca um dia específico de um exercício com uma observação (ex: troca de equipamento/máquina,
+ * ou um dia ruim isolado) — ver TipoMarcadorExercicio pro efeito de cada tipo na conta de
+ * tendência de progressão. Upsert: marcar de novo no mesmo dia substitui a observação/tipo. */
+export async function salvarMarcadorExercicio(
+  exercicioId: string,
+  data: string,
+  observacao: string,
+  tipo: TipoMarcadorExercicio,
+): Promise<void> {
   const { error } = await supabase.from("treino_marcadores").upsert(
-    { user_id: uid(), exercicio_id: exercicioId, data, observacao },
+    { user_id: uid(), exercicio_id: exercicioId, data, observacao, tipo },
     { onConflict: "user_id,exercicio_id,data" },
   );
   if (error) throw error;
@@ -651,11 +664,11 @@ export async function salvarMarcadorExercicio(exercicioId: string, data: string,
 export async function listMarcadoresExercicio(exercicioId: string): Promise<MarcadorExercicio[]> {
   const { data, error } = await supabase
     .from("treino_marcadores")
-    .select("data, observacao")
+    .select("data, observacao, tipo")
     .eq("exercicio_id", exercicioId)
     .order("data", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as MarcadorExercicio[];
 }
 
 export async function removerMarcadorExercicio(exercicioId: string, data: string): Promise<void> {

@@ -20,6 +20,7 @@
     type SessaoHistorico,
     type LinhaMusculoInput,
     type MarcadorExercicio,
+    type TipoMarcadorExercicio,
     type ObservacaoExercicio,
   } from "../../lib/treinoApi";
   import ExercicioChart from "./ExercicioChart.svelte";
@@ -45,7 +46,7 @@
   let loading = $state(true);
   let carregouAlgumaVez = $state(false);
 
-  const marcadoresPorData = $derived(new Map(marcadores.map((m) => [m.data, m.observacao])));
+  const marcadoresPorData = $derived(new Map(marcadores.map((m) => [m.data, m])));
 
   /** Observação vigente NA DATA de cada sessão do histórico — não a atual: sessões antigas
    * continuam mostrando o que valia então, mesmo que a observação já tenha sido editada depois. */
@@ -72,11 +73,14 @@
    * (lá só o dia aberto). */
   let sessaoParaMarcar = $state<SessaoHistorico | null>(null);
   let observacaoMarcador = $state("");
+  let tipoMarcador = $state<TipoMarcadorExercicio>("apenas_marcar");
   let salvandoMarcador = $state(false);
 
   function abrirMarcarSessao(sessao: SessaoHistorico): void {
     sessaoParaMarcar = sessao;
-    observacaoMarcador = marcadoresPorData.get(sessao.data) ?? "";
+    const existente = marcadoresPorData.get(sessao.data);
+    observacaoMarcador = existente?.observacao ?? "";
+    tipoMarcador = existente?.tipo ?? "apenas_marcar";
   }
 
   async function confirmarMarcarSessao(): Promise<void> {
@@ -84,8 +88,8 @@
     const data = sessaoParaMarcar.data;
     salvandoMarcador = true;
     try {
-      await salvarMarcadorExercicio(exercicioId, data, observacaoMarcador.trim());
-      marcadores = [...marcadores.filter((m) => m.data !== data), { data, observacao: observacaoMarcador.trim() }];
+      await salvarMarcadorExercicio(exercicioId, data, observacaoMarcador.trim(), tipoMarcador);
+      marcadores = [...marcadores.filter((m) => m.data !== data), { data, observacao: observacaoMarcador.trim(), tipo: tipoMarcador }];
       sessaoParaMarcar = null;
       observacaoMarcador = "";
     } catch (e) {
@@ -299,7 +303,7 @@
           </div>
           {#if marcadoresPorData.has(sessao.data)}
             <button class="sessao-marcador sessao-marcador-btn" onclick={() => abrirMarcarSessao(sessao)}
-            >🚩 {marcadoresPorData.get(sessao.data)}</button>
+            >🚩 {marcadoresPorData.get(sessao.data)?.observacao}</button>
           {:else}
             <button class="sessao-marcador-add" onclick={() => abrirMarcarSessao(sessao)}>🚩 Marcar exercício</button>
           {/if}
@@ -362,7 +366,23 @@
 
 {#if sessaoParaMarcar}
   <Sheet titulo="Marcar Exercício" onFechar={() => (sessaoParaMarcar = null)}>
-    <p class="marcador-ajuda">Marca um novo início no histórico do exercício.</p>
+    <div class="tipo-marcador-opcoes">
+      <button type="button" class:ativo={tipoMarcador === "apenas_marcar"} onclick={() => (tipoMarcador = "apenas_marcar")}
+      >Apenas marcar</button>
+      <button type="button" class:ativo={tipoMarcador === "desconsiderar"} onclick={() => (tipoMarcador = "desconsiderar")}
+      >Desconsiderar</button>
+      <button type="button" class:ativo={tipoMarcador === "reiniciar"} onclick={() => (tipoMarcador = "reiniciar")}
+      >Reiniciar histórico</button>
+    </div>
+    <p class="marcador-tipo-dica">
+      {#if tipoMarcador === "desconsiderar"}
+        Fica no histórico e no gráfico normalmente, mas esse dia não entra na conta de progressão.
+      {:else if tipoMarcador === "reiniciar"}
+        A conta de progressão passa a considerar só sessões a partir dessa data em diante (ex: troca de equipamento/técnica).
+      {:else}
+        Só aparece a bandeirinha no histórico e no gráfico — sem efeito na conta de progressão.
+      {/if}
+    </p>
     <textarea
       class="marcador-input"
       placeholder="Ex: Troquei pra máquina nova, peso não é comparável"
@@ -549,7 +569,29 @@
     color: var(--surface-muted);
     cursor: pointer;
   }
-  .marcador-ajuda {
+  .tipo-marcador-opcoes {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .tipo-marcador-opcoes button {
+    flex: 1;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tipo-marcador-opcoes button.ativo {
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
+  }
+  .marcador-tipo-dica {
     margin: 0 0 var(--space-3);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);

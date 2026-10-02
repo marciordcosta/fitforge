@@ -29,6 +29,7 @@
     type TreinoExercicio,
     type Exercicio,
     type LinhaMusculoInput,
+    type TipoMarcadorExercicio,
   } from "../../lib/treinoApi";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import AlertDialog from "../../components/AlertDialog.svelte";
@@ -620,18 +621,20 @@
    * em volta dessa data pode não ser progresso/regressão real. */
   let marcandoExIdx = $state<number | null>(null);
   let observacaoMarcador = $state("");
+  let tipoMarcador = $state<TipoMarcadorExercicio>("apenas_marcar");
   let salvandoMarcador = $state(false);
 
   function abrirMarcarExercicio(exIdx: number) {
     marcandoExIdx = exIdx;
     observacaoMarcador = "";
+    tipoMarcador = "apenas_marcar";
   }
 
   async function confirmarMarcarExercicio() {
     if (marcandoExIdx == null || !observacaoMarcador.trim()) return;
     salvandoMarcador = true;
     try {
-      await salvarMarcadorExercicio(sessao[marcandoExIdx].exercicio_id, data, observacaoMarcador.trim());
+      await salvarMarcadorExercicio(sessao[marcandoExIdx].exercicio_id, data, observacaoMarcador.trim(), tipoMarcador);
       marcandoExIdx = null;
       observacaoMarcador = "";
     } catch (err) {
@@ -1358,7 +1361,23 @@
 
 {#if marcandoExIdx !== null}
   <Sheet titulo="Marcar Exercício" onFechar={() => (marcandoExIdx = null)}>
-    <p class="marcador-ajuda">Marca um novo início no histórico do exercício.</p>
+    <div class="tipo-marcador-opcoes">
+      <button type="button" class:ativo={tipoMarcador === "apenas_marcar"} onclick={() => (tipoMarcador = "apenas_marcar")}
+      >Apenas marcar</button>
+      <button type="button" class:ativo={tipoMarcador === "desconsiderar"} onclick={() => (tipoMarcador = "desconsiderar")}
+      >Desconsiderar</button>
+      <button type="button" class:ativo={tipoMarcador === "reiniciar"} onclick={() => (tipoMarcador = "reiniciar")}
+      >Reiniciar histórico</button>
+    </div>
+    <p class="marcador-tipo-dica">
+      {#if tipoMarcador === "desconsiderar"}
+        Fica no histórico e no gráfico normalmente, mas esse dia não entra na conta de progressão.
+      {:else if tipoMarcador === "reiniciar"}
+        A conta de progressão passa a considerar só sessões a partir dessa data em diante (ex: troca de equipamento/técnica).
+      {:else}
+        Só aparece a bandeirinha no histórico e no gráfico — sem efeito na conta de progressão.
+      {/if}
+    </p>
     <textarea
       class="marcador-input"
       placeholder="Ex: Troquei pra máquina nova, peso não é comparável"
@@ -1963,7 +1982,29 @@
   .observacao-input::placeholder {
     color: var(--surface-muted);
   }
-  .marcador-ajuda {
+  .tipo-marcador-opcoes {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .tipo-marcador-opcoes button {
+    flex: 1;
+    padding: var(--space-2) var(--space-1);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-bg);
+    color: var(--surface-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tipo-marcador-opcoes button.ativo {
+    background: var(--color-secondary);
+    color: var(--surface-bg);
+    border-color: var(--color-secondary);
+  }
+  .marcador-tipo-dica {
     margin: 0 0 var(--space-3);
     font-size: var(--font-size-sm);
     color: var(--surface-muted);
