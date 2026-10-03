@@ -1556,19 +1556,19 @@
         <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong>
         <span class="valor-g">{carboidratoG.toFixed(0)} g</span>
         <span class="rotulo-macro">Carb</span>
-        {#if diffCarbo}<span class="meta-macro-diff">{textoDiffMeta(diffCarbo, "g")}</span>{/if}
+        <span class="meta-macro-diff" class:invisivel={!diffCarbo}>{diffCarbo ? textoDiffMeta(diffCarbo, "g") : ""}</span>
       </span>
       <span class="meta-macro-col">
         <strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong>
         <span class="valor-g">{gorduraG.toFixed(0)} g</span>
         <span class="rotulo-macro">Gorduras</span>
-        {#if diffGordura}<span class="meta-macro-diff">{textoDiffMeta(diffGordura, "g")}</span>{/if}
+        <span class="meta-macro-diff" class:invisivel={!diffGordura}>{diffGordura ? textoDiffMeta(diffGordura, "g") : ""}</span>
       </span>
       <span class="meta-macro-col">
         <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
         <span class="valor-g">{proteinaG.toFixed(0)} g</span>
         <span class="rotulo-macro">Proteínas</span>
-        {#if diffProteina}<span class="meta-macro-diff">{textoDiffMeta(diffProteina, "g")}</span>{/if}
+        <span class="meta-macro-diff" class:invisivel={!diffProteina}>{diffProteina ? textoDiffMeta(diffProteina, "g") : ""}</span>
       </span>
     </div>
   </div>
@@ -2526,8 +2526,9 @@
   .meta-macro-col .rotulo-macro {
     color: var(--surface-muted);
   }
-  /** Diferença entre a refeição cadastrada e a meta desse macro (textoDiffMeta) — discreto, só
-   * aparece quando a refeição tem lista de alimentos e o valor difere da meta. */
+  /** Diferença entre a refeição cadastrada e a meta desse macro (textoDiffMeta). Sempre ocupa o
+   * espaço (mesmo sem diff pra mostrar — ver .invisivel) pra todo card ter a mesma altura, com ou
+   * sem lista de alimentos cadastrada. */
   .meta-macro-diff {
     display: inline-block;
     margin-top: 2px;
@@ -2537,6 +2538,9 @@
     font-size: 10px;
     font-weight: 400;
     color: var(--surface-muted);
+  }
+  .meta-macro-diff.invisivel {
+    visibility: hidden;
   }
   .reordenar-card {
     flex: 1;
