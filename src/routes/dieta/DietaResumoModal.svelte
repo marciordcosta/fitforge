@@ -7,9 +7,8 @@
     getMetaSemanal,
     getDiasParaObjetivo,
     formatDiasObjetivo,
-    getPesosDoPeriodo,
+    getVariacaoSemanal,
   } from "../../lib/pesoApi";
-  import { hojeISO, somarDias } from "../../lib/dates";
 
   let { onFechar }: { onFechar: () => void } = $props();
 
@@ -26,21 +25,21 @@
   let pesoAlvo = $state<number | null>(null);
   let temMeta = $state(false);
   let diasObjetivo = $state<number | null>(null);
-  /** Variação % de peso nos últimos 7 dias (primeiro vs último registro da janela) — mesmo
-   * critério do card "Variação" da tela de Peso, só que com período fixo de 1 semana (esse modal
-   * não tem o filtro de período de lá). null sem pelo menos 2 registros na janela. */
+  /** Variação % de peso na última semana — mesma fonte (getVariacaoSemanal, pesoApi.ts) usada
+   * pelo card "Variação" de Peso.svelte: média móvel de 7 dias atual menos a de 7 dias atrás,
+   * nunca peso bruto. Fonte compartilhada garante que os dois números sempre batem. */
   let variacaoSemana = $state<number | null>(null);
 
   async function carregar(): Promise<void> {
     loading = true;
-    const [media, ultimoPeso, mediaPeso, meta, metaSemanal, dias, pesosSemana] = await Promise.all([
+    const [media, ultimoPeso, mediaPeso, meta, metaSemanal, dias, variacao] = await Promise.all([
       getMetasDiarias(),
       getUltimoPeso(),
       getPesoMedioAtual(),
       getMeta(),
       getMetaSemanal(),
       getDiasParaObjetivo(),
-      getPesosDoPeriodo(somarDias(hojeISO(), -6), hojeISO()),
+      getVariacaoSemanal(),
     ]);
     metaCalorias = media.calorias;
     metaProteina = media.proteinaG;
@@ -52,11 +51,7 @@
     metaSemanaPeso = metaSemanal;
     pesoAlvo = meta?.pesoAlvo ?? null;
     diasObjetivo = dias;
-    if (pesosSemana.length >= 2 && pesosSemana[0].peso !== 0) {
-      variacaoSemana = ((pesosSemana[pesosSemana.length - 1].peso - pesosSemana[0].peso) / pesosSemana[0].peso) * 100;
-    } else {
-      variacaoSemana = null;
-    }
+    variacaoSemana = variacao;
     loading = false;
   }
 

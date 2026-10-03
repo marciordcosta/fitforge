@@ -180,6 +180,9 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        // Mesmo motivo de Peso.svelte: sem isso, toda reconstrução do gráfico (destroy+new Chart)
+        // replay a animação de entrada padrão, dando efeito de "piscada".
+        animation: false,
         layout: { padding: { top: 28 } },
         plugins: {
           legend: { display: false },

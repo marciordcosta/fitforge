@@ -391,13 +391,14 @@
     return acumulada / semanas;
   }
 
-  /** Variação % de peso no período do filtro aplicado no gráfico (periodo) — sempre a partir dos
-   * pesos reais registrados, independente do modo diário/média escolhido pro desenho da linha.
-   * null sem pelo menos 2 registros no período. */
+  /** Variação % de peso no período do filtro aplicado no gráfico (periodo) — sempre a partir da
+   * MÉDIA MÓVEL de 7 dias (nunca do peso bruto de um dia isolado, que é ruidoso demais pra
+   * comparar dois pontos: água, horário da pesagem etc.), independente do modo diário/média
+   * escolhido pro DESENHO da linha. null sem pelo menos 2 pontos de média móvel no período. */
   const variacaoPeriodo = $derived.by(() => {
-    if (pesosGrafico.length < 2) return null;
-    if (tipoVariacaoPref === "media") return variacaoMediaSemanal(pesosGrafico);
-    return variacaoPct(pesosGrafico[0].peso, pesosGrafico[pesosGrafico.length - 1].peso);
+    if (mediaMovelGrafico.length < 2) return null;
+    if (tipoVariacaoPref === "media") return variacaoMediaSemanal(mediaMovelGrafico);
+    return variacaoPct(mediaMovelGrafico[0].peso, mediaMovelGrafico[mediaMovelGrafico.length - 1].peso);
   });
   const variacaoPeriodoTexto = $derived(
     variacaoPeriodo == null ? "—" : `${variacaoPeriodo > 0 ? "+" : ""}${variacaoPeriodo.toFixed(1).replace(".", ",")}%`,
@@ -651,6 +652,10 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        // Sem isso, toda vez que o efeito reconstrói o gráfico (destroy+new Chart, qualquer
+        // dependência reativa mudando -- preferência, filtro, peso editado) a animação de entrada
+        // padrão do Chart.js replay do zero, dando um efeito de "piscada" visível.
+        animation: false,
         layout: { padding: { top: 28, bottom: 22, left: 10, right: 14 } },
         plugins: {
           legend: { display: false },

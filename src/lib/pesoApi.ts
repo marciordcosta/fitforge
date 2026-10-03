@@ -407,6 +407,31 @@ export async function getPesoMedioAtual(): Promise<number | null> {
   return janela.reduce((acc, p) => acc + p.peso, 0) / janela.length;
 }
 
+/** Variação % de peso na última semana — SEMPRE a partir da média móvel de 7 dias (nunca do peso
+ * bruto de um único dia, que é ruidoso demais pra comparar dois pontos isolados: água, horário da
+ * pesagem etc.): média móvel atual (ancorada no registro mais recente, mesmo critério de
+ * getPesoMedioAtual) menos a média móvel de exatamente 7 dias antes dela. Fonte única usada tanto
+ * pelo card "Variação" de Peso.svelte (no filtro "1 semana") quanto pelo Resumo da Dieta — os dois
+ * têm que bater. null sem média móvel disponível nos dois pontos. */
+export async function getVariacaoSemanal(): Promise<number | null> {
+  const registros = await getPesosDoPeriodo("1900-01-01", hojeISO());
+  if (!registros.length) return null;
+  const serieMovel = calcularMediaMovelSerie(registros);
+  const dataMaisRecente = serieMovel[serieMovel.length - 1].data;
+  const dataSemanaAtras = somarDias(dataMaisRecente, -7);
+  function valorAteData(data: string): number | null {
+    let melhor: { data: string; peso: number } | null = null;
+    for (const p of serieMovel) {
+      if (p.data <= data && (!melhor || p.data > melhor.data)) melhor = p;
+    }
+    return melhor?.peso ?? null;
+  }
+  const mediaAtual = valorAteData(dataMaisRecente);
+  const mediaAnterior = valorAteData(dataSemanaAtras);
+  if (mediaAtual == null || mediaAnterior == null || mediaAnterior === 0) return null;
+  return ((mediaAtual - mediaAnterior) / mediaAnterior) * 100;
+}
+
 function proximoComWeekday(data: string, diaReset: DiaSemana): string {
   let d = parseISODate(data);
   while (d.getDay() !== diaReset) {
