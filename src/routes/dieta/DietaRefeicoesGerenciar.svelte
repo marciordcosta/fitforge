@@ -2471,8 +2471,8 @@
   .meta-donut {
     position: relative;
     display: block;
-    width: 64px;
-    height: 64px;
+    width: 76px;
+    height: 76px;
     border-radius: 50%;
     flex-shrink: 0;
     border: none;
@@ -2483,7 +2483,7 @@
   }
   .meta-donut-centro {
     position: absolute;
-    inset: 6px;
+    inset: 7px;
     border-radius: 50%;
     background: var(--surface-bg);
     display: flex;
@@ -2492,11 +2492,11 @@
     justify-content: center;
   }
   .meta-donut-centro strong {
-    font-size: 15px;
+    font-size: 17px;
     color: var(--surface-fg);
   }
   .meta-donut-centro span {
-    font-size: 9px;
+    font-size: 10px;
     color: var(--surface-muted);
     max-width: 100%;
     overflow: hidden;
