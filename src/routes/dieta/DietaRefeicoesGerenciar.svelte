@@ -768,10 +768,11 @@
     return receitaId ? (macrosListaRefeicao.get(receitaId) ?? null) : null;
   }
 
-  /** "+Xg" quando a refeição passa da meta desse macro, "-Xg" quando falta — diff já vem como
-   * refeição − meta (ver macrosRefeicaoEfetivos/metaDonut). Chamado só quando diff !== 0. */
-  function formatDiffMacro(diff: number): string {
-    return diff > 0 ? `+${diff}g` : `${diff}g`;
+  /** "Xg acima"/"X acima" quando a refeição passa da meta, "Xg rest."/"X rest." quando falta —
+   * mesmo texto/formato de restante()/passouMeta() em DiarioAlimentar.svelte (cards da Home).
+   * diff já vem como refeição − meta (ver macrosRefeicaoEfetivos/metaDonut); unidade "" pra calorias. */
+  function textoDiffMeta(diff: number, unidade: string): string {
+    return diff > 0 ? `${diff}${unidade} acima` : `${-diff}${unidade} rest.`;
   }
 
   /** Nome efetivo dessa refeição pro grupo de dias — só difere de m.nome quando o usuário renomeou
@@ -1533,6 +1534,7 @@
   {@const diffCarbo = refMacros ? Math.round(refMacros.carboidratoG) - Math.round(carboidratoG) : null}
   {@const diffGordura = refMacros ? Math.round(refMacros.gorduraG) - Math.round(gorduraG) : null}
   {@const diffProteina = refMacros ? Math.round(refMacros.proteinaG) - Math.round(proteinaG) : null}
+  {@const diffCalorias = refMacros ? Math.round(refMacros.calorias) - Math.round(calorias) : null}
   <div class="meta-resumo">
     <button
       type="button"
@@ -1546,7 +1548,7 @@
     >
       <span class="meta-donut-centro">
         <strong>{calorias.toFixed(0)}</strong>
-        <span>Cal</span>
+        <span>{diffCalorias ? textoDiffMeta(diffCalorias, "") : "Cal"}</span>
       </span>
     </button>
     <div class="meta-resumo-macros">
@@ -1554,19 +1556,19 @@
         <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong>
         <span class="valor-g">{carboidratoG.toFixed(0)} g</span>
         <span class="rotulo-macro">Carb</span>
-        {#if diffCarbo}<span class="meta-macro-diff">{formatDiffMacro(diffCarbo)}</span>{/if}
+        {#if diffCarbo}<span class="meta-macro-diff">{textoDiffMeta(diffCarbo, "g")}</span>{/if}
       </span>
       <span class="meta-macro-col">
         <strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong>
         <span class="valor-g">{gorduraG.toFixed(0)} g</span>
         <span class="rotulo-macro">Gorduras</span>
-        {#if diffGordura}<span class="meta-macro-diff">{formatDiffMacro(diffGordura)}</span>{/if}
+        {#if diffGordura}<span class="meta-macro-diff">{textoDiffMeta(diffGordura, "g")}</span>{/if}
       </span>
       <span class="meta-macro-col">
         <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
         <span class="valor-g">{proteinaG.toFixed(0)} g</span>
         <span class="rotulo-macro">Proteínas</span>
-        {#if diffProteina}<span class="meta-macro-diff">{formatDiffMacro(diffProteina)}</span>{/if}
+        {#if diffProteina}<span class="meta-macro-diff">{textoDiffMeta(diffProteina, "g")}</span>{/if}
       </span>
     </div>
   </div>
@@ -2496,6 +2498,10 @@
   .meta-donut-centro span {
     font-size: 9px;
     color: var(--surface-muted);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .meta-resumo-macros {
     flex: 1;
@@ -2520,7 +2526,7 @@
   .meta-macro-col .rotulo-macro {
     color: var(--surface-muted);
   }
-  /** Diferença entre a refeição cadastrada e a meta desse macro (formatDiffMacro) — discreto, só
+  /** Diferença entre a refeição cadastrada e a meta desse macro (textoDiffMeta) — discreto, só
    * aparece quando a refeição tem lista de alimentos e o valor difere da meta. */
   .meta-macro-diff {
     font-size: 10px;
