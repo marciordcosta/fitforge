@@ -2529,6 +2529,11 @@
   /** Diferença entre a refeição cadastrada e a meta desse macro (textoDiffMeta) — discreto, só
    * aparece quando a refeição tem lista de alimentos e o valor difere da meta. */
   .meta-macro-diff {
+    display: inline-block;
+    margin-top: 2px;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-bg);
     font-size: 10px;
     font-weight: 400;
     color: var(--surface-muted);
