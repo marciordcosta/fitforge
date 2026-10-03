@@ -687,9 +687,13 @@ export async function getContextoMetaCatalogo(modeloId: string, diasSemana?: num
  * outro "Lanche", independente, em Upper1). */
 async function existeNomeRefeicaoModelo(nome: string, idParaIgnorar?: string, diasSemana?: number[]): Promise<boolean> {
   if (diasSemana?.length) {
-    const [catalogo, modelosPorDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia()]);
+    // Precisa do metasDia (3º arg de resolverCatalogoEfetivoDoDia) pra comparar com o nome EFETIVO
+    // de cada dia (salvarNomeRefeicaoDias pode ter renomeado só pra esse grupo) — sem isso, a
+    // checagem comparava com o nome base do catálogo, que pode já ter sido trocado na tela e não é
+    // mais o que aparece pro usuário nesses dias.
+    const [catalogo, modelosPorDia, metasDia] = await Promise.all([listRefeicoesModelo(), listRefeicoesModeloDia(), listMetasDiaModelo()]);
     return diasSemana.some((dia) =>
-      resolverCatalogoEfetivoDoDia(dia, catalogo, modelosPorDia).some(
+      resolverCatalogoEfetivoDoDia(dia, catalogo, modelosPorDia, metasDia).some(
         (m) => m.id !== idParaIgnorar && m.nome.toLowerCase() === nome.toLowerCase(),
       ),
     );
@@ -2152,14 +2156,31 @@ export async function listReceitas(limite = 50): Promise<ReceitaResumo[]> {
   return (data ?? []).map((l) => mapReceitaResumo(l as unknown as Record<string, unknown>));
 }
 
-/** Soma de calorias de cada lista de alimentos privada de refeição (dieta_receitas ocultas),
- * carregada de uma vez pra todo o catálogo — usado só pra mostrar "refeição com X cal" no card de
- * Gerenciar Refeições, sem precisar abrir o detalhe (nem repetir a consulta por card). */
-export async function getCaloriasReceitas(receitaIds: string[]): Promise<Map<string, number>> {
+export interface MacrosReceita {
+  calorias: number;
+  proteinaG: number;
+  gorduraG: number;
+  carboidratoG: number;
+}
+
+/** Soma de calorias/macros de cada lista de alimentos privada de refeição (dieta_receitas ocultas),
+ * carregada de uma vez pra todo o catálogo — usado pra mostrar "refeição com X cal" no card de
+ * Gerenciar Refeições (sem precisar abrir o detalhe) e pro botão "iniciar meta pela refeição". */
+export async function getMacrosReceitas(receitaIds: string[]): Promise<Map<string, MacrosReceita>> {
   if (!receitaIds.length) return new Map();
   const { data, error } = await supabase.from("dieta_receitas").select(RECEITA_RESUMO_SELECT).in("id", receitaIds);
   if (error) throw error;
-  return new Map((data ?? []).map((l) => mapReceitaResumo(l as unknown as Record<string, unknown>)).map((r) => [r.id, r.calorias]));
+  return new Map(
+    (data ?? []).map((l) => {
+      const registro = l as unknown as Record<string, unknown>;
+      const itens = (registro.itens as ItemReceitaBruto[]) ?? [];
+      const totais = somarTotaisItensReceita(itens);
+      return [
+        registro.id as string,
+        { calorias: round1(totais.calorias), proteinaG: round1(totais.proteinaG), gorduraG: round1(totais.gorduraG), carboidratoG: round1(totais.carboidratoG) },
+      ] as const;
+    }),
+  );
 }
 
 export async function getReceita(id: string): Promise<Receita | null> {

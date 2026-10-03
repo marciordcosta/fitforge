@@ -34,7 +34,7 @@
     definirRefeicoesDoDia,
     salvarMetaNumericaRefeicao,
     salvarMetaNumericaRefeicaoDias,
-    getCaloriasReceitas,
+    getMacrosReceitas,
     getMetasDiarias,
     type RefeicaoModelo,
     type CaloriasPorDia,
@@ -44,6 +44,7 @@
     type LimiteParametro,
     type ContextoMetaCatalogo,
     type MetasDiarias,
+    type MacrosReceita,
   } from "../../lib/dietaApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
   import { DIAS_SEMANA_ABREV, listTreinos, type Treino } from "../../lib/treinoApi";
@@ -746,21 +747,28 @@
   }
 
   let modelos = $state<RefeicaoModelo[]>([]);
-  /** Calorias de cada lista de alimentos privada (chave: metaReceitaId), carregada uma vez só pra
-   * todo o catálogo — mostrada como "refeição com X cal" no card, ao lado do ícone de detalhes. */
-  let caloriasListaRefeicao = $state<Map<string, number>>(new Map());
+  /** Calorias/macros de cada lista de alimentos privada (chave: metaReceitaId), carregada uma vez
+   * só pra todo o catálogo — mostrada como "refeição com X cal" no card, e usada pelo botão
+   * "iniciar meta pela refeição" (iniciarMetaPelaRefeicao). */
+  let macrosListaRefeicao = $state<Map<string, MacrosReceita>>(new Map());
+
+  /** Id da lista de alimentos efetiva pra essa refeição/dia — null quando não tem nenhuma lista
+   * cadastrada ainda. Quando o grupo de dias tem uma lista própria (override do dia), ela prevalece
+   * sobre a do modelo base — mesma regra de resolução usada em DietaRefeicaoMetaEditar. */
+  function receitaIdEfetivo(m: RefeicaoModelo, diaSemana?: number): string | null {
+    const override = diaSemana != null ? metaDiaMap.get(`${m.id}:${diaSemana}`) : undefined;
+    return override?.metaReceitaId ?? m.metaReceitaId ?? null;
+  }
 
   /** "sem refeição" quando a refeição não tem nenhum alimento inserido (nunca ganhou uma lista
-   * própria); "refeição com X cal" quando tem, somando os itens dela — não é a META, é o que foi
-   * de fato cadastrado na lista (usada pro lançamento automático no diário). Quando o grupo de
-   * dias tem uma lista própria (override do dia), ela prevalece sobre a do modelo base — mesma
-   * regra de resolução usada em DietaRefeicaoMetaEditar (overrideDia ?? modelo). */
+   * própria); "C60g · G15g · P25g · 603 cal" quando tem, somando os itens dela — não é a META, é o
+   * que foi de fato cadastrado na lista (usada pro lançamento automático no diário). Mostra os
+   * macros direto (sem precisar abrir o detalhe) pra ficar sempre visível no card. */
   function textoListaAlimentos(m: RefeicaoModelo, diaSemana?: number): string {
-    const override = diaSemana != null ? metaDiaMap.get(`${m.id}:${diaSemana}`) : undefined;
-    const receitaId = override?.metaReceitaId ?? m.metaReceitaId;
-    if (!receitaId) return "sem refeição";
-    const cal = caloriasListaRefeicao.get(receitaId) ?? 0;
-    return `refeição com ${Math.round(cal)} cal`;
+    const receitaId = receitaIdEfetivo(m, diaSemana);
+    const macros = receitaId ? macrosListaRefeicao.get(receitaId) : undefined;
+    if (!macros) return "sem refeição";
+    return `C${Math.round(macros.carboidratoG)}g · G${Math.round(macros.gorduraG)}g · P${Math.round(macros.proteinaG)}g · ${Math.round(macros.calorias)} cal`;
   }
 
   /** Nome efetivo dessa refeição pro grupo de dias — só difere de m.nome quando o usuário renomeou
@@ -1023,8 +1031,8 @@
       const receitaIds = [...modelos.map((m) => m.metaReceitaId), ...metasDiaModelo.map((md) => md.metaReceitaId)].filter(
         (id): id is string => id != null,
       );
-      void getCaloriasReceitas(receitaIds)
-        .then((mapa) => (caloriasListaRefeicao = mapa))
+      void getMacrosReceitas(receitaIds)
+        .then((mapa) => (macrosListaRefeicao = mapa))
         .catch(() => {});
     } catch (err) {
       erro = (err as Error).message;
@@ -1287,6 +1295,28 @@
     }
   }
 
+  /** Só "inicia" a meta com os macros da lista de alimentos cadastrada pra essa refeição (arredondado
+   * pra grama) — depois disso o ajuste manual continua livre, igual a qualquer outra edição de meta.
+   * Sem efeito se a refeição não tem lista de alimentos (ícone nem aparece nesse caso). */
+  async function iniciarMetaPelaRefeicao(m: RefeicaoModelo, grupo?: GrupoDias): Promise<void> {
+    const receitaId = receitaIdEfetivo(m, grupo?.dias[0]);
+    const macros = receitaId ? macrosListaRefeicao.get(receitaId) : undefined;
+    if (!macros) return;
+    const proteinaG = Math.round(macros.proteinaG);
+    const gorduraG = Math.round(macros.gorduraG);
+    const carboidratoG = Math.round(macros.carboidratoG);
+    try {
+      if (grupo) {
+        await salvarMetaNumericaRefeicaoDias(m.id, grupo.dias, proteinaG, gorduraG, carboidratoG);
+      } else {
+        await salvarMetaNumericaRefeicao(m.id, proteinaG, gorduraG, carboidratoG);
+      }
+      await carregar();
+    } catch (err) {
+      alert("Erro ao iniciar meta pela refeição: " + (err as Error).message);
+    }
+  }
+
   async function salvar() {
     if (!nome.trim()) return;
     salvando = true;
@@ -1474,6 +1504,11 @@
 {#snippet iconExcluir()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+{/snippet}
+{#snippet iconIniciarMeta()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
   </svg>
 {/snippet}
 {#snippet iconInfo()}
@@ -1762,7 +1797,19 @@
                     oncontextmenu={(e) => aoContextMenuNome(e, m, grupo)}
                   >
                     <div class="card-header">
-                      <h2 class="refeicao-nome">{nomeEfetivo(m, grupo.dias[0])}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
+                      <span class="card-header-esquerda">
+                        <h2 class="refeicao-nome">{nomeEfetivo(m, grupo.dias[0])}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
+                        {#if !ultima && receitaIdEfetivo(m, grupo.dias[0])}
+                          <button
+                            type="button"
+                            class="item-iniciar-meta"
+                            onclick={(e) => { e.stopPropagation(); iniciarMetaPelaRefeicao(m, grupo); }}
+                            aria-label="Iniciar meta pela refeição"
+                          >
+                            {@render iconIniciarMeta()}
+                          </button>
+                        {/if}
+                      </span>
                       <span class="card-header-direita">
                         <span class="lista-alimentos-badge">{textoListaAlimentos(m, grupo.dias[0])}</span>
                         <span
@@ -1821,7 +1868,19 @@
                   oncontextmenu={(e) => aoContextMenuNome(e, m)}
                 >
                   <div class="card-header">
-                    <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
+                    <span class="card-header-esquerda">
+                      <h2 class="refeicao-nome">{m.nome}{#if ultima}<span class="nome-auto"> · automática</span>{/if}</h2>
+                      {#if !ultima && receitaIdEfetivo(m)}
+                        <button
+                          type="button"
+                          class="item-iniciar-meta"
+                          onclick={(e) => { e.stopPropagation(); iniciarMetaPelaRefeicao(m); }}
+                          aria-label="Iniciar meta pela refeição"
+                        >
+                          {@render iconIniciarMeta()}
+                        </button>
+                      {/if}
+                    </span>
                     <span class="card-header-direita">
                       <span class="lista-alimentos-badge">{textoListaAlimentos(m)}</span>
                       <span
@@ -2342,6 +2401,32 @@
     font-size: var(--font-size-lg);
     margin: 0;
     color: var(--surface-fg);
+  }
+  .card-header-esquerda {
+    flex-shrink: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  /** Ícone "iniciar meta pela refeição" (iniciarMetaPelaRefeicao) — só aparece quando a refeição
+   * tem uma lista de alimentos cadastrada (ver receitaIdEfetivo). */
+  .item-iniciar-meta {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--color-primary);
+    cursor: pointer;
+  }
+  .item-iniciar-meta svg {
+    width: 16px;
+    height: 16px;
   }
   .card-header-direita {
     flex-shrink: 0;
