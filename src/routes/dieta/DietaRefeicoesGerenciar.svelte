@@ -760,15 +760,18 @@
     return override?.metaReceitaId ?? m.metaReceitaId ?? null;
   }
 
-  /** "sem refeição" quando a refeição não tem nenhum alimento inserido (nunca ganhou uma lista
-   * própria); "C60g · G15g · P25g · 603 cal" quando tem, somando os itens dela — não é a META, é o
-   * que foi de fato cadastrado na lista (usada pro lançamento automático no diário). Mostra os
-   * macros direto (sem precisar abrir o detalhe) pra ficar sempre visível no card. */
-  function textoListaAlimentos(m: RefeicaoModelo, diaSemana?: number): string {
+  /** Macros da lista de alimentos cadastrada pra essa refeição/dia — null quando não tem nenhuma
+   * lista ainda. Comparados contra a META de cada macro (meta-macro-diff, embaixo de Carb/Gordura/
+   * Proteína no card) pra mostrar o quanto falta/passa da meta. */
+  function macrosRefeicaoEfetivos(m: RefeicaoModelo, diaSemana?: number): MacrosReceita | null {
     const receitaId = receitaIdEfetivo(m, diaSemana);
-    const macros = receitaId ? macrosListaRefeicao.get(receitaId) : undefined;
-    if (!macros) return "sem refeição";
-    return `C${Math.round(macros.carboidratoG)}g · G${Math.round(macros.gorduraG)}g · P${Math.round(macros.proteinaG)}g · ${Math.round(macros.calorias)} cal`;
+    return receitaId ? (macrosListaRefeicao.get(receitaId) ?? null) : null;
+  }
+
+  /** "+Xg" quando a refeição passa da meta desse macro, "-Xg" quando falta — diff já vem como
+   * refeição − meta (ver macrosRefeicaoEfetivos/metaDonut). Chamado só quando diff !== 0. */
+  function formatDiffMacro(diff: number): string {
+    return diff > 0 ? `+${diff}g` : `${diff}g`;
   }
 
   /** Nome efetivo dessa refeição pro grupo de dias — só difere de m.nome quando o usuário renomeou
@@ -1519,7 +1522,7 @@
   </svg>
 {/snippet}
 
-{#snippet metaDonut(carboidratoG: number, gorduraG: number, proteinaG: number, calorias: number, aoClicarCalorias: () => void)}
+{#snippet metaDonut(carboidratoG: number, gorduraG: number, proteinaG: number, calorias: number, refMacros: MacrosReceita | null, aoClicarCalorias: () => void)}
   {@const pctCarbo = calorias > 0 ? ((carboidratoG * 4) / calorias) * 100 : 0}
   {@const pctGordura = calorias > 0 ? ((gorduraG * 9) / calorias) * 100 : 0}
   {@const pctProteina = calorias > 0 ? ((proteinaG * 4) / calorias) * 100 : 0}
@@ -1527,6 +1530,9 @@
     calorias > 0
       ? `background: conic-gradient(${COR_CARBO} 0% ${pctCarbo}%, ${COR_GORDURA} ${pctCarbo}% ${pctCarbo + pctGordura}%, ${COR_PROTEINA} ${pctCarbo + pctGordura}% 100%);`
       : `background: var(--surface-border);`}
+  {@const diffCarbo = refMacros ? Math.round(refMacros.carboidratoG) - Math.round(carboidratoG) : null}
+  {@const diffGordura = refMacros ? Math.round(refMacros.gorduraG) - Math.round(gorduraG) : null}
+  {@const diffProteina = refMacros ? Math.round(refMacros.proteinaG) - Math.round(proteinaG) : null}
   <div class="meta-resumo">
     <button
       type="button"
@@ -1548,16 +1554,19 @@
         <strong class="pct" style={`color:${COR_CARBO}`}>{pctCarbo.toFixed(0)}%</strong>
         <span class="valor-g">{carboidratoG.toFixed(0)} g</span>
         <span class="rotulo-macro">Carb</span>
+        {#if diffCarbo}<span class="meta-macro-diff">{formatDiffMacro(diffCarbo)}</span>{/if}
       </span>
       <span class="meta-macro-col">
         <strong class="pct" style={`color:${COR_GORDURA}`}>{pctGordura.toFixed(0)}%</strong>
         <span class="valor-g">{gorduraG.toFixed(0)} g</span>
         <span class="rotulo-macro">Gorduras</span>
+        {#if diffGordura}<span class="meta-macro-diff">{formatDiffMacro(diffGordura)}</span>{/if}
       </span>
       <span class="meta-macro-col">
         <strong class="pct" style={`color:${COR_PROTEINA}`}>{pctProteina.toFixed(0)}%</strong>
         <span class="valor-g">{proteinaG.toFixed(0)} g</span>
         <span class="rotulo-macro">Proteínas</span>
+        {#if diffProteina}<span class="meta-macro-diff">{formatDiffMacro(diffProteina)}</span>{/if}
       </span>
     </div>
   </div>
@@ -1811,7 +1820,6 @@
                         {/if}
                       </span>
                       <span class="card-header-direita">
-                        <span class="lista-alimentos-badge">{textoListaAlimentos(m, grupo.dias[0])}</span>
                         <span
                           class="item-detalhe"
                           role="button"
@@ -1824,7 +1832,7 @@
                         </span>
                       </span>
                     </div>
-                    {@render metaDonut(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias ?? 0, () => abrirCaloriasRefeicao(m, grupo))}
+                    {@render metaDonut(meta.carboidratoG ?? 0, meta.gorduraG ?? 0, meta.proteinaG ?? 0, meta.calorias ?? 0, macrosRefeicaoEfetivos(m, grupo.dias[0]), () => abrirCaloriasRefeicao(m, grupo))}
                   </div>
                 </div>
               {/if}
@@ -1882,7 +1890,6 @@
                       {/if}
                     </span>
                     <span class="card-header-direita">
-                      <span class="lista-alimentos-badge">{textoListaAlimentos(m)}</span>
                       <span
                         class="item-detalhe"
                         role="button"
@@ -1895,7 +1902,7 @@
                       </span>
                     </span>
                   </div>
-                  {@render metaDonut(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias, () => abrirCaloriasRefeicao(m))}
+                  {@render metaDonut(efetivo.carboidratoG, efetivo.gorduraG, efetivo.proteinaG, efetivo.calorias, macrosRefeicaoEfetivos(m), () => abrirCaloriasRefeicao(m))}
                 </div>
               </div>
             {/if}
@@ -2453,12 +2460,6 @@
     font-weight: 400;
     color: var(--surface-muted);
   }
-  .lista-alimentos-badge {
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--surface-muted);
-    white-space: nowrap;
-  }
   .meta-resumo {
     display: flex;
     align-items: center;
@@ -2517,6 +2518,13 @@
     font-size: var(--font-size-base);
   }
   .meta-macro-col .rotulo-macro {
+    color: var(--surface-muted);
+  }
+  /** Diferença entre a refeição cadastrada e a meta desse macro (formatDiffMacro) — discreto, só
+   * aparece quando a refeição tem lista de alimentos e o valor difere da meta. */
+  .meta-macro-diff {
+    font-size: 10px;
+    font-weight: 400;
     color: var(--surface-muted);
   }
   .reordenar-card {
