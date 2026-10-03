@@ -157,6 +157,13 @@
 
   const minimoCalorias = $derived(parametro("calorias").min * pesoAtual);
 
+  /** Segunda=0 .. Domingo=6 — mesma convenção de segundaDaSemana (treinoApi.ts), usada só pra
+   * ORDENAR a exibição (os dias continuam numerados 0=Dom..6=Sáb internamente, convenção de
+   * Date.getDay() usada no resto do app). A semana visualmente começa na segunda, não no domingo. */
+  function ordemSemana(dia: number): number {
+    return (dia + 6) % 7;
+  }
+
   /** Resolvida 100% localmente — trocar Fixa/Ondulatória ou olhar a tela não bate no banco. */
   const diasResolvidos = $derived.by((): CaloriasPorDia[] => {
     if (modoCalorias === "fixa") {
@@ -168,6 +175,9 @@
       return [0, 1, 2, 3, 4, 5, 6].map((dia) => ({ diaSemana: dia, calorias: caloriasCalc, manual: manuaisDias.has(dia) }));
     }
   });
+
+  /** Mesma lista de diasResolvidos, só reordenada pra exibição (segunda primeiro, domingo por último). */
+  const diasResolvidosOrdenados = $derived([...diasResolvidos].sort((a, b) => ordemSemana(a.diaSemana) - ordemSemana(b.diaSemana)));
 
   /** Cor fixa por nome de bloco distinto — blocos diferentes saem com cores diferentes. */
   const corPorBloco = $derived.by(() => {
@@ -245,7 +255,9 @@
       lista.push(dia);
       porNome.set(v.nomeBloco, lista);
     }
-    return [...porNome.entries()].map(([nome, dias]) => ({ nome, dias: dias.sort((a, b) => a - b) }));
+    return [...porNome.entries()]
+      .map(([nome, dias]) => ({ nome, dias: dias.sort((a, b) => ordemSemana(a) - ordemSemana(b)) }))
+      .sort((a, b) => ordemSemana(a.dias[0]) - ordemSemana(b.dias[0]));
   });
 
   const todosOsDiasNomeados = $derived([0, 1, 2, 3, 4, 5, 6].every((d) => manuaisEfetivos.get(d)?.nomeBloco));
@@ -253,7 +265,7 @@
   /** Dias com a mesma meta de calorias E as mesmas refeições (na mesma ordem) viram um único bloco — dias diferentes em qualquer um dos dois saem em blocos separados. Ordem preservada pela primeira ocorrência (Dom..Sáb). */
   const gruposDias = $derived.by((): GrupoDias[] => {
     const grupos = new Map<string, GrupoDias>();
-    for (const d of diasResolvidos) {
+    for (const d of diasResolvidosOrdenados) {
       const chaveCal = Math.round(d.calorias);
       const listaDia = modelosDoDia(d.diaSemana);
       const chave = `${chaveCal}|${listaDia.map((m) => m.id).join(",")}`;
@@ -393,49 +405,47 @@
     mostrarCaloriasBlocos = true;
   }
 
+  /** Índice do último bloco da grade — sempre automático (nunca editado diretamente), ver aplicarValorBlocoLivre. */
+  function idxUltimoBloco(blocos: BlocoEdicao[]): number {
+    return blocos.length - 1;
+  }
+
   /**
-   * Generaliza resolverDistribuicao/distribuirValorPorDia pra quando TODOS os dias já têm um valor
-   * próprio (nenhum "automático" sobrando): editar um bloco desloca todos os OUTROS igualmente por
-   * dia (a soma ponderada por dias de cada bloco continua = metaPorDia × 7), preservando a diferença
-   * relativa entre eles em vez de nivelar todos num único valor.
+   * Edita um bloco LIVRE (qualquer um, menos o último) direto, sem empurrar os demais — só o
+   * ÚLTIMO bloco é recalculado, absorvendo a sobra necessária pra manter a média semanal ponderada
+   * (soma de cada bloco × dias, ÷ 7) igual a metaPorDia. Os outros blocos livres ficam intocados,
+   * cada um editável independente dos outros.
    */
-  function redistribuirEntreBlocos(
-    metaPorDia: number,
-    blocos: BlocoEdicao[],
-    idxEditado: number,
-    novoValor: number,
-    campo: "calorias" | "gorduraG",
-  ): BlocoEdicao[] {
-    const diasEditado = blocos[idxEditado].dias.length;
-    const diasOutrosTotal = 7 - diasEditado;
-    const valorAntigo = blocos[idxEditado][campo];
-    if (diasOutrosTotal === 0) {
-      return blocos.map((b, i) => (i === idxEditado ? { ...b, [campo]: novoValor } : b));
-    }
-    const deltaTotal = (novoValor - valorAntigo) * diasEditado;
-    const deltaPorDia = -deltaTotal / diasOutrosTotal;
-    return blocos.map((b, i) => (i === idxEditado ? { ...b, [campo]: novoValor } : { ...b, [campo]: Math.max(0, b[campo] + deltaPorDia) }));
+  function aplicarValorBlocoLivre(blocos: BlocoEdicao[], idxEditado: number, campo: "calorias" | "gorduraG", valor: number, metaPorDia: number): BlocoEdicao[] {
+    const idxUltimo = idxUltimoBloco(blocos);
+    if (idxEditado === idxUltimo) return blocos;
+    const comEditado = blocos.map((b, i) => (i === idxEditado ? { ...b, [campo]: valor } : b));
+    const diasUltimo = comEditado[idxUltimo].dias.length;
+    const somaOutros = comEditado.reduce((acc, b, i) => (i === idxUltimo ? acc : acc + b[campo] * b.dias.length), 0);
+    const valorUltimo = Math.max(0, (metaPorDia * 7 - somaOutros) / diasUltimo);
+    return comEditado.map((b, i) => (i === idxUltimo ? { ...b, [campo]: valorUltimo } : b));
   }
 
   function aplicarEdicaoCalorias(idx: number, valor: number) {
-    blocosEdicao = redistribuirEntreBlocos(caloriasCalc, blocosEdicao, idx, valor, "calorias");
+    blocosEdicao = aplicarValorBlocoLivre(blocosEdicao, idx, "calorias", valor, caloriasCalc);
     const proteina = proteinaGInput ?? 0;
     blocosEdicao = blocosEdicao.map((b) => ({ ...b, carboidratoG: carboidratoGDoDia(b.calorias, proteina, b.gorduraG) }));
   }
 
   /**
-   * Maior valor de calorias/gordura que dá pra colocar nesse bloco sem empurrar NENHUM outro bloco
-   * abaixo do mínimo parametrizado — redistribuirEntreBlocos desloca a diferença igualmente por dia
-   * entre os outros, então quem primeiro bate no piso é o bloco com o menor valor atual entre eles.
+   * Faixa válida pra editar um bloco LIVRE: o valor não pode ser tal que o último bloco (automático,
+   * absorve a sobra — ver aplicarValorBlocoLivre) seja empurrado pra fora do mínimo/máximo
+   * parametrizado. maximo = Infinity pra campos só-de-piso (ex: calorias, sem teto parametrizado).
    */
-  function tetoRedistribuicao(blocos: BlocoEdicao[], idxEditado: number, campo: "calorias" | "gorduraG", minimo: number): number {
+  function faixaEdicaoBloco(blocos: BlocoEdicao[], idxEditado: number, campo: "calorias" | "gorduraG", metaPorDia: number, minimo: number, maximo: number): { piso: number; teto: number } {
+    const idxUltimo = idxUltimoBloco(blocos);
     const diasEditado = blocos[idxEditado].dias.length;
-    const diasOutrosTotal = 7 - diasEditado;
-    const valorAntigo = blocos[idxEditado][campo];
-    if (diasOutrosTotal === 0) return Infinity;
-    const minOutros = Math.min(...blocos.filter((_, i) => i !== idxEditado).map((b) => b[campo]));
-    const teto = valorAntigo + ((minOutros - minimo) * diasOutrosTotal) / diasEditado;
-    return Math.max(teto, valorAntigo);
+    const diasUltimo = blocos[idxUltimo].dias.length;
+    const somaFixa = blocos.reduce((acc, b, i) => (i === idxEditado || i === idxUltimo ? acc : acc + b[campo] * b.dias.length), 0);
+    const metaTotal = metaPorDia * 7;
+    const tetoPorMinimoUltimo = (metaTotal - somaFixa - minimo * diasUltimo) / diasEditado;
+    const pisoPorMaximoUltimo = (metaTotal - somaFixa - maximo * diasUltimo) / diasEditado;
+    return { piso: Math.max(minimo, pisoPorMaximoUltimo), teto: Math.min(maximo, tetoPorMinimoUltimo) };
   }
 
   /** Maior proteína que dá pra colocar sem que o carboidrato recalculado de nenhum bloco (fecha calorias−proteína−gordura) fique abaixo do mínimo parametrizado. */
@@ -447,8 +457,7 @@
   function infoCelulaCalorias(idx: number) {
     const bloco = blocosEdicao[idx];
     const valorAtual = Math.round(bloco.calorias / 10) * 10;
-    const teto = tetoRedistribuicao(blocosEdicao, idx, "calorias", minimoCalorias);
-    const piso = Math.min(minimoCalorias, valorAtual);
+    const { piso, teto } = faixaEdicaoBloco(blocosEdicao, idx, "calorias", caloriasCalc, minimoCalorias, Infinity);
     return {
       titulo: `Calorias — ${bloco.nome}`,
       opcoes: opcoesCalorias().filter((o) => o.valor >= piso && o.valor <= teto),
@@ -457,16 +466,17 @@
     };
   }
 
-  /** 3 colunas de um bloco — Proteína é a coluna do valor GLOBAL, igual ao seletor de macros de fora do modal. Gordura e Proteína têm o teto limitado pra não empurrar nenhum bloco (esse ou os outros) abaixo do mínimo parametrizado. */
+  /** 3 colunas de um bloco — Proteína é a coluna do valor GLOBAL, igual ao seletor de macros de fora do modal. Gordura tem a faixa limitada pra não empurrar o ÚLTIMO bloco (automático) pra fora do mínimo/máximo parametrizado. */
   function colunasBloco(idx: number) {
     const bloco = blocosEdicao[idx];
     const gorduraMinG = parametro("gordura").min * pesoAtual;
+    const gorduraMaxG = parametro("gordura").max * pesoAtual;
     const carboMinG = parametro("carboidrato").min * pesoAtual;
-    const tetoGordura = tetoRedistribuicao(blocosEdicao, idx, "gorduraG", gorduraMinG);
+    const { piso: pisoGordura, teto: tetoGordura } = faixaEdicaoBloco(blocosEdicao, idx, "gorduraG", gorduraGInput ?? 0, gorduraMinG, gorduraMaxG);
     const tetoProt = tetoProteina(blocosEdicao, carboMinG);
     return [
       { chave: "carboidratoG", titulo: "Carboidrato", cor: COR_CARBO, opcoes: opcoesMacro(parametro("carboidrato").min, parametro("carboidrato").max), valorAtual: bloco.carboidratoG, kcalPorGrama: 4, secundario: secundarioMacro },
-      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesMacro(parametro("gordura").min, parametro("gordura").max).filter((o) => o.valor <= tetoGordura), valorAtual: bloco.gorduraG, kcalPorGrama: 9, secundario: secundarioMacro },
+      { chave: "gorduraG", titulo: "Gordura", cor: COR_GORDURA, opcoes: opcoesMacro(parametro("gordura").min, parametro("gordura").max).filter((o) => o.valor >= pisoGordura && o.valor <= tetoGordura), valorAtual: bloco.gorduraG, kcalPorGrama: 9, secundario: secundarioMacro },
       { chave: "proteinaG", titulo: "Proteína", cor: COR_PROTEINA, opcoes: opcoesMacro(parametro("proteina").min, parametro("proteina").max).filter((o) => o.valor <= tetoProt), valorAtual: proteinaGInput ?? 0, kcalPorGrama: 4, secundario: secundarioMacro },
     ];
   }
@@ -477,9 +487,10 @@
   }
 
   /**
-   * Gordura editada nesse bloco redistribui entre os outros (preserva a meta semanal); proteína
-   * editada aqui é global (atualiza todos); carboidrato desse bloco vira o valor escolhido direto —
-   * os demais blocos recalculam o carboidrato deles pra fechar a conta com a proteína/gordura atuais.
+   * Gordura editada nesse bloco (livre) só move o ÚLTIMO bloco (preserva a meta semanal de gordura);
+   * proteína editada aqui é global (atualiza todos); carboidrato desse bloco vira o valor escolhido
+   * direto, o que muda a calorias travada dele — o ÚLTIMO bloco absorve essa diferença também, pra
+   * manter a meta semanal de calorias. Os demais blocos livres ficam intocados.
    */
   function confirmarMacrosBloco(idx: number, valores: Record<string, number>) {
     if (valores.proteinaG !== proteinaGInput) {
@@ -487,18 +498,14 @@
       proteinaGKg = pesoAtual > 0 ? Math.round((valores.proteinaG / pesoAtual) * 100) / 100 : 0;
     }
     if (valores.gorduraG !== blocosEdicao[idx].gorduraG) {
-      blocosEdicao = redistribuirEntreBlocos(gorduraGInput ?? 0, blocosEdicao, idx, valores.gorduraG, "gorduraG");
+      blocosEdicao = aplicarValorBlocoLivre(blocosEdicao, idx, "gorduraG", valores.gorduraG, gorduraGInput ?? 0);
     }
     const proteina = proteinaGInput ?? 0;
-    blocosEdicao = blocosEdicao.map((b, i) =>
-      i === idx
-        // `calorias` é o campo travado de cada bloco (ver comentário de manuaisEfetivos) -- sem
-        // recalculá-lo aqui, o carboidrato escolhido era descartado silenciosamente ao salvar,
-        // porque manuaisEfetivos sempre deriva o carboidrato de volta a partir de `calorias`
-        // (nunca lê o carboidrato salvo direto).
-        ? { ...b, carboidratoG: valores.carboidratoG, calorias: valores.carboidratoG * 4 + b.gorduraG * 9 + proteina * 4 }
-        : { ...b, carboidratoG: carboidratoGDoDia(b.calorias, proteina, b.gorduraG) },
-    );
+    // `calorias` é o campo travado de cada bloco (ver comentário de manuaisEfetivos) -- usa a
+    // gordura (já atualizada acima) do próprio bloco pra fechar a conta com o carboidrato escolhido.
+    const novaCaloriasIdx = valores.carboidratoG * 4 + blocosEdicao[idx].gorduraG * 9 + proteina * 4;
+    blocosEdicao = aplicarValorBlocoLivre(blocosEdicao, idx, "calorias", novaCaloriasIdx, caloriasCalc);
+    blocosEdicao = blocosEdicao.map((b) => ({ ...b, carboidratoG: carboidratoGDoDia(b.calorias, proteina, b.gorduraG) }));
   }
 
   /** Só aplica localmente — persiste no banco junto com o resto ao tocar em "Salvar" no fim da tela. */
@@ -1649,7 +1656,7 @@
 
       {#if modoCalorias === "ondulatoria"}
         <div class="dias-lista">
-          {#each diasResolvidos as dia (dia.diaSemana)}
+          {#each diasResolvidosOrdenados as dia (dia.diaSemana)}
             {@const cor = corDoDia(dia)}
             {@const treino = treinoDoDia(dia.diaSemana)}
             {@const nomeBloco = nomeDoDia(dia.diaSemana)}
@@ -1931,7 +1938,11 @@
             <td class="grade-col-rotulo">Calorias (kcal)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => (blocoCaloriasEditando = idx)}>{Math.round(bloco.calorias)}</button>
+                {#if idx === blocosEdicao.length - 1}
+                  <span class="grade-valor-auto">{Math.round(bloco.calorias)}</span>
+                {:else}
+                  <button type="button" class="grade-valor-btn" onclick={() => (blocoCaloriasEditando = idx)}>{Math.round(bloco.calorias)}</button>
+                {/if}
               </td>
             {/each}
           </tr>
@@ -1949,9 +1960,13 @@
             <td class="grade-col-rotulo">Gordura (g)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>
-                  {Math.round(bloco.gorduraG)} <span class="grade-valor-gkg">{gkgDiscreto(bloco.gorduraG)}</span>
-                </button>
+                {#if idx === blocosEdicao.length - 1}
+                  <span class="grade-valor-auto">{Math.round(bloco.gorduraG)} <span class="grade-valor-gkg">{gkgDiscreto(bloco.gorduraG)}</span></span>
+                {:else}
+                  <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>
+                    {Math.round(bloco.gorduraG)} <span class="grade-valor-gkg">{gkgDiscreto(bloco.gorduraG)}</span>
+                  </button>
+                {/if}
               </td>
             {/each}
           </tr>
@@ -1959,9 +1974,13 @@
             <td class="grade-col-rotulo">Carboidrato (g)</td>
             {#each blocosEdicao as bloco, idx (bloco.nome)}
               <td class="grade-valor">
-                <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>
-                  {Math.round(bloco.carboidratoG)} <span class="grade-valor-gkg">{gkgDiscreto(bloco.carboidratoG)}</span>
-                </button>
+                {#if idx === blocosEdicao.length - 1}
+                  <span class="grade-valor-auto">{Math.round(bloco.carboidratoG)} <span class="grade-valor-gkg">{gkgDiscreto(bloco.carboidratoG)}</span></span>
+                {:else}
+                  <button type="button" class="grade-valor-btn" onclick={() => abrirMacrosBloco(idx)}>
+                    {Math.round(bloco.carboidratoG)} <span class="grade-valor-gkg">{gkgDiscreto(bloco.carboidratoG)}</span>
+                  </button>
+                {/if}
               </td>
             {/each}
           </tr>
@@ -2555,6 +2574,17 @@
     font-weight: 400;
     white-space: nowrap;
     color: var(--surface-muted);
+  }
+  /** Último bloco da grade — automático (recalcula sozinho pra fechar a média semanal), não clicável. */
+  .grade-valor-auto {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--surface-muted);
+    padding: var(--space-1) var(--space-2);
   }
   .distribuicao-header {
     display: flex;
