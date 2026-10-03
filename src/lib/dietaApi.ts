@@ -878,6 +878,21 @@ export async function garantirRefeicoesPadraoDoDia(data: string): Promise<Refeic
   return promessa;
 }
 
+/** Nomes das refeições que fazem parte do catálogo HOJE pra esse dia da semana (Fixa ou a lista
+ * efetiva da Ondulatória, já com os overrides de nome por dia) — usado tanto por
+ * garantirRefeicoesPadraoDoDiaImpl quanto pra filtrar refeições "órfãs" (nome antigo de uma
+ * refeição renomeada/excluída no catálogo depois, mas que ficou no dia porque já tinha item
+ * lançado — ver o comentário dessa função) de listas de seleção como "Mover para". */
+export async function getNomesCatalogoEfetivoDoDia(data: string): Promise<Set<string>> {
+  const diaSemana = parseISODate(data).getDay();
+  const [catalogo, modelosPorDia, metasDia] = await Promise.all([
+    listRefeicoesModelo(),
+    listRefeicoesModeloDia(),
+    listMetasDiaModelo(),
+  ]);
+  return new Set(resolverCatalogoEfetivoDoDia(diaSemana, catalogo, modelosPorDia, metasDia).map((m) => m.nome));
+}
+
 /** Se o dia ainda não tem nenhuma refeição, cria uma pra cada item do catálogo efetivo desse dia
  * da semana (respeitando a lista específica da Ondulatória, se houver) e retorna a lista já pronta.
  * Se já tiver refeições mas alguma foi criada antes de existir uma lista específica pro dia (ou de

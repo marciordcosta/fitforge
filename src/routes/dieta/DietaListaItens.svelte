@@ -10,6 +10,7 @@
     removerItemDiario,
     moverItemDiario,
     getRefeicoesDoDia,
+    getNomesCatalogoEfetivoDoDia,
     type ItemDiario,
     type Alimento,
     type RefeicaoDia,
@@ -177,12 +178,15 @@
   }
 
   /** Refeições do MESMO dia pra mover o item — busca na hora (não fica em cache), já que o
-   * usuário pode ter criado uma refeição avulsa nova desde que essa tela abriu. */
+   * usuário pode ter criado uma refeição avulsa nova desde que essa tela abriu. Só oferece as que
+   * ainda fazem parte do catálogo de hoje — uma refeição renomeada/excluída no catálogo depois de
+   * já ter item lançado continua existindo nesse dia (pra não perder o item), mas não deve aparecer
+   * aqui como destino (ver comentário de garantirRefeicoesPadraoDoDiaImpl em dietaApi.ts). */
   async function abrirMoverItem(item: ItemDiario): Promise<void> {
     itemMenu = null;
     try {
-      const todas = await getRefeicoesDoDia(dataRefeicao);
-      const opcoes = todas.filter((r) => r.id !== refeicaoId);
+      const [todas, nomesAtivos] = await Promise.all([getRefeicoesDoDia(dataRefeicao), getNomesCatalogoEfetivoDoDia(dataRefeicao)]);
+      const opcoes = todas.filter((r) => r.id !== refeicaoId && nomesAtivos.has(r.nome));
       if (!opcoes.length) {
         alert("Não há outra refeição hoje pra mover.");
         return;
