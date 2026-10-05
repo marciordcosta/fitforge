@@ -14,7 +14,7 @@
     criarRotinaAPartirDeSessao,
     getRecordesExercicio,
     listObservacoesExerciciosEmLote,
-    observacaoParaHistorico,
+    observacaoNaData,
     listMarcadoresExercicio,
     salvarMarcadorExercicio,
     removerMarcadorExercicio,
@@ -81,7 +81,7 @@
     if (sessao.length && sessao.every((ex) => ex.sets.length === 0)) modoEdicao = true;
     const observacoesPorId = await listObservacoesExerciciosEmLote(sessao.map((ex) => ex.exercicioId));
     observacoesPorExercicio = new Map(
-      sessao.map((ex) => [ex.exercicioId, observacaoParaHistorico(observacoesPorId.get(ex.exercicioId) ?? [], data)]),
+      sessao.map((ex) => [ex.exercicioId, observacaoNaData(observacoesPorId.get(ex.exercicioId) ?? [], data)]),
     );
     const marcadoresPorId = await Promise.all(
       sessao.map(async (ex) => {

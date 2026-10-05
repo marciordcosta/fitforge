@@ -750,16 +750,6 @@ export function observacaoNaData(lista: ObservacaoExercicio[], data: string): st
   return atual;
 }
 
-/** Mesma resolução de observacaoNaData, mas cai pra versão mais recente (mesmo que registrada
- * depois da sessão) quando nenhuma existia ainda naquela data — pra uma nota adicionada hoje não
- * ficar invisível nas sessões antigas do histórico só por ter sido escrita depois delas. Sessões
- * anteriores a uma edição real (nota trocada por outra) continuam mostrando a versão certa. */
-export function observacaoParaHistorico(lista: ObservacaoExercicio[], data: string): string | null {
-  const naData = observacaoNaData(lista, data);
-  if (naData) return naData;
-  return lista.length ? lista[lista.length - 1].observacao : null;
-}
-
 // ---------------- Rotinas (treinos) ----------------
 
 const TREINO_EXERCICIO_SELECT =

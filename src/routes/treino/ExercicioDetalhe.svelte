@@ -15,7 +15,7 @@
     salvarMarcadorExercicio,
     removerMarcadorExercicio,
     listObservacoesExercicio,
-    observacaoParaHistorico,
+    observacaoNaData,
     type Exercicio,
     type SessaoHistorico,
     type LinhaMusculoInput,
@@ -48,10 +48,10 @@
 
   const marcadoresPorData = $derived(new Map(marcadores.map((m) => [m.data, m])));
 
-  /** Observação vigente NA DATA de cada sessão do histórico — não a atual: sessões antigas
-   * continuam mostrando o que valia então, mesmo que a observação já tenha sido editada depois. */
+  /** Observação vigente NA DATA de cada sessão do histórico — só vale a partir da sessão em que foi
+   * escrita (sessões anteriores ficam sem nota), e sessões posteriores mostram a versão mais recente. */
   function observacaoDaSessao(data: string): string | null {
-    return observacaoParaHistorico(observacoes, data);
+    return observacaoNaData(observacoes, data);
   }
 
   /** Compartilhado com o gráfico (ExercicioChart) — o mesmo filtro por quantidade de
