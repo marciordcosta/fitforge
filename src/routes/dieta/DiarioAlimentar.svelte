@@ -1080,6 +1080,7 @@
           <button
             type="button"
             class="acao-adicionar"
+            class:vazio={!temItens}
             onclick={(e) => {
               e.stopPropagation();
               navigate(`/dieta/alimentos/refeicao/${refeicao.id}`);
@@ -1553,6 +1554,13 @@
     font-size: var(--font-size-base);
     font-family: inherit;
     cursor: pointer;
+  }
+  /** Refeição sem nenhum alimento: botão cheio na cor primária (mesmo visual do botão do treino do
+   * dia). Borda transparente em vez de sumir, pra não mudar o tamanho do card (static layout). */
+  .acao-adicionar.vazio {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    border: 1px solid transparent;
   }
   .pct-titulo {
     margin: 0 0 var(--space-2);
