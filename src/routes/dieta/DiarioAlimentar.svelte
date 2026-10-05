@@ -1561,6 +1561,7 @@
     background: var(--color-primary);
     color: var(--color-primary-fg);
     border: 1px solid transparent;
+    font-family: revert;
   }
   .pct-titulo {
     margin: 0 0 var(--space-2);
@@ -1575,6 +1576,7 @@
   }
   .resumo-alimentos.resumo-vazio {
     font-style: italic;
+    margin-bottom: var(--space-3);
   }
   .resumo-nomes {
     overflow: hidden;
