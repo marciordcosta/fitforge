@@ -708,12 +708,12 @@
     navigate(`/peso/dia/${hojeISO()}`);
   }
 
-  function aoSalvar() {
-    void carregar();
-    void carregarGrafico();
-    // O prazo do objetivo é projetado da última média — precisa recalcular a cada peso novo.
-    void carregarMeta();
-  }
+  /** Não busca nada aqui de propósito — salvarPeso/excluirPeso (pesoApi.ts) já chamam
+   * invalidarNamespace("peso"), que o $effect de versaoPesoVista acima (linha ~245) já observa e
+   * reage chamando carregar/carregarGrafico/carregarMeta sozinho. Chamar de novo aqui duplicava a
+   * busca (duas rodadas concorrentes mexendo no mesmo loadingGrafico), fazendo o gráfico
+   * destruir/recriar o canvas duas vezes seguidas a cada peso novo -- o "tremendo a tela" relatado. */
+  function aoSalvar() {}
 
   function aoSalvarMeta() {
     void carregarMeta();
