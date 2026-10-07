@@ -474,11 +474,18 @@ interface SegmentoMeta {
  * segmento cada um lê, então calculam os limites de semana uma vez só.
  *
  * A cada início de semana (o dia configurado em `diaResetSemana`), a meta da semana é recalculada
- * do zero: pega a média móvel dos últimos 7 dias vigente naquele dia e aplica o ritmo MÍNIMO (`percentualMin`) uma única vez pra achar o alvo do FIM da semana — nunca
- * acumula "dívida" de semanas anteriores nem reage dia a dia. O início da semana é sempre onde a
- * semana ANTERIOR terminou (não a média real daquele dia), pra a linha nunca dar salto, só mudar
- * de inclinação. Na primeira semana de uma configuração de meta (sem semana anterior pra herdar),
- * o início é a própria média vigente naquele dia.
+ * do zero: pega a média móvel dos últimos 7 dias vigente naquele dia e aplica o ritmo MÍNIMO
+ * (`percentualMin`) uma única vez pra achar o alvo do FIM da semana — nunca acumula "dívida" de
+ * semanas anteriores nem reage dia a dia. O início da semana é sempre onde a semana ANTERIOR
+ * terminou (não a média real daquele dia), pra a linha nunca dar salto, só mudar de inclinação.
+ * Só a PRIMEIRA semana de toda a meta (sem semana nenhuma anterior pra herdar) começa na própria
+ * média vigente naquele dia.
+ *
+ * A sequência de reinícios (limites) atravessa trocas de configuração (editar % mínimo, peso-alvo
+ * etc. em Meta) sem interrupção — editar e salvar NÃO insere um reinício no dia da edição; só o
+ * PRÓXIMO reinício real (o dia da semana configurado) passa a usar os valores novos, sempre
+ * herdando a continuidade de onde a semana vigente estava indo. Sem isso, qualquer ajuste na tela
+ * de Meta reiniciava a linha inteira, achatada na média real do dia da edição.
  *
  * `percentualMax` NÃO entra nessa conta — só é usado pro alerta de "ajustar rota" (ver
  * getObservacaoMeta), nunca muda o formato da linha.
@@ -502,59 +509,67 @@ function calcularSegmentosPorDia(pesos: PesoRegistro[], historico: PesoMetaHisto
     return melhor?.peso ?? null;
   }
 
-  // Uma "era" por configuração de meta (vigenteDesde), cada uma cobrindo [inicio, fim).
-  const eras = historico.map((h, i) => ({ config: h, inicio: h.vigenteDesde, fim: historico[i + 1]?.vigenteDesde ?? null }));
+  const primeiraData = historico[0].vigenteDesde;
+  const ultimaData = datas[datas.length - 1];
 
-  for (const era of eras) {
-    const datasDaEra = datas.filter((d) => d >= era.inicio && (era.fim == null || d < era.fim));
-    if (!datasDaEra.length) continue;
-
-    if (era.config.tipo === "manutencao") {
-      for (const d of datasDaEra) mapa.set(d, { tipo: "manutencao", valor: era.config.pesoAlvo, inicio: null, fim: null, limiteData: null });
-      continue;
-    }
-    if (era.config.percentualMin == null) {
-      for (const d of datasDaEra) mapa.set(d, null);
-      continue;
-    }
-
-    const { diaResetSemana, percentualMin, pesoAlvo } = era.config;
-
-    // Limites de semana: começa em era.inicio, depois o 1º dia com o weekday configurado, daí em diante de 7 em 7.
-    const limites: string[] = [era.inicio];
-    let proximo = proximoComWeekday(era.inicio, diaResetSemana);
-    if (proximo === era.inicio) proximo = somarDias(proximo, 7);
-    const ultimaData = datasDaEra[datasDaEra.length - 1];
-    while (proximo <= ultimaData) {
+  // Sequência de limites (reinícios) da meta inteira, cruzando trocas de configuração (editar a
+  // meta) SEM reiniciar no meio da semana: o próximo limite sempre respeita o diaResetSemana da
+  // config vigente NAQUELE momento, então editar os parâmetros só muda o que vai valer no PRÓXIMO
+  // reinício real — nunca insere um reinício extra no dia em que a edição foi salva.
+  const limites: string[] = [primeiraData];
+  {
+    let atual = primeiraData;
+    while (atual <= ultimaData) {
+      const diaReset = (metaNaData(historico, atual) as PesoMetaHistorico).diaResetSemana;
+      let proximo = proximoComWeekday(atual, diaReset);
+      if (proximo === atual) proximo = somarDias(proximo, 7);
+      if (proximo > ultimaData) break;
       limites.push(proximo);
-      proximo = somarDias(proximo, 7);
+      atual = proximo;
     }
+  }
 
-    const inicioPorLimite = new Map<string, number>();
-    const fimPorLimite = new Map<string, number>();
-    let continuidade: number | null = null;
-    for (const limite of limites) {
-      const mediaNoLimite = mediaAteData(limite);
-      if (mediaNoLimite == null) continue;
-      const inicioValor = continuidade ?? mediaNoLimite;
-      const fimValor = limitarPeloAlvo(mediaNoLimite * (1 + percentualMin / 100), percentualMin, pesoAlvo);
-      inicioPorLimite.set(limite, inicioValor);
-      fimPorLimite.set(limite, fimValor);
-      continuidade = fimValor;
+  const inicioPorLimite = new Map<string, number>();
+  const fimPorLimite = new Map<string, number>();
+  const tipoPorLimite = new Map<string, "percentual" | "manutencao">();
+  let continuidade: number | null = null;
+  for (const limite of limites) {
+    const config = metaNaData(historico, limite) as PesoMetaHistorico;
+    if (config.tipo === "manutencao") {
+      tipoPorLimite.set(limite, "manutencao");
+      inicioPorLimite.set(limite, continuidade ?? config.pesoAlvo ?? 0);
+      fimPorLimite.set(limite, config.pesoAlvo ?? 0);
+      continuidade = config.pesoAlvo;
+      continue;
     }
+    const mediaNoLimite = mediaAteData(limite);
+    if (config.percentualMin == null || mediaNoLimite == null) continue;
+    const inicioValor = continuidade ?? mediaNoLimite;
+    const fimValor = limitarPeloAlvo(mediaNoLimite * (1 + config.percentualMin / 100), config.percentualMin, config.pesoAlvo);
+    tipoPorLimite.set(limite, "percentual");
+    inicioPorLimite.set(limite, inicioValor);
+    fimPorLimite.set(limite, fimValor);
+    continuidade = fimValor;
+  }
 
-    for (const data of datasDaEra) {
-      let limiteAtual = limites[0];
-      for (const l of limites) {
-        if (l <= data) limiteAtual = l;
-        else break;
-      }
-      const inicioValor = inicioPorLimite.get(limiteAtual);
-      const fimValor = fimPorLimite.get(limiteAtual);
-      if (inicioValor == null || fimValor == null) {
-        mapa.set(data, null);
-        continue;
-      }
+  for (const data of datas) {
+    if (data < primeiraData) {
+      mapa.set(data, null);
+      continue;
+    }
+    let limiteAtual = limites[0];
+    for (const l of limites) {
+      if (l <= data) limiteAtual = l;
+      else break;
+    }
+    const tipo = tipoPorLimite.get(limiteAtual);
+    const inicioValor = inicioPorLimite.get(limiteAtual);
+    const fimValor = fimPorLimite.get(limiteAtual);
+    if (!tipo || inicioValor == null || fimValor == null) {
+      mapa.set(data, null);
+    } else if (tipo === "manutencao") {
+      mapa.set(data, { tipo: "manutencao", valor: fimValor, inicio: null, fim: null, limiteData: null });
+    } else {
       mapa.set(data, { tipo: "percentual", valor: null, inicio: inicioValor, fim: fimValor, limiteData: limiteAtual });
     }
   }
