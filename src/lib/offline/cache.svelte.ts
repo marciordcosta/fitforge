@@ -59,13 +59,18 @@ export async function comCache<T>(chave: string, buscar: () => Promise<T>): Prom
   const db = await getDb();
   const emCache = await db.get("cache", chave);
 
-  async function revalidar(): Promise<T> {
+  async function revalidar(avisarMudanca: boolean): Promise<T> {
     const valor = await buscar();
-    // Só marca o namespace como "mudou" quando o conteúdo de fato mudou — sem isso,
-    // um componente que observasse a versão pra recarregar entraria em loop: toda
-    // recarga revalida, toda revalidação bumpava a versão, e o bump disparava outra
-    // recarga, pra sempre, mesmo quando o dado voltou idêntico (o caso comum).
-    if (JSON.stringify(valor) !== JSON.stringify(emCache?.valor)) {
+    // Só marca o namespace como "mudou" quando o conteúdo de fato mudou (e só quando havia um
+    // valor em cache ANTES, mostrado na hora pra quem chamou — ver avisarMudanca) — sem isso, um
+    // componente que observasse a versão pra recarregar entraria em loop: toda recarga revalida,
+    // toda revalidação bumpava a versão, e o bump disparava outra recarga, pra sempre, mesmo
+    // quando o dado voltou idêntico (o caso comum). Bumpar também no caso SEM cache prévio (ex:
+    // logo após invalidarNamespace apagar tudo) duplicava o aviso: quem invalidou já bumpou uma
+    // vez, e cada busca "a frio" das várias chaves daquele namespace bumpava de novo, cada uma em
+    // instante diferente — um efeito reativo observando a versão reconstruía a tela várias vezes
+    // seguidas (relatado como "tela tremendo" ao salvar um peso novo).
+    if (avisarMudanca && JSON.stringify(valor) !== JSON.stringify(emCache?.valor)) {
       marcarAtualizado(namespace);
     }
     await db.put("cache", { valor, salvoEm: Date.now() }, chave);
@@ -73,7 +78,7 @@ export async function comCache<T>(chave: string, buscar: () => Promise<T>): Prom
   }
 
   if (emCache) {
-    void revalidar().catch(() => {
+    void revalidar(true).catch(() => {
       // Offline ou erro de rede durante a revalidação em segundo plano — o valor em
       // cache continua valendo, não há nada pra fazer aqui.
     });
@@ -84,5 +89,5 @@ export async function comCache<T>(chave: string, buscar: () => Promise<T>): Prom
     throw new Error("Sem conexão e sem dado salvo localmente ainda.");
   }
 
-  return revalidar();
+  return revalidar(false);
 }
