@@ -7,8 +7,6 @@
   import { getMeta, getUltimoPeso, salvarMeta, excluirMeta, type DiaSemana } from "../../lib/pesoApi";
   import { getTipoDieta, type TipoDieta } from "../../lib/dietaApi";
   import {
-    lerMostrarDiaSemana,
-    gravarMostrarDiaSemana,
     lerMostrarPesoVariacao,
     gravarMostrarPesoVariacao,
     lerInformarTreino,
@@ -49,19 +47,14 @@
     if (typeof localStorage !== "undefined") localStorage.setItem(CHAVE_MODO_GRAFICO_PADRAO, m);
   }
 
-  /** 4 itens de exibição do gráfico (Peso.svelte) — cada um independente, só valem nos filtros de
+  /** 3 itens de exibição do gráfico (Peso.svelte) — cada um independente, só valem nos filtros de
    * período marcados em filtrosAplicados (ver pesoGraficoPrefs.ts). Mesma convenção de
    * modoGraficoPadrao: gravam direto no toque, sem passar pelo fluxo de "Salvar Meta". */
-  let mostrarDiaSemana = $state(lerMostrarDiaSemana());
   let mostrarPesoVariacao = $state(lerMostrarPesoVariacao());
   let informarTreino = $state(lerInformarTreino());
   let destacarRegistro = $state(lerDestacarRegistro());
   let filtrosAplicados = $state<Set<FiltroPeriodo>>(lerFiltrosAplicados());
 
-  function alternarMostrarDiaSemana(v: boolean): void {
-    mostrarDiaSemana = v;
-    gravarMostrarDiaSemana(v);
-  }
   function alternarMostrarPesoVariacao(v: boolean): void {
     mostrarPesoVariacao = v;
     gravarMostrarPesoVariacao(v);
@@ -283,13 +276,6 @@
       <label class="campo-checkbox-linha">
         <input type="checkbox" checked={mostrarPesoVariacao} onchange={(e) => alternarMostrarPesoVariacao(e.currentTarget.checked)} />
         Adicionar peso/variação no gráfico
-      </label>
-    </div>
-
-    <div class="campo">
-      <label class="campo-checkbox-linha">
-        <input type="checkbox" checked={mostrarDiaSemana} onchange={(e) => alternarMostrarDiaSemana(e.currentTarget.checked)} />
-        Adicionar dia da semana no gráfico
       </label>
     </div>
 

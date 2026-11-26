@@ -23,7 +23,6 @@
   import { getDiasComTreino, listTreinos, DIAS_SEMANA_ABREV } from "../../lib/treinoApi";
   import { cacheInvalidacao } from "../../lib/offline/cache.svelte";
   import {
-    lerMostrarDiaSemana,
     lerMostrarPesoVariacao,
     lerInformarTreino,
     lerDestacarRegistro,
@@ -130,7 +129,6 @@
    * de propósito): essas regras valem pra CADA cálculo enquanto a tela de Peso estiver aberta,
    * então precisam ser $state e relidas quando o modal de Meta fecha — senão mudar a config não
    * refletia até recarregar a página inteira. */
-  let mostrarDiaSemanaPref = $state(lerMostrarDiaSemana());
   let mostrarPesoVariacaoPref = $state(lerMostrarPesoVariacao());
   let informarTreinoPref = $state(lerInformarTreino());
   let destacarRegistroPref = $state(lerDestacarRegistro());
@@ -488,10 +486,9 @@
    * longos com dezenas de pontos. */
   const mostrarPesoVariacao = $derived(mostrarPesoVariacaoPref && periodoNoFiltro);
 
-  /** "Adicionar dia da semana no gráfico" — texto (Qui, Sex...) embaixo de cada ponto. */
-  // Só no filtro de 1 semana: de 1 mês em diante o eixo volta a mostrar a data (um dia da semana
-  // sozinho, repetido, não situa ninguém em períodos longos).
-  const mostrarDiaSemanaGrafico = $derived(mostrarDiaSemanaPref && periodoNoFiltro && periodo.valor === PERIODOS[0].valor);
+  /** Eixo do gráfico mostra o dia da semana no lugar da data só no filtro de 1 semana: de 1 mês em
+   * diante volta a data (um dia da semana sozinho, repetido, não situa ninguém em períodos longos). */
+  const mostrarDiaSemanaGrafico = $derived(periodo.valor === PERIODOS[0].valor);
 
   /** "Destacar registro (ponto) no gráfico" — a bolinha em cada ponto da linha. */
   const destacarRegistro = $derived(destacarRegistroPref && periodoNoFiltro);
@@ -927,7 +924,6 @@
   <PesoMetaFormSheet
     onFechar={() => {
       mostrarFormMeta = false;
-      mostrarDiaSemanaPref = lerMostrarDiaSemana();
       mostrarPesoVariacaoPref = lerMostrarPesoVariacao();
       informarTreinoPref = lerInformarTreino();
       destacarRegistroPref = lerDestacarRegistro();
