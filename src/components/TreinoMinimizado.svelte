@@ -1,6 +1,7 @@
 <script lang="ts">
   import { navigate } from "../lib/router.svelte";
   import { treinoLogSessao } from "../lib/treinoLogSessao.svelte";
+  import { lerFimDoDescanso } from "../lib/treinoDescansoPrefs";
 
   /** onAbrir: usado quando essa barra aparece por cima de uma subtela da própria rotina ao vivo
    * (ex: o picker de exercícios), que cobre a lista mas não navega de verdade pra fora da rota —
@@ -59,7 +60,7 @@
      * zerar (contando o atraso em negativo) até pular ou iniciar outro descanso. */
     const descansando =
       atual.sessao.find((ex) => ex.descansoAte && ex.descansoAte > agora) ??
-      atual.sessao.find((ex) => ex.descansoAte != null);
+      (lerFimDoDescanso() === "zerar" ? undefined : atual.sessao.find((ex) => ex.descansoAte != null));
     if (!descansando) return null;
 
     const restante = Math.ceil((descansando.descansoAte! - agora) / 1000);

@@ -4,6 +4,7 @@
   import { toISODate } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
+  import { lerFimDoDescanso, gravarFimDoDescanso, type FimDoDescanso } from "../../lib/treinoDescansoPrefs";
   import {
     getParametrosDistribuicao,
     salvarParametrosDistribuicao,
@@ -19,6 +20,13 @@
     type OrdenacaoHome,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
+
+  /** Preferência do aparelho, aplicada na hora (não depende do botão Salvar dos demais parâmetros). */
+  let fimDoDescanso = $state<FimDoDescanso>(lerFimDoDescanso());
+  function escolherFimDoDescanso(valor: FimDoDescanso) {
+    fimDoDescanso = valor;
+    gravarFimDoDescanso(valor);
+  }
 
   let carregando = $state(true);
   let erro = $state<string | null>(null);
@@ -398,6 +406,20 @@
         <input type="checkbox" bind:checked={destacarExerciciosSemRotina} />
         <span>Destacar na lista Exercícios os que ainda não estão em nenhuma rotina (em vez dos que já estão)</span>
       </label>
+    </div>
+
+    <div class="param-card">
+      <p class="param-card-titulo">Cronômetro de descanso</p>
+      <p class="param-card-desc">O que acontece quando o descanso chega em 0:00. Vale na hora, só neste aparelho.</p>
+      <div class="fadiga-opcoes">
+        <button type="button" class:ativo={fimDoDescanso === "regressivo"} onclick={() => escolherFimDoDescanso("regressivo")}>Continuar regressivo</button>
+        <button type="button" class:ativo={fimDoDescanso === "zerar"} onclick={() => escolherFimDoDescanso("zerar")}>Zerar ao terminar</button>
+      </div>
+      <p class="param-card-desc">
+        {fimDoDescanso === "zerar"
+          ? "Ao chegar em 0:00 o cronômetro some sozinho."
+          : "Ao chegar em 0:00 continua contando o atraso em negativo (-0:05, -0:06…) até você pular."}
+      </p>
     </div>
 
     <div class="param-card">

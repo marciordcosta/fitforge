@@ -1,5 +1,6 @@
 <script lang="ts">
   import CarregandoBloco from "../../components/CarregandoBloco.svelte";
+  import { lerFimDoDescanso } from "../../lib/treinoDescansoPrefs";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
   import { hojeISO, parseISODate } from "../../lib/dates";
@@ -280,11 +281,13 @@
     return lista.reduce((mais, ex) => ((ex.descansoInicioEm ?? 0) > (mais.descansoInicioEm ?? 0) ? ex : mais));
   }
 
-  /** O cronômetro (anel ou barra) continua visível depois de zerar, contando o atraso em negativo,
-   * até o usuário pular ou uma nova série iniciar outro descanso. */
+  /** Por padrão ("regressivo") o cronômetro continua visível depois de zerar, contando o atraso em
+   * negativo, até o usuário pular ou uma nova série iniciar outro descanso. Com a preferência
+   * "zerar" (Treino > Parametrização), ele some sozinho ao chegar em 0:00. */
   const exercicioDescansando = $derived.by(() => {
     const ativos = sessao.filter((ex) => ex.descansoAte && ex.descansoAte > agora);
     if (ativos.length) return maisRecente(ativos);
+    if (lerFimDoDescanso() === "zerar") return null;
     const expirados = sessao.filter((ex) => ex.descansoAte != null);
     return expirados.length ? maisRecente(expirados) : null;
   });
