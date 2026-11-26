@@ -245,9 +245,13 @@
 {/snippet}
 
 {#if loading}
-  <p class="muted">Carregando histórico…</p>
+  <!-- Espaço do bloco inteiro reservado (botões do topo + gráfico + seletor de métrica): a tela de
+       histórico não pula quando o gráfico aparece. -->
+  <div class="skeleton bloco-reservado" role="status" aria-label="Carregando histórico"></div>
 {:else if !historicoComAoVivo.length}
-  <p class="muted">Nenhum registro ainda. O gráfico aparece depois do primeiro treino logado.</p>
+  <div class="bloco-reservado bloco-vazio">
+    <p class="muted">Nenhum registro ainda. O gráfico aparece depois do primeiro treino logado.</p>
+  </div>
 {:else}
   <div class="chart-toolbar">
     <button class="icone-topo" class:ativo={filtroQtd !== 6} onclick={() => (mostrarFiltro = true)} aria-label="Filtrar registros">
@@ -288,6 +292,21 @@
 {/if}
 
 <style>
+  /* Altura = .chart-toolbar (30 + 8) + .chart-wrap (220 + 12) + .toggle (~31): o mesmo que o bloco
+     do gráfico ocupa quando carregado. */
+  .bloco-reservado {
+    height: 301px;
+    margin-bottom: var(--space-5);
+    border-radius: var(--radius-lg);
+  }
+  .bloco-vazio {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 var(--space-4);
+    box-sizing: border-box;
+  }
   .chart-toolbar {
     display: flex;
     justify-content: space-between;

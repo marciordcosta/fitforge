@@ -560,7 +560,11 @@ export function calcular1RM(peso: number, reps: number): number {
 /** `antesDe`, quando informado, restringe ao histórico ESTRITAMENTE anterior a essa data — mesmo
  * critério de getMelhoresAntesDe, usado por getRecordesExercicio pra calcular a base de recordes
  * de uma sessão (ao vivo ou edição retroativa) sem contar o que já foi feito nesse mesmo dia. */
-export async function getHistoricoExercicio(exercicioId: string, antesDe?: string): Promise<HistoricoPonto[]> {
+export function getHistoricoExercicio(exercicioId: string, antesDe?: string): Promise<HistoricoPonto[]> {
+  return compartilharEmAndamento(`treino:rede:historico:${exercicioId}:${antesDe ?? ""}`, () => getHistoricoExercicioImpl(exercicioId, antesDe), TTL_TREINO_MS);
+}
+
+async function getHistoricoExercicioImpl(exercicioId: string, antesDe?: string): Promise<HistoricoPonto[]> {
   let query = supabase.from("treino_registros").select("data, peso, repeticoes").eq("exercicio_id", exercicioId).not("peso", "is", null);
   if (antesDe) query = query.lt("data", antesDe);
   const { data, error } = await query.order("data", { ascending: true });

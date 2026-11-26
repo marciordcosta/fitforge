@@ -10,6 +10,7 @@
     excluirRegistroExercicioDia,
     construirMusculosInput,
     getHistoricoDetalhadoExercicio,
+    getHistoricoExercicio,
     distribuicaoMusculosExercicio,
     listMarcadoresExercicio,
     salvarMarcadorExercicio,
@@ -122,6 +123,8 @@
       getHistoricoDetalhadoExercicio(exercicioId),
       listMarcadoresExercicio(exercicioId),
       listObservacoesExercicio(exercicioId),
+      // Já aquece o histórico que o gráfico vai pedir ao montar: ele abre sem uma segunda espera.
+      getHistoricoExercicio(exercicioId).catch(() => []),
     ]);
     exercicio = ex;
     historico = hist;
@@ -258,7 +261,11 @@
   </div>
 
   {#if loading && !carregouAlgumaVez}
-    <p class="muted">Carregando…</p>
+    <!-- Espaço reservado: músculos envolvidos, gráfico e as primeiras sessões. -->
+    <div class="skeleton" style="height:120px; margin-bottom:var(--space-4); border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:301px; margin-bottom:var(--space-5); border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:160px; margin-bottom:var(--space-3); border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:160px; border-radius:var(--radius-lg)"></div>
   {:else}
     <div class="conteudo" class:carregando={loading}>
     {#if !exercicio}
