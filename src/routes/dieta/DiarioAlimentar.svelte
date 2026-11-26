@@ -1040,11 +1040,11 @@
                 {temItens ? itens.filter((i) => i.refeicaoId === refeicao.id).map((i) => i.nome).join(", ") : "Nenhum alimento ainda"}
               </p>
             {/if}
-            {#if temItens}
-              <p class="resumo-alimentos resumo-macros">
-                Carb {totais.carboidratoG.toFixed(0)}g · Gorduras {totais.gorduraG.toFixed(0)}g · Proteínas {totais.proteinaG.toFixed(0)}g
-              </p>
-            {/if}
+            <!-- Linha de macros sempre ocupa o espaço (invisível sem itens): o card não muda de
+                 altura ao receber o primeiro alimento. -->
+            <p class="resumo-alimentos resumo-macros" class:resumo-macros-oculto={!temItens} aria-hidden={!temItens}>
+              Carb {totais.carboidratoG.toFixed(0)}g · Gorduras {totais.gorduraG.toFixed(0)}g · Proteínas {totais.proteinaG.toFixed(0)}g
+            </p>
           {:else if metaAtual}
             {@const metaBarra = {
               calorias: arredondarDezena(metaCardPara("calorias", metaAtual, prefsRefeicoes.barraBase)),
@@ -1276,7 +1276,7 @@
     border-radius: var(--radius-lg);
   }
   .sk-refeicao {
-    height: 92px;
+    height: 190px;
     margin-bottom: var(--space-4);
     border-radius: var(--radius-lg);
   }
@@ -1612,9 +1612,13 @@
   }
   .resumo-alimentos.resumo-vazio {
     font-style: italic;
-    margin-bottom: var(--space-3);
+  }
+  .resumo-macros-oculto {
+    visibility: hidden;
   }
   .resumo-nomes {
+    /* Sempre 2 linhas de altura (1 ou 2 linhas de nomes, ou o texto de vazio): altura fixa. */
+    min-height: calc(1.4em * 2);
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
