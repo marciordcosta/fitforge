@@ -174,7 +174,7 @@
 
   /** Observação de "ajustar rota" (ver getObservacaoMeta em pesoApi.ts) — quando a média real
    * desvia além do ritmo máximo tolerado, pra qualquer lado. */
-  let observacaoMeta = $state<{ desvioPct: number; direcao: "acima" | "abaixo" } | null>(null);
+  let observacaoMeta = $state<{ desvioPct: number; direcao: "acima" | "abaixo"; mediaKg: number; metaKg: number; limitePct: number } | null>(null);
 
   /** Falso só até a PRIMEIRA carga de meta/último peso/média terminar — os 4 cards de resumo
    * mostram um quadrado de carregamento (do tamanho exato do valor) enquanto isso, em vez de "—"
@@ -887,7 +887,7 @@
 
   {#if observacaoMeta}
     <button class="observacao-meta" onclick={() => (mostrarFormMeta = true)}>
-      Sua média está {observacaoMeta.direcao === "acima" ? "acima" : "abaixo"} do ritmo máximo configurado ({Math.abs(observacaoMeta.desvioPct).toFixed(1)}%) — hora de ajustar a rota (dieta, treino, cardio).
+      Sua média ({formatPeso(observacaoMeta.mediaKg)} kg) está {Math.abs(observacaoMeta.desvioPct).toFixed(1).replace(".", ",")}% {observacaoMeta.direcao === "acima" ? "acima" : "abaixo"} da meta de hoje ({formatPeso(observacaoMeta.metaKg)} kg), além do limite de {observacaoMeta.limitePct.toFixed(1).replace(".", ",")}% — hora de ajustar a rota (dieta, treino, cardio).
     </button>
   {/if}
 

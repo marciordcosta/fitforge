@@ -643,7 +643,7 @@ export async function getMetaSemanal(): Promise<number | null> {
  * configurado, a rota precisa mudar (indo rápido ou devagar demais pro ritmo máximo tolerado, nos
  * três tipos de dieta). null sem meta percentual configurada, sem peso suficiente, ou se o desvio
  * está dentro da tolerância (nada a avisar). */
-export async function getObservacaoMeta(): Promise<{ desvioPct: number; direcao: "acima" | "abaixo" } | null> {
+export async function getObservacaoMeta(): Promise<{ desvioPct: number; direcao: "acima" | "abaixo"; mediaKg: number; metaKg: number; limitePct: number } | null> {
   const meta = await getMeta();
   if (!meta || meta.tipo !== "percentual" || meta.percentualMax == null) return null;
   const [historico, registros] = await Promise.all([listMetaHistorico(), getPesosDoPeriodo("1900-01-01", hojeISO())]);
@@ -663,7 +663,13 @@ export async function getObservacaoMeta(): Promise<{ desvioPct: number; direcao:
 
   const desvioPct = ((mediaHoje - metaHoje) / metaHoje) * 100;
   if (Math.abs(desvioPct) <= Math.abs(metaAtiva.percentualMax)) return null;
-  return { desvioPct, direcao: desvioPct > 0 ? "acima" : "abaixo" };
+  return {
+    desvioPct,
+    direcao: desvioPct > 0 ? "acima" : "abaixo",
+    mediaKg: mediaHoje,
+    metaKg: metaHoje,
+    limitePct: Math.abs(metaAtiva.percentualMax),
+  };
 }
 
 /** Taxa de variação (kg/semana) das últimas 2 semanas: compara a média dos últimos 7 dias com a
