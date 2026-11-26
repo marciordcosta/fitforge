@@ -78,6 +78,7 @@
       }
       controls = novosControls;
       prepararControles(el);
+      iniciarDetectorNativo(el, aindaValido);
     } catch (err) {
       if (!aindaValido()) return;
       fase = "erro";
@@ -130,6 +131,33 @@
     aplicar(avancadas);
   }
 
+  /** Leitor nativo do Android em paralelo ao zxing: acerta bem mais com imagem um pouco borrada. */
+  function iniciarDetectorNativo(el: HTMLVideoElement, aindaValido: () => boolean) {
+    const Detector = (globalThis as unknown as { BarcodeDetector?: new (o?: unknown) => { detect(i: HTMLVideoElement): Promise<{ rawValue: string }[]> } }).BarcodeDetector;
+    if (!Detector) return;
+    const detector = new Detector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"] });
+    const tick = async () => {
+      if (!aindaValido() || detectando || !controls) return;
+      try {
+        if (el.readyState >= 2) {
+          const achados = await detector.detect(el);
+          const codigo = achados[0]?.rawValue;
+          if (codigo && !detectando) {
+            detectando = true;
+            controls?.stop();
+            controls = null;
+            void aoDetectar(codigo);
+            return;
+          }
+        }
+      } catch {
+        /* tenta no próximo ciclo */
+      }
+      setTimeout(tick, 150);
+    };
+    setTimeout(tick, 150);
+  }
+
   function aoMudarZoom() {
     aplicar([{ zoom: zoomValor }]);
   }
@@ -169,23 +197,67 @@
     if (!arquivo) return;
     erroFoto = "";
     lendoFoto = true;
-    const url = URL.createObjectURL(arquivo);
     try {
-      const hints = new Map<DecodeHintType, unknown>([
-        [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39]],
-        [DecodeHintType.TRY_HARDER, true],
-      ]);
-      const reader = new BrowserMultiFormatReader(hints as Map<DecodeHintType, unknown>);
-      const resultado = await reader.decodeFromImageUrl(url);
+      const codigo = await lerCodigoDaFoto(arquivo);
+      if (!codigo) throw new Error("sem código");
       controls?.stop();
       controls = null;
       detectando = true;
-      void aoDetectar(resultado.getText());
+      void aoDetectar(codigo);
     } catch {
       erroFoto = "Não consegui ler o código nessa foto. Tente de novo, com o código bem nítido e na horizontal.";
     } finally {
-      URL.revokeObjectURL(url);
       lendoFoto = false;
+    }
+  }
+
+  const FORMATOS_ZXING = [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39];
+
+  /** Lê o código numa foto: primeiro o leitor nativo do Android (BarcodeDetector, bem melhor com
+   * foto grande/levemente fora de foco), depois o zxing com a foto reduzida em vários tamanhos e
+   * girada — fotos de 12MP inteiras fazem o zxing falhar. */
+  async function lerCodigoDaFoto(arquivo: File): Promise<string | null> {
+    const bitmap = await createImageBitmap(arquivo);
+    try {
+      const Detector = (globalThis as unknown as { BarcodeDetector?: new (o?: unknown) => { detect(i: ImageBitmap): Promise<{ rawValue: string }[]> } }).BarcodeDetector;
+      if (Detector) {
+        try {
+          const achados = await new Detector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"] }).detect(bitmap);
+          if (achados[0]?.rawValue) return achados[0].rawValue;
+        } catch {
+          /* segue pro zxing */
+        }
+      }
+      const hints = new Map<DecodeHintType, unknown>([
+        [DecodeHintType.POSSIBLE_FORMATS, FORMATOS_ZXING],
+        [DecodeHintType.TRY_HARDER, true],
+      ]);
+      const reader = new BrowserMultiFormatReader(hints as Map<DecodeHintType, unknown>);
+      for (const maxLado of [1600, 1000, 700]) {
+        const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
+        for (const giro of [0, 90]) {
+          const w = Math.round(bitmap.width * escala);
+          const h = Math.round(bitmap.height * escala);
+          const canvas = document.createElement("canvas");
+          canvas.width = giro ? h : w;
+          canvas.height = giro ? w : h;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
+          if (giro) {
+            ctx.translate(canvas.width, 0);
+            ctx.rotate(Math.PI / 2);
+          }
+          ctx.drawImage(bitmap, 0, 0, w, h);
+          try {
+            return reader.decodeFromCanvas(canvas).getText();
+          } catch {
+            /* próxima tentativa */
+          }
+        }
+      }
+      return null;
+    } finally {
+      bitmap.close();
     }
   }
 
