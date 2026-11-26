@@ -12,6 +12,11 @@
   import DietaParametrizacao from "./DietaParametrizacao.svelte";
   import Placeholder from "../Placeholder.svelte";
   import { hojeISO } from "../../lib/dates";
+  import { prepararCatalogoAlimentos } from "../../lib/dietaApi";
+
+  // Baixa o catálogo de alimentos pro aparelho já na abertura (em segundo plano) — a lista e a busca
+  // da tela de adicionar alimento passam a abrir sem esperar o servidor.
+  prepararCatalogoAlimentos();
 
   const segmentos = $derived(router.path.replace(/^\/dieta\/?/, "").split("/").filter(Boolean));
 </script>

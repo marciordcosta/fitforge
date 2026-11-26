@@ -4,7 +4,8 @@ import { DIAS_SEMANA_ABREV, segundaDaSemana } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
 import { parseISODate, somarDias } from "./dates";
 import { marcarDietaDesatualizada } from "./dietaInvalidacao.svelte";
-import { comCache, compartilharEmAndamento, invalidarNamespace } from "./offline/cache.svelte";
+import { atualizarCache, comCache, compartilharEmAndamento, invalidarChaves, invalidarNamespace } from "./offline/cache.svelte";
+import { getDb } from "./offline/db";
 
 function uid(): string {
   const id = auth.user?.id;
@@ -84,12 +85,161 @@ function porPalavrasNomeOuMarca<T>(builder: T, colunaNome: string, termo: string
   );
 }
 
+
+// ---------------- Catálogo local de alimentos ----------------
+//
+// O catálogo inteiro (alimentos não ocultos) fica no aparelho — memória + IndexedDB — e a lista e a
+// busca rodam ali, sem ida ao servidor a cada letra digitada. A conferência com o servidor acontece
+// em segundo plano (no máximo a cada INTERVALO_CONFERENCIA_MS) e só troca a cópia local se algo
+// mudou. As escritas (criar/editar/excluir) já aplicam a mudança na cópia local na hora.
+
+const CHAVE_CATALOGO = "alimentos:catalogo";
+const INTERVALO_CONFERENCIA_MS = 60_000;
+const TAMANHO_PAGINA = 1000;
+
+interface ItemCatalogo {
+  alimento: Alimento;
+  /** Nome + marca em minúsculo e sem acento — o que a busca compara. */
+  chave: string;
+}
+
+let catalogoMemoria: ItemCatalogo[] | null = null;
+let catalogoCarregando: Promise<ItemCatalogo[]> | null = null;
+let conferenciaEmAndamento: Promise<void> | null = null;
+let ultimaConferencia = 0;
+
+function chaveBuscaAlimento(a: Alimento): string {
+  return semAcento(`${a.nome} ${a.marca ?? ""}`.toLowerCase());
+}
+
+function indexarCatalogo(lista: Alimento[]): ItemCatalogo[] {
+  return lista
+    .map((alimento) => ({ alimento, chave: chaveBuscaAlimento(alimento) }))
+    .sort((x, y) => x.alimento.nome.localeCompare(y.alimento.nome, "pt-BR"));
+}
+
+async function baixarCatalogoDoServidor(): Promise<Alimento[]> {
+  const todos: Alimento[] = [];
+  for (let de = 0; ; de += TAMANHO_PAGINA) {
+    const { data, error } = await supabase
+      .from("alimentos")
+      .select(ALIMENTO_SELECT)
+      .eq("oculta", false)
+      .order("id", { ascending: true })
+      .range(de, de + TAMANHO_PAGINA - 1);
+    if (error) throw error;
+    const pagina = (data ?? []).map((l) => mapAlimento(l as Record<string, unknown>));
+    todos.push(...pagina);
+    if (pagina.length < TAMANHO_PAGINA) break;
+  }
+  return todos;
+}
+
+/** Compara o conteúdo (ignorando a ordem) pra só trocar a cópia local — e avisar quem observa —
+ * quando algo de fato mudou. */
+function assinaturaCatalogo(lista: Alimento[]): string {
+  return JSON.stringify([...lista].sort((a, b) => (a.id < b.id ? -1 : 1)));
+}
+
+async function salvarCatalogoLocal(lista: Alimento[]): Promise<void> {
+  // atualizarCache grava no IndexedDB e bumpa a versão do namespace "alimentos".
+  await atualizarCache(CHAVE_CATALOGO, lista);
+}
+
+/** Confere com o servidor em segundo plano (sem await de quem chama). Respeita o intervalo, a não
+ * ser com `forcar` (ex: logo depois de uma escrita que talvez tenha mexido em algo que não
+ * conhecemos localmente). */
+function conferirCatalogoEmSegundoPlano(forcar = false): void {
+  if (conferenciaEmAndamento) return;
+  if (!forcar && Date.now() - ultimaConferencia < INTERVALO_CONFERENCIA_MS) return;
+  ultimaConferencia = Date.now();
+  conferenciaEmAndamento = (async () => {
+    try {
+      const doServidor = await baixarCatalogoDoServidor();
+      const atual = catalogoMemoria?.map((i) => i.alimento) ?? [];
+      if (assinaturaCatalogo(doServidor) === assinaturaCatalogo(atual)) return;
+      catalogoMemoria = indexarCatalogo(doServidor);
+      await salvarCatalogoLocal(doServidor);
+    } catch {
+      // offline ou erro de rede: a cópia local continua valendo
+    } finally {
+      conferenciaEmAndamento = null;
+    }
+  })();
+}
+
+async function carregarCatalogo(): Promise<ItemCatalogo[]> {
+  if (catalogoMemoria) {
+    conferirCatalogoEmSegundoPlano();
+    return catalogoMemoria;
+  }
+  if (!catalogoCarregando) {
+    catalogoCarregando = (async () => {
+      const db = await getDb();
+      const salvo = await db.get("cache", CHAVE_CATALOGO);
+      if (salvo) {
+        catalogoMemoria = indexarCatalogo(salvo.valor as Alimento[]);
+        conferirCatalogoEmSegundoPlano(true);
+        return catalogoMemoria;
+      }
+      // Primeira vez neste aparelho: precisa baixar tudo antes de mostrar.
+      const lista = await baixarCatalogoDoServidor();
+      catalogoMemoria = indexarCatalogo(lista);
+      ultimaConferencia = Date.now();
+      await salvarCatalogoLocal(lista);
+      return catalogoMemoria;
+    })().finally(() => {
+      catalogoCarregando = null;
+    });
+  }
+  return catalogoCarregando;
+}
+
+/** Já deixa o catálogo pronto no aparelho (chamado no boot do app, sem esperar). */
+export function prepararCatalogoAlimentos(): void {
+  void carregarCatalogo().catch(() => {});
+}
+
+/** Aplica uma mudança conhecida na cópia local na hora (sem esperar o servidor). */
+async function aplicarNoCatalogo(mudanca: { upsert?: Alimento; remover?: string }): Promise<void> {
+  if (!catalogoMemoria) return; // sem cópia local ainda: o primeiro download já trará a mudança
+  const idAlvo = mudanca.upsert?.id ?? mudanca.remover;
+  const lista = catalogoMemoria.map((i) => i.alimento).filter((a) => a.id !== idAlvo);
+  if (mudanca.upsert) lista.push(mudanca.upsert);
+  catalogoMemoria = indexarCatalogo(lista);
+  try {
+    await salvarCatalogoLocal(lista);
+  } catch {
+    // só a persistência falhou; a memória já está certa
+  }
+}
+
+function filtrarCatalogo(itens: ItemCatalogo[], termo: string, limite: number): Alimento[] {
+  const palavras = semAcento(termo.trim().toLowerCase()).split(/\s+/).filter(Boolean);
+  const achados: Alimento[] = [];
+  for (const item of itens) {
+    if (palavras.every((p) => item.chave.includes(p))) {
+      achados.push(item.alimento);
+      if (achados.length >= limite) break;
+    }
+  }
+  return achados;
+}
+
 /** Busca ignorando acento e maiúsculas — compara contra `nome_normalizado` (minúsculo, sem acento,
  * mantido em dia por trigger no banco) em vez da coluna `nome` bruta. Também busca pela marca (essa
  * sem normalização de acento — marca costuma vir sem acento e não tem uma coluna normalizada). */
 export async function buscarAlimentos(query: string): Promise<Alimento[]> {
   const termo = query.trim();
   if (!termo) return [];
+  try {
+    return filtrarCatalogo(await carregarCatalogo(), termo, 30);
+  } catch {
+    return buscarAlimentosNoServidor(termo);
+  }
+}
+
+async function buscarAlimentosNoServidor(termo: string): Promise<Alimento[]> {
   const { data, error } = await porPalavrasNomeOuMarca(
     supabase.from("alimentos").select(ALIMENTO_SELECT).eq("oculta", false),
     "nome_normalizado",
@@ -103,17 +253,24 @@ export async function buscarAlimentos(query: string): Promise<Alimento[]> {
 
 /** Lista inicial pra tela de catálogo (sem termo de busca ainda) — as primeiras N por ordem alfabética. */
 export async function listAlimentos(limite = 50): Promise<Alimento[]> {
-  const { data, error } = await supabase
-    .from("alimentos")
-    .select(ALIMENTO_SELECT)
-    .eq("oculta", false)
-    .order("nome", { ascending: true })
-    .limit(limite);
-  if (error) throw error;
-  return (data ?? []).map(mapAlimento);
+  try {
+    return (await carregarCatalogo()).slice(0, limite).map((i) => i.alimento);
+  } catch {
+    const { data, error } = await supabase
+      .from("alimentos")
+      .select(ALIMENTO_SELECT)
+      .eq("oculta", false)
+      .order("nome", { ascending: true })
+      .limit(limite);
+    if (error) throw error;
+    return (data ?? []).map(mapAlimento);
+  }
 }
 
 export async function getAlimento(id: string): Promise<Alimento | null> {
+  // Cópia local primeiro (alimentos ocultos não estão nela e caem no servidor, como antes).
+  const local = catalogoMemoria?.find((i) => i.alimento.id === id);
+  if (local) return local.alimento;
   const { data, error } = await supabase.from("alimentos").select(ALIMENTO_SELECT).eq("id", id).maybeSingle();
   if (error) throw error;
   return data ? mapAlimento(data) : null;
@@ -158,6 +315,26 @@ export async function criarAlimentoManual(input: AlimentoManualInput, oculta = f
     .select("id")
     .single();
   if (error) throw error;
+  if (!oculta) {
+    await aplicarNoCatalogo({
+      upsert: {
+        id: data.id,
+        nome: input.nome,
+        marca: input.marca,
+        porcaoPadraoQtd: input.porcaoPadraoQtd,
+        porcaoPadraoUnidade: input.porcaoPadraoUnidade,
+        caloriasPorPorcao: input.caloriasPorPorcao,
+        proteinaG: input.proteinaG,
+        gorduraG: input.gorduraG,
+        carboidratoG: input.carboidratoG,
+        fibraG: input.fibraG,
+        gorduraSaturadaG: input.gorduraSaturadaG,
+        gorduraInsaturadaG: input.gorduraInsaturadaG,
+        fonte: "manual",
+        codigoBarras: null,
+      },
+    });
+  }
   return data.id;
 }
 
@@ -179,6 +356,8 @@ export async function atualizarAlimentoManual(id: string, input: AlimentoManualI
     })
     .eq("id", id);
   if (error) throw error;
+  const local = catalogoMemoria?.find((i) => i.alimento.id === id)?.alimento;
+  if (local) await aplicarNoCatalogo({ upsert: { ...local, ...input } });
 }
 
 /** Cria uma cópia editável de qualquer alimento (mesmo de fonte TACO/OpenFoodFacts) — a cópia é sempre "manual". */
@@ -203,6 +382,9 @@ export async function duplicarAlimento(alimento: Alimento): Promise<string> {
     .select("id")
     .single();
   if (error) throw error;
+  await aplicarNoCatalogo({
+    upsert: { ...alimento, id: data.id, nome: `${alimento.nome} (cópia)`, fonte: "manual", codigoBarras: null },
+  });
   return data.id;
 }
 
@@ -211,11 +393,14 @@ export async function duplicarAlimento(alimento: Alimento): Promise<string> {
 export async function renomearAlimento(id: string, nome: string): Promise<void> {
   const { error } = await supabase.from("alimentos").update({ nome }).eq("id", id);
   if (error) throw error;
+  const local = catalogoMemoria?.find((i) => i.alimento.id === id)?.alimento;
+  if (local) await aplicarNoCatalogo({ upsert: { ...local, nome } });
 }
 
 export async function excluirAlimento(id: string): Promise<void> {
   const { error } = await supabase.from("alimentos").delete().eq("id", id);
   if (error) throw error;
+  await aplicarNoCatalogo({ remover: id });
 }
 
 /** Acha um alimento já cadastrado (por qualquer usuário) com esse código de barras — evita duplicar o mesmo produto ao reescanear. */
@@ -268,6 +453,26 @@ export async function criarAlimentoOpenFoodFacts(input: AlimentoOpenFoodFactsInp
     .select("id")
     .single();
   if (error) throw error;
+  if (!oculta) {
+    await aplicarNoCatalogo({
+      upsert: {
+        id: data.id,
+        nome: input.nome,
+        marca: input.marca,
+        porcaoPadraoQtd: 100,
+        porcaoPadraoUnidade: "g",
+        caloriasPorPorcao: input.caloriasPorPorcao,
+        proteinaG: input.proteinaG,
+        gorduraG: input.gorduraG,
+        carboidratoG: input.carboidratoG,
+        fibraG: input.fibraG,
+        gorduraSaturadaG: input.gorduraSaturadaG,
+        gorduraInsaturadaG: input.gorduraInsaturadaG,
+        fonte: "openfoodfacts",
+        codigoBarras: input.codigoBarras,
+      },
+    });
+  }
   return data.id;
 }
 
@@ -1094,6 +1299,13 @@ function mapItemDiario(l: Record<string, unknown>): ItemDiario {
   };
 }
 
+/** Lançar/editar/mover/remover um item só muda o diário (itens por dia) e o saldo calórico
+ * acumulado (que soma o consumido dos dias anteriores) — metas, parâmetros e o resto do cache da
+ * dieta continuam valendo, então a tela do Diário reabre sem refazer tudo. */
+function invalidarDiario(): Promise<void> {
+  return invalidarChaves("dieta", ["dieta:getDiarioDoDia:", "dieta:getSaldoCaloricoEntrando:"]);
+}
+
 const ITEM_DIARIO_SELECT =
   "id, alimento_id, refeicao_id, quantidade, unidade, calorias, proteina_g, gordura_g, carboidrato_g, fibra_g, gordura_saturada_g, created_at, alimento:alimentos(nome)";
 
@@ -1148,7 +1360,7 @@ export async function adicionarItemDiario(input: {
     gordura_saturada_g: round1((input.alimento.gorduraSaturadaG ?? 0) * fator),
   });
   if (error) throw error;
-  await invalidarNamespace("dieta");
+  await invalidarDiario();
 }
 
 /** `alimento` vem sempre com a nutrição ATUAL do catálogo, não a de quando o item foi lançado —
@@ -1177,27 +1389,27 @@ export async function atualizarItemDiario(
   }
   const { error } = await supabase.from("diario_alimentos").update(update).eq("id", id);
   if (error) throw error;
-  await invalidarNamespace("dieta");
+  await invalidarDiario();
 }
 
 /** Move um item já lançado pra outra refeição do mesmo dia, sem mexer em quantidade/macros. */
 export async function moverItemDiario(id: string, novaRefeicaoId: string): Promise<void> {
   const { error } = await supabase.from("diario_alimentos").update({ refeicao_id: novaRefeicaoId }).eq("id", id);
   if (error) throw error;
-  await invalidarNamespace("dieta");
+  await invalidarDiario();
 }
 
 export async function removerItemDiario(id: string): Promise<void> {
   const { error } = await supabase.from("diario_alimentos").delete().eq("id", id);
   if (error) throw error;
-  await invalidarNamespace("dieta");
+  await invalidarDiario();
 }
 
 /** Remove todos os itens já lançados nessa refeição — usado por "Substituir refeição" ao puxar a referência padrão. */
 export async function removerItensDaRefeicao(refeicaoId: string): Promise<void> {
   const { error } = await supabase.from("diario_alimentos").delete().eq("refeicao_id", refeicaoId);
   if (error) throw error;
-  await invalidarNamespace("dieta");
+  await invalidarDiario();
 }
 
 // ---------------- Metas diárias ----------------

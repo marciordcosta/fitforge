@@ -53,6 +53,19 @@ export async function invalidarNamespace(namespace: string): Promise<void> {
   marcarAtualizado(namespace);
 }
 
+/** Igual invalidarNamespace, mas só apaga as chaves que começam com algum dos `prefixos` — pra uma
+ * escrita que só afeta algumas leituras (ex: lançar um alimento só muda o diário do dia e o saldo
+ * acumulado, não as metas), o resto do cache continua valendo e a tela seguinte abre na hora em vez
+ * de refazer todas as consultas. Também bumpa a versão do namespace pra quem observa recarregar. */
+export async function invalidarChaves(namespace: string, prefixos: string[]): Promise<void> {
+  const db = await getDb();
+  geracoes[namespace] = (geracoes[namespace] ?? 0) + 1;
+  for (const k of [...buscasEmAndamento.keys()]) if (prefixos.some((p) => k.startsWith(`rede:${p}`))) buscasEmAndamento.delete(k);
+  const chaves = await db.getAllKeys("cache");
+  await Promise.all(chaves.filter((c) => prefixos.some((p) => c.startsWith(p))).map((c) => db.delete("cache", c)));
+  marcarAtualizado(namespace);
+}
+
 /** Stale-while-revalidate genérico: devolve o valor em cache na hora (se existir) e
  * busca fresco em paralelo, atualizando o cache e o contador de versão do
  * namespace quando a busca terminar. Sem cache local e offline, rejeita com uma

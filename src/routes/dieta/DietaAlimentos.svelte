@@ -1,6 +1,7 @@
 <script lang="ts">
   import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
+  import { cacheInvalidacao } from "../../lib/offline/cache.svelte";
   import { navigate, voltar as voltarRouter } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import {
@@ -170,6 +171,21 @@
     }
   }
 
+  /** O catálogo local é conferido com o servidor em segundo plano; quando algo muda lá, refaz só a
+   * lista do catálogo (sem mexer nos resultados do Open Food Facts nem no estado de carregamento). */
+  let versaoCatalogoVista = cacheInvalidacao.versao("alimentos");
+  $effect(() => {
+    const v = cacheInvalidacao.versao("alimentos");
+    if (v === versaoCatalogoVista) return;
+    versaoCatalogoVista = v;
+    const termo = untrack(() => busca);
+    void (termo.trim() ? buscarAlimentos(termo) : listAlimentos())
+      .then((res) => {
+        if (untrack(() => busca) === termo) alimentos = res;
+      })
+      .catch(() => {});
+  });
+
   function aoDigitar() {
     clearTimeout(timeoutBusca);
     timeoutBusca = setTimeout(() => {
@@ -213,15 +229,17 @@
 
   async function adicionarRapido(a: Alimento) {
     if (!refeicaoIdFixo || adicionadosIds.has(a.id)) return;
-    adicionandoId = a.id;
+    // Otimista: o item já aparece como adicionado e a gravação segue em segundo plano; se falhar,
+    // desfaz a marca e avisa. Dá pra tocar em vários "+" seguidos sem esperar cada resposta.
+    adicionadosIds = new Set(adicionadosIds).add(a.id);
+    mostrarMensagem(`Adicionado ao ${refeicaoNome}`);
     try {
       await adicionarItemDiario({ alimento: a, data: refeicaoData, refeicaoId: refeicaoIdFixo, quantidade: a.porcaoPadraoQtd });
-      adicionadosIds = new Set(adicionadosIds).add(a.id);
-      mostrarMensagem(`Adicionado ao ${refeicaoNome}`);
     } catch (err) {
+      const restante = new Set(adicionadosIds);
+      restante.delete(a.id);
+      adicionadosIds = restante;
       alert("Erro ao adicionar alimento: " + (err as Error).message);
-    } finally {
-      adicionandoId = null;
     }
   }
 
@@ -234,15 +252,15 @@
   async function adicionarNaReceita(a: Alimento) {
     if (adicionadosIds.has(a.id)) return;
     if (receitaIdExistente) {
-      adicionandoId = a.id;
+      adicionadosIds = new Set(adicionadosIds).add(a.id);
+      mostrarMensagem(`${a.nome} adicionado`);
       try {
         await adicionarItemReceita(receitaIdExistente, a.id, a.porcaoPadraoQtd);
-        adicionadosIds = new Set(adicionadosIds).add(a.id);
-        mostrarMensagem(`${a.nome} adicionado`);
       } catch (err) {
+        const restante = new Set(adicionadosIds);
+        restante.delete(a.id);
+        adicionadosIds = restante;
         alert("Erro ao adicionar alimento: " + (err as Error).message);
-      } finally {
-        adicionandoId = null;
       }
       return;
     }
