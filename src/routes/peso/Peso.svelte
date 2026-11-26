@@ -780,6 +780,12 @@
   <div class="header">
     <h1>Peso <span class="modo-label">{modoGrafico === "media" ? "Média" : "Diário"}</span></h1>
     <div class="header-acoes">
+      <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar peso">
+        {@render iconAdicionar()}
+      </button>
+      <button class="icon-btn" onclick={() => (mostrarFiltro = true)} aria-label="Filtro de período">
+        {@render iconFiltro()}
+      </button>
       <button
         class="icon-btn"
         class:icone-off={loadingGrafico || !pesosGrafico.length}
@@ -791,12 +797,6 @@
       </button>
       <button class="icon-btn" onclick={() => (mostrarFormMeta = true)} aria-label="Configurar meta">
         {@render iconMeta()}
-      </button>
-      <button class="icon-btn" onclick={() => (mostrarFiltro = true)} aria-label="Filtro de período">
-        {@render iconFiltro()}
-      </button>
-      <button class="icon-btn" onclick={abrirAdicionar} aria-label="Adicionar peso">
-        {@render iconAdicionar()}
       </button>
     </div>
   </div>
