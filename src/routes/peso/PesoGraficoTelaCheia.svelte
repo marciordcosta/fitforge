@@ -184,7 +184,7 @@
         scales: {
           x: {
             ticks: mostrarDiaSemanaGrafico
-              ? { color: "#c9ced8", font: { size: 12, weight: "bold" }, padding: 10 }
+              ? { color: "#9aa0ab", font: { size: 12, weight: "bold" }, padding: 10 }
               : { color: "#9aa0ab" },
             grid: { display: false },
           },

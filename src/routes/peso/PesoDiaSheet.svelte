@@ -395,7 +395,4 @@
     flex-direction: column;
     gap: var(--space-2);
   }
-  .muted {
-    color: var(--surface-muted);
-  }
 </style>

@@ -629,9 +629,9 @@
         // Com "dia da semana" ligado, o eixo mostra o dia da semana NO LUGAR da data (fora da área
         // do gráfico, sem poluir o desenho).
         if (mostrarDiaSemanaGrafico) {
-          // Dia da semana com mais destaque que a data: maior, negrito e em caixa alta.
+          // Dia da semana: maior, negrito e caixa alta, mas em cinza pra não chamar tanta atenção.
           ctx.font = "700 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-          ctx.fillStyle = "#c9ced8";
+          ctx.fillStyle = "#9aa0ab";
           ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()].toUpperCase(), ponto.x, y);
         } else {
           ctx.fillText(formatDataCurta(dataExibicao(p)), ponto.x, y);
