@@ -97,23 +97,11 @@
           const yAlvo = escalaY.getPixelForValue(alvo);
           const yLinha = yAlvo >= ponto.y ? yAlvo + 12 : yAlvo - 12;
           if (Math.abs(yLinha - yPeso) < 14) return;
-          if (mostrarDiaSemanaGrafico && Math.abs(yLinha - Math.min(ponto.y + 15, c.chartArea.bottom - 4)) < 14) return;
           ctx.fillStyle = COR_TREINO;
           ctx.fillText(formatPeso(alvo), ponto.x, yLinha);
         });
       }
 
-      // ---- "Adicionar dia da semana no gráfico" (independente do item acima) ----
-      if (mostrarDiaSemanaGrafico) {
-        pontos.forEach((ponto, i) => {
-          if (pontosComRotulo && !pontosComRotulo[i]) return;
-          const p = pontosGrafico[i];
-          if (!p) return;
-          const yDia = Math.min(ponto.y + 15, c.chartArea.bottom - 4);
-          ctx.fillStyle = "#9aa0ab";
-          ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()], ponto.x, yDia);
-        });
-      }
       ctx.restore();
     },
   };
@@ -131,7 +119,7 @@
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pontosGrafico.map((p, i) => (pontosComData && !pontosComData[i] ? "" : formatDataCurta(p.data))),
+        labels: pontosGrafico.map((p, i) => (pontosComData && !pontosComData[i] ? "" : mostrarDiaSemanaGrafico ? DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()] : formatDataCurta(p.data))),
         datasets: [
           {
             data: pontosGrafico.map((p) => p.peso),
@@ -192,8 +180,6 @@
         scales: {
           x: { ticks: { color: "#9aa0ab" }, grid: { display: false } },
           y: {
-            // Mesma folga do gráfico compacto (Peso.svelte) — ver o comentário lá.
-            grace: mostrarDiaSemanaGrafico ? "12%" : undefined,
             ticks: { color: "#9aa0ab" },
             grid: { color: "rgba(255, 255, 255, 0.08)" },
           },

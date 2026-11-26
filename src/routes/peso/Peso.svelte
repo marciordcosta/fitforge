@@ -581,24 +581,8 @@
           const yLinha = yAlvo >= ponto.y ? yAlvo + 10 : yAlvo - 9;
           // Colado no número do peso (meta quase igual ao peso) — pula pra não sobrepor.
           if (Math.abs(yLinha - yPeso) < 11) return;
-          // Colado no dia da semana embaixo do ponto (quando ligado) — idem.
-          if (mostrarDiaSemanaGrafico && Math.abs(yLinha - Math.min(ponto.y + 13, c.chartArea.bottom - 4)) < 11) return;
           ctx.fillStyle = COR_TREINO;
           ctx.fillText(formatPeso(alvo), ponto.x, yLinha);
-        });
-      }
-
-      // ---- "Adicionar dia da semana no gráfico" (independente do item acima) ----
-      if (mostrarDiaSemanaGrafico) {
-        // Trava no fundo da área do gráfico pra nunca sobrepor a data do eixo (pluginDatasEixo),
-        // que desenha um pouco abaixo dela.
-        pontos.forEach((ponto, i) => {
-          if (rotulo && !rotulo[i]) return;
-          const p = pontosGrafico[i];
-          if (!p) return;
-          const yDia = Math.min(ponto.y + 13, c.chartArea.bottom - 4);
-          ctx.fillStyle = "#9aa0ab";
-          ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()], ponto.x, yDia);
         });
       }
 
@@ -623,7 +607,13 @@
         if (rotulo && !rotulo[i]) return;
         const p = pontosDados[i];
         if (!p) return;
-        ctx.fillText(formatDataCurta(dataExibicao(p)), ponto.x, y);
+        // Com "dia da semana" ligado, o eixo mostra o dia da semana NO LUGAR da data (fora da área
+        // do gráfico, sem poluir o desenho).
+        ctx.fillText(
+          mostrarDiaSemanaGrafico ? DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()] : formatDataCurta(dataExibicao(p)),
+          ponto.x,
+          y,
+        );
       });
       ctx.restore();
     },
@@ -708,11 +698,6 @@
         scales: {
           x: { display: false },
           y: {
-            // Com "dia da semana" ligado: reserva uma folga abaixo do menor valor, senão o ponto
-            // mais baixo ficava colado na base da área do gráfico, sem espaço pro dia da semana
-            // embaixo dele — mesmo com o clamp, o texto saía quase em cima da data do eixo
-            // (pluginDatasEixo), ilegível.
-            grace: mostrarDiaSemanaGrafico ? "12%" : undefined,
             ticks: {
               color: "#9aa0ab",
               font: { size: 10 },
