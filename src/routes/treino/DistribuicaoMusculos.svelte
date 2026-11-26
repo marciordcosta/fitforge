@@ -928,10 +928,11 @@
     // exibindo "10" na tela, classificando errado (ex: caindo em "moderado" quando devia ser
     // "foco" pelo número que o usuário está vendo).
     const classe = classificarVolumeSemanal(arredondarValor(v), parametrosParaMusculo(musculo));
-    if (classe === "insuficiente" || classe === "excessivo") return "var(--color-danger)";
-    if (classe === "foco") return "var(--color-secondary)";
-    if (classe === "moderado") return "var(--color-success)";
-    return "var(--color-neutral)";
+    // Padrão único: vermelho = abaixo da manutenção, verde = na meta (manutenção, moderado e foco),
+    // azul = acima do foco.
+    if (classe === "insuficiente") return "var(--color-danger)";
+    if (classe === "excessivo") return "var(--color-secondary)";
+    return "var(--color-success)";
   }
 
   /** Estilo completo (texto + fundo) pra um valor de série numa "caixa" (grade semanal, Realizado

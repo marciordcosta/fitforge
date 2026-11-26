@@ -315,7 +315,7 @@
         &nbsp;·&nbsp; <span class="legenda-cor legenda-manutencao">●</span> {seriesManutencaoMin}–{seriesManutencaoMax} — manutenção
         &nbsp;·&nbsp; <span class="legenda-cor legenda-moderado">●</span> {seriesManutencaoMax + 1}–{seriesFocoMin - 1} — moderado
         &nbsp;·&nbsp; <span class="legenda-cor legenda-foco">●</span> {seriesFocoMin}–{seriesFocoMax} — foco
-        &nbsp;·&nbsp; <span class="legenda-cor legenda-abaixo">●</span> acima de {seriesFocoMax} — excessivo
+        &nbsp;·&nbsp; <span class="legenda-cor legenda-acima">●</span> acima de {seriesFocoMax} — excessivo
       </p>
         </div>
       {/if}
@@ -712,13 +712,16 @@
     color: var(--color-danger);
   }
   .legenda-manutencao {
-    color: var(--color-neutral);
+    color: var(--color-success);
+  }
+  .legenda-acima {
+    color: var(--color-secondary);
   }
   .legenda-moderado {
     color: var(--color-success);
   }
   .legenda-foco {
-    color: var(--color-secondary);
+    color: var(--color-success);
   }
   .legenda-fase-a {
     color: #60a5fa;
