@@ -887,7 +887,7 @@
 
   {#if observacaoMeta}
     <button class="observacao-meta" onclick={() => (mostrarFormMeta = true)}>
-      Sua média ({formatPeso(observacaoMeta.mediaKg)} kg) está {Math.abs(observacaoMeta.desvioPct).toFixed(1).replace(".", ",")}% {observacaoMeta.direcao === "acima" ? "acima" : "abaixo"} da meta de hoje ({formatPeso(observacaoMeta.metaKg)} kg), além do limite de {observacaoMeta.limitePct.toFixed(1).replace(".", ",")}% — hora de ajustar a rota (dieta, treino, cardio).
+      Sua média ({formatPeso(observacaoMeta.mediaKg)} kg) está {formatPeso(Math.abs(observacaoMeta.mediaKg - observacaoMeta.metaKg))} kg ({Math.abs(observacaoMeta.desvioPct).toFixed(1).replace(".", ",")}%) {observacaoMeta.direcao === "acima" ? "acima" : "abaixo"} da meta semanal de hoje ({formatPeso(observacaoMeta.metaKg)} kg) — limite aceito: {observacaoMeta.limitePct.toFixed(1).replace(".", ",")}%. Hora de ajustar a rota (dieta, treino, cardio).
     </button>
   {/if}
 
