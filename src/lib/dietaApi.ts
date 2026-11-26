@@ -4,7 +4,7 @@ import { DIAS_SEMANA_ABREV, segundaDaSemana } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
 import { parseISODate, somarDias } from "./dates";
 import { marcarDietaDesatualizada } from "./dietaInvalidacao.svelte";
-import { comCache, invalidarNamespace } from "./offline/cache.svelte";
+import { comCache, compartilharEmAndamento, invalidarNamespace } from "./offline/cache.svelte";
 
 function uid(): string {
   const id = auth.user?.id;
@@ -348,7 +348,11 @@ function mapRefeicaoModelo(l: Record<string, unknown>): RefeicaoModelo {
 }
 
 /** Lista o catálogo já na ordem escolhida pelo usuário (arrastar na tela de Gerenciar Refeições). */
-export async function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
+export function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
+  return compartilharEmAndamento("dieta:rede:refeicoesModelo", () => listRefeicoesModeloImpl());
+}
+
+async function listRefeicoesModeloImpl(): Promise<RefeicaoModelo[]> {
   const { data, error } = await supabase
     .from("dieta_refeicoes_modelo")
     .select(REFEICAO_MODELO_SELECT)
@@ -491,7 +495,11 @@ const META_DIA_MODELO_SELECT =
   "modelo_id, dia_semana, nome, meta_receita_id, meta_proteina_g, meta_gordura_g, meta_carboidrato_g, meta_receita:dieta_receitas!meta_receita_id(oculta)";
 
 /** Todas as metas por dia já configuradas (qualquer refeição, qualquer dia) — ausência de linha pra um (modelo, dia) usa o meta_receita_id/meta numérica/nome global como fallback. */
-export async function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
+export function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
+  return compartilharEmAndamento("dieta:rede:metasDiaModelo", () => listMetasDiaModeloImpl());
+}
+
+async function listMetasDiaModeloImpl(): Promise<MetaDiaModelo[]> {
   const { data, error } = await supabase.from("dieta_refeicoes_modelo_meta_dia").select(META_DIA_MODELO_SELECT);
   if (error) throw error;
   return (data ?? []).map((l) => {
@@ -764,7 +772,11 @@ export interface RefeicaoModeloDia {
 }
 
 /** Ausência de qualquer linha pra um dia = esse dia ainda usa o catálogo global inteiro, na ordem global. */
-export async function listRefeicoesModeloDia(): Promise<RefeicaoModeloDia[]> {
+export function listRefeicoesModeloDia(): Promise<RefeicaoModeloDia[]> {
+  return compartilharEmAndamento("dieta:rede:refeicoesModeloDia", () => listRefeicoesModeloDiaImpl());
+}
+
+async function listRefeicoesModeloDiaImpl(): Promise<RefeicaoModeloDia[]> {
   const { data, error } = await supabase.from("dieta_refeicoes_modelo_dia").select("modelo_id, dia_semana, ordem");
   if (error) throw error;
   return (data ?? []).map((l) => ({ modeloId: l.modelo_id as string, diaSemana: l.dia_semana as number, ordem: l.ordem as number }));
@@ -839,7 +851,11 @@ function resolverCatalogoEfetivoDoDia(
 /** Ordem própria de cada refeição DENTRO DO DIA (coluna `ordem`, arrastar/setas na Home) — fixada
  * na criação (catálogo entra na posição do catálogo nesse momento; avulsa entra no fim) e livre
  * pra reordenar depois, sem nunca mexer no catálogo/padrão configurado. */
-export async function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
+export function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
+  return compartilharEmAndamento(`dieta:rede:refeicoesDoDia:${data}`, () => getRefeicoesDoDiaImpl(data));
+}
+
+async function getRefeicoesDoDiaImpl(data: string): Promise<RefeicaoDia[]> {
   const { data: linhas, error } = await supabase
     .from("dieta_refeicoes_dia")
     .select("id, nome, data, ordem")
@@ -1305,7 +1321,11 @@ export function gramasDoParametro(def: DefinicaoParametro, valor: number, pesoAt
   return ((valor / 100) * caloriasCalc) / (def.kcalPorGrama ?? 4);
 }
 
-export async function getParametros(): Promise<Map<string, LimiteParametro>> {
+export function getParametros(): Promise<Map<string, LimiteParametro>> {
+  return compartilharEmAndamento("dieta:rede:parametros", () => getParametrosImpl());
+}
+
+async function getParametrosImpl(): Promise<Map<string, LimiteParametro>> {
   const { data, error } = await supabase.from("dieta_parametros").select("chave, min_por_kg, max_por_kg");
   if (error) throw error;
   const mapa = new Map(Object.entries(PARAMETROS_PADRAO).map(([chave, v]) => [chave, { ...v }]));
@@ -1359,7 +1379,11 @@ const PERFIL_PADRAO: PerfilDietaEditavel = {
   janelaCalibracaoDias: 14,
 };
 
-export async function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
+export function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
+  return compartilharEmAndamento("dieta:rede:perfil", () => getPerfilDietaEditavelImpl());
+}
+
+async function getPerfilDietaEditavelImpl(): Promise<PerfilDietaEditavel> {
   const { data, error } = await supabase
     .from("dieta_perfil")
     .select(
@@ -1520,7 +1544,11 @@ const PREFERENCIAS_REFEICOES_PADRAO: PreferenciasRefeicoesHome = {
   corBarraItens: "calorias",
 };
 
-export async function getPreferenciasRefeicoesHome(): Promise<PreferenciasRefeicoesHome> {
+export function getPreferenciasRefeicoesHome(): Promise<PreferenciasRefeicoesHome> {
+  return compartilharEmAndamento("dieta:rede:prefsRefeicoesHome", () => getPreferenciasRefeicoesHomeImpl());
+}
+
+async function getPreferenciasRefeicoesHomeImpl(): Promise<PreferenciasRefeicoesHome> {
   const { data, error } = await supabase
     .from("dieta_perfil")
     .select("refeicoes_barra_base, refeicoes_valores_base, refeicoes_exibicao, mostrar_barra_itens, cor_barra_itens")
@@ -1619,7 +1647,11 @@ export function distribuirValorPorDia(metaPorDia: number, manuais: Map<number, n
   );
 }
 
-export async function getModoCalorias(): Promise<"fixa" | "ondulatoria"> {
+export function getModoCalorias(): Promise<"fixa" | "ondulatoria"> {
+  return compartilharEmAndamento("dieta:rede:modoCalorias", () => getModoCaloriasImpl());
+}
+
+async function getModoCaloriasImpl(): Promise<"fixa" | "ondulatoria"> {
   const { data, error } = await supabase.from("dieta_perfil").select("modo_calorias").maybeSingle();
   if (error) throw error;
   return data?.modo_calorias === "ondulatoria" ? "ondulatoria" : "fixa";
@@ -1635,7 +1667,11 @@ export interface CaloriasDiaManual {
   nomeBloco: string | null;
 }
 
-export async function getCaloriasDiaManuais(): Promise<Map<number, CaloriasDiaManual>> {
+export function getCaloriasDiaManuais(): Promise<Map<number, CaloriasDiaManual>> {
+  return compartilharEmAndamento("dieta:rede:caloriasDiaManuais", () => getCaloriasDiaManuaisImpl());
+}
+
+async function getCaloriasDiaManuaisImpl(): Promise<Map<number, CaloriasDiaManual>> {
   const { data, error } = await supabase
     .from("dieta_calorias_dia")
     .select("dia_semana, calorias, proteina_g, gordura_g, carboidrato_g, nome_bloco");
@@ -1741,7 +1777,11 @@ export interface DietaOverrideDia {
 /** Overrides de uma semana (identificada pela segunda-feira dela, mesma convenção de
  * segundaDaSemana em treinoApi.ts). Vazio = a semana segue a Ondulatória normal configurada em
  * Parametrização. */
-export async function listOverrideSemanaDieta(semanaInicio: string): Promise<DietaOverrideDia[]> {
+export function listOverrideSemanaDieta(semanaInicio: string): Promise<DietaOverrideDia[]> {
+  return compartilharEmAndamento(`dieta:rede:overrideSemana:${semanaInicio}`, () => listOverrideSemanaDietaImpl(semanaInicio));
+}
+
+async function listOverrideSemanaDietaImpl(semanaInicio: string): Promise<DietaOverrideDia[]> {
   const { data, error } = await supabase
     .from("dieta_semana_override")
     .select("dia_semana, calorias, gordura_g")

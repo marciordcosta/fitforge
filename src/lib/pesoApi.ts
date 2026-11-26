@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { toISODate, parseISODate, hojeISO, somarDias } from "./dates";
-import { comCache, invalidarNamespace } from "./offline/cache.svelte";
+import { comCache, compartilharEmAndamento, invalidarNamespace } from "./offline/cache.svelte";
 
 export interface PesoRegistro {
   data: string;
@@ -224,7 +224,11 @@ export async function getPesoMedioNaData(data: string): Promise<number | null> {
   return registros.reduce((acc, p) => acc + p.peso, 0) / registros.length;
 }
 
-export async function getUltimoPeso(): Promise<number | null> {
+export function getUltimoPeso(): Promise<number | null> {
+  return compartilharEmAndamento("peso:rede:ultimoPeso", () => getUltimoPesoImpl());
+}
+
+async function getUltimoPesoImpl(): Promise<number | null> {
   const { data, error } = await supabase
     .from("pesos")
     .select("peso")
@@ -257,7 +261,11 @@ export interface PesoMeta {
   diaResetSemana: DiaSemana;
 }
 
-export async function getMeta(): Promise<PesoMeta | null> {
+export function getMeta(): Promise<PesoMeta | null> {
+  return compartilharEmAndamento("peso:rede:meta", () => getMetaImpl());
+}
+
+async function getMetaImpl(): Promise<PesoMeta | null> {
   const { data, error } = await supabase
     .from("peso_metas")
     .select("tipo, percentual_min, percentual_max, peso_alvo, dia_reset_semana")
@@ -320,7 +328,11 @@ export interface PesoMetaHistorico extends PesoMeta {
 
 /** Todo o histórico de metas do usuário, do mais antigo pro mais recente — usado pra resolver qual
  * meta valia em cada dia do gráfico (ver metaNaData). */
-export async function listMetaHistorico(): Promise<PesoMetaHistorico[]> {
+export function listMetaHistorico(): Promise<PesoMetaHistorico[]> {
+  return compartilharEmAndamento("peso:rede:metaHistorico", () => listMetaHistoricoImpl());
+}
+
+async function listMetaHistoricoImpl(): Promise<PesoMetaHistorico[]> {
   const { data, error } = await supabase
     .from("peso_metas_historico")
     .select("tipo, percentual_min, percentual_max, peso_alvo, dia_reset_semana, vigente_desde")

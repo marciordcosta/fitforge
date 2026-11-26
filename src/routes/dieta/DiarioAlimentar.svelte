@@ -425,8 +425,11 @@
     loading = true;
     erro = null;
     try {
-      const refeicoesRes = await garantirRefeicoesPadraoDoDia(dataAlvo);
-      const [itensRes, metasRes, metasRefeicoesRes, acumular, saldoEntrando, deltasHojeRes] = await Promise.all([
+      // Tudo em paralelo (antes: garantirRefeicoesPadraoDoDia terminava primeiro e só então as
+      // outras 6 consultas começavam — uma "cascata" que somava as latências). Nenhuma das outras
+      // depende do resultado dela; cada uma já tem o seu próprio cache/dedupe.
+      const [refeicoesRes, itensRes, metasRes, metasRefeicoesRes, acumular, saldoEntrando, deltasHojeRes] = await Promise.all([
+        garantirRefeicoesPadraoDoDia(dataAlvo),
         getDiarioDoDia(dataAlvo),
         getMetasDoDia(dataAlvo),
         carregarMetasRefeicoes(dataAlvo),
@@ -849,12 +852,10 @@
     <button class="icon-btn" onclick={() => (mostrarMenuMais = true)} aria-label="Adicionar">+</button>
   </div>
 
-  {#if loading && !carregouAlgumaVez}
-    <p class="muted">Carregando…</p>
-  {:else if erro}
+  {#if erro}
     <p class="erro">Erro ao carregar o diário: {erro}</p>
   {:else}
-    <div class="conteudo" class:carregando={loading}>
+    <div class="conteudo" class:carregando={loading && carregouAlgumaVez}>
     {#if metas}
       <div class="card-calorias">
         <p class="card-titulo">Calorias</p>
@@ -946,6 +947,10 @@
           </div>
         </div>
       </div>
+    {:else if !carregouAlgumaVez}
+      <!-- Cada bloco reserva o tamanho do card real até os dados chegarem (nada pula depois). -->
+      <div class="skeleton sk-calorias" aria-label="Carregando calorias"></div>
+      <div class="skeleton sk-macros" aria-label="Carregando macros"></div>
     {/if}
 
     <div class="quick-actions">
@@ -982,7 +987,11 @@
       {/if}
     </div>
 
-    {#if !refeicoes.length}
+    {#if !carregouAlgumaVez}
+      <div class="skeleton sk-refeicao" aria-label="Carregando refeição"></div>
+      <div class="skeleton sk-refeicao" aria-hidden="true"></div>
+      <div class="skeleton sk-refeicao" aria-hidden="true"></div>
+    {:else if !refeicoes.length}
       <p class="muted">Nenhuma refeição ainda. Toque em + pra criar.</p>
     {:else}
       {#each refeicoes as refeicao (refeicao.id)}
@@ -1243,6 +1252,24 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: var(--space-4);
+    /* Altura reservada pro chip de rotina/status (que chega depois, assíncrono) — sem isso a
+       linha crescia alguns px quando o chip aparecia e empurrava a tela toda. */
+    min-height: 32px;
+  }
+  .sk-calorias {
+    height: 122px;
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius-lg);
+  }
+  .sk-macros {
+    height: 148px;
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius-lg);
+  }
+  .sk-refeicao {
+    height: 92px;
+    margin-bottom: var(--space-4);
+    border-radius: var(--radius-lg);
   }
   .dia-btn {
     flex-shrink: 0;

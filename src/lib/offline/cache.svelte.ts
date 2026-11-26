@@ -15,6 +15,10 @@ export const cacheInvalidacao = {
   },
 };
 
+/** Geração por namespace, incrementada a cada invalidação — uma busca que COMEÇOU antes de uma
+ * escrita não pode gravar o resultado (anterior à escrita) no cache depois dela. */
+const geracoes: Record<string, number> = {};
+
 function marcarAtualizado(namespace: string): void {
   versoes[namespace] = (versoes[namespace] ?? 0) + 1;
 }
@@ -41,6 +45,8 @@ export async function atualizarCache<T>(chave: string, valor: T): Promise<void> 
  * já bump a versão, pra quem estiver observando recarregar também. */
 export async function invalidarNamespace(namespace: string): Promise<void> {
   const db = await getDb();
+  geracoes[namespace] = (geracoes[namespace] ?? 0) + 1;
+  for (const k of [...buscasEmAndamento.keys()]) if (k.startsWith(`rede:${namespace}:`) || k.startsWith(`${namespace}:rede:`)) buscasEmAndamento.delete(k);
   const chaves = await db.getAllKeys("cache");
   const doNamespace = chaves.filter((c) => c.startsWith(`${namespace}:`));
   await Promise.all(doNamespace.map((c) => db.delete("cache", c)));
@@ -54,13 +60,34 @@ export async function invalidarNamespace(namespace: string): Promise<void> {
  *
  * `chave` inclui o namespace como prefixo (ex: "treino:listTreinos") — é dela que
  * o namespace é extraído pra saber qual contador de versão incrementar. */
+/** Buscas de rede em andamento por chave de cache — chamadas simultâneas pra mesma chave (muito
+ * comum: várias abas/telas montadas no boot pedindo o mesmo "peso completo", "meta" etc.)
+ * compartilham UMA ida à rede em vez de cada uma disparar a sua. Some ao terminar (nunca guarda
+ * valor velho: só junta quem pediu enquanto a mesma busca ainda estava no ar). */
+const buscasEmAndamento = new Map<string, Promise<unknown>>();
+
+/** Mesma ideia pra leituras SEM cache persistente (ex: perfil da dieta, parâmetros): quem chamar
+ * a mesma `chave` enquanto a primeira ainda está pendente recebe a mesma promessa. Não guarda nada
+ * depois de resolver, então nunca devolve dado desatualizado após uma escrita. */
+export function compartilharEmAndamento<T>(chave: string, buscar: () => Promise<T>): Promise<T> {
+  const existente = buscasEmAndamento.get(chave) as Promise<T> | undefined;
+  if (existente) return existente;
+  const promessa = buscar().finally(() => {
+    if (buscasEmAndamento.get(chave) === promessa) buscasEmAndamento.delete(chave);
+  });
+  buscasEmAndamento.set(chave, promessa);
+  return promessa;
+}
+
 export async function comCache<T>(chave: string, buscar: () => Promise<T>): Promise<T> {
   const namespace = chave.split(":")[0];
   const db = await getDb();
   const emCache = await db.get("cache", chave);
 
   async function revalidar(avisarMudanca: boolean): Promise<T> {
-    const valor = await buscar();
+    const geracaoInicial = geracoes[namespace] ?? 0;
+    const valor = await compartilharEmAndamento(`rede:${chave}`, buscar);
+    if ((geracoes[namespace] ?? 0) !== geracaoInicial) return valor;
     // Só marca o namespace como "mudou" quando o conteúdo de fato mudou (e só quando havia um
     // valor em cache ANTES, mostrado na hora pra quem chamou — ver avisarMudanca) — sem isso, um
     // componente que observasse a versão pra recarregar entraria em loop: toda recarga revalida,

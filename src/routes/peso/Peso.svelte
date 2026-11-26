@@ -175,21 +175,30 @@
    * desvia além do ritmo máximo tolerado, pra qualquer lado. */
   let observacaoMeta = $state<{ desvioPct: number; direcao: "acima" | "abaixo" } | null>(null);
 
+  /** Falso só até a PRIMEIRA carga de meta/último peso/média terminar — os 4 cards de resumo
+   * mostram um quadrado de carregamento (do tamanho exato do valor) enquanto isso, em vez de "—"
+   * e depois o número, e recargas seguintes (peso novo salvo etc.) nunca voltam a esse estado. */
+  let metaCarregada = $state(false);
+
   async function carregarMeta() {
-    const [metaCarregada, historico, ultimo, media, pesosTudo, observacao] = await Promise.all([
-      getMeta(),
-      listMetaHistorico(),
-      getUltimoPeso(),
-      getPesoMedioAtual(),
-      getPesosDoPeriodo("1900-01-01", hojeISO()),
-      getObservacaoMeta(),
-    ]);
-    meta = metaCarregada;
-    metaHistorico = historico;
-    ultimoPeso = ultimo;
-    pesoMedioAtual = media;
-    pesosCompletos = pesosTudo;
-    observacaoMeta = observacao;
+    try {
+      const [metaCarregadaRes, historico, ultimo, media, pesosTudo, observacao] = await Promise.all([
+        getMeta(),
+        listMetaHistorico(),
+        getUltimoPeso(),
+        getPesoMedioAtual(),
+        getPesosDoPeriodo("1900-01-01", hojeISO()),
+        getObservacaoMeta(),
+      ]);
+      meta = metaCarregadaRes;
+      metaHistorico = historico;
+      ultimoPeso = ultimo;
+      pesoMedioAtual = media;
+      pesosCompletos = pesosTudo;
+      observacaoMeta = observacao;
+    } finally {
+      metaCarregada = true;
+    }
   }
 
   void carregarMeta();
@@ -198,8 +207,11 @@
   const mesInicio = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth(), 1));
   const mesFim = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth() + 1, 0));
 
-  async function carregar() {
-    loading = true;
+  /** `comSkeleton`: só na troca de mês (os dias exibidos passam a ser de OUTRO mês, então a grade
+   * vira quadradinhos de carregamento até chegar). Recargas do mesmo mês (peso novo salvo etc.)
+   * mantêm a grade atual na tela e só trocam os valores quando chegam — nada some nem reflui. */
+  async function carregar(comSkeleton = false) {
+    if (comSkeleton) loading = true;
     const dataInicio = toISODate(mesInicio);
     const dataFim = toISODate(mesFim);
     const [listaPesos, listaTreinos, diasFoto] = await Promise.all([
@@ -215,8 +227,10 @@
 
   void carregar();
 
+  /** Nunca volta `loadingGrafico` pra true depois da primeira carga: trocar o período ou receber
+   * um peso novo mantém o gráfico atual na tela (a área tem altura fixa) e só redesenha quando os
+   * dados novos chegam — antes o gráfico inteiro sumia e voltava, empurrando a tela toda. */
   async function carregarGrafico() {
-    loadingGrafico = true;
     const hoje = new Date();
     const dataInicio = periodo.dias == null ? "1900-01-01" : toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - periodo.dias));
     // Busca 6 dias a mais antes do início pedido, só pra a média móvel do primeiro dia visível já ter janela cheia.
@@ -259,7 +273,7 @@
   function trocarMes(delta: number) {
     direcaoMes = delta;
     mesBase = new Date(mesBase.getFullYear(), mesBase.getMonth() + delta, 1);
-    void carregar();
+    void carregar(true);
   }
 
   /** Arrastar a grade do calendário pros lados troca de mês — sem pointer capture, pra não
@@ -773,20 +787,27 @@
     </div>
   </div>
 
-  {#if loadingGrafico}
-    <p class="muted">Carregando…</p>
-  {:else if !pesosGrafico.length}
-    <p class="muted">Nenhum registro nesse período.</p>
-  {:else}
-    <div class="chart-toolbar">
-      <button class="icone-topo" onclick={() => (mostrarGraficoCheio = true)} aria-label="Ver gráfico em tela cheia">
-        {@render iconExpandir()}
-      </button>
-    </div>
-    <div class="chart-wrap">
-      <canvas bind:this={canvas}></canvas>
-    </div>
-  {/if}
+  <!-- Área do gráfico SEMPRE reservada (barra de ferramentas + 220px), com o gráfico, o quadrado
+       de carregamento ou o aviso de "sem registro" dentro dela — nunca some nem muda de altura. -->
+  <div class="chart-toolbar">
+    <button
+      class="icone-topo"
+      class:icone-topo-off={loadingGrafico || !pesosGrafico.length}
+      disabled={loadingGrafico || !pesosGrafico.length}
+      onclick={() => (mostrarGraficoCheio = true)}
+      aria-label="Ver gráfico em tela cheia"
+    >
+      {@render iconExpandir()}
+    </button>
+  </div>
+  <div class="chart-wrap">
+    <canvas bind:this={canvas}></canvas>
+    {#if loadingGrafico}
+      <div class="skeleton chart-skel" aria-label="Carregando gráfico"></div>
+    {:else if !pesosGrafico.length}
+      <p class="muted chart-vazio">Nenhum registro nesse período.</p>
+    {/if}
+  </div>
 
   <div class="quick-actions">
     <button
@@ -795,7 +816,7 @@
       onclick={() => selecionarModoGrafico("diario")}
     >
       <span class="quick-card-label">Últ. registro</span>
-      <span class="quick-card-valor">{pesoAtualTexto}</span>
+      {#if metaCarregada}<span class="quick-card-valor">{pesoAtualTexto}</span>{:else}<span class="skeleton valor-skel"></span>{/if}
     </button>
     <button
       class="quick-card quick-card-btn"
@@ -803,7 +824,7 @@
       onclick={() => selecionarModoGrafico("media")}
     >
       <span class="quick-card-label">{mediaAtualLabel}</span>
-      <span class="quick-card-valor">{mediaAtualTexto}</span>
+      {#if metaCarregada}<span class="quick-card-valor">{mediaAtualTexto}</span>{:else}<span class="skeleton valor-skel"></span>{/if}
     </button>
     <button
       class="quick-card quick-card-btn"
@@ -812,11 +833,11 @@
       aria-label={metaVisivel ? "Ocultar meta no gráfico" : "Mostrar meta no gráfico"}
     >
       <span class="quick-card-label">Meta semanal</span>
-      <span class="quick-card-valor">{metaSemanalTexto}</span>
+      {#if metaCarregada}<span class="quick-card-valor">{metaSemanalTexto}</span>{:else}<span class="skeleton valor-skel"></span>{/if}
     </button>
     <div class="quick-card">
       <span class="quick-card-label">Variação</span>
-      <span class="quick-card-valor">{variacaoPeriodoTexto}</span>
+      {#if !loadingGrafico}<span class="quick-card-valor">{variacaoPeriodoTexto}</span>{:else}<span class="skeleton valor-skel"></span>{/if}
     </div>
   </div>
 
@@ -845,8 +866,7 @@
       {/each}
     </div>
 
-    {#if !loading}
-      {#key mesLabel}
+    {#key mesLabel}
         <div
           class="grade"
           in:fly={{ x: direcaoMes * 32, duration: 220, easing: cubicOut }}
@@ -855,6 +875,8 @@
         {#each celulas as cel, i (i)}
           {#if cel === null}
             <div class="celula vazia"></div>
+          {:else if loading}
+            <div class="skeleton celula-skel" aria-hidden="true"></div>
           {:else}
             {@const ehHoje = cel.iso === hojeISO()}
             {@const temTreino = cel.nomeTreino != null}
@@ -876,7 +898,6 @@
         {/each}
         </div>
       {/key}
-    {/if}
   </div>
 </div>
 
@@ -992,6 +1013,28 @@
     width: 100%;
     height: 220px;
     margin-bottom: var(--space-5);
+  }
+  .chart-skel {
+    position: absolute;
+    inset: 0;
+  }
+  .chart-vazio {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+  }
+  .icone-topo-off {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .valor-skel {
+    display: block;
+    width: 52px;
+    height: 16px;
+    border-radius: 6px;
   }
   .modo-label {
     font-size: 12px;
@@ -1115,6 +1158,11 @@
     box-sizing: border-box;
     overflow: hidden;
     cursor: pointer;
+  }
+  .celula-skel {
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    opacity: 0.6;
   }
   .celula.vazia {
     visibility: hidden;
