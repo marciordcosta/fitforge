@@ -79,6 +79,7 @@
       controls = novosControls;
       prepararControles(el);
       iniciarDetectorNativo(el, aindaValido);
+      iniciarRecorteAmpliado(el, aindaValido);
     } catch (err) {
       if (!aindaValido()) return;
       fase = "erro";
@@ -156,6 +157,60 @@
       setTimeout(tick, 150);
     };
     setTimeout(tick, 150);
+  }
+
+  /** Zoom digital no centro do quadro (onde fica a mira) + tentativa com a imagem girada: código
+   * pequeno ou deitado na vertical (comum quando a câmera pega a lente grande-angular) não era lido
+   * pelo zxing no quadro inteiro. Alterna entre 3 recortes/giros a cada ciclo. */
+  function iniciarRecorteAmpliado(el: HTMLVideoElement, aindaValido: () => boolean) {
+    const hints = new Map<DecodeHintType, unknown>([
+      [DecodeHintType.POSSIBLE_FORMATS, FORMATOS_ZXING],
+      [DecodeHintType.TRY_HARDER, true],
+    ]);
+    const reader = new BrowserMultiFormatReader(hints as Map<DecodeHintType, unknown>);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+    const passos = [
+      { fracao: 0.55, giro: 0 },
+      { fracao: 0.55, giro: 90 },
+      { fracao: 0.35, giro: 0 },
+      { fracao: 0.35, giro: 90 },
+    ];
+    let n = 0;
+    const tick = () => {
+      if (!aindaValido() || detectando || !controls) return;
+      if (el.readyState >= 2 && el.videoWidth) {
+        const { fracao, giro } = passos[n++ % passos.length];
+        const w = Math.round(el.videoWidth * fracao);
+        const h = Math.round(el.videoHeight * fracao);
+        const sx = Math.round((el.videoWidth - w) / 2);
+        const sy = Math.round((el.videoHeight - h) / 2);
+        canvas.width = giro ? h : w;
+        canvas.height = giro ? w : h;
+        ctx.save();
+        if (giro) {
+          ctx.translate(canvas.width, 0);
+          ctx.rotate(Math.PI / 2);
+        }
+        ctx.drawImage(el, sx, sy, w, h, 0, 0, w, h);
+        ctx.restore();
+        try {
+          const codigo = reader.decodeFromCanvas(canvas).getText();
+          if (codigo && !detectando) {
+            detectando = true;
+            controls?.stop();
+            controls = null;
+            void aoDetectar(codigo);
+            return;
+          }
+        } catch {
+          /* nada nesse recorte */
+        }
+      }
+      setTimeout(tick, 80);
+    };
+    setTimeout(tick, 200);
   }
 
   function aoMudarZoom() {
