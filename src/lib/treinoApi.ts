@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { hojeISO, parseISODate, toISODate } from "./dates";
 import { comCache, compartilharEmAndamento, invalidarNamespace, atualizarCache } from "./offline/cache.svelte";
+import { getDb } from "./offline/db";
 
 /** Leituras por exercício (último registro, recordes, observações) reaproveitadas por 10 minutos
  * na memória: trocar/adicionar exercício no treino ao vivo não refaz a mesma consulta. Qualquer
@@ -802,7 +803,26 @@ export async function listTreinos(): Promise<TreinoComExercicios[]> {
   });
 }
 
+/** Abrir/editar/iniciar uma rotina lê primeiro a cópia guardada no aparelho (a mesma lista que a tela
+ * inicial do Treino usa) — a tela abre na hora; a lista é conferida com o servidor em segundo plano.
+ * Qualquer gravação em rotinas apaga essa cópia (ver supabase.ts), então depois de editar a leitura
+ * seguinte vem direto do servidor. Rotina que não está na cópia (nova demais) também cai no servidor. */
 export async function getTreino(id: string): Promise<TreinoComExercicios | null> {
+  try {
+    const db = await getDb();
+    const salvo = await db.get("cache", "treino:listTreinos");
+    const local = (salvo?.valor as TreinoComExercicios[] | undefined)?.find((t) => t.id === id);
+    if (local) {
+      void listTreinos().catch(() => {});
+      return local;
+    }
+  } catch {
+    // sem cópia local: busca no servidor
+  }
+  return getTreinoDoServidor(id);
+}
+
+export async function getTreinoDoServidor(id: string): Promise<TreinoComExercicios | null> {
   const { data, error } = await supabase
     .from("treinos")
     .select(`id, nome_treino, dia_semana, ordem, registros_zerados_em, exercicios:treino_exercicios(${TREINO_EXERCICIO_SELECT})`)
@@ -974,7 +994,7 @@ export async function moverTreinoParaDia(treinoId: string, novoDia: number | nul
 }
 
 export async function duplicateTreino(id: string): Promise<string> {
-  const original = await getTreino(id);
+  const original = await getTreinoDoServidor(id);
   if (!original) throw new Error("Rotina não encontrada.");
   const novoId = await createTreino(`${original.nome_treino} (cópia)`);
   if (original.exercicios.length) {
