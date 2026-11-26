@@ -181,22 +181,31 @@
    * e depois o número, e recargas seguintes (peso novo salvo etc.) nunca voltam a esse estado. */
   let metaCarregada = $state(false);
 
+  async function buscarMeta() {
+    const [metaCarregadaRes, historico, ultimo, media, pesosTudo, observacao] = await Promise.all([
+      getMeta(),
+      listMetaHistorico(),
+      getUltimoPeso(),
+      getPesoMedioAtual(),
+      getPesosDoPeriodo("1900-01-01", hojeISO()),
+      getObservacaoMeta(),
+    ]);
+    return { metaCarregadaRes, historico, ultimo, media, pesosTudo, observacao };
+  }
+
+  function aplicarMeta(r: Awaited<ReturnType<typeof buscarMeta>>) {
+    meta = r.metaCarregadaRes;
+    metaHistorico = r.historico;
+    ultimoPeso = r.ultimo;
+    pesoMedioAtual = r.media;
+    pesosCompletos = r.pesosTudo;
+    observacaoMeta = r.observacao;
+    metaCarregada = true;
+  }
+
   async function carregarMeta() {
     try {
-      const [metaCarregadaRes, historico, ultimo, media, pesosTudo, observacao] = await Promise.all([
-        getMeta(),
-        listMetaHistorico(),
-        getUltimoPeso(),
-        getPesoMedioAtual(),
-        getPesosDoPeriodo("1900-01-01", hojeISO()),
-        getObservacaoMeta(),
-      ]);
-      meta = metaCarregadaRes;
-      metaHistorico = historico;
-      ultimoPeso = ultimo;
-      pesoMedioAtual = media;
-      pesosCompletos = pesosTudo;
-      observacaoMeta = observacao;
+      aplicarMeta(await buscarMeta());
     } finally {
       metaCarregada = true;
     }
@@ -211,8 +220,7 @@
   /** `comSkeleton`: só na troca de mês (os dias exibidos passam a ser de OUTRO mês, então a grade
    * vira quadradinhos de carregamento até chegar). Recargas do mesmo mês (peso novo salvo etc.)
    * mantêm a grade atual na tela e só trocam os valores quando chegam — nada some nem reflui. */
-  async function carregar(comSkeleton = false) {
-    if (comSkeleton) loading = true;
+  async function buscarMes() {
     const dataInicio = toISODate(mesInicio);
     const dataFim = toISODate(mesFim);
     const [listaPesos, listaTreinos, diasFoto] = await Promise.all([
@@ -220,10 +228,19 @@
       getDiasComTreino(dataInicio, dataFim),
       getDiasComFoto(dataInicio, dataFim),
     ]);
-    pesos = listaPesos;
-    diasComTreino = new Map(listaTreinos.map((t) => [t.data, t.treinoNome]));
-    diasComFoto = diasFoto;
+    return { listaPesos, listaTreinos, diasFoto };
+  }
+
+  function aplicarMes(r: Awaited<ReturnType<typeof buscarMes>>) {
+    pesos = r.listaPesos;
+    diasComTreino = new Map(r.listaTreinos.map((t) => [t.data, t.treinoNome]));
+    diasComFoto = r.diasFoto;
     loading = false;
+  }
+
+  async function carregar(comSkeleton = false) {
+    if (comSkeleton) loading = true;
+    aplicarMes(await buscarMes());
   }
 
   aguardarCarga(carregar());
@@ -231,7 +248,7 @@
   /** Nunca volta `loadingGrafico` pra true depois da primeira carga: trocar o período ou receber
    * um peso novo mantém o gráfico atual na tela (a área tem altura fixa) e só redesenha quando os
    * dados novos chegam — antes o gráfico inteiro sumia e voltava, empurrando a tela toda. */
-  async function carregarGrafico() {
+  async function buscarGrafico() {
     const hoje = new Date();
     const dataInicio = periodo.dias == null ? "1900-01-01" : toISODate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - periodo.dias));
     // Busca 6 dias a mais antes do início pedido, só pra a média móvel do primeiro dia visível já ter janela cheia.
@@ -242,11 +259,39 @@
       getPesosDoPeriodo(dataInicioBusca, dataFim),
       getDiasComTreino(dataInicio, dataFim),
     ]);
-    pesosGraficoBruto = listaPesos;
-    dataInicioGrafico = dataInicio;
-    diasComTreinoGrafico = new Set(listaTreinos.map((t) => t.data));
-    diasComTreinoNomeGrafico = new Map(listaTreinos.map((t) => [t.data, t.treinoNome]));
+    return { listaPesos, listaTreinos, dataInicio };
+  }
+
+  function aplicarGrafico(r: Awaited<ReturnType<typeof buscarGrafico>>) {
+    pesosGraficoBruto = r.listaPesos;
+    dataInicioGrafico = r.dataInicio;
+    diasComTreinoGrafico = new Set(r.listaTreinos.map((t) => t.data));
+    diasComTreinoNomeGrafico = new Map(r.listaTreinos.map((t) => [t.data, t.treinoNome]));
     loadingGrafico = false;
+  }
+
+  async function carregarGrafico() {
+    aplicarGrafico(await buscarGrafico());
+  }
+
+  /** Recarga depois de salvar/excluir um peso: busca TUDO (mês, gráfico, meta/cards) e só então
+   * aplica tudo junto, de forma síncrona — uma única renderização e UM redesenho do gráfico. Antes
+   * eram 3 recargas independentes terminando em momentos diferentes: o calendário atualizava, depois
+   * o gráfico redesenhava, depois a linha de meta e os cards mudavam (cada uma com dados em
+   * estágios diferentes), o que aparecia como a tela "tremendo". */
+  async function carregarTudo() {
+    const mesAntes = mesLabel;
+    const periodoAntes = periodo.valor;
+    try {
+      const [m, g, me] = await Promise.all([buscarMes(), buscarGrafico(), buscarMeta()]);
+      // Mês/período trocados no meio da espera: essa troca já disparou a própria carga.
+      if (mesAntes !== mesLabel || periodoAntes !== periodo.valor) return;
+      aplicarMes(m);
+      aplicarGrafico(g);
+      aplicarMeta(me);
+    } catch {
+      // mantém o que já está na tela
+    }
   }
 
   aguardarCarga(carregarGrafico());
@@ -261,9 +306,7 @@
     const versaoAtual = cacheInvalidacao.versao("peso");
     if (versaoAtual !== versaoPesoVista) {
       versaoPesoVista = versaoAtual;
-      void carregar();
-      void carregarGrafico();
-      void carregarMeta();
+      void carregarTudo();
     }
   });
 
