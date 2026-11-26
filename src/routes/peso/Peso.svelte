@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { aguardarCarga } from "../../lib/prontidao.svelte";
   import { Chart } from "chart.js/auto";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
@@ -93,7 +94,7 @@
     }
   }
 
-  void carregarRotinaSemana();
+  aguardarCarga(carregarRotinaSemana());
 
   /** Deriva do path (não de estado local) pra que o botão "voltar" do navegador feche o modal, ou reabra ao voltar de uma tela navegada a partir dele (ex: link "Dia de X"). */
   const diaSelecionado = $derived.by(() => {
@@ -201,7 +202,7 @@
     }
   }
 
-  void carregarMeta();
+  aguardarCarga(carregarMeta());
 
   const mesLabel = $derived(`${MESES[mesBase.getMonth()]} ${mesBase.getFullYear()}`);
   const mesInicio = $derived(new Date(mesBase.getFullYear(), mesBase.getMonth(), 1));
@@ -225,7 +226,7 @@
     loading = false;
   }
 
-  void carregar();
+  aguardarCarga(carregar());
 
   /** Nunca volta `loadingGrafico` pra true depois da primeira carga: trocar o período ou receber
    * um peso novo mantém o gráfico atual na tela (a área tem altura fixa) e só redesenha quando os
@@ -248,7 +249,7 @@
     loadingGrafico = false;
   }
 
-  void carregarGrafico();
+  aguardarCarga(carregarGrafico());
 
   /** A aba Peso fica sempre montada (ver App.svelte) -- sem isso, registrar um peso novo (ex: o
    * de hoje) não refletia aqui até recarregar a página inteira: carregar/carregarGrafico/

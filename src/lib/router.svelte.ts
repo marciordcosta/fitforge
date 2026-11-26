@@ -32,6 +32,12 @@ export function navigate(to: string): void {
   path = window.location.pathname;
 }
 
+/** Troca a URL atual sem empilhar no histórico (ex: "/" -> última aba usada ao abrir o app). */
+export function substituir(to: string): void {
+  if (to !== window.location.pathname) window.history.replaceState({}, "", to);
+  path = window.location.pathname;
+}
+
 /** Volta pra tela anterior de verdade quando houve navegação dentro do
  * app; se a tela foi aberta direto (deep link, recarregar a página, PWA
  * retomada numa rota funda), não há histórico REAL pra voltar — mas o

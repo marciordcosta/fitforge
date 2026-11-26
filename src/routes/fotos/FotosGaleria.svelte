@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { aguardarCarga } from "../../lib/prontidao.svelte";
   import { navigate } from "../../lib/router.svelte";
   import { scale } from "svelte/transition";
   import { parseISODate, hojeISO, somarDias } from "../../lib/dates";
@@ -169,7 +170,7 @@
     }
   }
 
-  void carregar();
+  aguardarCarga(carregar());
 
   function formatarData(iso: string): string {
     const texto = parseISODate(iso).toLocaleDateString("pt-BR", {

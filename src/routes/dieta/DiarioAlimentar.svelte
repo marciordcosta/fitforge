@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { aguardarCarga } from "../../lib/prontidao.svelte";
   import { navigate } from "../../lib/router.svelte";
   import { parseISODate, toISODate, hojeISO, somarDias } from "../../lib/dates";
   import Sheet from "../../components/Sheet.svelte";
@@ -398,7 +399,7 @@
     }
   }
 
-  void carregarParametros();
+  aguardarCarga(carregarParametros());
 
   async function carregarInfoTopo() {
     try {
@@ -411,7 +412,7 @@
     }
   }
 
-  void carregarInfoTopo();
+  aguardarCarga(carregarInfoTopo());
 
   /** Contador de chamadas — trocar de data rapidamente (setas/seletor) dispara um novo carregar()
    * antes do anterior terminar; sem isso, a resposta mais lenta podia chegar por último e
@@ -471,7 +472,7 @@
     }
   }
 
-  void carregar();
+  aguardarCarga(carregar());
 
   /** A aba Dieta fica sempre montada (ver App.svelte) — sem isso, ajustar as calorias da semana
    * pelo fluxo "Não vai treinar hoje?" (iniciado no Home/Treino) não aparecia aqui até recarregar

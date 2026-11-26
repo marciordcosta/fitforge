@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { router, navigate } from "./lib/router.svelte";
+  import { router, navigate, substituir } from "./lib/router.svelte";
+  import { prontidao, marcarAbasMontadas } from "./lib/prontidao.svelte";
   import { auth, logout } from "./lib/auth.svelte";
   import { treinoLogSessao } from "./lib/treinoLogSessao.svelte";
   import { iniciarSyncEngine, configurarAvisoFalha } from "./lib/offline/syncEngine";
@@ -12,8 +13,6 @@
   import Toast from "./components/Toast.svelte";
   import Login from "./routes/login/Login.svelte";
   import RedefinirSenha from "./routes/login/RedefinirSenha.svelte";
-  import Home from "./routes/Home.svelte";
-  import HomeParametrizacao from "./routes/home/HomeParametrizacao.svelte";
   import Treino from "./routes/treino/Treino.svelte";
   import Peso from "./routes/peso/Peso.svelte";
   import Dieta from "./routes/dieta/Dieta.svelte";
@@ -22,13 +21,36 @@
   /** As 5 abas principais ficam sempre montadas (escondidas via `hidden`, nunca destruídas) assim
    * que o usuário loga — cada uma carrega seus dados uma única vez (no boot, em paralelo) e trocar
    * de aba depois disso é instantâneo, sem refetch nem tela de "Carregando…" a cada troca. */
+  const CHAVE_ULTIMA_ABA = "fitforge_ultima_aba";
+  const ABAS_VALIDAS = ["peso", "dieta", "treino", "fotos"];
+
+  /** Última aba usada (guardada no aparelho) — é pra onde o app abre, já que não há mais tela
+   * inicial. Sem nada salvo ainda, abre em Treino. */
+  function lerUltimaAba(): string {
+    try {
+      const v = localStorage.getItem(CHAVE_ULTIMA_ABA);
+      if (v && ABAS_VALIDAS.includes(v)) return v;
+    } catch {
+      // sem acesso ao armazenamento local — cai no padrão
+    }
+    return "treino";
+  }
+
   const abaAtiva = $derived.by(() => {
     if (router.path.startsWith("/treino")) return "treino";
     if (router.path.startsWith("/peso")) return "peso";
     if (router.path.startsWith("/dieta")) return "dieta";
     if (router.path.startsWith("/fotos")) return "fotos";
-    if (router.path === "/inicio/configurar") return "configurar";
-    return "home";
+    return lerUltimaAba();
+  });
+
+  $effect(() => {
+    if (!ABAS_VALIDAS.some((a) => router.path === `/${a}` || router.path.startsWith(`/${a}/`))) return;
+    try {
+      localStorage.setItem(CHAVE_ULTIMA_ABA, abaAtiva);
+    } catch {
+      // só uma conveniência
+    }
   });
 
   /** As telas fora da rotina ao vivo / comparação de fotos (essas duas já são cheias e cuidam do
@@ -45,7 +67,6 @@
    * nativa de nada mais no app (miniaturas de foto, anéis de macro/músculo etc. continuam intactos,
    * já que a faixa de swipe nem os alcança). */
   const ABAS_SWIPE: { chave: string; caminho: string }[] = [
-    { chave: "home", caminho: "/" },
     { chave: "peso", caminho: "/peso" },
     { chave: "dieta", caminho: "/dieta" },
     { chave: "treino", caminho: "/treino" },
@@ -118,7 +139,20 @@
       return;
     }
 
-    if (router.path === "/login") navigate("/");
+    // Sem tela inicial: "/" (ou o fim do login) abre direto na última aba usada.
+    if (router.path === "/login" || router.path === "/" || router.path === "") {
+      substituir(`/${lerUltimaAba()}`);
+    }
+  });
+
+  /** Roda depois que as abas montaram (e já registraram suas buscas iniciais): a partir daqui a
+   * tela única de "Carregando…" espera todas terminarem (ver prontidao.svelte.ts). */
+  let abasMarcadas = false;
+  $effect(() => {
+    if (!auth.loading && !auth.emRecuperacao && auth.user && auth.isAllowed && router.path !== "/login" && !abasMarcadas) {
+      abasMarcadas = true;
+      marcarAbasMontadas();
+    }
   });
 </script>
 
@@ -132,14 +166,10 @@
   {#if mostrarFlutuantes && treinoLogSessao.atual}
     <TreinoTopoFixo />
   {/if}
-  <div hidden={abaAtiva !== "home"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Home /></div>
   <div hidden={abaAtiva !== "treino"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Treino /></div>
   <div hidden={abaAtiva !== "peso"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Peso /></div>
   <div hidden={abaAtiva !== "dieta"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Dieta /></div>
   <div hidden={abaAtiva !== "fotos"} class="aba-entrada aba-entrada-{direcaoTransicaoAba}"><Fotos /></div>
-  {#if abaAtiva === "configurar"}
-    <HomeParametrizacao />
-  {/if}
   {#if mostrarFlutuantes}
     {#if treinoLogSessao.atual}
       <TreinoMinimizado />
@@ -166,6 +196,9 @@
     </div>
   {/if}
   <Toast />
+  {#if !prontidao.pronto}
+    <div class="splash" role="status">Carregando…</div>
+  {/if}
 {/if}
 
 <style>
@@ -211,6 +244,17 @@
   }
   .swipe-borda.direita {
     right: 0;
+  }
+  /* Cobre as abas (já montadas por baixo, buscando dados) até tudo carregar de uma vez. */
+  .splash {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-bg);
+    color: var(--surface-muted);
   }
   .loading {
     min-height: 100vh;

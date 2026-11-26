@@ -26,6 +26,7 @@
   } from "../../lib/treinoApi";
   import { partesFadigaSemanal, partesParaSegmentos, CORES_FAIXA } from "../../lib/fadiga";
   import { cacheInvalidacao } from "../../lib/offline/cache.svelte";
+  import { aguardarCarga } from "../../lib/prontidao.svelte";
 
   let treinos = $state<TreinoComExercicios[]>([]);
   let parametrosDistribuicao = $state<ParametrosDistribuicao>(PARAMETROS_DISTRIBUICAO_PADRAO);
@@ -214,7 +215,7 @@
     }
   }
 
-  void carregar();
+  aguardarCarga(carregar());
 
   /** A aba Treino fica sempre montada (ver App.svelte) -- sem isso, o anel de fadiga/séries
    * feitas ficava com a contagem de antes de terminar uma rotina até recarregar a página: o

@@ -5,38 +5,22 @@
    * previne o reload padrão do <a> e usa router.navigate().
    */
   import { router, navigate } from "../lib/router.svelte";
-  import { getOrdemModulos, type NavModulo } from "../lib/homeApi";
-  import { cacheInvalidacao } from "../lib/offline/cache.svelte";
 
   interface NavItem {
     href: string;
     label: string;
-    icon: "home" | "dumbbell" | "chart" | "photo" | "meal";
+    icon: "dumbbell" | "chart" | "photo" | "meal";
   }
 
-  const ITEM_INICIO: NavItem = { href: "/", label: "Início", icon: "home" };
-  const ITEM_POR_MODULO: Record<NavModulo, NavItem> = {
-    peso: { href: "/peso", label: "Peso", icon: "chart" },
-    dieta: { href: "/dieta", label: "Dieta", icon: "meal" },
-    treino: { href: "/treino", label: "Treino", icon: "dumbbell" },
-    fotos: { href: "/fotos", label: "Fotos", icon: "photo" },
-  };
-
-  /** "Início" sempre primeira, fixa — o resto segue a ordem/visibilidade de Cards da Início >
-   * Módulos (Parametrização). Recarrega sozinho quando essa preferência muda (ver
-   * invalidarNamespace("home") em homeApi.ts) — a barra fica sempre montada (App.svelte), então
-   * sem isso só refletiria a mudança depois de um reload da página inteira. */
-  let items = $state<NavItem[]>([ITEM_INICIO, ...Object.values(ITEM_POR_MODULO)]);
-
-  $effect(() => {
-    cacheInvalidacao.versao("home");
-    void getOrdemModulos().then((modulos) => {
-      items = [ITEM_INICIO, ...modulos.map((m) => ITEM_POR_MODULO[m])];
-    });
-  });
+  const items: NavItem[] = [
+    { href: "/peso", label: "Peso", icon: "chart" },
+    { href: "/dieta", label: "Dieta", icon: "meal" },
+    { href: "/treino", label: "Treino", icon: "dumbbell" },
+    { href: "/fotos", label: "Fotos", icon: "photo" },
+  ];
 
   function isActive(href: string): boolean {
-    return href === "/" ? router.path === "/" : router.path.startsWith(href);
+    return router.path.startsWith(href);
   }
 
   function onNavClick(event: MouseEvent, href: string): void {
@@ -54,12 +38,7 @@
       onclick={(e) => onNavClick(e, item.href)}
     >
       <span class="icon" aria-hidden="true">
-        {#if item.icon === "home"}
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 11l9-8 9 8" />
-            <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
-          </svg>
-        {:else if item.icon === "dumbbell"}
+        {#if item.icon === "dumbbell"}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="6" y1="12" x2="18" y2="12" />
             <rect x="2" y="9" width="3" height="6" rx="1" />
