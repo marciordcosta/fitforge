@@ -1036,9 +1036,13 @@
       const receitaIds = [...modelos.map((m) => m.metaReceitaId), ...metasDiaModelo.map((md) => md.metaReceitaId)].filter(
         (id): id is string => id != null,
       );
-      void getMacrosReceitas(receitaIds)
-        .then((mapa) => (macrosListaRefeicao = mapa))
-        .catch(() => {});
+      // Dentro do carregamento principal (não solto): os macros da lista mudam o donut e o ícone
+      // "iniciar meta" de cada card — chegando depois da tela pronta, o card mudava na cara do usuário.
+      try {
+        macrosListaRefeicao = await getMacrosReceitas(receitaIds);
+      } catch {
+        // informativo — sem isso o card só não oferece "iniciar meta pela lista"
+      }
     } catch (err) {
       erro = (err as Error).message;
     } finally {
