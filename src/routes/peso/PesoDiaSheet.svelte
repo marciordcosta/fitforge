@@ -191,7 +191,7 @@
   <div class="foto-secao">
     <span class="foto-label">Foto de acompanhamento</span>
     {#if carregando}
-      <p class="muted">Carregando…</p>
+      <div class="foto-linha"><div class="skeleton foto-skel" aria-label="Carregando"></div></div>
     {:else}
       <div class="foto-linha">
         <button
@@ -227,9 +227,11 @@
 
   <div class="acoes">
     <Button onclick={salvar} disabled={salvando || carregando || peso == null}>Salvar</Button>
-    {#if pesoOriginal != null}
-      <Button variant="danger" onclick={excluir} disabled={salvando}>Excluir Registro</Button>
-    {/if}
+    <!-- Espaço do "Excluir Registro" sempre reservado (invisível quando não há registro / ainda
+         carregando) — o modal não cresce nem pula quando o dado chega. -->
+    <div class="excluir-reserva" class:excluir-oculto={carregando || pesoOriginal == null} aria-hidden={carregando || pesoOriginal == null}>
+      <Button variant="danger" onclick={excluir} disabled={salvando || carregando || pesoOriginal == null}>Excluir Registro</Button>
+    </div>
   </div>
 </Sheet>
 
@@ -260,6 +262,10 @@
 {/if}
 
 <style>
+  .excluir-oculto {
+    visibility: hidden;
+    pointer-events: none;
+  }
   .campo {
     display: flex;
     flex-direction: column;
@@ -325,6 +331,11 @@
     gap: var(--space-2);
     padding: var(--space-2) 0;
     overflow-x: auto;
+  }
+  .foto-skel {
+    flex-shrink: 0;
+    width: 72px;
+    height: 72px;
   }
   .foto-btn {
     flex-shrink: 0;

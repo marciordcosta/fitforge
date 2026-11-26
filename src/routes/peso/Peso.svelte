@@ -614,7 +614,8 @@
       const pontosDados = pontosGrafico;
       const rotulo = pontosComData;
       const pontos = c.getDatasetMeta(0).data;
-      const y = c.chartArea.bottom + 11;
+      // Dia da semana (maior e em negrito) ganha mais respiro em relação à linha de grade de baixo.
+      const y = c.chartArea.bottom + (mostrarDiaSemanaGrafico ? 17 : 11);
       const { ctx } = c;
       ctx.save();
       ctx.font = "9px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -701,7 +702,7 @@
         // dependência reativa mudando -- preferência, filtro, peso editado) a animação de entrada
         // padrão do Chart.js replay do zero, dando um efeito de "piscada" visível.
         animation: false,
-        layout: { padding: { top: 28, bottom: 22, left: 10, right: 14 } },
+        layout: { padding: { top: 28, bottom: 28, left: 10, right: 14 } },
         plugins: {
           legend: { display: false },
           tooltip: {
