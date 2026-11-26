@@ -1,4 +1,5 @@
 <script lang="ts">
+  import MusculoGraficoProgressao from "./MusculoGraficoProgressao.svelte";
   import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import { navigate, voltar, router } from "../../lib/router.svelte";
@@ -1169,6 +1170,28 @@
     }
     return { totalBruto, totalValido, totalAcumulado };
   });
+
+  /** Exercícios do modal por músculo pro gráfico de progressão, com o peso de cada um = séries ×
+   * contribuição no músculo (um exercício que aparece em mais de uma rotina soma). */
+  const itensGraficoMusculo = $derived.by(() => {
+    if (!modalMusculoRotina) return [];
+    const { musculo, itens } = modalMusculoRotina;
+    const mapa = new Map<string, { exercicioId: string; nome: string; peso: number }>();
+    for (const it of itens) {
+      const te = treinos.flatMap((t) => t.exercicios).find((x) => x.id === it.treinoExercicioId);
+      const contribuicao = te?.exercicio?.musculos.find((m) => m.musculo_id === musculo.id)?.peso_contribuicao ?? 0;
+      const atual = mapa.get(it.exercicioId);
+      if (atual) atual.peso += it.series * contribuicao;
+      else mapa.set(it.exercicioId, { exercicioId: it.exercicioId, nome: it.exercicioNome, peso: it.series * contribuicao });
+    }
+    return Array.from(mapa.values());
+  });
+
+  /** Pontos de 1RM de um exercício pro gráfico, já com os marcadores/pausa da tendência aplicados. */
+  async function pontosGraficoMusculo(exercicioId: string): Promise<{ data: string; melhor1rm: number }[]> {
+    const pontos = historicoPorExercicio.get(exercicioId) ?? (await getHistoricoExercicio(exercicioId));
+    return pontosParaTendencia(pontos, marcadoresPorExercicio.get(exercicioId));
+  }
 
   // ---------------- Tendência de progressão do músculo (1RM médio das últimas sessões) ----------------
 
@@ -3024,6 +3047,9 @@
     {/if}
     {#if statusAjusteMusculo}
       <p class="status-ajuste status-ajuste-{statusAjusteMusculo.tipo}">{statusAjusteMusculo.texto}</p>
+    {/if}
+    {#if itensGraficoMusculo.length}
+      <MusculoGraficoProgressao itens={itensGraficoMusculo} obterPontos={pontosGraficoMusculo} />
     {/if}
     {#if !modalMusculoRotina.itens.length}
       <p class="muted">Nenhum exercício encontrado.</p>
