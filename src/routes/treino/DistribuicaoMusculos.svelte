@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import { navigate, voltar, router } from "../../lib/router.svelte";
   import { toISODate, parseISODate } from "../../lib/dates";
+  import { lerPausaReiniciarSemanas, dataCortePorPausa } from "../../lib/treinoProgressaoPrefs";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -1198,13 +1199,23 @@
    *   equipamento) — sem isso, uma mudança de peso causada por ela entraria na conta como se
    *   fosse evolução real.
    * - "apenas_marcar": sem efeito nenhum aqui, só visual.
-   * Sem marcador, devolve a lista inteira. */
+   * Além dos marcadores, a preferência "Reiniciar progressão após pausa" (Treino > Parametrização)
+   * age como um "reiniciar" no primeiro treino depois de uma pausa longa — e, se o último treino do
+   * exercício já passou do prazo, a conta inteira fica em branco até voltar a treiná-lo.
+   * Sem marcador nem pausa, devolve a lista inteira. */
   function pontosParaTendencia<T extends { data: string }>(pontos: T[], marcadores: MarcadorExercicio[] | undefined): T[] {
-    if (!marcadores || !marcadores.length) return pontos;
-    const datasDesconsiderar = new Set(marcadores.filter((m) => m.tipo === "desconsiderar").map((m) => m.data));
-    const marcadoresReiniciar = marcadores.filter((m) => m.tipo === "reiniciar");
+    const datasDesconsiderar = new Set((marcadores ?? []).filter((m) => m.tipo === "desconsiderar").map((m) => m.data));
+    const marcadoresReiniciar = (marcadores ?? []).filter((m) => m.tipo === "reiniciar");
     const ultimaDataReiniciar = marcadoresReiniciar.length ? marcadoresReiniciar[marcadoresReiniciar.length - 1].data : null;
-    return pontos.filter((p) => !datasDesconsiderar.has(p.data) && (ultimaDataReiniciar == null || p.data >= ultimaDataReiniciar));
+    // A pausa é medida entre sessões de verdade (lista completa, antes de "desconsiderar" tirar dias).
+    const cortePausa = dataCortePorPausa(
+      pontos.map((p) => p.data),
+      lerPausaReiniciarSemanas(),
+      toISODate(new Date()),
+    );
+    if (!datasDesconsiderar.size && ultimaDataReiniciar == null && cortePausa == null) return pontos;
+    const corte = [ultimaDataReiniciar, cortePausa].filter((d): d is string => d != null).sort().pop() ?? null;
+    return pontos.filter((p) => !datasDesconsiderar.has(p.data) && (corte == null || p.data >= corte));
   }
 
   /** Tendência de um exercício específico (não agregada por músculo) — mostrada como texto

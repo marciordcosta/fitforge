@@ -5,6 +5,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { lerFimDoDescanso, gravarFimDoDescanso, type FimDoDescanso } from "../../lib/treinoDescansoPrefs";
+  import { lerPausaReiniciarSemanas, gravarPausaReiniciarSemanas } from "../../lib/treinoProgressaoPrefs";
   import {
     getParametrosDistribuicao,
     salvarParametrosDistribuicao,
@@ -35,6 +36,13 @@
     if (novo.has(titulo)) novo.delete(titulo);
     else novo.add(titulo);
     cardsAbertos = novo;
+  }
+
+  /** Prazo (em semanas) do "reiniciar automático" da tendência de progressão — preferência do aparelho,
+   * aplicada na hora. 0 ou vazio = desligado. */
+  let pausaReiniciarSemanas = $state<number | null>(lerPausaReiniciarSemanas() || null);
+  function aoMudarPausaReiniciar() {
+    gravarPausaReiniciarSemanas(pausaReiniciarSemanas ?? 0);
   }
 
   let carregando = $state(true);
@@ -440,6 +448,42 @@
         <input type="checkbox" bind:checked={destacarExerciciosSemRotina} />
         <span>Destacar na lista Exercícios os que ainda não estão em nenhuma rotina (em vez dos que já estão)</span>
       </label>
+        </div>
+      {/if}
+    </div>
+
+    <div class="param-card">
+      <button type="button" class="param-card-header" onclick={() => alternarCard("Reiniciar progressão após pausa")}>
+        <span>Reiniciar progressão após pausa</span>
+        <span class="chevron" class:aberto={cardsAbertos.has("Reiniciar progressão após pausa")}>{@render iconChevron()}</span>
+      </button>
+      {#if cardsAbertos.has("Reiniciar progressão após pausa")}
+        <div class="param-card-body">
+          <p class="param-card-desc">
+            Quem passa um tempo sem fazer um exercício costuma voltar com carga menor, e isso não é regressão de verdade.
+            Com um prazo definido, a conta de progressão/regressão ignora o histórico de antes de uma pausa desse tamanho
+            (entre duas sessões do exercício, ou do último treino dele até hoje) e recomeça a contar a partir da volta.
+            Vale na hora, só neste aparelho. Vazio ou 0 = desligado.
+          </p>
+          <div class="param-linha">
+            <div class="param-linha-topo">
+              <p class="param-nome">Pausa de</p>
+              <div class="param-campos">
+                <input
+                  class="param-input"
+                  type="number"
+                  inputmode="numeric"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  aria-label="Semanas de pausa para reiniciar a progressão"
+                  bind:value={pausaReiniciarSemanas}
+                  oninput={aoMudarPausaReiniciar}
+                />
+                <span class="param-unidade">semanas</span>
+              </div>
+            </div>
+          </div>
         </div>
       {/if}
     </div>
