@@ -997,7 +997,7 @@
   }
   .chart-toolbar {
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     margin-bottom: var(--space-2);
   }
   .icone-topo {
