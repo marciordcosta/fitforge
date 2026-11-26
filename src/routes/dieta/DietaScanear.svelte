@@ -2,7 +2,7 @@
   import { untrack } from "svelte";
   import { navigate, voltar as voltarRouter } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
-  import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
+  import { BrowserMultiFormatReader } from "@zxing/browser";
   import { BarcodeFormat, DecodeHintType } from "@zxing/library";
   import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts, type AlimentoOpenFoodFactsInput } from "../../lib/dietaApi";
   import { buscarProdutoPorCodigoBarras } from "../../lib/openFoodFacts";
@@ -20,15 +20,8 @@
 
   const dataResolvida = untrack(() => data) ?? hojeISO();
 
-  let videoEl = $state<HTMLVideoElement | null>(null);
   let fase = $state<"camera" | "buscando" | "erro">("camera");
   let mensagemErro = $state("");
-  let controls: IScannerControls | null = null;
-  /** zxing pode entregar dois frames decodificados em sequência antes do ctrl.stop() surtir efeito
-   * — sem essa trava, os dois chamavam aoDetectar concorrentemente pro mesmo código e, pra um
-   * produto novo, uma das duas criações batia no unique constraint de codigo_barras e mostrava um
-   * erro cru de banco em vez de simplesmente ignorar a segunda detecção. */
-  let detectando = false;
   let mostrarManual = $state(false);
   let codigoManual = $state("");
   /** Produto novo (não achado localmente) achado na Open Food Facts, aguardando a escolha de
@@ -37,213 +30,9 @@
   let produtoPendente = $state<AlimentoOpenFoodFactsInput | null>(null);
   let mostrarEscolhaSalvar = $state(false);
 
-  /** `aindaValido` cobre o caso de o usuário sair da tela ANTES do getUserMedia/decodeFromConstraints
-   * resolver: nesse momento `controls` ainda é null, então o cleanup do $effect (controls?.stop())
-   * não tem nada pra parar; sem essa checagem, quando a promise resolvia depois do unmount, a
-   * câmera ficava ligada em segundo plano pra sempre (ninguém mais chamava stop() nela). */
-  async function iniciarCamera(el: HTMLVideoElement, aindaValido: () => boolean) {
-    try {
-      // Garante que uma câmera de uma visita anterior (ainda não totalmente liberada pelo navegador) não fique
-      // disputando o dispositivo com essa nova tentativa — sem isso, às vezes o getUserMedia trava em silêncio.
-      controls?.stop();
-      controls = null;
-      detectando = false;
-      trackAtual = null;
-      zoomInfo = null;
-      temLanterna = false;
-      lanternaLigada = false;
-      // Só os formatos de código de produto (EAN/UPC, mais Code 128/39 de etiquetas) e modo "tentar
-      // mais": decodifica bem mais rápido e acerta mais do que procurar QR/PDF417/etc. em todo quadro.
-      // Tenta de novo a cada 60ms (o padrão é 500ms, o que dava poucas chances por segundo).
-      const hints = new Map<DecodeHintType, unknown>([
-        [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39]],
-        [DecodeHintType.TRY_HARDER, true],
-      ]);
-      const reader = new BrowserMultiFormatReader(hints as Map<DecodeHintType, unknown>, { delayBetweenScanAttempts: 60 });
-      const novosControls = await reader.decodeFromConstraints(
-        { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },
-        el,
-        (result, _err, ctrl) => {
-          if (result && !detectando) {
-            detectando = true;
-            ctrl.stop();
-            controls = null;
-            void aoDetectar(result.getText());
-          }
-        },
-      );
-      if (!aindaValido()) {
-        novosControls.stop();
-        return;
-      }
-      controls = novosControls;
-      prepararControles(el);
-      iniciarDetectorNativo(el, aindaValido);
-      iniciarRecorteAmpliado(el, aindaValido);
-    } catch (err) {
-      if (!aindaValido()) return;
-      fase = "erro";
-      mensagemErro = "Não foi possível acessar a câmera: " + (err as Error).message;
-    }
-  }
-
-  /** Controles de câmera que dependem do aparelho (Chrome Android; no iOS Safari não existem e
-   * tudo abaixo é ignorado em silêncio). */
-  type CapacidadesCamera = MediaTrackCapabilities & {
-    focusMode?: string[];
-    zoom?: { min: number; max: number; step: number };
-    torch?: boolean;
-  };
-  let trackAtual: MediaStreamTrack | null = null;
-  let zoomInfo = $state<{ min: number; max: number; step: number } | null>(null);
-  let zoomValor = $state(1);
-  let temLanterna = $state(false);
-  let lanternaLigada = $state(false);
-  let timeoutFoco: ReturnType<typeof setTimeout> | undefined;
-
-  function aplicar(avancadas: Record<string, unknown>[]) {
-    if (!trackAtual) return;
-    const constraints = { advanced: avancadas } as unknown as MediaTrackConstraints;
-    trackAtual.applyConstraints(constraints).catch(() => {});
-  }
-
-  /**
-   * Foco contínuo + zoom inicial de 2x: câmera de celular não foca bem muito perto, e o zoom
-   * deixa o usuário afastar o aparelho (onde ela foca) mantendo o código grande no quadro — era o
-   * que mais fazia a leitura "não pegar nada". Cada ajuste vai em um conjunto próprio de
-   * `advanced`: o aparelho ignora só o que não suporta, em vez de descartar tudo junto.
-   */
-  function prepararControles(el: HTMLVideoElement) {
-    const stream = el.srcObject;
-    if (!(stream instanceof MediaStream)) return;
-    const track = stream.getVideoTracks()[0];
-    if (!track?.getCapabilities) return;
-    trackAtual = track;
-    const cap = track.getCapabilities() as CapacidadesCamera;
-    const avancadas: Record<string, unknown>[] = [];
-    if (cap.focusMode?.includes("continuous")) avancadas.push({ focusMode: "continuous" });
-    if (cap.zoom) {
-      const alvo = Math.min(cap.zoom.max, Math.max(cap.zoom.min, 2));
-      zoomInfo = cap.zoom;
-      zoomValor = alvo;
-      avancadas.push({ zoom: alvo });
-    }
-    temLanterna = !!cap.torch;
-    aplicar(avancadas);
-  }
-
-  /** Leitor nativo do Android em paralelo ao zxing: acerta bem mais com imagem um pouco borrada. */
-  function iniciarDetectorNativo(el: HTMLVideoElement, aindaValido: () => boolean) {
-    const Detector = (globalThis as unknown as { BarcodeDetector?: new (o?: unknown) => { detect(i: HTMLVideoElement): Promise<{ rawValue: string }[]> } }).BarcodeDetector;
-    if (!Detector) return;
-    const detector = new Detector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"] });
-    const tick = async () => {
-      if (!aindaValido() || detectando || !controls) return;
-      try {
-        if (el.readyState >= 2) {
-          const achados = await detector.detect(el);
-          const codigo = achados[0]?.rawValue;
-          if (codigo && !detectando) {
-            detectando = true;
-            controls?.stop();
-            controls = null;
-            void aoDetectar(codigo);
-            return;
-          }
-        }
-      } catch {
-        /* tenta no próximo ciclo */
-      }
-      setTimeout(tick, 150);
-    };
-    setTimeout(tick, 150);
-  }
-
-  /** Zoom digital no centro do quadro (onde fica a mira) + tentativa com a imagem girada: código
-   * pequeno ou deitado na vertical (comum quando a câmera pega a lente grande-angular) não era lido
-   * pelo zxing no quadro inteiro. Alterna entre 3 recortes/giros a cada ciclo. */
-  function iniciarRecorteAmpliado(el: HTMLVideoElement, aindaValido: () => boolean) {
-    const hints = new Map<DecodeHintType, unknown>([
-      [DecodeHintType.POSSIBLE_FORMATS, FORMATOS_ZXING],
-      [DecodeHintType.TRY_HARDER, true],
-    ]);
-    const reader = new BrowserMultiFormatReader(hints as Map<DecodeHintType, unknown>);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
-    const passos = [
-      { fracao: 0.55, giro: 0 },
-      { fracao: 0.55, giro: 90 },
-      { fracao: 0.35, giro: 0 },
-      { fracao: 0.35, giro: 90 },
-    ];
-    let n = 0;
-    const tick = () => {
-      if (!aindaValido() || detectando || !controls) return;
-      if (el.readyState >= 2 && el.videoWidth) {
-        const { fracao, giro } = passos[n++ % passos.length];
-        const w = Math.round(el.videoWidth * fracao);
-        const h = Math.round(el.videoHeight * fracao);
-        const sx = Math.round((el.videoWidth - w) / 2);
-        const sy = Math.round((el.videoHeight - h) / 2);
-        canvas.width = giro ? h : w;
-        canvas.height = giro ? w : h;
-        ctx.save();
-        if (giro) {
-          ctx.translate(canvas.width, 0);
-          ctx.rotate(Math.PI / 2);
-        }
-        ctx.drawImage(el, sx, sy, w, h, 0, 0, w, h);
-        ctx.restore();
-        try {
-          const codigo = reader.decodeFromCanvas(canvas).getText();
-          if (codigo && !detectando) {
-            detectando = true;
-            controls?.stop();
-            controls = null;
-            void aoDetectar(codigo);
-            return;
-          }
-        } catch {
-          /* nada nesse recorte */
-        }
-      }
-      setTimeout(tick, 80);
-    };
-    setTimeout(tick, 200);
-  }
-
-  function aoMudarZoom() {
-    aplicar([{ zoom: zoomValor }]);
-  }
-
-  function alternarLanterna() {
-    lanternaLigada = !lanternaLigada;
-    aplicar([{ torch: lanternaLigada }]);
-  }
-
-  /** Toque na imagem = focar ali (foco de um disparo) e depois volta pro contínuo. */
-  function focarNoToque(e: MouseEvent) {
-    if (!trackAtual?.getCapabilities) return;
-    const cap = trackAtual.getCapabilities() as CapacidadesCamera;
-    if (!cap.focusMode?.includes("single-shot")) return;
-    const alvo = e.currentTarget as HTMLElement;
-    const r = alvo.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
-    const y = (e.clientY - r.top) / r.height;
-    aplicar([{ focusMode: "single-shot", pointsOfInterest: [{ x, y }] }]);
-    clearTimeout(timeoutFoco);
-    timeoutFoco = setTimeout(() => {
-      if (cap.focusMode?.includes("continuous")) aplicar([{ focusMode: "continuous" }]);
-    }, 1500);
-  }
-
-  /** Plano B quando a câmera ao vivo não foca (comum em WebView/alguns aparelhos, onde o navegador
-   * não expõe foco/zoom): abre o app de câmera do sistema, que tem foco automático de verdade, e
-   * lê o código na foto tirada. */
+  /** Abre o app de câmera do sistema (foco automático de verdade) e lê o código na foto tirada. */
   let inputFoto = $state<HTMLInputElement | null>(null);
   let lendoFoto = $state(false);
-  let aoVivo = $state(false);
   let erroFoto = $state("");
 
   async function aoTirarFoto(e: Event) {
@@ -256,9 +45,6 @@
     try {
       const codigo = await lerCodigoDaFoto(arquivo);
       if (!codigo) throw new Error("sem código");
-      controls?.stop();
-      controls = null;
-      detectando = true;
       void aoDetectar(codigo);
     } catch {
       erroFoto = "Não consegui ler o código nessa foto. Tente de novo, com o código bem nítido e na horizontal.";
@@ -333,24 +119,6 @@
     }
   }
 
-  /** Ao voltar do app de câmera, a câmera ao vivo pode ter sido encerrada pelo sistema: reabre. */
-  function aoVoltarVisivel() {
-    if (document.visibilityState !== "visible" || fase !== "camera" || !videoEl) return;
-    if (trackAtual && trackAtual.readyState === "live") return;
-    if (detectando) return;
-    void iniciarCamera(videoEl, () => true);
-  }
-
-  $effect(() => {
-    if (!videoEl) return;
-    let valido = true;
-    void iniciarCamera(videoEl, () => valido);
-    return () => {
-      valido = false;
-      controls?.stop();
-    };
-  });
-
   function irParaItem(alimentoId: string) {
     const destino = modoReceita
       ? `/dieta/alimento/${alimentoId}/receita${receitaIdExistente ? `/${receitaIdExistente}` : ""}`
@@ -410,8 +178,6 @@
     const codigo = codigoManual.trim();
     if (!codigo) return;
     mostrarManual = false;
-    controls?.stop();
-    controls = null;
     void aoDetectar(codigo);
   }
 
@@ -460,8 +226,6 @@
   </svg>
 {/snippet}
 
-<svelte:document onvisibilitychange={aoVoltarVisivel} />
-
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={voltar} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -472,40 +236,17 @@
   {#if fase === "camera"}
     <!-- A câmera do sistema (foto, com foco automático) é o caminho principal: a câmera ao vivo do
          navegador não foca no aparelho do usuário. A caixa tem sempre o mesmo tamanho. -->
-    {#if aoVivo}
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      <div class="camera-wrap" onclick={focarNoToque}>
-        <video bind:this={videoEl} class="video" autoplay muted playsinline></video>
-        <div class="mira"></div>
-      </div>
-    {:else}
-      <div class="camera-wrap camera-inativa">
-        <button type="button" class="botao-camera" onclick={() => inputFoto?.click()} disabled={lendoFoto}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" />
-            <circle cx="12" cy="13" r="4" />
-          </svg>
-          <span>{lendoFoto ? "Lendo o código…" : "Escanear com a câmera"}</span>
-        </button>
-      </div>
-    {/if}
-    <!-- Linha de controles sempre ocupa o espaço (altura fixa), com ou sem suporte do aparelho. -->
-    <div class="controles-camera">
-      {#if aoVivo && zoomInfo}
-        <label class="zoom">
-          <span>Zoom</span>
-          <input type="range" min={zoomInfo.min} max={zoomInfo.max} step={zoomInfo.step || 0.1} bind:value={zoomValor} oninput={aoMudarZoom} />
-        </label>
-      {/if}
-      {#if aoVivo && temLanterna}
-        <button type="button" class="lanterna" class:ligada={lanternaLigada} onclick={alternarLanterna}>Lanterna</button>
-      {/if}
+    <div class="camera-wrap camera-inativa">
+      <button type="button" class="botao-camera" onclick={() => inputFoto?.click()} disabled={lendoFoto}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+        <span>{lendoFoto ? "Lendo o código…" : "Escanear com a câmera"}</span>
+      </button>
     </div>
     <input bind:this={inputFoto} class="foto-input" type="file" accept="image/*" capture="environment" onchange={aoTirarFoto} />
-    <p class="dica" class:erro={!!erroFoto}>
-      {erroFoto || (aoVivo ? "Aponte para o código dentro da mira." : "Abre a câmera traseira: tire a foto com o código bem visível.")}
-    </p>
-    <Button variant="secondary" onclick={() => (aoVivo = !aoVivo)}>{aoVivo ? "Voltar para a foto" : "Usar câmera ao vivo"}</Button>
+    <p class="dica" class:erro={!!erroFoto}>{erroFoto || "Abre a câmera traseira: tire a foto com o código bem visível."}</p>
     <Button variant="secondary" onclick={() => (mostrarManual = true)}>Digitar código manualmente</Button>
   {:else if fase === "buscando"}
     <p class="muted">Buscando informações do produto…</p>
@@ -612,11 +353,6 @@
     overflow: hidden;
     background: #000;
   }
-  .video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
   .camera-inativa {
     display: flex;
     align-items: center;
@@ -642,48 +378,6 @@
   }
   .botao-camera:disabled {
     opacity: 0.6;
-  }
-  .mira {
-    position: absolute;
-    inset: 20% 10%;
-    border: 2px solid var(--color-primary);
-    border-radius: var(--radius-md);
-    pointer-events: none;
-  }
-  .controles-camera {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 36px;
-    margin-top: var(--space-3);
-  }
-  .zoom {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--font-size-sm);
-    color: var(--surface-muted);
-  }
-  .zoom input {
-    flex: 1;
-    min-width: 0;
-  }
-  .lanterna {
-    flex-shrink: 0;
-    border: 1px solid var(--surface-border);
-    background: none;
-    color: var(--surface-fg);
-    border-radius: 999px;
-    padding: 6px 14px;
-    font-family: inherit;
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-  }
-  .lanterna.ligada {
-    background: var(--color-primary);
-    color: var(--color-primary-fg);
-    border-color: var(--color-primary);
   }
   .dica {
     text-align: center;
