@@ -10,10 +10,16 @@
   let {
     itens,
     obterPontos,
+    cheia = $bindable(false),
+    podeAmpliar = $bindable(false),
   }: {
     /** `peso` = séries × contribuição do exercício nesse músculo (soma, se aparecer em mais de uma rotina). */
     itens: { exercicioId: string; nome: string; peso: number }[];
     obterPontos: (exercicioId: string) => Promise<{ data: string; melhor1rm: number }[]>;
+    /** Tela cheia: controlada por fora (o botão de ampliar fica ao lado do status de progressão, no modal). */
+    cheia?: boolean;
+    /** Avisa o modal se há gráfico pra ampliar. */
+    podeAmpliar?: boolean;
   } = $props();
 
   const MAX_SEMANAS = 12;
@@ -24,7 +30,6 @@
 
   let carregando = $state(true);
   let series = $state<Serie[]>([]);
-  let cheia = $state(false);
   let token = 0;
 
   async function carregar(lista: typeof itens): Promise<void> {
@@ -166,6 +171,14 @@
     };
   }
 
+  $effect(() => {
+    podeAmpliar = !carregando && temDados;
+    return () => {
+      podeAmpliar = false;
+      cheia = false;
+    };
+  });
+
   /** Muda a cada recálculo: faz a ação redesenhar. */
   const versao = $derived(dados);
 </script>
@@ -177,18 +190,10 @@
     <div class="vazio"><p>Poucos registros para montar o gráfico (precisa de pelo menos 2 semanas de treino).</p></div>
   {:else}
     <canvas use:grafico={versao}></canvas>
-    <button type="button" class="expandir" onclick={() => (cheia = true)} aria-label="Abrir gráfico em tela cheia">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <polyline points="15 3 21 3 21 9" />
-        <polyline points="9 21 3 21 3 15" />
-        <line x1="21" y1="3" x2="14" y2="10" />
-        <line x1="3" y1="21" x2="10" y2="14" />
-      </svg>
-    </button>
   {/if}
 </div>
 
-{#if cheia}
+{#if cheia && temDados}
   <div class="tela-cheia" role="dialog" aria-label="Gráfico de progressão do músculo">
     <div class="tela-cheia-topo">
       <span>Progressão por exercício</span>
@@ -230,23 +235,6 @@
   }
   .vazio p {
     margin: 0;
-  }
-  .expandir {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 30px;
-    height: 30px;
-    padding: 6px;
-    border: 1px solid var(--surface-border);
-    border-radius: 8px;
-    background: var(--surface-bg);
-    color: var(--surface-muted);
-    cursor: pointer;
-  }
-  .expandir svg {
-    width: 100%;
-    height: 100%;
   }
   .tela-cheia {
     position: fixed;
