@@ -11,6 +11,7 @@
     modo,
     metaLinha,
     pontosComRotulo,
+    diffMetaPorPonto,
     metaAlvoPorPonto,
     pontosComData,
     mostrarPesoVariacao,
@@ -26,6 +27,8 @@
     metaLinha: (number | null)[] | null;
     /** Quais pontos recebem rótulo (período longo rotula só alguns) — null = todos. */
     pontosComRotulo: boolean[] | null;
+    /** Diferença % pra meta de cada ponto (null = sem meta visível → mostra kg). */
+    diffMetaPorPonto: (number | null)[] | null;
     metaAlvoPorPonto: (number | null)[] | null;
     /** No máximo 8 datas no eixo, em intervalos iguais — mesma lista calculada em Peso.svelte. */
     pontosComData: boolean[] | null;
@@ -90,8 +93,9 @@
           const p = pontosGrafico[i];
           if (!p) return;
           const yPeso = ponto.y - 14;
+          const diff = diffMetaPorPonto?.[i];
           ctx.fillStyle = "#fff";
-          ctx.fillText(formatPeso(p.peso), ponto.x, yPeso);
+          ctx.fillText(diff != null ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%` : formatPeso(p.peso), ponto.x, yPeso);
           const alvo = metaAlvoPorPonto?.[i];
           if (alvo == null || !escalaY) return;
           const yAlvo = escalaY.getPixelForValue(alvo);

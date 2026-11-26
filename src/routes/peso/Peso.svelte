@@ -524,6 +524,22 @@
     return pontosGrafico.map((_, i) => indices.has(i));
   });
 
+  /** Diferença % de cada dia rotulado em relação ao peso esperado pela meta naquela mesma data —
+   * com a linha da meta ligada, é isso que os rótulos da linha principal mostram (o valor da meta em
+   * kg vai nos rótulos vermelhos, sobre a própria linha da meta). Compara o valor efetivamente
+   * plotado (bruto no modo diário, média no modo média). */
+  const diffMetaPorPonto = $derived.by(() => {
+    const alvos = metaVisivel ? metaAlvoPorPonto : null;
+    const rotulo = pontosComRotulo;
+    const pontos = pontosGrafico;
+    if (!alvos || !rotulo || !pontos.length) return null;
+    return pontos.map((p, i) => {
+      const alvo = alvos[i];
+      if (!rotulo[i] || alvo == null) return null;
+      return ((p.peso - alvo) / alvo) * 100;
+    });
+  });
+
   const pluginRotulosMeta = {
     id: "rotulosMeta",
     afterDatasetsDraw(c: Chart) {
@@ -562,17 +578,19 @@
           }
         }
       } else {
-        // Linha principal SEMPRE com o valor em kg (peso bruto ou média, conforme o modo) — ligar a
-        // linha da meta não troca mais isso por %. Com a meta visível, cada ponto rotulado também
-        // ganha, em vermelho, o valor da meta daquele dia (do lado de fora do par ponto/meta, pra
-        // não encostar no número do peso), pra dar a referência direta.
+        // Com a linha da meta ligada, a linha principal mostra a diferença % pra meta do dia (kg
+        // quando não há meta pra comparar), e cada ponto rotulado ganha, em vermelho, o peso da meta
+        // daquele dia sobre a própria linha da meta (do lado de fora do par ponto/meta, pra não
+        // encostar no número de cima) — a referência em kg pro % exibido.
+        const diffs = diffMetaPorPonto;
         pontos.forEach((ponto, i) => {
           if (rotulo && !rotulo[i]) return;
           const p = pontosGrafico[i];
           if (!p) return;
           const yPeso = ponto.y - 11;
+          const diff = diffs?.[i];
           ctx.fillStyle = "#fff";
-          ctx.fillText(formatPeso(p.peso), ponto.x, yPeso);
+          ctx.fillText(diff != null ? `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%` : formatPeso(p.peso), ponto.x, yPeso);
 
           const alvo = alvos?.[i];
           if (alvo == null || !escalaY) return;
@@ -943,6 +961,7 @@
     modo={modoGrafico}
     {metaLinha}
     pontosComRotulo={metaVisivel ? pontosComRotulo : null}
+    {diffMetaPorPonto}
     metaAlvoPorPonto={metaVisivel ? metaAlvoPorPonto : null}
     {pontosComData}
     {mostrarPesoVariacao}
