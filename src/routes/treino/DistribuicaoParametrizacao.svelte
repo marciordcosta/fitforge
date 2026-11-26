@@ -28,6 +28,15 @@
     gravarFimDoDescanso(valor);
   }
 
+  /** Blocos de configuração começam fechados (como na Parametrização da Dieta); tocar no título abre. */
+  let cardsAbertos = $state<Set<string>>(new Set());
+  function alternarCard(titulo: string) {
+    const novo = new Set(cardsAbertos);
+    if (novo.has(titulo)) novo.delete(titulo);
+    else novo.add(titulo);
+    cardsAbertos = novo;
+  }
+
   let carregando = $state(true);
   let erro = $state<string | null>(null);
   let salvando = $state(false);
@@ -244,6 +253,12 @@
   </svg>
 {/snippet}
 
+{#snippet iconChevron()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 9l6 6 6-6" />
+  </svg>
+{/snippet}
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={() => voltar("/treino")} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -257,7 +272,12 @@
     <p class="erro">Erro ao carregar parâmetros: {erro}</p>
   {:else}
     <div class="param-card">
-      <p class="param-card-titulo">Classificação de Volume Semanal</p>
+      <button type="button" class="param-card-header" onclick={() => alternarCard("Classificação de Volume Semanal")}>
+        <span>Classificação de Volume Semanal</span>
+        <span class="chevron" class:aberto={cardsAbertos.has("Classificação de Volume Semanal")}>{@render iconChevron()}</span>
+      </button>
+      {#if cardsAbertos.has("Classificação de Volume Semanal")}
+        <div class="param-card-body">
       <p class="param-card-desc">Usada pra colorir o total de séries por músculo na semana (Distribuição, Rotinas).</p>
       <div class="param-linha">
         <div class="param-titulos">
@@ -288,10 +308,17 @@
         &nbsp;·&nbsp; <span class="legenda-cor legenda-foco">●</span> {seriesFocoMin}–{seriesFocoMax} — foco
         &nbsp;·&nbsp; <span class="legenda-cor legenda-abaixo">●</span> acima de {seriesFocoMax} — excessivo
       </p>
+        </div>
+      {/if}
     </div>
 
     <div class="param-card">
-      <p class="param-card-titulo">Fadiga por Posição</p>
+      <button type="button" class="param-card-header" onclick={() => alternarCard("Fadiga por Posição")}>
+        <span>Fadiga por Posição</span>
+        <span class="chevron" class:aberto={cardsAbertos.has("Fadiga por Posição")}>{@render iconChevron()}</span>
+      </button>
+      {#if cardsAbertos.has("Fadiga por Posição")}
+        <div class="param-card-body">
       <div class="fadiga-opcoes">
         {#each OPCOES_FADIGA as opcao (opcao.valor)}
           <button type="button" class:ativo={fadigaModo === opcao.valor} onclick={() => (fadigaModo = opcao.valor)}>{opcao.label}</button>
@@ -353,10 +380,17 @@
           </div>
         </div>
       {/if}
+        </div>
+      {/if}
     </div>
 
     <div class="param-card">
-      <p class="param-card-titulo">Modo de Distribuição</p>
+      <button type="button" class="param-card-header" onclick={() => alternarCard("Modo de Distribuição")}>
+        <span>Modo de Distribuição</span>
+        <span class="chevron" class:aberto={cardsAbertos.has("Modo de Distribuição")}>{@render iconChevron()}</span>
+      </button>
+      {#if cardsAbertos.has("Modo de Distribuição")}
+        <div class="param-card-body">
 
       <p class="param-subtitulo">Colunas</p>
       <label class="checkbox-linha">
@@ -406,10 +440,17 @@
         <input type="checkbox" bind:checked={destacarExerciciosSemRotina} />
         <span>Destacar na lista Exercícios os que ainda não estão em nenhuma rotina (em vez dos que já estão)</span>
       </label>
+        </div>
+      {/if}
     </div>
 
     <div class="param-card">
-      <p class="param-card-titulo">Cronômetro de descanso</p>
+      <button type="button" class="param-card-header" onclick={() => alternarCard("Cronômetro de descanso")}>
+        <span>Cronômetro de descanso</span>
+        <span class="chevron" class:aberto={cardsAbertos.has("Cronômetro de descanso")}>{@render iconChevron()}</span>
+      </button>
+      {#if cardsAbertos.has("Cronômetro de descanso")}
+        <div class="param-card-body">
       <p class="param-card-desc">O que acontece quando o descanso chega em 0:00. Vale na hora, só neste aparelho.</p>
       <div class="fadiga-opcoes">
         <button type="button" class:ativo={fimDoDescanso === "regressivo"} onclick={() => escolherFimDoDescanso("regressivo")}>Continuar regressivo</button>
@@ -420,10 +461,17 @@
           ? "Ao chegar em 0:00 o cronômetro some sozinho."
           : "Ao chegar em 0:00 continua contando o atraso em negativo (-0:05, -0:06…) até você pular."}
       </p>
+        </div>
+      {/if}
     </div>
 
     <div class="param-card">
-      <p class="param-card-titulo">Contagem de registros</p>
+      <button type="button" class="param-card-header" onclick={() => alternarCard("Contagem de registros")}>
+        <span>Contagem de registros</span>
+        <span class="chevron" class:aberto={cardsAbertos.has("Contagem de registros")}>{@render iconChevron()}</span>
+      </button>
+      {#if cardsAbertos.has("Contagem de registros")}
+        <div class="param-card-body">
       <p class="param-card-desc">
         "Registros" no rodapé do card de cada rotina conta as sessões feitas desde o último reset manual — editar a rotina não zera mais sozinho.
       </p>
@@ -449,6 +497,8 @@
             </li>
           {/each}
         </ul>
+      {/if}
+        </div>
       {/if}
     </div>
 
@@ -527,12 +577,36 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
     margin-bottom: var(--space-3);
-    padding: var(--space-4);
+    overflow: hidden;
   }
-  .param-card-titulo {
-    margin: 0 0 4px;
+  .param-card-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4);
+    border: none;
+    background: none;
+    color: var(--surface-fg);
     font-size: var(--font-size-base);
     font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .chevron {
+    display: flex;
+    color: var(--surface-muted);
+    transition: transform 0.15s ease;
+  }
+  .chevron svg {
+    width: 18px;
+    height: 18px;
+  }
+  .chevron.aberto {
+    transform: rotate(180deg);
+  }
+  .param-card-body {
+    padding: 0 var(--space-4) var(--space-4);
   }
   .param-card-desc {
     margin: 0 0 var(--space-3);
