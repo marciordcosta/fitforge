@@ -10,7 +10,7 @@
     diasComTreinoNomeGrafico,
     modo,
     metaLinha,
-    diffMetaPorPonto,
+    pontosComRotulo,
     metaAlvoPorPonto,
     pontosComData,
     mostrarPesoVariacao,
@@ -24,7 +24,8 @@
     diasComTreinoNomeGrafico: Map<string, string>;
     modo: "diario" | "media";
     metaLinha: (number | null)[] | null;
-    diffMetaPorPonto: (number | null)[] | null;
+    /** Quais pontos recebem rótulo (período longo rotula só alguns) — null = todos. */
+    pontosComRotulo: boolean[] | null;
     metaAlvoPorPonto: (number | null)[] | null;
     /** No máximo 8 datas no eixo, em intervalos iguais — mesma lista calculada em Peso.svelte. */
     pontosComData: boolean[] | null;
@@ -82,40 +83,30 @@
           }
         }
       } else {
+        // Igual Peso.svelte: linha principal sempre em kg; com a meta visível, cada ponto rotulado
+        // ganha também o valor da meta (vermelho) do lado de fora do par ponto/meta.
         pontos.forEach((ponto, i) => {
-          const diff = diffMetaPorPonto?.[i];
-          // Suprimido por período maior que 1 semana (ver pontosComRotulo em Peso.svelte) — não anota esse ponto.
-          if (diffMetaPorPonto != null && diff == null) return;
-          const yDiff = ponto.y - 14;
-          if (diff != null) {
-            ctx.fillStyle = "#fff";
-            const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
-            ctx.fillText(texto, ponto.x, yDiff);
-          } else {
-            // Sem meta ativa (ou sem meta cadastrada) — mostra o peso real em vez de nada, igual Peso.svelte.
-            const p = pontosGrafico[i];
-            if (p) {
-              ctx.fillStyle = "#fff";
-              ctx.fillText(formatPeso(p.peso), ponto.x, yDiff);
-            }
-          }
-          // Só o último ponto da linha reta da meta ganha o rótulo com o valor — igual Peso.svelte.
-          if (i !== pontos.length - 1) return;
+          if (pontosComRotulo && !pontosComRotulo[i]) return;
+          const p = pontosGrafico[i];
+          if (!p) return;
+          const yPeso = ponto.y - 14;
+          ctx.fillStyle = "#fff";
+          ctx.fillText(formatPeso(p.peso), ponto.x, yPeso);
           const alvo = metaAlvoPorPonto?.[i];
-          if (alvo != null && escalaY) {
-            const yLinha = escalaY.getPixelForValue(alvo) - 12;
-            if (diff != null && Math.abs(yLinha - yDiff) < 14) return;
-            ctx.fillStyle = COR_TREINO;
-            ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
-          }
+          if (alvo == null || !escalaY) return;
+          const yAlvo = escalaY.getPixelForValue(alvo);
+          const yLinha = yAlvo >= ponto.y ? yAlvo + 12 : yAlvo - 12;
+          if (Math.abs(yLinha - yPeso) < 14) return;
+          if (mostrarDiaSemanaGrafico && Math.abs(yLinha - Math.min(ponto.y + 15, c.chartArea.bottom - 4)) < 14) return;
+          ctx.fillStyle = COR_TREINO;
+          ctx.fillText(formatPeso(alvo), ponto.x, yLinha);
         });
       }
 
       // ---- "Adicionar dia da semana no gráfico" (independente do item acima) ----
       if (mostrarDiaSemanaGrafico) {
         pontos.forEach((ponto, i) => {
-          const diff = diffMetaPorPonto?.[i];
-          if (diffMetaPorPonto != null && diff == null) return;
+          if (pontosComRotulo && !pontosComRotulo[i]) return;
           const p = pontosGrafico[i];
           if (!p) return;
           const yDia = Math.min(ponto.y + 15, c.chartArea.bottom - 4);

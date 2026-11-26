@@ -524,23 +524,6 @@
     return pontosGrafico.map((_, i) => indices.has(i));
   });
 
-  /**
-   * Diferença % de cada dia rotulado em relação ao peso esperado pela meta naquela mesma data.
-   * Compara sempre o valor efetivamente plotado (bruto no modo diário, média no modo média), pra
-   * o sinal do rótulo bater com a posição visual do ponto em relação à linha da meta.
-   */
-  const diffMetaPorPonto = $derived.by(() => {
-    const alvos = metaVisivel ? metaAlvoPorPonto : null;
-    const rotulo = pontosComRotulo;
-    const pontos = pontosGrafico;
-    if (!alvos || !rotulo || !pontos.length) return null;
-    return pontos.map((p, i) => {
-      const alvo = alvos[i];
-      if (!rotulo[i] || alvo == null) return null;
-      return ((p.peso - alvo) / alvo) * 100;
-    });
-  });
-
   const pluginRotulosMeta = {
     id: "rotulosMeta",
     afterDatasetsDraw(c: Chart) {
@@ -579,36 +562,29 @@
           }
         }
       } else {
-        const diffs = diffMetaPorPonto;
+        // Linha principal SEMPRE com o valor em kg (peso bruto ou média, conforme o modo) — ligar a
+        // linha da meta não troca mais isso por %. Com a meta visível, cada ponto rotulado também
+        // ganha, em vermelho, o valor da meta daquele dia (do lado de fora do par ponto/meta, pra
+        // não encostar no número do peso), pra dar a referência direta.
         pontos.forEach((ponto, i) => {
           if (rotulo && !rotulo[i]) return;
-          const diff = diffs?.[i];
-          const yDiff = ponto.y - 11;
-          if (diff != null) {
-            ctx.fillStyle = "#fff";
-            const texto = `${diff > 0 ? "+" : ""}${diff.toFixed(1)}%`;
-            ctx.fillText(texto, ponto.x, yDiff);
-          } else {
-            // Sem meta ativa (ou sem meta cadastrada) não há o que comparar em % — mostra o peso
-            // real do ponto (bruto ou média, conforme o modo selecionado) em vez de nada.
-            const p = pontosGrafico[i];
-            if (p) {
-              ctx.fillStyle = "#fff";
-              ctx.fillText(formatPeso(p.peso), ponto.x, yDiff);
-            }
-          }
-          // Só o último ponto da linha reta da meta ganha o rótulo com o valor (76.3kg) — um
-          // número em cada ponto poluía o gráfico, já que a linha é reta e o valor de cada ponto
-          // intermediário já dá pra inferir visualmente.
-          if (i !== pontos.length - 1) return;
+          const p = pontosGrafico[i];
+          if (!p) return;
+          const yPeso = ponto.y - 11;
+          ctx.fillStyle = "#fff";
+          ctx.fillText(formatPeso(p.peso), ponto.x, yPeso);
+
           const alvo = alvos?.[i];
-          if (alvo != null && escalaY) {
-            const yLinha = escalaY.getPixelForValue(alvo) - 9;
-            // Perto demais do rótulo do peso real (ex: primeiro ponto, onde a meta parte do mesmo valor) — pula pra não sobrepor.
-            if (diff != null && Math.abs(yLinha - yDiff) < 12) return;
-            ctx.fillStyle = COR_TREINO;
-            ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
-          }
+          if (alvo == null || !escalaY) return;
+          const yAlvo = escalaY.getPixelForValue(alvo);
+          // Meta abaixo do ponto: rótulo logo abaixo da linha da meta; acima: logo acima dela.
+          const yLinha = yAlvo >= ponto.y ? yAlvo + 10 : yAlvo - 9;
+          // Colado no número do peso (meta quase igual ao peso) — pula pra não sobrepor.
+          if (Math.abs(yLinha - yPeso) < 11) return;
+          // Colado no dia da semana embaixo do ponto (quando ligado) — idem.
+          if (mostrarDiaSemanaGrafico && Math.abs(yLinha - Math.min(ponto.y + 13, c.chartArea.bottom - 4)) < 11) return;
+          ctx.fillStyle = COR_TREINO;
+          ctx.fillText(formatPeso(alvo), ponto.x, yLinha);
         });
       }
 
@@ -981,7 +957,7 @@
     {diasComTreinoNomeGrafico}
     modo={modoGrafico}
     {metaLinha}
-    {diffMetaPorPonto}
+    pontosComRotulo={metaVisivel ? pontosComRotulo : null}
     metaAlvoPorPonto={metaVisivel ? metaAlvoPorPonto : null}
     {pontosComData}
     {mostrarPesoVariacao}
