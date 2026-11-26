@@ -503,7 +503,9 @@
   const mostrarPesoVariacao = $derived(mostrarPesoVariacaoPref && periodoNoFiltro);
 
   /** "Adicionar dia da semana no gráfico" — texto (Qui, Sex...) embaixo de cada ponto. */
-  const mostrarDiaSemanaGrafico = $derived(mostrarDiaSemanaPref && periodoNoFiltro);
+  // Só no filtro de 1 semana: de 1 mês em diante o eixo volta a mostrar a data (um dia da semana
+  // sozinho, repetido, não situa ninguém em períodos longos).
+  const mostrarDiaSemanaGrafico = $derived(mostrarDiaSemanaPref && periodoNoFiltro && periodo.valor === PERIODOS[0].valor);
 
   /** "Destacar registro (ponto) no gráfico" — a bolinha em cada ponto da linha. */
   const destacarRegistro = $derived(destacarRegistroPref && periodoNoFiltro);
