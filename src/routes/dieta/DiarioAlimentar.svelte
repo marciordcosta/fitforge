@@ -41,6 +41,7 @@
   } from "../../lib/dietaApi";
   import { mostrarToast } from "../../lib/toast.svelte";
   import { dietaInvalidacao } from "../../lib/dietaInvalidacao.svelte";
+  import { cacheInvalidacao } from "../../lib/offline/cache.svelte";
   import { listTreinos, type Treino } from "../../lib/treinoApi";
   import { getPesoMedioAtual } from "../../lib/pesoApi";
 
@@ -478,9 +479,16 @@
    * pelo fluxo "Não vai treinar hoje?" (iniciado no Home/Treino) não aparecia aqui até recarregar
    * a página. */
   let versaoDietaVista = dietaInvalidacao.versao;
+  /** Também observa o contador do cache da dieta: adicionar/editar/remover/mover item (e qualquer
+   * escrita que chame invalidarNamespace("dieta")) só bumpa ESTE contador — antes o Diário, sempre
+   * montado, voltava de uma tela de refeição sem saber que os itens mudaram. */
+  let versaoCacheVista = cacheInvalidacao.versao("dieta");
   $effect(() => {
-    if (dietaInvalidacao.versao !== versaoDietaVista) {
-      versaoDietaVista = dietaInvalidacao.versao;
+    const v1 = dietaInvalidacao.versao;
+    const v2 = cacheInvalidacao.versao("dieta");
+    if (v1 !== versaoDietaVista || v2 !== versaoCacheVista) {
+      versaoDietaVista = v1;
+      versaoCacheVista = v2;
       void carregar();
     }
   });
