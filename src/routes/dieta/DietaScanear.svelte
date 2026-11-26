@@ -155,6 +155,48 @@
     }, 1500);
   }
 
+  /** Plano B quando a câmera ao vivo não foca (comum em WebView/alguns aparelhos, onde o navegador
+   * não expõe foco/zoom): abre o app de câmera do sistema, que tem foco automático de verdade, e
+   * lê o código na foto tirada. */
+  let inputFoto = $state<HTMLInputElement | null>(null);
+  let lendoFoto = $state(false);
+  let erroFoto = $state("");
+
+  async function aoTirarFoto(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const arquivo = input.files?.[0];
+    input.value = "";
+    if (!arquivo) return;
+    erroFoto = "";
+    lendoFoto = true;
+    const url = URL.createObjectURL(arquivo);
+    try {
+      const hints = new Map<DecodeHintType, unknown>([
+        [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39]],
+        [DecodeHintType.TRY_HARDER, true],
+      ]);
+      const reader = new BrowserMultiFormatReader(hints as Map<DecodeHintType, unknown>);
+      const resultado = await reader.decodeFromImageUrl(url);
+      controls?.stop();
+      controls = null;
+      detectando = true;
+      void aoDetectar(resultado.getText());
+    } catch {
+      erroFoto = "Não consegui ler o código nessa foto. Tente de novo, com o código bem nítido e na horizontal.";
+    } finally {
+      URL.revokeObjectURL(url);
+      lendoFoto = false;
+    }
+  }
+
+  /** Ao voltar do app de câmera, a câmera ao vivo pode ter sido encerrada pelo sistema: reabre. */
+  function aoVoltarVisivel() {
+    if (document.visibilityState !== "visible" || fase !== "camera" || !videoEl) return;
+    if (trackAtual && trackAtual.readyState === "live") return;
+    if (detectando) return;
+    void iniciarCamera(videoEl, () => true);
+  }
+
   $effect(() => {
     if (!videoEl) return;
     let valido = true;
@@ -274,6 +316,8 @@
   </svg>
 {/snippet}
 
+<svelte:document onvisibilitychange={aoVoltarVisivel} />
+
 <div class="container has-bottom-nav">
   <div class="header">
     <button class="back" onclick={voltar} aria-label="Voltar">{@render iconVoltar()}</button>
@@ -299,7 +343,11 @@
         <button type="button" class="lanterna" class:ligada={lanternaLigada} onclick={alternarLanterna}>Lanterna</button>
       {/if}
     </div>
-    <p class="dica">Aponte para o código, afaste um pouco se estiver desfocado e toque na imagem para focar.</p>
+    <input bind:this={inputFoto} class="foto-input" type="file" accept="image/*" capture="environment" onchange={aoTirarFoto} />
+    <Button variant="secondary" onclick={() => inputFoto?.click()} disabled={lendoFoto}>
+      {lendoFoto ? "Lendo foto…" : "Tirar foto do código (foco automático)"}
+    </Button>
+    <p class="dica" class:erro={!!erroFoto}>{erroFoto || "Aponte para o código, afaste um pouco se estiver desfocado e toque na imagem para focar."}</p>
     <Button variant="secondary" onclick={() => (mostrarManual = true)}>Digitar código manualmente</Button>
   {:else if fase === "buscando"}
     <p class="muted">Buscando informações do produto…</p>
@@ -354,6 +402,9 @@
 {/if}
 
 <style>
+  .foto-input {
+    display: none;
+  }
   .container {
     max-width: 480px;
     margin: 0 auto;
