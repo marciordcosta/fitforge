@@ -8,7 +8,7 @@
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
-  import PieChart from "../../components/PieChart.svelte";
+  import PieChart, { PALETA } from "../../components/PieChart.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
   import Exercicios from "./Exercicios.svelte";
   import { treinoEditorRascunho, type PendenteMoverTrocar } from "../../lib/treinoEditorRascunho.svelte";
@@ -1186,6 +1186,12 @@
     }
     return Array.from(mapa.values());
   });
+
+  /** Cor da linha do exercício no gráfico (mesma ordem/paleta do MusculoGraficoProgressao). */
+  function corLinhaGrafico(exercicioId: string): string | null {
+    const i = itensGraficoMusculo.findIndex((x) => x.exercicioId === exercicioId);
+    return i < 0 ? null : PALETA[i % PALETA.length];
+  }
 
   /** Pontos de 1RM de um exercício pro gráfico, já com os marcadores/pausa da tendência aplicados. */
   async function pontosGraficoMusculo(exercicioId: string): Promise<{ data: string; melhor1rm: number }[]> {
@@ -3063,6 +3069,9 @@
           >
             <span class="exercicio-musculo-coluna">
               <span class="exercicio-musculo-info">
+                {#if corLinhaGrafico(item.exercicioId)}
+                  <span class="exercicio-musculo-bolinha" style={`background:${corLinhaGrafico(item.exercicioId)}`} aria-hidden="true"></span>
+                {/if}
                 <span class="exercicio-musculo-nome">{item.exercicioNome}</span>
                 {#if variacaoPct != null}
                   <span
@@ -4241,6 +4250,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .exercicio-musculo-bolinha {
+    flex: none;
+    align-self: center;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
   }
   .exercicio-musculo-nome {
     min-width: 0;
