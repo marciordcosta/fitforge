@@ -17,9 +17,6 @@
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type ParametrosDistribuicao,
     type FadigaModo,
-    type GraficoCampo,
-    type HomeModoGrupos,
-    type OrdenacaoHome,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
 
@@ -62,11 +59,7 @@
   let mostrarSeriesTotais = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesTotais);
   let mostrarSeriesPonderadas = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesPonderadas);
   let mostrarSeriesAcumuladas = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesAcumuladas);
-  let campoGrade = $state<GraficoCampo>(PARAMETROS_DISTRIBUICAO_PADRAO.campoGrade);
-  let graficoCampo = $state<GraficoCampo>(PARAMETROS_DISTRIBUICAO_PADRAO.graficoCampo);
-  let homeModoGrupos = $state<HomeModoGrupos>(PARAMETROS_DISTRIBUICAO_PADRAO.homeModoGrupos);
   let destacarExerciciosSemRotina = $state(PARAMETROS_DISTRIBUICAO_PADRAO.destacarExerciciosSemRotina);
-  let ordenacaoHome = $state<OrdenacaoHome>(PARAMETROS_DISTRIBUICAO_PADRAO.ordenacaoHome);
 
   let treinos = $state<TreinoComExercicios[]>([]);
   /** Quantas sessões cada rotina teve desde o último reset manual -- mesma conta do rodapé do
@@ -77,26 +70,13 @@
   let confirmandoZerarTodas = $state(false);
   let confirmandoZerarId = $state<string | null>(null);
 
-  const OPCOES_ORDENACAO_HOME: { valor: OrdenacaoHome; label: string; desc: string }[] = [
-    { valor: "dia", label: "Por dia", desc: "Sempre sobe a rotina do dia mais próximo, feita ou não essa semana" },
-    { valor: "pendente", label: "Por rotina pendente", desc: "Pula rotinas já feitas essa semana e sobe a próxima ainda não executada" },
-  ];
 
   const OPCOES_FADIGA: { valor: FadigaModo; label: string }[] = [
     { valor: "fases", label: "Fases" },
     { valor: "gradual", label: "Gradual" },
   ];
 
-  const OPCOES_GRAFICO: { valor: GraficoCampo; label: string }[] = [
-    { valor: "total", label: "Totais" },
-    { valor: "ponderado", label: "Ponderadas" },
-    { valor: "destacada", label: "Destacada" },
-  ];
 
-  const OPCOES_HOME_GRUPOS: { valor: HomeModoGrupos; label: string }[] = [
-    { valor: "todos", label: "Todos os grupos" },
-    { valor: "proximo", label: "Próximo treino" },
-  ];
 
   /** Impede desmarcar a última coluna ativa — sempre precisa sobrar pelo menos uma. */
   function alternarColuna(campo: "totais" | "ponderadas" | "acumuladas", e: Event): void {
@@ -171,11 +151,7 @@
       mostrarSeriesTotais = p.mostrarSeriesTotais;
       mostrarSeriesPonderadas = p.mostrarSeriesPonderadas;
       mostrarSeriesAcumuladas = p.mostrarSeriesAcumuladas;
-      campoGrade = p.campoGrade;
-      graficoCampo = p.graficoCampo;
-      homeModoGrupos = p.homeModoGrupos;
       destacarExerciciosSemRotina = p.destacarExerciciosSemRotina;
-      ordenacaoHome = p.ordenacaoHome;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
@@ -239,11 +215,12 @@
         mostrarSeriesTotais,
         mostrarSeriesPonderadas,
         mostrarSeriesAcumuladas,
-        campoGrade,
-        graficoCampo,
-        homeModoGrupos,
         destacarExerciciosSemRotina,
-        ordenacaoHome,
+        // Fixos: não são mais configuráveis, ficam no padrão.
+        campoGrade: PARAMETROS_DISTRIBUICAO_PADRAO.campoGrade,
+        graficoCampo: PARAMETROS_DISTRIBUICAO_PADRAO.graficoCampo,
+        homeModoGrupos: PARAMETROS_DISTRIBUICAO_PADRAO.homeModoGrupos,
+        ordenacaoHome: PARAMETROS_DISTRIBUICAO_PADRAO.ordenacaoHome,
       };
       await salvarParametrosDistribuicao(p);
       mostrarToast("Salvo");
@@ -414,35 +391,6 @@
         <input type="checkbox" checked={mostrarSeriesAcumuladas} onchange={(e) => alternarColuna("acumuladas", e)} />
         <span>Séries Acumuladas</span>
       </label>
-
-      <p class="param-subtitulo">Distribuição semanal</p>
-      <div class="opcoes-toggle">
-        {#each OPCOES_GRAFICO as opcao (opcao.valor)}
-          <button type="button" class:ativo={campoGrade === opcao.valor} onclick={() => (campoGrade = opcao.valor)}>{opcao.label}</button>
-        {/each}
-      </div>
-
-      <p class="param-subtitulo">Gráficos</p>
-      <div class="opcoes-toggle">
-        {#each OPCOES_GRAFICO as opcao (opcao.valor)}
-          <button type="button" class:ativo={graficoCampo === opcao.valor} onclick={() => (graficoCampo = opcao.valor)}>{opcao.label}</button>
-        {/each}
-      </div>
-
-      <p class="param-subtitulo">Grupos musculares (Início)</p>
-      <div class="opcoes-toggle">
-        {#each OPCOES_HOME_GRUPOS as opcao (opcao.valor)}
-          <button type="button" class:ativo={homeModoGrupos === opcao.valor} onclick={() => (homeModoGrupos = opcao.valor)}>{opcao.label}</button>
-        {/each}
-      </div>
-
-      <p class="param-subtitulo">Ordem das Rotinas (Início)</p>
-      <div class="opcoes-toggle">
-        {#each OPCOES_ORDENACAO_HOME as opcao (opcao.valor)}
-          <button type="button" class:ativo={ordenacaoHome === opcao.valor} onclick={() => (ordenacaoHome = opcao.valor)}>{opcao.label}</button>
-        {/each}
-      </div>
-      <p class="param-card-desc">{OPCOES_ORDENACAO_HOME.find((o) => o.valor === ordenacaoHome)?.desc}</p>
 
       <p class="param-subtitulo">Lista de Exercícios</p>
       <label class="checkbox-linha">
@@ -784,27 +732,6 @@
   .checkbox-linha span {
     font-size: var(--font-size-base);
     color: var(--surface-fg);
-  }
-  .opcoes-toggle {
-    display: flex;
-    gap: var(--space-2);
-  }
-  .opcoes-toggle button {
-    flex: 1;
-    padding: var(--space-2) var(--space-1);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-bg);
-    color: var(--surface-muted);
-    font-family: inherit;
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .opcoes-toggle button.ativo {
-    background: var(--color-secondary);
-    color: var(--surface-bg);
-    border-color: var(--color-secondary);
   }
   .formula {
     margin: 0 0 var(--space-2);

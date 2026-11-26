@@ -1874,7 +1874,7 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   graficoCampo: "destacada",
   homeModoGrupos: "todos",
   destacarExerciciosSemRotina: false,
-  ordenacaoHome: "dia",
+  ordenacaoHome: "pendente",
 };
 
 export type ClasseVolumeSemanal = "insuficiente" | "manutencao" | "moderado" | "foco" | "excessivo";
@@ -1916,11 +1916,11 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
       mostrarSeriesTotais: data.mostrar_series_totais,
       mostrarSeriesPonderadas: data.mostrar_series_ponderadas,
       mostrarSeriesAcumuladas: data.mostrar_series_acumuladas,
-      campoGrade: data.campo_grade === "total" || data.campo_grade === "ponderado" ? data.campo_grade : "destacada",
-      graficoCampo: data.grafico_campo === "total" || data.grafico_campo === "ponderado" ? data.grafico_campo : "destacada",
-      homeModoGrupos: data.home_modo_grupos === "proximo" ? "proximo" : "todos",
+      campoGrade: "destacada",
+      graficoCampo: "destacada",
+      homeModoGrupos: "todos",
       destacarExerciciosSemRotina: data.destacar_exercicios_sem_rotina ?? false,
-      ordenacaoHome: data.ordenacao_home === "pendente" ? "pendente" : "dia",
+      ordenacaoHome: "pendente",
     };
   });
 }
