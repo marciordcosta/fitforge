@@ -716,15 +716,8 @@
         scales: {
           x: { display: false },
           y: {
-            ticks: {
-              color: "#9aa0ab",
-              font: { size: 10 },
-              // Uma linha sim, outra não — todo gridline continua desenhado, só o número (usa
-              // a formatação padrão do Chart.js pra não divergir do que já tinha) fica de fora.
-              callback(valor, indice) {
-                return indice % 2 === 0 ? this.getLabelForValue(valor as number) : "";
-              },
-            },
+            // Sem os números do eixo Y (os pontos já trazem o valor); as linhas de grade continuam.
+            ticks: { display: false },
             grid: { color: "rgba(255, 255, 255, 0.08)" },
           },
         },
