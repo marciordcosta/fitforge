@@ -780,6 +780,15 @@
   <div class="header">
     <h1>Peso <span class="modo-label">{modoGrafico === "media" ? "Média" : "Diário"}</span></h1>
     <div class="header-acoes">
+      <button
+        class="icon-btn"
+        class:icone-off={loadingGrafico || !pesosGrafico.length}
+        disabled={loadingGrafico || !pesosGrafico.length}
+        onclick={() => (mostrarGraficoCheio = true)}
+        aria-label="Ver gráfico em tela cheia"
+      >
+        {@render iconExpandir()}
+      </button>
       <button class="icon-btn" onclick={() => (mostrarFormMeta = true)} aria-label="Configurar meta">
         {@render iconMeta()}
       </button>
@@ -792,19 +801,8 @@
     </div>
   </div>
 
-  <!-- Área do gráfico SEMPRE reservada (barra de ferramentas + 220px), com o gráfico, o quadrado
-       de carregamento ou o aviso de "sem registro" dentro dela — nunca some nem muda de altura. -->
-  <div class="chart-toolbar">
-    <button
-      class="icone-topo"
-      class:icone-topo-off={loadingGrafico || !pesosGrafico.length}
-      disabled={loadingGrafico || !pesosGrafico.length}
-      onclick={() => (mostrarGraficoCheio = true)}
-      aria-label="Ver gráfico em tela cheia"
-    >
-      {@render iconExpandir()}
-    </button>
-  </div>
+  <!-- Área do gráfico SEMPRE reservada (220px), com o gráfico, o quadrado de carregamento ou o
+       aviso de "sem registro" dentro dela — nunca some nem muda de altura. -->
   <div class="chart-wrap">
     <canvas bind:this={canvas}></canvas>
     {#if loadingGrafico}
@@ -991,27 +989,6 @@
     width: 22px;
     height: 22px;
   }
-  .chart-toolbar {
-    display: flex;
-    justify-content: flex-start;
-    margin-bottom: var(--space-2);
-  }
-  .icone-topo {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: none;
-    background: var(--surface-card);
-    color: var(--surface-muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-  .icone-topo svg {
-    width: 15px;
-    height: 15px;
-  }
   .chart-wrap {
     position: relative;
     display: block;
@@ -1031,7 +1008,7 @@
     justify-content: center;
     margin: 0;
   }
-  .icone-topo-off {
+  .icone-off {
     opacity: 0.4;
     cursor: default;
   }
