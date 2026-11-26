@@ -288,26 +288,42 @@
         [DecodeHintType.TRY_HARDER, true],
       ]);
       const reader = new BrowserMultiFormatReader(hints as Map<DecodeHintType, unknown>);
-      for (const maxLado of [1600, 1000, 700]) {
-        const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
+      // Janelas da foto em resolução original (código pequeno na foto cheia some quando ela é
+      // reduzida): foto inteira, depois recortes de 60% e 40% em grade, cada um normal e girado.
+      const janelas: { x: number; y: number; f: number }[] = [{ x: 0, y: 0, f: 1 }];
+      for (const f of [0.6, 0.4]) {
+        const passo = (1 - f) / 2;
+        for (const y of [0, 1, 2]) for (const x of [0, 1, 2]) janelas.push({ x: x * passo, y: y * passo, f });
+      }
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return null;
+      let tentativas = 0;
+      for (const jan of janelas) {
+        const sw = Math.round(bitmap.width * jan.f);
+        const sh = Math.round(bitmap.height * jan.f);
+        const sx = Math.round(bitmap.width * jan.x);
+        const sy = Math.round(bitmap.height * jan.y);
+        const escala = Math.min(1, 1600 / Math.max(sw, sh));
+        const w = Math.round(sw * escala);
+        const h = Math.round(sh * escala);
         for (const giro of [0, 90]) {
-          const w = Math.round(bitmap.width * escala);
-          const h = Math.round(bitmap.height * escala);
-          const canvas = document.createElement("canvas");
           canvas.width = giro ? h : w;
           canvas.height = giro ? w : h;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) continue;
+          ctx.save();
           if (giro) {
             ctx.translate(canvas.width, 0);
             ctx.rotate(Math.PI / 2);
           }
-          ctx.drawImage(bitmap, 0, 0, w, h);
+          ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, w, h);
+          ctx.restore();
           try {
             return reader.decodeFromCanvas(canvas).getText();
           } catch {
-            /* próxima tentativa */
+            /* próxima janela */
           }
+          // Respira a cada poucas tentativas pra tela não travar.
+          if (++tentativas % 4 === 0) await new Promise((r) => setTimeout(r, 0));
         }
       }
       return null;
