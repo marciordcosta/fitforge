@@ -1,7 +1,13 @@
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { hojeISO, parseISODate, toISODate } from "./dates";
-import { comCache, invalidarNamespace, atualizarCache } from "./offline/cache.svelte";
+import { comCache, compartilharEmAndamento, invalidarNamespace, atualizarCache } from "./offline/cache.svelte";
+
+/** Leituras por exercício (último registro, recordes, observações) reaproveitadas por 10 minutos
+ * na memória: trocar/adicionar exercício no treino ao vivo não refaz a mesma consulta. Qualquer
+ * gravação do app esvazia isso na hora (ver supabase.ts), então não mostra dado de antes de uma
+ * escrita. */
+const TTL_TREINO_MS = 600_000;
 import { registrarOperacao } from "./offline/queue.svelte";
 
 export const PESOS_CONTRIBUICAO_PRESET = [1, 0.75, 0.5, 0.25] as const;
@@ -164,12 +170,14 @@ export function textoBuscavelExercicio(ex: Exercicio): string {
 // pra somar totais por grupo. Referenciado por musculos.agrupamento_id.
 
 export async function listAgrupamentosMusculares(): Promise<AgrupamentoMuscular[]> {
-  const { data, error } = await supabase
-    .from("agrupamentos_musculares")
-    .select("id, nome, ordem")
-    .order("ordem", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  return comCache("treino:listAgrupamentos", async () => {
+    const { data, error } = await supabase
+      .from("agrupamentos_musculares")
+      .select("id, nome, ordem")
+      .order("ordem", { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  });
 }
 
 export async function findOrCreateAgrupamentoMuscular(nome: string): Promise<AgrupamentoMuscular> {
@@ -276,12 +284,14 @@ export async function deleteMusculo(id: string): Promise<void> {
 // ---------------- Padrões de movimento ----------------
 
 export async function listPadroesMovimento(): Promise<PadraoMovimento[]> {
-  const { data, error } = await supabase
-    .from("padroes_movimento")
-    .select("id, nome, cor_fundo, cor_fonte, ordem")
-    .order("ordem", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  return comCache("treino:listPadroes", async () => {
+    const { data, error } = await supabase
+      .from("padroes_movimento")
+      .select("id, nome, cor_fundo, cor_fonte, ordem")
+      .order("ordem", { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  });
 }
 
 export async function findOrCreatePadraoMovimento(nome: string): Promise<PadraoMovimento> {
@@ -330,13 +340,15 @@ function mapPadraoComMusculos(row: PadraoRow): PadraoMovimentoComMusculos {
 }
 
 export async function listPadroesMovimentoComMusculos(): Promise<PadraoMovimentoComMusculos[]> {
-  const { data, error } = await supabase
-    .from("padroes_movimento")
-    .select(PADRAO_COM_MUSCULOS_SELECT)
-    .order("nome", { ascending: true })
-    .order("ordem", { ascending: true, referencedTable: "padrao_movimento_musculos" });
-  if (error) throw error;
-  return ((data ?? []) as unknown as PadraoRow[]).map(mapPadraoComMusculos);
+  return comCache("treino:listPadroesComMusculos", async () => {
+    const { data, error } = await supabase
+      .from("padroes_movimento")
+      .select(PADRAO_COM_MUSCULOS_SELECT)
+      .order("nome", { ascending: true })
+      .order("ordem", { ascending: true, referencedTable: "padrao_movimento_musculos" });
+    if (error) throw error;
+    return ((data ?? []) as unknown as PadraoRow[]).map(mapPadraoComMusculos);
+  });
 }
 
 export async function getPadraoMovimentoComMusculos(id: string): Promise<PadraoMovimentoComMusculos | null> {
@@ -409,13 +421,15 @@ const EXERCICIO_SELECT = `id, padrao_id, nome, descanso_padrao_seg, ordem, padra
 /** Exclui exercícios avulsos (criados direto numa sessão ao vivo pra uso pontual) — só existem
  * pra manter o histórico daquele treino, nunca aparecem no catálogo reutilizável. */
 export async function listExercicios(): Promise<Exercicio[]> {
-  const { data, error } = await supabase
-    .from("exercicios")
-    .select(EXERCICIO_SELECT)
-    .eq("avulso", false)
-    .order("nome", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as unknown as Exercicio[];
+  return comCache("treino:listExercicios", async () => {
+    const { data, error } = await supabase
+      .from("exercicios")
+      .select(EXERCICIO_SELECT)
+      .eq("avulso", false)
+      .order("nome", { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as unknown as Exercicio[];
+  });
 }
 
 export async function getExercicio(id: string): Promise<Exercicio | null> {
@@ -622,7 +636,11 @@ export interface RecordesExercicio {
 }
 
 /** Recordes pessoais do exercício até agora (antes da sessão atual), usados para detectar novas marcas ao logar. */
-export async function getRecordesExercicio(exercicioId: string, antesDe?: string): Promise<RecordesExercicio> {
+export function getRecordesExercicio(exercicioId: string, antesDe?: string): Promise<RecordesExercicio> {
+  return compartilharEmAndamento(`treino:rede:recordes:${exercicioId}:${antesDe ?? ""}`, () => getRecordesExercicioImpl(exercicioId, antesDe), TTL_TREINO_MS);
+}
+
+async function getRecordesExercicioImpl(exercicioId: string, antesDe?: string): Promise<RecordesExercicio> {
   const historico = await getHistoricoExercicio(exercicioId, antesDe);
   if (!historico.length) return { maiorPeso: 0, melhor1rm: 0, melhorVolumeSerie: 0 };
   return {
@@ -689,7 +707,12 @@ export async function salvarObservacaoExercicio(exercicioId: string, observacao:
 
 /** Observação atual (mais recente com data <= hoje) de cada exercício, em lote — evita N+1 nas
  * telas com lista de exercícios (rotina inteira, log de treino etc). */
-export async function getObservacoesAtuais(exercicioIds: string[]): Promise<Map<string, string>> {
+export function getObservacoesAtuais(exercicioIds: string[]): Promise<Map<string, string>> {
+  const chave = [...exercicioIds].sort().join(",");
+  return compartilharEmAndamento(`treino:rede:observacoesAtuais:${chave}`, () => getObservacoesAtuaisImpl(exercicioIds), TTL_TREINO_MS);
+}
+
+async function getObservacoesAtuaisImpl(exercicioIds: string[]): Promise<Map<string, string>> {
   if (!exercicioIds.length) return new Map();
   const { data, error } = await supabase
     .from("treino_observacoes")
@@ -1519,10 +1542,11 @@ export async function criarRotinaAPartirDeSessao(
 }
 
 /** Último registro de um exercício, filtrado por rotina se `treinoId` for informado. */
-export async function getUltimoRegistro(
-  exercicioId: string,
-  treinoId?: string,
-): Promise<SetRegistro[]> {
+export function getUltimoRegistro(exercicioId: string, treinoId?: string): Promise<SetRegistro[]> {
+  return compartilharEmAndamento(`treino:rede:ultimoRegistro:${exercicioId}:${treinoId ?? ""}`, () => getUltimoRegistroImpl(exercicioId, treinoId), TTL_TREINO_MS);
+}
+
+async function getUltimoRegistroImpl(exercicioId: string, treinoId?: string): Promise<SetRegistro[]> {
   let q = supabase
     .from("treino_registros")
     .select("data, serie, peso, repeticoes")
@@ -1557,7 +1581,11 @@ export async function construirSeriesPadrao(exercicioId: string, numSeries: numb
 
 // ---------------- Configuração do usuário ----------------
 
-export async function getHistoricoFonte(): Promise<HistoricoFonte> {
+export function getHistoricoFonte(): Promise<HistoricoFonte> {
+  return compartilharEmAndamento("treino:rede:historicoFonte", () => getHistoricoFonteImpl(), TTL_TREINO_MS);
+}
+
+async function getHistoricoFonteImpl(): Promise<HistoricoFonte> {
   const { data } = await supabase
     .from("usuario_config")
     .select("historico_fonte")

@@ -10,6 +10,7 @@
   import {
     getTreino,
     listTreinos,
+    listExercicios,
     getUltimoRegistro,
     getHistoricoFonte,
     getRecordesExercicio,
@@ -209,6 +210,10 @@
   }
 
   void carregarOutrasRotinas();
+
+  // Deixa a lista de exercícios pronta no aparelho: trocar/adicionar exercício no ao vivo abre o
+  // seletor sem esperar o servidor.
+  void listExercicios().catch(() => {});
 
   /** true assim que o usuário confirma concluir/descartar o treino — a partir daqui a sessão não
    * deve mais ser reescrita no store global. Sem isso, qualquer mudança reativa (ex: `salvando`
