@@ -46,3 +46,24 @@ export function dataCortePorPausa(datas: string[], semanas: number, hoje: string
   }
   return corte;
 }
+
+const CHAVE_FADIGA_ATIVA = "fitforge_treino_fadiga_ativa";
+
+/** Liga/desliga o desconto de fadiga por posição (Treino > Parametrização > Fadiga por Posição).
+ * Desligada: as séries todas contam como "bloco A" (sem desconto), então as barras ficam de uma cor
+ * só e Acumuladas = Ponderadas. Preferência do aparelho; padrão ligada. */
+export function lerFadigaAtiva(): boolean {
+  try {
+    return localStorage.getItem(CHAVE_FADIGA_ATIVA) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function gravarFadigaAtiva(ativa: boolean): void {
+  try {
+    localStorage.setItem(CHAVE_FADIGA_ATIVA, ativa ? "1" : "0");
+  } catch {
+    // sem localStorage: a preferência só não persiste
+  }
+}

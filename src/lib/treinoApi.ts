@@ -1,3 +1,4 @@
+import { lerFadigaAtiva } from "./treinoProgressaoPrefs";
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { hojeISO, parseISODate, toISODate } from "./dates";
@@ -1824,6 +1825,8 @@ export interface ParametrosDistribuicao {
   seriesFocoMin: number;
   seriesFocoMax: number;
   fadigaModo: FadigaModo;
+  /** Desconto de fadiga por posição ligado (padrão). Desligado: todas as séries contam como bloco A. Preferência do aparelho (localStorage). */
+  fadigaAtiva: boolean;
   /** % da sessão (não nº de séries) até onde a posição na rotina (modo Fases) conta como
    * bloco de maior prioridade/retorno (faixa A) — depois disso até fadigaFasesCorteB é o
    * bloco intermediário (faixa B), e além dele o bloco final (faixa C). Não modela fadiga
@@ -1863,6 +1866,7 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   seriesFocoMin: 12,
   seriesFocoMax: 20,
   fadigaModo: "fases",
+  fadigaAtiva: true,
   fadigaFasesCorteA: 20,
   fadigaFasesCorteB: 50,
   fadigaGradualC: 0.12,
@@ -1894,6 +1898,11 @@ export function classificarVolumeSemanal(v: number, p: ParametrosDistribuicao): 
 }
 
 export async function getParametrosDistribuicao(): Promise<ParametrosDistribuicao> {
+  const p = await getParametrosDistribuicaoBase();
+  return { ...p, fadigaAtiva: lerFadigaAtiva() };
+}
+
+async function getParametrosDistribuicaoBase(): Promise<ParametrosDistribuicao> {
   return comCache("treino:getParametrosDistribuicao", async () => {
     const { data, error } = await supabase
       .from("treino_parametros")
@@ -1908,7 +1917,8 @@ export async function getParametrosDistribuicao(): Promise<ParametrosDistribuica
       seriesManutencaoMax: data.series_manutencao_max,
       seriesFocoMin: data.series_foco_min,
       seriesFocoMax: data.series_foco_max,
-      fadigaModo: data.fadiga_modo === "gradual" ? "gradual" : "fases",
+      fadigaModo: "fases",
+      fadigaAtiva: true,
       fadigaFasesCorteA: data.fadiga_fases_corte_a,
       fadigaFasesCorteB: data.fadiga_fases_corte_b,
       fadigaGradualC: data.fadiga_gradual_c,
@@ -1932,7 +1942,7 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     series_manutencao_max: p.seriesManutencaoMax,
     series_foco_min: p.seriesFocoMin,
     series_foco_max: p.seriesFocoMax,
-    fadiga_modo: p.fadigaModo,
+    fadiga_modo: "fases",
     fadiga_fases_corte_a: p.fadigaFasesCorteA,
     fadiga_fases_corte_b: p.fadigaFasesCorteB,
     fadiga_gradual_c: p.fadigaGradualC,

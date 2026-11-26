@@ -31,6 +31,8 @@ export function partesParaSegmentos(p: Partes): { valor: number; cor: string }[]
 /** Faixa A/B/C pela posição RELATIVA da série na sessão (% do total de séries do treino,
  * não nº absoluto) — corte configurável em Parametrização (fadigaFasesCorteA/B, em %). */
 export function faixaPorPosicaoRelativa(posicao: number, totalSeries: number, p: ParametrosDistribuicao): "a" | "b" | "c" {
+  // Fadiga desligada: nenhuma série é descontada (tudo vira bloco A: uma cor só, Acumuladas = Ponderadas).
+  if (!p.fadigaAtiva) return "a";
   const percentual = totalSeries > 0 ? (posicao / totalSeries) * 100 : 100;
   if (percentual <= p.fadigaFasesCorteA) return "a";
   if (percentual <= p.fadigaFasesCorteB) return "b";

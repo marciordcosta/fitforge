@@ -6,7 +6,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { lerFimDoDescanso, gravarFimDoDescanso, type FimDoDescanso } from "../../lib/treinoDescansoPrefs";
-  import { lerPausaReiniciarSemanas, gravarPausaReiniciarSemanas } from "../../lib/treinoProgressaoPrefs";
+  import { lerPausaReiniciarSemanas, gravarPausaReiniciarSemanas, lerFadigaAtiva, gravarFadigaAtiva } from "../../lib/treinoProgressaoPrefs";
   import {
     getParametrosDistribuicao,
     salvarParametrosDistribuicao,
@@ -16,7 +16,6 @@
     getRegistrosPorTreinoDesde,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     type ParametrosDistribuicao,
-    type FadigaModo,
     type TreinoComExercicios,
   } from "../../lib/treinoApi";
 
@@ -51,11 +50,9 @@
   let seriesManutencaoMax = $state(PARAMETROS_DISTRIBUICAO_PADRAO.seriesManutencaoMax);
   let seriesFocoMin = $state(PARAMETROS_DISTRIBUICAO_PADRAO.seriesFocoMin);
   let seriesFocoMax = $state(PARAMETROS_DISTRIBUICAO_PADRAO.seriesFocoMax);
-  let fadigaModo = $state<FadigaModo>(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaModo);
+  let fadigaAtiva = $state(lerFadigaAtiva());
   let fadigaFasesCorteA = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaFasesCorteA);
   let fadigaFasesCorteB = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaFasesCorteB);
-  let fadigaGradualC = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualC);
-  let fadigaGradualD = $state(PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualD);
   let mostrarSeriesTotais = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesTotais);
   let mostrarSeriesPonderadas = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesPonderadas);
   let mostrarSeriesAcumuladas = $state(PARAMETROS_DISTRIBUICAO_PADRAO.mostrarSeriesAcumuladas);
@@ -71,10 +68,6 @@
   let confirmandoZerarId = $state<string | null>(null);
 
 
-  const OPCOES_FADIGA: { valor: FadigaModo; label: string }[] = [
-    { valor: "fases", label: "Fases" },
-    { valor: "gradual", label: "Gradual" },
-  ];
 
 
 
@@ -90,19 +83,6 @@
     if (campo === "totais") mostrarSeriesTotais = input.checked;
     else if (campo === "ponderadas") mostrarSeriesPonderadas = input.checked;
     else mostrarSeriesAcumuladas = input.checked;
-  }
-
-  /** Preview ao vivo das primeiras 8 séries — mesma função pura usada no motor de cálculo, só
-   * pra o usuário ver o efeito de mexer em c/d antes de salvar. */
-  const previewGradual = $derived(
-    Array.from({ length: 8 }, (_, i) => {
-      const n = i + 1;
-      return { n, fator: fatorPerformanceGradual(n, fadigaGradualC, fadigaGradualD) };
-    }),
-  );
-
-  function formatFator(v: number): string {
-    return v.toFixed(2);
   }
 
   /** Mesma conta de carregarRegistrosPorTreino em DistribuicaoMusculos.svelte. */
@@ -143,11 +123,8 @@
       seriesManutencaoMax = p.seriesManutencaoMax;
       seriesFocoMin = p.seriesFocoMin;
       seriesFocoMax = p.seriesFocoMax;
-      fadigaModo = p.fadigaModo;
       fadigaFasesCorteA = p.fadigaFasesCorteA;
       fadigaFasesCorteB = p.fadigaFasesCorteB;
-      fadigaGradualC = p.fadigaGradualC;
-      fadigaGradualD = p.fadigaGradualD;
       mostrarSeriesTotais = p.mostrarSeriesTotais;
       mostrarSeriesPonderadas = p.mostrarSeriesPonderadas;
       mostrarSeriesAcumuladas = p.mostrarSeriesAcumuladas;
@@ -207,11 +184,12 @@
         seriesManutencaoMax,
         seriesFocoMin,
         seriesFocoMax,
-        fadigaModo,
+        fadigaModo: PARAMETROS_DISTRIBUICAO_PADRAO.fadigaModo,
+        fadigaAtiva,
         fadigaFasesCorteA,
         fadigaFasesCorteB,
-        fadigaGradualC,
-        fadigaGradualD,
+        fadigaGradualC: PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualC,
+        fadigaGradualD: PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualD,
         mostrarSeriesTotais,
         mostrarSeriesPonderadas,
         mostrarSeriesAcumuladas,
@@ -222,6 +200,7 @@
         homeModoGrupos: PARAMETROS_DISTRIBUICAO_PADRAO.homeModoGrupos,
         ordenacaoHome: PARAMETROS_DISTRIBUICAO_PADRAO.ordenacaoHome,
       };
+      gravarFadigaAtiva(fadigaAtiva);
       await salvarParametrosDistribuicao(p);
       mostrarToast("Salvo");
       voltar("/treino");
@@ -305,13 +284,15 @@
       </button>
       {#if cardsAbertos.has("Fadiga por Posição")}
         <div class="param-card-body">
-      <div class="fadiga-opcoes">
-        {#each OPCOES_FADIGA as opcao (opcao.valor)}
-          <button type="button" class:ativo={fadigaModo === opcao.valor} onclick={() => (fadigaModo = opcao.valor)}>{opcao.label}</button>
-        {/each}
-      </div>
+      <label class="checkbox-linha">
+        <input type="checkbox" bind:checked={fadigaAtiva} />
+        <span>Descontar a fadiga por posição da série</span>
+      </label>
+      <p class="param-card-desc">
+        Desligado, todas as séries contam inteiro: as barras ficam de uma cor só e Acumuladas fica igual a Ponderadas.
+      </p>
 
-      {#if fadigaModo === "fases"}
+      {#if fadigaAtiva}
         <div class="param-linha">
           <div class="param-linha-topo">
             <p class="param-nome">Bloco A até <span class="legenda-cor legenda-fase-a">●</span></p>
@@ -332,40 +313,6 @@
         </div>
       {/if}
 
-      {#if fadigaModo === "gradual"}
-        <p class="formula">
-          Pₙ = P₁ × (1 − F), F = c·ln(n) + (n−1)·d
-        </p>
-        <div class="param-linha">
-          <div class="param-linha-topo">
-            <p class="param-nome">c <span class="param-unidade">(fadiga inicial)</span></p>
-            <div class="param-campos">
-              <input class="param-input" type="number" inputmode="decimal" min="0" step="0.01" aria-label="Coeficiente c" bind:value={fadigaGradualC} />
-            </div>
-          </div>
-        </div>
-        <div class="param-linha">
-          <div class="param-linha-topo">
-            <p class="param-nome">d <span class="param-unidade">(desgaste sistêmico)</span></p>
-            <div class="param-campos">
-              <input class="param-input" type="number" inputmode="decimal" min="0" step="0.001" aria-label="Coeficiente d" bind:value={fadigaGradualD} />
-            </div>
-          </div>
-        </div>
-
-        <div class="preview-tabela">
-          <div class="preview-linha preview-cabecalho">
-            {#each previewGradual as p (p.n)}
-              <span>Série {p.n}</span>
-            {/each}
-          </div>
-          <div class="preview-linha">
-            {#each previewGradual as p (p.n)}
-              <span>{formatFator(p.fator)}</span>
-            {/each}
-          </div>
-        </div>
-      {/if}
         </div>
       {/if}
     </div>
@@ -732,29 +679,6 @@
   .checkbox-linha span {
     font-size: var(--font-size-base);
     color: var(--surface-fg);
-  }
-  .formula {
-    margin: 0 0 var(--space-2);
-    font-size: 12px;
-    color: var(--surface-muted);
-    font-style: italic;
-  }
-  .preview-tabela {
-    margin-top: var(--space-2);
-    overflow-x: auto;
-  }
-  .preview-linha {
-    display: flex;
-    gap: var(--space-3);
-  }
-  .preview-linha span {
-    flex-shrink: 0;
-    width: 56px;
-    text-align: center;
-    font-size: 12px;
-  }
-  .preview-cabecalho span {
-    color: var(--surface-muted);
   }
   .zerar-todas-btn {
     width: 100%;
