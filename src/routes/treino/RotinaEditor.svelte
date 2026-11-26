@@ -10,15 +10,12 @@
   import {
     getTreino,
     createTreino,
-    renameTreino,
-    salvarExerciciosRotina,
-    limparMetasMusculoRotina,
+    salvarRotinaOuEnfileirar,
     getUltimoRegistro,
     getObservacoesAtuais,
     salvarObservacaoExercicio,
     listTreinos,
     adicionarTreinoExercicio,
-    removerTreinoExercicio,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
     type Exercicio,
@@ -393,31 +390,31 @@
     }
     salvando = true;
     try {
+      // Rotina nova precisa do id antes de tudo (um único pedido); daí em diante segue igual a uma
+      // edição. Salvar edição não espera o servidor: a tela fecha na hora e a gravação segue em
+      // segundo plano — se falhar, o app avisa e guarda na fila pra sincronizar depois.
       const id = treinoId ?? (await createTreino(nomeTreino.trim(), diaSemana));
-      if (treinoId) await renameTreino(treinoId, nomeTreino.trim(), diaSemana);
-      await salvarExerciciosRotina(
-        id,
-        linhas.map((l) => ({
+      const dados = {
+        treinoId: id,
+        nome: nomeTreino.trim(),
+        diaSemana,
+        itens: $state.snapshot(linhas).map((l) => ({
           exercicio_id: l.exercicio_id,
           descanso_seg: l.descanso_seg,
           series: l.series,
         })),
-      );
-      // "Ir para Rotinas" só é aplicado de verdade aqui — até agora mexeu só no rascunho local
-      // (linhas), igual ao editor completo em DistribuicaoMusculos.svelte. Cancelar antes daqui
-      // não afeta nenhuma das duas rotinas.
-      for (const p of pendentesMoverTrocar) {
-        const anterior = await getUltimoRegistro(p.exercicioEntraId);
-        await adicionarTreinoExercicio(p.destinoTreinoId, p.exercicioEntraId, p.exercicioEntraNumSeries, anterior, p.destinoOrdem);
-        if (p.exercicioSaiTreinoExercicioId) await removerTreinoExercicio(p.exercicioSaiTreinoExercicioId);
-      }
-      // A meta é um alvo pra guiar o ajuste (grade "Distribuição na Semana") — uma vez salvo o
-      // resultado, ela deixa de fazer sentido e some, até definir um novo alvo. Mesma regra que
-      // já valia salvando pelo editor embutido em DistribuicaoMusculos.svelte.
-      await limparMetasMusculoRotina(id);
+        pendentes: $state.snapshot(pendentesMoverTrocar),
+      };
       pendentesMoverTrocar = [];
       rotinaEditorSessao.limpar();
-      mostrarToast("Salvo");
+      mostrarToast("Salvando…", 1500);
+      void salvarRotinaOuEnfileirar(dados)
+        .then((r) => {
+          if (r.estado === "salvo") mostrarToast("Salvo");
+          else if (r.erro) mostrarToast(`Não consegui salvar "${dados.nome}" (${r.erro.message}). Vou tentar de novo sozinho.`, 6000);
+          else mostrarToast("Sem conexão — a rotina sincroniza quando voltar", 4000);
+        })
+        .catch((e) => mostrarToast(`Erro ao salvar "${dados.nome}": ${(e as Error).message}`, 6000));
       // Não usa window.history.back() direto: o guarda de saída (voltar físico) continuaria
       // armado nesse instante — limpar() zera rotinaEditorSessao.original, o que faz
       // temAlteracoes() voltar true — e interceptaria essa navegação como se fosse um descarte.

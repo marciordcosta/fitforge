@@ -9,7 +9,8 @@ import { getDb } from "./offline/db";
  * gravação do app esvazia isso na hora (ver supabase.ts), então não mostra dado de antes de uma
  * escrita. */
 const TTL_TREINO_MS = 600_000;
-import { registrarOperacao } from "./offline/queue.svelte";
+import { enfileirar, registrarOperacao } from "./offline/queue.svelte";
+import { conectividade } from "./offline/connectivity.svelte";
 
 export const PESOS_CONTRIBUICAO_PRESET = [1, 0.75, 0.5, 0.25] as const;
 
@@ -1037,35 +1038,89 @@ export async function salvarExerciciosRotina(treinoId: string, itens: ItemRotina
     return;
   }
 
-  for (let idx = 0; idx < itens.length; idx++) {
-    const item = itens[idx];
-    const { data: te, error: insError } = await supabase
-      .from("treino_exercicios")
-      .insert({
+  // Todos os exercícios num único insert e todas as séries noutro (antes: 2 pedidos em sequência
+  // POR exercício) — gravar uma rotina de 8 exercícios passa de ~17 idas ao servidor pra 3.
+  const { data: criados, error: insError } = await supabase
+    .from("treino_exercicios")
+    .insert(
+      itens.map((item, idx) => ({
         user_id: uid(),
         treino_id: treinoId,
         exercicio_id: item.exercicio_id,
         descanso_seg: item.descanso_seg,
         ordem: idx,
-      })
-      .select("id")
-      .single();
-    if (insError) throw insError;
+      })),
+    )
+    .select("id, ordem");
+  if (insError) throw insError;
+  const idPorOrdem = new Map((criados ?? []).map((c) => [c.ordem as number, c.id as string]));
 
-    if (item.series.length) {
-      const { error: seriesError } = await supabase.from("treino_exercicio_series").insert(
-        item.series.map((s) => ({
-          treino_exercicio_id: te.id,
-          serie: s.serie,
-          peso_alvo: s.peso_alvo,
-          rep_min: s.rep_min,
-          rep_max: s.rep_max,
-        })),
-      );
-      if (seriesError) throw seriesError;
-    }
+  const series = itens.flatMap((item, idx) =>
+    item.series.map((s) => ({
+      treino_exercicio_id: idPorOrdem.get(idx)!,
+      serie: s.serie,
+      peso_alvo: s.peso_alvo,
+      rep_min: s.rep_min,
+      rep_max: s.rep_max,
+    })),
+  );
+  if (series.length) {
+    const { error: seriesError } = await supabase.from("treino_exercicio_series").insert(series);
+    if (seriesError) throw seriesError;
   }
   await invalidarNamespace("treino");
+}
+
+/** Um "mover/trocar com outra rotina" ainda não aplicado (ver RotinaEditor). */
+export interface PendenteRotinaSalvar {
+  destinoTreinoId: string;
+  exercicioEntraId: string;
+  exercicioEntraNumSeries: number;
+  exercicioSaiTreinoExercicioId?: string;
+  destinoOrdem?: number;
+}
+
+export interface DadosSalvarRotina {
+  treinoId: string;
+  nome: string;
+  diaSemana: number | null;
+  itens: ItemRotina[];
+  pendentes: PendenteRotinaSalvar[];
+}
+
+/** Tudo o que "Salvar rotina" grava, numa função só — pra poder rodar em segundo plano e, se falhar,
+ * ir pra fila de sincronização. Regravar é seguro: salvarExerciciosRotina apaga e recria a lista. */
+export async function salvarRotinaExistente(d: DadosSalvarRotina): Promise<void> {
+  await renameTreino(d.treinoId, d.nome, d.diaSemana);
+  await salvarExerciciosRotina(d.treinoId, d.itens);
+  for (const p of d.pendentes) {
+    const anterior = await getUltimoRegistro(p.exercicioEntraId);
+    await adicionarTreinoExercicio(p.destinoTreinoId, p.exercicioEntraId, p.exercicioEntraNumSeries, anterior, p.destinoOrdem);
+    if (p.exercicioSaiTreinoExercicioId) await removerTreinoExercicio(p.exercicioSaiTreinoExercicioId);
+  }
+  // A meta de músculo é um alvo pra guiar o ajuste — salvo o resultado, ela deixa de fazer sentido.
+  await limparMetasMusculoRotina(d.treinoId);
+}
+
+registrarOperacao("treino:salvarRotinaExistente", (...args: unknown[]) => salvarRotinaExistente(args[0] as DadosSalvarRotina));
+
+export type ResultadoSalvarRotina = { estado: "salvo" } | { estado: "enfileirado"; erro?: Error };
+
+/** Grava a rotina; se não der (sem conexão, ou erro do servidor), guarda na fila de sincronização
+ * pra tentar de novo sozinha — nunca perde a edição. Quem chamou decide como avisar o usuário. */
+export async function salvarRotinaOuEnfileirar(d: DadosSalvarRotina): Promise<ResultadoSalvarRotina> {
+  let erro: Error | undefined;
+  if (conectividade.online) {
+    try {
+      await salvarRotinaExistente(d);
+      return { estado: "salvo" };
+    } catch (e) {
+      erro = e as Error;
+    }
+  }
+  await enfileirar("treino:salvarRotinaExistente", [d], `Rotina ${d.nome}`);
+  // Sem erro = estava offline desde o início; com erro = falhou online (ou caiu no meio).
+  return { estado: "enfileirado", erro: conectividade.online ? erro : undefined };
 }
 
 /** Atualiza só o descanso de um exercício dentro de uma rotina (editável direto na tela de log). */
