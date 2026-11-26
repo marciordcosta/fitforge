@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
   import { hojeISO, parseISODate } from "../../lib/dates";
@@ -138,19 +139,23 @@
       return;
     }
 
-    treino = await getTreino(treinoId);
+    // A fonte do histórico não depende da rotina: busca junto (antes era uma espera a mais, em
+    // sequência, antes de qualquer exercício começar a carregar).
+    const [treinoRes, fonte] = await Promise.all([getTreino(treinoId), getHistoricoFonte()]);
+    treino = treinoRes;
     if (!treino) {
       naoEncontrada = true;
       loading = false;
       return;
     }
     nomeTreino = treino.nome_treino;
-    const fonte = await getHistoricoFonte();
     const exerciciosOrdenados = treino.exercicios.slice().sort((a, b) => a.ordem - b.ordem);
-    const observacoesAtuais = await getObservacoesAtuais(exerciciosOrdenados.map((te) => te.exercicio_id));
+    // As observações também vão em paralelo com o histórico/recordes de cada exercício.
+    const observacoesPromessa = getObservacoesAtuais(exerciciosOrdenados.map((te) => te.exercicio_id));
 
     sessao = await Promise.all(
       exerciciosOrdenados.map(async (te) => {
+        const observacoesAtuais = await observacoesPromessa;
         const [anterior, recordes] = await Promise.all([
           getUltimoRegistro(te.exercicio_id, fonte === "ultima_rotina" ? treinoId : undefined),
           getRecordesExercicio(te.exercicio_id, data),
@@ -1123,7 +1128,9 @@
 
 <div class="container" style={headerFixoAltura ? `padding-top: ${headerFixoAltura}px` : undefined}>
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <!-- Quadrados do tamanho aproximado de um card de exercício (nome, notas, descanso, tabela de
+         séries, botão): a tela não "estoura" de uma vez quando os exercícios chegam. -->
+    <CarregandoBloco linhas={3} altura={300} />
   {:else if naoEncontrada}
     <p class="muted">Rotina não encontrada.</p>
   {:else}
