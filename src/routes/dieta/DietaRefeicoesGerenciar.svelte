@@ -1515,11 +1515,6 @@
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 {/snippet}
-{#snippet iconIniciarMeta()}
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-  </svg>
-{/snippet}
 {#snippet iconInfo()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="9" />
@@ -1820,9 +1815,9 @@
                             type="button"
                             class="item-iniciar-meta"
                             onclick={(e) => { e.stopPropagation(); iniciarMetaPelaRefeicao(m, grupo); }}
-                            aria-label="Iniciar meta pela refeição"
+                            aria-label="Atualizar meta pela refeição"
                           >
-                            {@render iconIniciarMeta()}
+                            Atualizar meta
                           </button>
                         {/if}
                       </span>
@@ -1890,9 +1885,9 @@
                           type="button"
                           class="item-iniciar-meta"
                           onclick={(e) => { e.stopPropagation(); iniciarMetaPelaRefeicao(m); }}
-                          aria-label="Iniciar meta pela refeição"
+                          aria-label="Atualizar meta pela refeição"
                         >
-                          {@render iconIniciarMeta()}
+                          Atualizar meta
                         </button>
                       {/if}
                     </span>
@@ -2427,20 +2422,17 @@
    * tem uma lista de alimentos cadastrada (ver receitaIdEfetivo). */
   .item-iniciar-meta {
     flex-shrink: 0;
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
+    white-space: nowrap;
+    border: 1px solid var(--color-primary);
     background: none;
-    padding: 0;
+    border-radius: 999px;
+    padding: 2px var(--space-2);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    line-height: 1.4;
     color: var(--color-primary);
     cursor: pointer;
-  }
-  .item-iniciar-meta svg {
-    width: 16px;
-    height: 16px;
   }
   .card-header-direita {
     flex-shrink: 0;
