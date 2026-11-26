@@ -478,20 +478,6 @@
     return alvos;
   });
 
-  /**
-   * Com mais de 7 dias no período, rotular todo ponto fica poluído (nos dois modos, já que ambos tem
-   * um ponto por dia agora). Nesse caso, rotula a cada 7 pontos, contando de trás pra frente a partir
-   * do mais recente — janela móvel, não semana de calendário fechada, pra sempre incluir o ponto mais
-   * recente e manter o espaçamento uniforme independente de onde os dados começam. Com até 7 dias,
-   * anota todo ponto normalmente.
-   */
-  const pontosComRotulo = $derived.by((): boolean[] | null => {
-    if (!pontosGrafico.length) return null;
-    if (periodo.valor === PERIODOS[0].valor || pontosGrafico.length <= 7) return pontosGrafico.map(() => true);
-    const total = pontosGrafico.length;
-    return pontosGrafico.map((_, i) => (total - 1 - i) % 7 === 0);
-  });
-
   /** Se o filtro de período atual está marcado em "Filtros que serão aplicados" (Meta >
    * Parametrização do gráfico) — fora dele, nenhum dos 4 itens de exibição aparece, não importa o
    * estado do checkbox de cada um (eles só valem DENTRO dos filtros marcados aqui). */
@@ -532,13 +518,14 @@
    * plotado (bruto no modo diário, média no modo média). */
   const diffMetaPorPonto = $derived.by(() => {
     const alvos = metaVisivel ? metaAlvoPorPonto : null;
-    const rotulo = pontosComRotulo;
+    // Rótulos só onde há data no eixo (pontosComData): 1 semana = todos os dias, períodos maiores =
+    // só nas datas exibidas. Valor em % quando a meta está visível, senão em kg.
+    const rotulo = pontosComData;
     const pontos = pontosGrafico;
-    // % só no filtro de 1 semana; de 1 mês em diante os rótulos mostram o peso em kg (e a meta em kg).
-    if (!alvos || !rotulo || !pontos.length || periodo.valor !== PERIODOS[0].valor) return null;
+    if (!alvos || !pontos.length) return null;
     return pontos.map((p, i) => {
       const alvo = alvos[i];
-      if (!rotulo[i] || alvo == null) return null;
+      if ((rotulo && !rotulo[i]) || alvo == null) return null;
       return ((p.peso - alvo) / alvo) * 100;
     });
   });
@@ -556,7 +543,7 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      const rotulo = pontosComRotulo;
+      const rotulo = pontosComData;
 
       // ---- "Adicionar peso/variação no gráfico" ----
       if (!mostrarPesoVariacao) {
@@ -631,14 +618,12 @@
         if (!p) return;
         // Com "dia da semana" ligado, o eixo mostra o dia da semana NO LUGAR da data (fora da área
         // do gráfico, sem poluir o desenho).
-        if (mostrarDiaSemanaGrafico) {
-          // Dia da semana: maior, negrito e caixa alta, mas em cinza pra não chamar tanta atenção.
-          ctx.font = "700 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-          ctx.fillStyle = "#9aa0ab";
-          ctx.fillText(DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()].toUpperCase(), ponto.x, y);
-        } else {
-          ctx.fillText(formatDataCurta(dataExibicao(p)), ponto.x, y);
-        }
+        // Dia da semana no MESMO formato da data (mesma fonte/cor), no lugar dela.
+        ctx.fillText(
+          mostrarDiaSemanaGrafico ? DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()] : formatDataCurta(dataExibicao(p)),
+          ponto.x,
+          y,
+        );
       });
       ctx.restore();
     },
@@ -960,7 +945,7 @@
     {diasComTreinoNomeGrafico}
     modo={modoGrafico}
     {metaLinha}
-    pontosComRotulo={metaVisivel ? pontosComRotulo : null}
+    pontosComRotulo={pontosComData}
     {diffMetaPorPonto}
     metaAlvoPorPonto={metaVisivel ? metaAlvoPorPonto : null}
     {pontosComData}

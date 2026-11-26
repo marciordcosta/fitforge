@@ -123,7 +123,7 @@
     chart = new Chart(canvas, {
       type: "line",
       data: {
-        labels: pontosGrafico.map((p, i) => (pontosComData && !pontosComData[i] ? "" : mostrarDiaSemanaGrafico ? DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()].toUpperCase() : formatDataCurta(p.data))),
+        labels: pontosGrafico.map((p, i) => (pontosComData && !pontosComData[i] ? "" : mostrarDiaSemanaGrafico ? DIAS_SEMANA_ABREV[parseISODate(p.data).getDay()] : formatDataCurta(p.data))),
         datasets: [
           {
             data: pontosGrafico.map((p) => p.peso),
@@ -183,9 +183,8 @@
         },
         scales: {
           x: {
-            ticks: mostrarDiaSemanaGrafico
-              ? { color: "#9aa0ab", font: { size: 12, weight: "bold" }, padding: 10 }
-              : { color: "#9aa0ab" },
+            // Dia da semana no mesmo formato da data, só com um respiro maior das linhas do gráfico.
+            ticks: { color: "#9aa0ab", padding: mostrarDiaSemanaGrafico ? 10 : 3 },
             grid: { display: false },
           },
           y: {
