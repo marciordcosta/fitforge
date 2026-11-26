@@ -169,19 +169,22 @@
   <div class="titulo-dia">
     <strong>{diaSemanaLabel}</strong><span class="titulo-data-complemento">, {dataComplementoLabel}</span>
   </div>
-  {#if nomeRotina}
-    <button
-      class="link-rotina"
-      onclick={() =>
-        navigate(
-          treinoEfetuado
-            ? `/treino/historico/${treinoIdRotina ?? "avulso"}/${data}`
-            : `/treino/rotina/${treinoIdRotina}/ver`,
-        )}
-    >
-      Dia de <span class="link-rotina-nome">"{nomeRotina}"</span>
-    </button>
-  {/if}
+  <!-- Linha "Dia de <rotina>" SEMPRE reservada (invisível enquanto carrega ou quando o dia não tem
+       rotina) — o conteúdo do modal não desce quando o nome chega. -->
+  <button
+    class="link-rotina"
+    class:link-rotina-oculto={!nomeRotina}
+    aria-hidden={!nomeRotina}
+    tabindex={nomeRotina ? 0 : -1}
+    onclick={() =>
+      navigate(
+        treinoEfetuado
+          ? `/treino/historico/${treinoIdRotina ?? "avulso"}/${data}`
+          : `/treino/rotina/${treinoIdRotina}/ver`,
+      )}
+  >
+    Dia de <span class="link-rotina-nome">"{nomeRotina ?? "rotina"}"</span>
+  </button>
 
   <div class="campo">
     <label for="peso-input">Peso (kg)</label>
@@ -311,6 +314,10 @@
     font-size: var(--font-size-sm);
     font-family: inherit;
     cursor: pointer;
+  }
+  .link-rotina-oculto {
+    visibility: hidden;
+    pointer-events: none;
   }
   .link-rotina-nome {
     color: var(--color-primary);
