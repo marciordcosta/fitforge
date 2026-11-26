@@ -31,6 +31,10 @@
   let treinos = $state<TreinoComExercicios[]>([]);
   let parametrosDistribuicao = $state<ParametrosDistribuicao>(PARAMETROS_DISTRIBUICAO_PADRAO);
   let loading = $state(true);
+  /** true depois da primeira carga: as recargas (ao terminar um treino, ao editar uma rotina) mantêm o
+   * conteúdo na tela em vez de apagar os cards e mostrar "Carregando…" — antes a tela encolhia e
+   * crescia de novo a cada recarga. Só a primeira carga mostra os quadrados de carregamento. */
+  let carregouAlgumaVez = $state(false);
   let erroCarregar = $state<string | null>(null);
   let musculos = $state<Musculo[]>([]);
   let seriesPorTreino = $state<Map<string, number>>(new Map());
@@ -212,6 +216,7 @@
       erroCarregar = (e as Error).message;
     } finally {
       loading = false;
+      carregouAlgumaVez = true;
     }
   }
 
@@ -431,7 +436,11 @@
     <button class="icon-btn" onclick={() => (mostrarMenuNovo = true)} aria-label="Novo">+</button>
   </div>
 
-  {#if !loading}
+  {#if !carregouAlgumaVez}
+    <!-- Espaço reservado dos cards de Séries e Grupos Musculares (tamanho aproximado). -->
+    <div class="skeleton" style="height:112px; margin-bottom:var(--space-4); border-radius:var(--radius-lg)"></div>
+    <div class="skeleton" style="height:140px; margin-bottom:var(--space-4); border-radius:var(--radius-lg)"></div>
+  {:else}
     <div class="card-series">
       <p class="card-titulo">Séries</p>
       <div class="series-linha">
@@ -517,8 +526,10 @@
 
   <p class="rotinas-titulo">Rotinas</p>
 
-  {#if loading}
-    <p class="muted">Carregando…</p>
+  {#if !carregouAlgumaVez}
+    {#each [0, 1, 2] as i (i)}
+      <div class="skeleton" style="height:164px; margin-bottom:var(--space-4); border-radius:var(--radius-lg)"></div>
+    {/each}
   {:else if erroCarregar}
     <p class="erro">Erro ao carregar: {erroCarregar}</p>
   {:else if !treinos.length}
