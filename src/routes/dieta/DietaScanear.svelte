@@ -243,6 +243,7 @@
    * lê o código na foto tirada. */
   let inputFoto = $state<HTMLInputElement | null>(null);
   let lendoFoto = $state(false);
+  let aoVivo = $state(false);
   let erroFoto = $state("");
 
   async function aoTirarFoto(e: Event) {
@@ -469,28 +470,42 @@
   </div>
 
   {#if fase === "camera"}
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="camera-wrap" onclick={focarNoToque}>
-      <video bind:this={videoEl} class="video" autoplay muted playsinline></video>
-      <div class="mira"></div>
-    </div>
+    <!-- A câmera do sistema (foto, com foco automático) é o caminho principal: a câmera ao vivo do
+         navegador não foca no aparelho do usuário. A caixa tem sempre o mesmo tamanho. -->
+    {#if aoVivo}
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="camera-wrap" onclick={focarNoToque}>
+        <video bind:this={videoEl} class="video" autoplay muted playsinline></video>
+        <div class="mira"></div>
+      </div>
+    {:else}
+      <div class="camera-wrap camera-inativa">
+        <button type="button" class="botao-camera" onclick={() => inputFoto?.click()} disabled={lendoFoto}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+          <span>{lendoFoto ? "Lendo o código…" : "Escanear com a câmera"}</span>
+        </button>
+      </div>
+    {/if}
     <!-- Linha de controles sempre ocupa o espaço (altura fixa), com ou sem suporte do aparelho. -->
     <div class="controles-camera">
-      {#if zoomInfo}
+      {#if aoVivo && zoomInfo}
         <label class="zoom">
           <span>Zoom</span>
           <input type="range" min={zoomInfo.min} max={zoomInfo.max} step={zoomInfo.step || 0.1} bind:value={zoomValor} oninput={aoMudarZoom} />
         </label>
       {/if}
-      {#if temLanterna}
+      {#if aoVivo && temLanterna}
         <button type="button" class="lanterna" class:ligada={lanternaLigada} onclick={alternarLanterna}>Lanterna</button>
       {/if}
     </div>
     <input bind:this={inputFoto} class="foto-input" type="file" accept="image/*" capture="environment" onchange={aoTirarFoto} />
-    <Button variant="secondary" onclick={() => inputFoto?.click()} disabled={lendoFoto}>
-      {lendoFoto ? "Lendo foto…" : "Tirar foto do código (foco automático)"}
-    </Button>
-    <p class="dica" class:erro={!!erroFoto}>{erroFoto || "Aponte para o código, afaste um pouco se estiver desfocado e toque na imagem para focar."}</p>
+    <p class="dica" class:erro={!!erroFoto}>
+      {erroFoto || (aoVivo ? "Aponte para o código dentro da mira." : "Abre a câmera traseira: tire a foto com o código bem visível.")}
+    </p>
+    <Button variant="secondary" onclick={() => (aoVivo = !aoVivo)}>{aoVivo ? "Voltar para a foto" : "Usar câmera ao vivo"}</Button>
     <Button variant="secondary" onclick={() => (mostrarManual = true)}>Digitar código manualmente</Button>
   {:else if fase === "buscando"}
     <p class="muted">Buscando informações do produto…</p>
@@ -601,6 +616,32 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+  .camera-inativa {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface, #1b1f2a);
+  }
+  .botao-camera {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-6) var(--space-5);
+    border: 0;
+    border-radius: var(--radius-lg);
+    background: var(--color-primary);
+    color: #06201c;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  .botao-camera svg {
+    width: 48px;
+    height: 48px;
+  }
+  .botao-camera:disabled {
+    opacity: 0.6;
   }
   .mira {
     position: absolute;
