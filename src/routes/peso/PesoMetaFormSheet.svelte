@@ -302,7 +302,7 @@
           </button>
         {/each}
       </div>
-      <span class="campo-dica">Os 4 itens acima só aparecem nos filtros marcados aqui</span>
+      <span class="campo-dica">Os 3 itens acima só aparecem nos filtros marcados aqui</span>
     </div>
 
     <Button onclick={salvar} disabled={salvando || !podeSalvar}>Salvar Meta</Button>

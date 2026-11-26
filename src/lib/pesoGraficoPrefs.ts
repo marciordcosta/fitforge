@@ -59,7 +59,7 @@ export function gravarDestacarRegistro(v: boolean): void {
   gravarBool(CHAVE_DESTACAR_REGISTRO, v);
 }
 
-/** Filtros de período (Peso.svelte) em que os 4 itens acima podem aparecer — fora deles, nenhum
+/** Filtros de período (Peso.svelte) em que os 3 itens acima podem aparecer — fora deles, nenhum
  * aparece, mesmo marcado. Padrão: "1 semana" e "1 mês" (cobre o que já era automático antes de
  * virar configurável). */
 const FILTROS_PADRAO: FiltroPeriodo[] = ["7d", "1m"];

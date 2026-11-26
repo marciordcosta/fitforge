@@ -32,7 +32,7 @@
     metaAlvoPorPonto: (number | null)[] | null;
     /** No máximo 8 datas no eixo, em intervalos iguais — mesma lista calculada em Peso.svelte. */
     pontosComData: boolean[] | null;
-    /** 4 itens de exibição do gráfico (Meta > Parametrização), já resolvidos pelo filtro de
+    /** 3 itens de exibição do gráfico (Meta > Parametrização), já resolvidos pelo filtro de
      * período em Peso.svelte — aqui só consome o resultado pronto. */
     mostrarPesoVariacao: boolean;
     mostrarDiaSemanaGrafico: boolean;

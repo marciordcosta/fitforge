@@ -124,7 +124,7 @@
     modoGrafico = m;
   }
 
-  /** 4 itens de exibição do gráfico + filtros em que valem (Meta > Parametrização do gráfico, ver
+  /** 3 itens de exibição do gráfico + filtros em que valem (Meta > Parametrização do gráfico, ver
    * pesoGraficoPrefs.ts). Diferente de CHAVE_MODO_GRAFICO_PADRAO (que só semeia o estado inicial,
    * de propósito): essas regras valem pra CADA cálculo enquanto a tela de Peso estiver aberta,
    * então precisam ser $state e relidas quando o modal de Meta fecha — senão mudar a config não
@@ -477,7 +477,7 @@
   });
 
   /** Se o filtro de período atual está marcado em "Filtros que serão aplicados" (Meta >
-   * Parametrização do gráfico) — fora dele, nenhum dos 4 itens de exibição aparece, não importa o
+   * Parametrização do gráfico) — fora dele, nenhum dos 3 itens de exibição aparece, não importa o
    * estado do checkbox de cada um (eles só valem DENTRO dos filtros marcados aqui). */
   const periodoNoFiltro = $derived(filtrosAplicadosPref.has(periodo.valor as FiltroPeriodo));
 
