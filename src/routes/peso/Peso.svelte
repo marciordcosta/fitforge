@@ -33,6 +33,7 @@
   import PesoMetaFormSheet from "./PesoMetaFormSheet.svelte";
   import PesoGraficoTelaCheia from "./PesoGraficoTelaCheia.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
+  import AlertDialog from "../../components/AlertDialog.svelte";
 
   const COR_PESO = "#5eead4";
   const COR_TREINO = "#f87171";
@@ -172,7 +173,15 @@
 
   /** Observação de "ajustar rota" (ver getObservacaoMeta em pesoApi.ts) — quando a média real
    * desvia além do ritmo máximo tolerado, pra qualquer lado. */
+  let mostrarObservacaoMeta = $state(false);
   let observacaoMeta = $state<{ desvioPct: number; direcao: "acima" | "abaixo"; mediaKg: number; metaKg: number; limitePct: number } | null>(null);
+
+  /** Mensagem do aviso de desvio da meta semanal (média de hoje vs meta de hoje) — mostrada no modal. */
+  const textoObservacaoMeta = $derived(
+    observacaoMeta
+      ? `Sua média (${formatPeso(observacaoMeta.mediaKg)} kg) está ${formatPeso(Math.abs(observacaoMeta.mediaKg - observacaoMeta.metaKg))} kg (${Math.abs(observacaoMeta.desvioPct).toFixed(1).replace(".", ",")}%) ${observacaoMeta.direcao === "acima" ? "acima" : "abaixo"} da meta semanal de hoje (${formatPeso(observacaoMeta.metaKg)} kg) — hora de ajustar a rota (dieta, treino, cardio).`
+      : null,
+  );
 
   /** Falso só até a PRIMEIRA carga de meta/último peso/média terminar — os 4 cards de resumo
    * mostram um quadrado de carregamento (do tamanho exato do valor) enquanto isso, em vez de "—"
@@ -838,16 +847,19 @@
       <span class="quick-card-label">Meta semanal</span>
       {#if metaCarregada}<span class="quick-card-valor">{metaSemanalTexto}</span>{:else}<span class="skeleton valor-skel"></span>{/if}
     </button>
-    <div class="quick-card">
+    <div class="quick-card quick-card-variacao">
       <span class="quick-card-label">Variação</span>
       {#if !loadingGrafico}<span class="quick-card-valor">{variacaoPeriodoTexto}</span>{:else}<span class="skeleton valor-skel"></span>{/if}
+      <!-- Aviso de desvio da meta: só um ícone no canto do card (não ocupa espaço nem empurra nada);
+           o texto abre num modal central ao tocar. -->
+      {#if observacaoMeta}
+        <button type="button" class="alerta-variacao" onclick={() => (mostrarObservacaoMeta = true)} aria-label="Ver aviso sobre a meta semanal">!</button>
+      {/if}
     </div>
   </div>
 
-  {#if observacaoMeta}
-    <button class="observacao-meta" onclick={() => (mostrarFormMeta = true)}>
-      Sua média ({formatPeso(observacaoMeta.mediaKg)} kg) está {formatPeso(Math.abs(observacaoMeta.mediaKg - observacaoMeta.metaKg))} kg ({Math.abs(observacaoMeta.desvioPct).toFixed(1).replace(".", ",")}%) {observacaoMeta.direcao === "acima" ? "acima" : "abaixo"} da meta semanal de hoje ({formatPeso(observacaoMeta.metaKg)} kg) — hora de ajustar a rota (dieta, treino, cardio).
-    </button>
+  {#if mostrarObservacaoMeta && textoObservacaoMeta}
+    <AlertDialog mensagem={textoObservacaoMeta} onFechar={() => (mostrarObservacaoMeta = false)} />
   {/if}
 
   <div class="mes-nav">
@@ -1028,19 +1040,27 @@
     gap: var(--space-2);
     margin-bottom: var(--space-6);
   }
-  .observacao-meta {
-    display: block;
-    width: 100%;
-    margin: 0 0 var(--space-6);
-    padding: var(--space-3);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-negative);
-    background: var(--surface-card);
+  .quick-card-variacao {
+    position: relative;
+  }
+  .alerta-variacao {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--color-negative);
+    background: none;
     color: var(--color-negative);
     font-family: inherit;
-    font-size: var(--font-size-sm);
-    text-align: left;
-    line-height: 1.4;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
   }
   .quick-card {
