@@ -534,7 +534,8 @@
     const alvos = metaVisivel ? metaAlvoPorPonto : null;
     const rotulo = pontosComRotulo;
     const pontos = pontosGrafico;
-    if (!alvos || !rotulo || !pontos.length) return null;
+    // % só no filtro de 1 semana; de 1 mês em diante os rótulos mostram o peso em kg (e a meta em kg).
+    if (!alvos || !rotulo || !pontos.length || periodo.valor !== PERIODOS[0].valor) return null;
     return pontos.map((p, i) => {
       const alvo = alvos[i];
       if (!rotulo[i] || alvo == null) return null;
