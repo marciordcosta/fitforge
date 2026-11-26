@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { voltar } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
   import { getAgrupamentoMuscular, updateAgrupamentoMuscular, deleteAgrupamentoMuscular } from "../../lib/treinoApi";
@@ -72,7 +73,7 @@
   </div>
 
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={4} altura={72} />
   {:else if !encontrado}
     <p class="muted">Agrupamento não encontrado.</p>
   {:else}

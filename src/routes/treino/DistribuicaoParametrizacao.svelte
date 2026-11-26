@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { voltar } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
   import { toISODate } from "../../lib/dates";
@@ -275,7 +276,7 @@
   </div>
 
   {#if carregando}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={6} altura={64} />
   {:else if erro}
     <p class="erro">Erro ao carregar parâmetros: {erro}</p>
   {:else}
@@ -609,9 +610,6 @@
   .header-spacer {
     width: 36px;
     flex-shrink: 0;
-  }
-  .muted {
-    color: var(--surface-muted);
   }
   .erro {
     color: var(--color-danger);

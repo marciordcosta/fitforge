@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { listPadroesMovimentoComMusculos, correspondeBusca, type PadraoMovimentoComMusculos } from "../../lib/treinoApi";
 
@@ -53,7 +54,7 @@
   <input class="search" type="text" placeholder="Procurar movimento" bind:value={busca} />
 
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={6} altura={64} />
   {:else if erroCarregar}
     <p class="erro">Erro ao carregar: {erroCarregar}</p>
   {:else if !padroes.length}

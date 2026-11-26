@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { limitarDigitos } from "../../lib/limitarDigitos";
   import { parseISODate, hojeISO } from "../../lib/dates";
   import { formatDuracaoTreino } from "../../lib/tempo";
@@ -321,7 +322,7 @@
   <p class="data-label">{dataLabel}{#if duracaoSeg != null} · ⏱ {formatDuracaoTreino(duracaoSeg)}{/if}</p>
 
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={3} altura={150} />
   {:else if !sessao.length}
     <p class="muted">Nenhum registro encontrado para esse dia.</p>
   {:else if modoEdicao}

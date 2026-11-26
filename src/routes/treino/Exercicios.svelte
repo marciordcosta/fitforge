@@ -6,6 +6,7 @@
 </script>
 
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import {
@@ -301,7 +302,7 @@
   <input class="search" type="text" placeholder="Procurar exercício" bind:value={busca} />
 
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={8} altura={64} />
   {:else if erro}
     <p class="muted">Erro ao carregar exercícios: {erro}</p>
     <Button onclick={carregar}>Tentar de novo</Button>

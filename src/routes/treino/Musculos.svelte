@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import {
     listMusculos,
@@ -69,7 +70,7 @@
   <input class="search" type="text" placeholder="Procurar músculo" bind:value={busca} />
 
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={8} altura={64} />
   {:else if !musculos.length}
     <p class="muted">Nenhum músculo cadastrado.</p>
   {:else if !filtrados.length}

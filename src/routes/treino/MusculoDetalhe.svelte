@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { mostrarToast } from "../../lib/toast.svelte";
   import {
@@ -111,7 +112,7 @@
   </div>
 
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={4} altura={72} />
   {:else if !encontrado}
     <p class="muted">Músculo não encontrado.</p>
   {:else}

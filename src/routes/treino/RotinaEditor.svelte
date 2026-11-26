@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { limitarDigitos } from "../../lib/limitarDigitos";
   import { navigate } from "../../lib/router.svelte";
   import { formatMinSeg } from "../../lib/tempo";
@@ -483,7 +484,7 @@
   </div>
 
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={4} altura={110} />
   {:else if erroCarregar}
     <p class="erro">Erro ao carregar: {erroCarregar}</p>
   {:else}

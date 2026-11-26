@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -125,7 +126,7 @@
 
 <Sheet titulo="Mudar dia" {onFechar} acaoTituloDireita={acaoSalvar}>
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={4} altura={56} />
   {:else}
     <p class="ajuda">Toque no dia que cada treino cai (um dia por treino) — só vale pra essa semana.</p>
     {#if !treinosDaSemana.length}
@@ -167,9 +168,6 @@
 {/if}
 
 <style>
-  .muted {
-    color: var(--surface-muted);
-  }
   .ajuda {
     margin: 0 0 var(--space-4);
     font-size: var(--font-size-sm);

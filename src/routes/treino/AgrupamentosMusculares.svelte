@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { listAgrupamentosMusculares, type AgrupamentoMuscular } from "../../lib/treinoApi";
 
@@ -41,7 +42,7 @@
   </p>
 
   {#if loading}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={6} altura={64} />
   {:else if !agrupamentos.length}
     <p class="muted">Nenhum agrupamento cadastrado.</p>
   {:else}

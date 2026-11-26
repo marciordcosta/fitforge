@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import { Chart, type ChartDataset } from "chart.js/auto";
   import { getHistoricoExercicio, listExercicios, type HistoricoPonto, type Exercicio, type MarcadorExercicio } from "../../lib/treinoApi";
@@ -475,7 +476,7 @@
   <button class="fechar" onclick={onFechar} aria-label="Fechar">✕</button>
   <div class="grafico-wrap">
     {#if loading}
-      <p class="muted">Carregando…</p>
+      <CarregandoBloco linhas={1} altura={220} />
     {:else if !historicoFiltrado.length}
       <p class="muted">Nenhum registro ainda.</p>
     {:else}

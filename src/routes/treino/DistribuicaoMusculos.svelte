@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import { navigate, voltar, router } from "../../lib/router.svelte";
   import { toISODate, parseISODate } from "../../lib/dates";
@@ -2607,7 +2608,7 @@
         <button class="icon-btn" onclick={() => abrirMenuRealizado()} aria-label="Mais opções">⋮</button>
       </div>
       {#if carregandoRealizado && !carregouRealizadoAlgumaVez}
-        <p class="muted">Carregando…</p>
+        <CarregandoBloco linhas={5} altura={110} />
       {:else if !listaRealizado.length}
         <p class="muted">Nenhum treino registrado nesse mês.</p>
       {:else}

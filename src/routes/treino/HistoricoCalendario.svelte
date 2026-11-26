@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { toISODate, hojeISO } from "../../lib/dates";
   import { getDiasComTreino, listTreinos, type DiaComTreino, type TreinoComExercicios } from "../../lib/treinoApi";
@@ -113,7 +114,7 @@
     </div>
 
     {#if loading && !carregouAlgumaVez}
-      <p class="muted">Carregando…</p>
+      <CarregandoBloco linhas={1} altura={320} />
     {:else}
       <div class="grade" class:carregando={loading}>
         {#each celulas as cel, i (i)}
@@ -308,8 +309,5 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
-  }
-  .muted {
-    color: var(--surface-muted);
   }
 </style>
