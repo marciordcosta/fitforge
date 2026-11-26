@@ -2426,9 +2426,9 @@
     border: 1px solid var(--color-primary);
     background: none;
     border-radius: 999px;
-    padding: 2px var(--space-2);
+    padding: 1px 6px;
     font-family: inherit;
-    font-size: var(--font-size-sm);
+    font-size: 10px;
     font-weight: 600;
     line-height: 1.4;
     color: var(--color-primary);
