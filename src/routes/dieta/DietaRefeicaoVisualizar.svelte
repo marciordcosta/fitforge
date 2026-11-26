@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { parseISODate } from "../../lib/dates";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -305,7 +306,7 @@
 
 <div class="container has-bottom-nav">
   {#if loading && !carregouAlgumaVez}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={4} altura={84} />
   {:else if erro}
     <p class="erro">Erro ao carregar a refeição: {erro}</p>
   {:else if !refeicao}

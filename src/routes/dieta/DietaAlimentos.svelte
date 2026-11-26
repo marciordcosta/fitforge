@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import { navigate, voltar as voltarRouter } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
@@ -400,7 +401,7 @@
   </div>
 
   {#if loading && !carregouAlgumaVez}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={6} altura={56} />
   {:else if erro}
     <p class="erro">Erro ao buscar alimentos: {erro}</p>
   {:else}

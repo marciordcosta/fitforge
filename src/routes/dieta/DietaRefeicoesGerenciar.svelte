@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import Sheet from "../../components/Sheet.svelte";
   import Button from "../../components/Button.svelte";
@@ -1595,7 +1596,7 @@
   {:else if erro}
     <p class="erro">Erro ao carregar refeições: {erro}</p>
   {:else if !pronto}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={5} altura={72} />
   {:else if aba === "calorias"}
       <p class="peso-ref">Com base no peso médio atual: <strong>{pesoAtual.toFixed(1)} kg</strong></p>
 

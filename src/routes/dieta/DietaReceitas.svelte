@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { navigate, voltar } from "../../lib/router.svelte";
   import { buscarReceitas, listReceitas, type ReceitaResumo } from "../../lib/dietaApi";
   import { limparRascunho, definirContexto } from "../../lib/receitaRascunho.svelte";
@@ -81,7 +82,7 @@
   <input class="search" type="text" placeholder="Procurar refeição" bind:value={busca} oninput={aoDigitar} />
 
   {#if loading && !carregouAlgumaVez}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={5} altura={64} />
   {:else}
     <div class="conteudo" class:carregando={loading}>
     {#if erro}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { voltar } from "../../lib/router.svelte";
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -252,7 +253,7 @@
   </div>
 
   {#if carregando}
-    <p class="muted">Carregando…</p>
+    <CarregandoBloco linhas={5} altura={72} />
   {:else if erro}
     <p class="erro">Erro ao carregar parâmetros: {erro}</p>
   {:else}
@@ -531,9 +532,6 @@
     margin: 0 0 var(--space-2);
     color: var(--surface-muted);
     font-size: var(--font-size-sm);
-  }
-  .muted {
-    color: var(--surface-muted);
   }
   .erro {
     color: var(--color-danger);

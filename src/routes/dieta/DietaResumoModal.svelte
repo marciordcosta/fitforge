@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { getMetasDiarias } from "../../lib/dietaApi";
   import {
     getUltimoPeso,
@@ -90,7 +91,7 @@
     <h3 class="resumo-titulo">Resumo</h3>
 
     {#if loading}
-      <p class="resumo-carregando">Carregando…</p>
+      <CarregandoBloco linhas={4} altura={64} />
     {:else}
       <div class="resumo-secao">
         <div class="resumo-linha">
@@ -172,11 +173,6 @@
   .resumo-titulo {
     text-align: center;
     font-size: var(--font-size-base);
-    margin: 0 0 var(--space-4);
-  }
-  .resumo-carregando {
-    text-align: center;
-    color: var(--surface-muted);
     margin: 0 0 var(--space-4);
   }
   .resumo-secao {
