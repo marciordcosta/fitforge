@@ -46,6 +46,7 @@ export async function atualizarCache<T>(chave: string, valor: T): Promise<void> 
 export async function invalidarNamespace(namespace: string): Promise<void> {
   const db = await getDb();
   geracoes[namespace] = (geracoes[namespace] ?? 0) + 1;
+  limparRecentes(`${namespace}:`);
   for (const k of [...buscasEmAndamento.keys()]) if (k.startsWith(`rede:${namespace}:`) || k.startsWith(`${namespace}:rede:`)) buscasEmAndamento.delete(k);
   const chaves = await db.getAllKeys("cache");
   const doNamespace = chaves.filter((c) => c.startsWith(`${namespace}:`));
@@ -82,12 +83,42 @@ const buscasEmAndamento = new Map<string, Promise<unknown>>();
 /** Mesma ideia pra leituras SEM cache persistente (ex: perfil da dieta, parâmetros): quem chamar
  * a mesma `chave` enquanto a primeira ainda está pendente recebe a mesma promessa. Não guarda nada
  * depois de resolver, então nunca devolve dado desatualizado após uma escrita. */
-export function compartilharEmAndamento<T>(chave: string, buscar: () => Promise<T>): Promise<T> {
+/** Valores já resolvidos de leituras "quentes" (chave -> valor + validade), mantidos só na memória
+ * por alguns segundos pra telas que se abrem em sequência (Diário -> refeição -> voltar) não
+ * refazerem as mesmas consultas. Nunca vira dado desatualizado após uma escrita do app: o cliente
+ * do Supabase (supabase.ts) chama limparRecentes() a cada gravação bem-sucedida. */
+const recentes = new Map<string, { valor: unknown; expira: number }>();
+let geracaoRecentes = 0;
+
+/** Esquece os valores recentes (todos, ou só os de chave começando com `prefixo`). Uma leitura que
+ * já estava no ar quando isso é chamado não grava o resultado (pode ser anterior à escrita). */
+export function limparRecentes(prefixo?: string): void {
+  geracaoRecentes++;
+  if (!prefixo) {
+    recentes.clear();
+    return;
+  }
+  for (const k of [...recentes.keys()]) if (k.startsWith(prefixo)) recentes.delete(k);
+}
+
+export function compartilharEmAndamento<T>(chave: string, buscar: () => Promise<T>, ttlMs = 0): Promise<T> {
+  if (ttlMs > 0) {
+    const recente = recentes.get(chave);
+    if (recente && recente.expira > Date.now()) return Promise.resolve(structuredClone(recente.valor) as T);
+  }
   const existente = buscasEmAndamento.get(chave) as Promise<T> | undefined;
   if (existente) return existente;
-  const promessa = buscar().finally(() => {
-    if (buscasEmAndamento.get(chave) === promessa) buscasEmAndamento.delete(chave);
-  });
+  const geracaoInicial = geracaoRecentes;
+  const promessa = buscar()
+    .then((valor) => {
+      // Guarda uma cópia: quem recebe o valor original pode (e costuma) mutá-lo — o estado reativo do
+      // Svelte escreve direto no objeto — e isso não pode vazar pro próximo que ler do cache.
+      if (ttlMs > 0 && geracaoInicial === geracaoRecentes) recentes.set(chave, { valor: structuredClone(valor), expira: Date.now() + ttlMs });
+      return valor;
+    })
+    .finally(() => {
+      if (buscasEmAndamento.get(chave) === promessa) buscasEmAndamento.delete(chave);
+    });
   buscasEmAndamento.set(chave, promessa);
   return promessa;
 }

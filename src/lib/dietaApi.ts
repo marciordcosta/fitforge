@@ -19,6 +19,11 @@ function round1(n: number): number {
 
 // ---------------- Alimentos ----------------
 
+/** Por quanto tempo leituras repetidas (Diário -> refeição -> voltar) reaproveitam o valor já baixado.
+ * Qualquer gravação do app esvazia isso na hora (ver supabase.ts), então só pesa mudança vinda de
+ * outro aparelho. */
+const TTL_LEITURAS_MS = 120_000;
+
 export type FonteAlimento = "manual" | "taco" | "openfoodfacts";
 
 export interface Alimento {
@@ -554,7 +559,7 @@ function mapRefeicaoModelo(l: Record<string, unknown>): RefeicaoModelo {
 
 /** Lista o catálogo já na ordem escolhida pelo usuário (arrastar na tela de Gerenciar Refeições). */
 export function listRefeicoesModelo(): Promise<RefeicaoModelo[]> {
-  return compartilharEmAndamento("dieta:rede:refeicoesModelo", () => listRefeicoesModeloImpl());
+  return compartilharEmAndamento("dieta:rede:refeicoesModelo", () => listRefeicoesModeloImpl(), TTL_LEITURAS_MS);
 }
 
 async function listRefeicoesModeloImpl(): Promise<RefeicaoModelo[]> {
@@ -701,7 +706,7 @@ const META_DIA_MODELO_SELECT =
 
 /** Todas as metas por dia já configuradas (qualquer refeição, qualquer dia) — ausência de linha pra um (modelo, dia) usa o meta_receita_id/meta numérica/nome global como fallback. */
 export function listMetasDiaModelo(): Promise<MetaDiaModelo[]> {
-  return compartilharEmAndamento("dieta:rede:metasDiaModelo", () => listMetasDiaModeloImpl());
+  return compartilharEmAndamento("dieta:rede:metasDiaModelo", () => listMetasDiaModeloImpl(), TTL_LEITURAS_MS);
 }
 
 async function listMetasDiaModeloImpl(): Promise<MetaDiaModelo[]> {
@@ -978,7 +983,7 @@ export interface RefeicaoModeloDia {
 
 /** Ausência de qualquer linha pra um dia = esse dia ainda usa o catálogo global inteiro, na ordem global. */
 export function listRefeicoesModeloDia(): Promise<RefeicaoModeloDia[]> {
-  return compartilharEmAndamento("dieta:rede:refeicoesModeloDia", () => listRefeicoesModeloDiaImpl());
+  return compartilharEmAndamento("dieta:rede:refeicoesModeloDia", () => listRefeicoesModeloDiaImpl(), TTL_LEITURAS_MS);
 }
 
 async function listRefeicoesModeloDiaImpl(): Promise<RefeicaoModeloDia[]> {
@@ -1057,7 +1062,7 @@ function resolverCatalogoEfetivoDoDia(
  * na criação (catálogo entra na posição do catálogo nesse momento; avulsa entra no fim) e livre
  * pra reordenar depois, sem nunca mexer no catálogo/padrão configurado. */
 export function getRefeicoesDoDia(data: string): Promise<RefeicaoDia[]> {
-  return compartilharEmAndamento(`dieta:rede:refeicoesDoDia:${data}`, () => getRefeicoesDoDiaImpl(data));
+  return compartilharEmAndamento(`dieta:rede:refeicoesDoDia:${data}`, () => getRefeicoesDoDiaImpl(data), TTL_LEITURAS_MS);
 }
 
 async function getRefeicoesDoDiaImpl(data: string): Promise<RefeicaoDia[]> {
@@ -1206,7 +1211,11 @@ export async function salvarComoReceitaPadrao(
   }
 }
 
-export async function getRefeicaoDia(id: string): Promise<RefeicaoDia | null> {
+export function getRefeicaoDia(id: string): Promise<RefeicaoDia | null> {
+  return compartilharEmAndamento(`dieta:rede:refeicaoDia:${id}`, () => getRefeicaoDiaImpl(id), TTL_LEITURAS_MS);
+}
+
+async function getRefeicaoDiaImpl(id: string): Promise<RefeicaoDia | null> {
   const { data, error } = await supabase.from("dieta_refeicoes_dia").select("id, nome, data, ordem").eq("id", id).maybeSingle();
   if (error) throw error;
   return data ?? null;
@@ -1328,7 +1337,11 @@ export async function getItemDiario(id: string): Promise<ItemDiario | null> {
   return data ? mapItemDiario(data as Record<string, unknown>) : null;
 }
 
-export async function getItensDaRefeicao(refeicaoId: string): Promise<ItemDiario[]> {
+export function getItensDaRefeicao(refeicaoId: string): Promise<ItemDiario[]> {
+  return compartilharEmAndamento(`dieta:rede:itensRefeicao:${refeicaoId}`, () => getItensDaRefeicaoImpl(refeicaoId), TTL_LEITURAS_MS);
+}
+
+async function getItensDaRefeicaoImpl(refeicaoId: string): Promise<ItemDiario[]> {
   const { data: linhas, error } = await supabase
     .from("diario_alimentos")
     .select(ITEM_DIARIO_SELECT)
@@ -1534,7 +1547,7 @@ export function gramasDoParametro(def: DefinicaoParametro, valor: number, pesoAt
 }
 
 export function getParametros(): Promise<Map<string, LimiteParametro>> {
-  return compartilharEmAndamento("dieta:rede:parametros", () => getParametrosImpl());
+  return compartilharEmAndamento("dieta:rede:parametros", () => getParametrosImpl(), TTL_LEITURAS_MS);
 }
 
 async function getParametrosImpl(): Promise<Map<string, LimiteParametro>> {
@@ -1592,7 +1605,7 @@ const PERFIL_PADRAO: PerfilDietaEditavel = {
 };
 
 export function getPerfilDietaEditavel(): Promise<PerfilDietaEditavel> {
-  return compartilharEmAndamento("dieta:rede:perfil", () => getPerfilDietaEditavelImpl());
+  return compartilharEmAndamento("dieta:rede:perfil", () => getPerfilDietaEditavelImpl(), TTL_LEITURAS_MS);
 }
 
 async function getPerfilDietaEditavelImpl(): Promise<PerfilDietaEditavel> {
@@ -1757,7 +1770,7 @@ const PREFERENCIAS_REFEICOES_PADRAO: PreferenciasRefeicoesHome = {
 };
 
 export function getPreferenciasRefeicoesHome(): Promise<PreferenciasRefeicoesHome> {
-  return compartilharEmAndamento("dieta:rede:prefsRefeicoesHome", () => getPreferenciasRefeicoesHomeImpl());
+  return compartilharEmAndamento("dieta:rede:prefsRefeicoesHome", () => getPreferenciasRefeicoesHomeImpl(), TTL_LEITURAS_MS);
 }
 
 async function getPreferenciasRefeicoesHomeImpl(): Promise<PreferenciasRefeicoesHome> {
@@ -1860,7 +1873,7 @@ export function distribuirValorPorDia(metaPorDia: number, manuais: Map<number, n
 }
 
 export function getModoCalorias(): Promise<"fixa" | "ondulatoria"> {
-  return compartilharEmAndamento("dieta:rede:modoCalorias", () => getModoCaloriasImpl());
+  return compartilharEmAndamento("dieta:rede:modoCalorias", () => getModoCaloriasImpl(), TTL_LEITURAS_MS);
 }
 
 async function getModoCaloriasImpl(): Promise<"fixa" | "ondulatoria"> {
@@ -1880,7 +1893,7 @@ export interface CaloriasDiaManual {
 }
 
 export function getCaloriasDiaManuais(): Promise<Map<number, CaloriasDiaManual>> {
-  return compartilharEmAndamento("dieta:rede:caloriasDiaManuais", () => getCaloriasDiaManuaisImpl());
+  return compartilharEmAndamento("dieta:rede:caloriasDiaManuais", () => getCaloriasDiaManuaisImpl(), TTL_LEITURAS_MS);
 }
 
 async function getCaloriasDiaManuaisImpl(): Promise<Map<number, CaloriasDiaManual>> {
@@ -1990,7 +2003,7 @@ export interface DietaOverrideDia {
  * segundaDaSemana em treinoApi.ts). Vazio = a semana segue a Ondulatória normal configurada em
  * Parametrização. */
 export function listOverrideSemanaDieta(semanaInicio: string): Promise<DietaOverrideDia[]> {
-  return compartilharEmAndamento(`dieta:rede:overrideSemana:${semanaInicio}`, () => listOverrideSemanaDietaImpl(semanaInicio));
+  return compartilharEmAndamento(`dieta:rede:overrideSemana:${semanaInicio}`, () => listOverrideSemanaDietaImpl(semanaInicio), TTL_LEITURAS_MS);
 }
 
 async function listOverrideSemanaDietaImpl(semanaInicio: string): Promise<DietaOverrideDia[]> {

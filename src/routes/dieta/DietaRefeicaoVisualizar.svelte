@@ -73,19 +73,23 @@
       itens = itensRes;
       prefsRefeicoes = prefs;
       modeloRefeicao = refeicao ? (modelos.find((m) => m.nome === refeicao!.nome) ?? null) : null;
-      [metaRefeicao, metaDiaria] = refeicao
-        ? await Promise.all([getMetaRefeicaoPorNome(refeicao.nome, refeicao.data), getMetasDoDia(refeicao.data)])
-        : [null, null];
 
+      // Metas e a receita padrão em paralelo (antes: metas primeiro e só depois a receita — uma
+      // espera a mais, em sequência, antes da tela aparecer).
+      let receitaIdEfetiva: string | null = null;
       if (refeicao && modeloRefeicao) {
         const diaSemana = parseISODate(refeicao.data).getDay();
         const override = metasDia.find((md) => md.modeloId === modeloRefeicao!.id && md.diaSemana === diaSemana);
-        const receitaIdEfetiva = override?.metaReceitaId ?? modeloRefeicao.metaReceitaId ?? null;
-        const receitaPadrao = receitaIdEfetiva ? await getReceita(receitaIdEfetiva) : null;
-        receitaPadraoTemItens = !!receitaPadrao?.itens.length;
-      } else {
-        receitaPadraoTemItens = false;
+        receitaIdEfetiva = override?.metaReceitaId ?? modeloRefeicao.metaReceitaId ?? null;
       }
+      const [metasRes, receitaPadrao] = await Promise.all([
+        refeicao
+          ? Promise.all([getMetaRefeicaoPorNome(refeicao.nome, refeicao.data), getMetasDoDia(refeicao.data)])
+          : Promise.resolve([null, null] as const),
+        receitaIdEfetiva ? getReceita(receitaIdEfetiva) : Promise.resolve(null),
+      ]);
+      [metaRefeicao, metaDiaria] = metasRes;
+      receitaPadraoTemItens = !!receitaPadrao?.itens.length;
     } catch (err) {
       erro = (err as Error).message;
     } finally {
