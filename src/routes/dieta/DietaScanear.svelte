@@ -3,6 +3,7 @@
   import { navigate, voltar as voltarRouter } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
+  import { BarcodeFormat, DecodeHintType } from "@zxing/library";
   import { getAlimentoPorCodigoBarras, criarAlimentoOpenFoodFacts, type AlimentoOpenFoodFactsInput } from "../../lib/dietaApi";
   import { buscarProdutoPorCodigoBarras } from "../../lib/openFoodFacts";
   import { receitaRascunho, urlNovaReceitaMeta } from "../../lib/receitaRascunho.svelte";
@@ -47,7 +48,18 @@
       controls?.stop();
       controls = null;
       detectando = false;
-      const reader = new BrowserMultiFormatReader();
+      trackAtual = null;
+      zoomInfo = null;
+      temLanterna = false;
+      lanternaLigada = false;
+      // Só os formatos de código de produto (EAN/UPC, mais Code 128/39 de etiquetas) e modo "tentar
+      // mais": decodifica bem mais rápido e acerta mais do que procurar QR/PDF417/etc. em todo quadro.
+      // Tenta de novo a cada 60ms (o padrão é 500ms, o que dava poucas chances por segundo).
+      const hints = new Map<DecodeHintType, unknown>([
+        [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128, BarcodeFormat.CODE_39]],
+        [DecodeHintType.TRY_HARDER, true],
+      ]);
+      const reader = new BrowserMultiFormatReader(hints as Map<DecodeHintType, unknown>, { delayBetweenScanAttempts: 60 });
       const novosControls = await reader.decodeFromConstraints(
         { video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } },
         el,
@@ -65,7 +77,7 @@
         return;
       }
       controls = novosControls;
-      ajustarFoco(el);
+      prepararControles(el);
     } catch (err) {
       if (!aindaValido()) return;
       fase = "erro";
@@ -73,21 +85,74 @@
     }
   }
 
+  /** Controles de câmera que dependem do aparelho (Chrome Android; no iOS Safari não existem e
+   * tudo abaixo é ignorado em silêncio). */
+  type CapacidadesCamera = MediaTrackCapabilities & {
+    focusMode?: string[];
+    zoom?: { min: number; max: number; step: number };
+    torch?: boolean;
+  };
+  let trackAtual: MediaStreamTrack | null = null;
+  let zoomInfo = $state<{ min: number; max: number; step: number } | null>(null);
+  let zoomValor = $state(1);
+  let temLanterna = $state(false);
+  let lanternaLigada = $state(false);
+  let timeoutFoco: ReturnType<typeof setTimeout> | undefined;
+
+  function aplicar(avancadas: Record<string, unknown>[]) {
+    if (!trackAtual) return;
+    const constraints = { advanced: avancadas } as unknown as MediaTrackConstraints;
+    trackAtual.applyConstraints(constraints).catch(() => {});
+  }
+
   /**
-   * Pede foco contínuo (ajuda a mirar de perto num código de barras) — focusMode não faz parte
-   * do MediaTrackConstraintSet padrão do TS, só existe em navegadores que suportam a Image
-   * Capture API (Chrome Android). No iOS Safari `getCapabilities` nem lista "focusMode", então
-   * a checagem abaixo já ignora silenciosamente sem tentar aplicar nada.
+   * Foco contínuo + zoom inicial de 2x: câmera de celular não foca bem muito perto, e o zoom
+   * deixa o usuário afastar o aparelho (onde ela foca) mantendo o código grande no quadro — era o
+   * que mais fazia a leitura "não pegar nada". Cada ajuste vai em um conjunto próprio de
+   * `advanced`: o aparelho ignora só o que não suporta, em vez de descartar tudo junto.
    */
-  function ajustarFoco(el: HTMLVideoElement) {
+  function prepararControles(el: HTMLVideoElement) {
     const stream = el.srcObject;
     if (!(stream instanceof MediaStream)) return;
     const track = stream.getVideoTracks()[0];
     if (!track?.getCapabilities) return;
-    const capacidades = track.getCapabilities() as MediaTrackCapabilities & { focusMode?: string[] };
-    if (!capacidades.focusMode?.includes("continuous")) return;
-    const constraintsFoco = { advanced: [{ focusMode: "continuous" }] } as unknown as MediaTrackConstraints;
-    track.applyConstraints(constraintsFoco).catch(() => {});
+    trackAtual = track;
+    const cap = track.getCapabilities() as CapacidadesCamera;
+    const avancadas: Record<string, unknown>[] = [];
+    if (cap.focusMode?.includes("continuous")) avancadas.push({ focusMode: "continuous" });
+    if (cap.zoom) {
+      const alvo = Math.min(cap.zoom.max, Math.max(cap.zoom.min, 2));
+      zoomInfo = cap.zoom;
+      zoomValor = alvo;
+      avancadas.push({ zoom: alvo });
+    }
+    temLanterna = !!cap.torch;
+    aplicar(avancadas);
+  }
+
+  function aoMudarZoom() {
+    aplicar([{ zoom: zoomValor }]);
+  }
+
+  function alternarLanterna() {
+    lanternaLigada = !lanternaLigada;
+    aplicar([{ torch: lanternaLigada }]);
+  }
+
+  /** Toque na imagem = focar ali (foco de um disparo) e depois volta pro contínuo. */
+  function focarNoToque(e: MouseEvent) {
+    if (!trackAtual?.getCapabilities) return;
+    const cap = trackAtual.getCapabilities() as CapacidadesCamera;
+    if (!cap.focusMode?.includes("single-shot")) return;
+    const alvo = e.currentTarget as HTMLElement;
+    const r = alvo.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    aplicar([{ focusMode: "single-shot", pointsOfInterest: [{ x, y }] }]);
+    clearTimeout(timeoutFoco);
+    timeoutFoco = setTimeout(() => {
+      if (cap.focusMode?.includes("continuous")) aplicar([{ focusMode: "continuous" }]);
+    }, 1500);
   }
 
   $effect(() => {
@@ -217,11 +282,24 @@
   </div>
 
   {#if fase === "camera"}
-    <div class="camera-wrap">
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="camera-wrap" onclick={focarNoToque}>
       <video bind:this={videoEl} class="video" autoplay muted playsinline></video>
       <div class="mira"></div>
     </div>
-    <p class="dica">Aponte a câmera para o código de barras do produto.</p>
+    <!-- Linha de controles sempre ocupa o espaço (altura fixa), com ou sem suporte do aparelho. -->
+    <div class="controles-camera">
+      {#if zoomInfo}
+        <label class="zoom">
+          <span>Zoom</span>
+          <input type="range" min={zoomInfo.min} max={zoomInfo.max} step={zoomInfo.step || 0.1} bind:value={zoomValor} oninput={aoMudarZoom} />
+        </label>
+      {/if}
+      {#if temLanterna}
+        <button type="button" class="lanterna" class:ligada={lanternaLigada} onclick={alternarLanterna}>Lanterna</button>
+      {/if}
+    </div>
+    <p class="dica">Aponte para o código, afaste um pouco se estiver desfocado e toque na imagem para focar.</p>
     <Button variant="secondary" onclick={() => (mostrarManual = true)}>Digitar código manualmente</Button>
   {:else if fase === "buscando"}
     <p class="muted">Buscando informações do produto…</p>
@@ -336,6 +414,41 @@
     border: 2px solid var(--color-primary);
     border-radius: var(--radius-md);
     pointer-events: none;
+  }
+  .controles-camera {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 36px;
+    margin-top: var(--space-3);
+  }
+  .zoom {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .zoom input {
+    flex: 1;
+    min-width: 0;
+  }
+  .lanterna {
+    flex-shrink: 0;
+    border: 1px solid var(--surface-border);
+    background: none;
+    color: var(--surface-fg);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+  .lanterna.ligada {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+    border-color: var(--color-primary);
   }
   .dica {
     text-align: center;
