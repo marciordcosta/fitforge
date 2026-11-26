@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { limitarDigitos } from "../../lib/limitarDigitos";
   import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { lerFimDoDescanso } from "../../lib/treinoDescansoPrefs";
   import { navigate, voltar } from "../../lib/router.svelte";
@@ -1136,7 +1137,8 @@
               />
               <input
                 type="number"
-                inputmode="decimal"
+                inputmode="numeric"
+                use:limitarDigitos
                 placeholder={serieItem.anteriorReps != null ? String(serieItem.anteriorReps) : "-"}
                 bind:value={serieItem.repeticoes}
                 onchange={() => atualizarRecordesExercicio(ex)}
@@ -1522,12 +1524,12 @@
     <div class="meta-editor-campos">
       <label class="meta-editor-campo">
         <span>Mínimo</span>
-        <input type="number" inputmode="numeric" placeholder="-" bind:value={metaRepMinTemp} />
+        <input type="number" inputmode="numeric" use:limitarDigitos placeholder="-" bind:value={metaRepMinTemp} />
       </label>
       <span class="meta-editor-a">a</span>
       <label class="meta-editor-campo">
         <span>Máximo</span>
-        <input type="number" inputmode="numeric" placeholder="-" bind:value={metaRepMaxTemp} />
+        <input type="number" inputmode="numeric" use:limitarDigitos placeholder="-" bind:value={metaRepMaxTemp} />
       </label>
     </div>
     <button class="meta-editor-salvar" onclick={salvarMetaSerie}>Salvar</button>

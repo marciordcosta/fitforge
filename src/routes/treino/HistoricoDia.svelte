@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { limitarDigitos } from "../../lib/limitarDigitos";
   import { parseISODate, hojeISO } from "../../lib/dates";
   import { formatDuracaoTreino } from "../../lib/tempo";
   import { navigate, voltar } from "../../lib/router.svelte";
@@ -348,7 +349,7 @@
             <div class="linha">
               <span class="serie-num">{serieItem.serie}</span>
               <input type="number" inputmode="decimal" placeholder="-" bind:value={serieItem.peso} />
-              <input type="number" inputmode="decimal" placeholder="-" bind:value={serieItem.repeticoes} />
+              <input type="number" inputmode="numeric" use:limitarDigitos placeholder="-" bind:value={serieItem.repeticoes} />
               <button class="remover" onclick={() => removerSerie(exIdx, setIdx)} aria-label="Remover série">✕</button>
             </div>
           {/each}

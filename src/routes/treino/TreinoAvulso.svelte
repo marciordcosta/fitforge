@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { limitarDigitos } from "../../lib/limitarDigitos";
   import { voltar } from "../../lib/router.svelte";
   import { hojeISO } from "../../lib/dates";
   import Button from "../../components/Button.svelte";
@@ -115,7 +116,7 @@
           <div class="serie-linha">
             <span class="serie-numero">Série {s.serie}</span>
             <input type="number" inputmode="decimal" step="0.5" placeholder="kg" aria-label={`Peso série ${s.serie}`} bind:value={s.peso} />
-            <input type="number" inputmode="numeric" placeholder="reps" aria-label={`Repetições série ${s.serie}`} bind:value={s.repeticoes} />
+            <input type="number" inputmode="numeric" use:limitarDigitos placeholder="reps" aria-label={`Repetições série ${s.serie}`} bind:value={s.repeticoes} />
             <button class="remover-serie-btn" onclick={() => removerSerie(item.exercicio.id, s.serie)} aria-label={`Remover série ${s.serie}`}>✕</button>
           </div>
         {/each}

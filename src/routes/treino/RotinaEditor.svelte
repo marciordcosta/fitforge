@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { limitarDigitos } from "../../lib/limitarDigitos";
   import { navigate } from "../../lib/router.svelte";
   import { formatMinSeg } from "../../lib/tempo";
   import { mostrarToast } from "../../lib/toast.svelte";
@@ -523,9 +524,9 @@
               <button class="serie-num" onclick={() => toggleMenuSerie(idx, setIdx)}>{serie.serie}</button>
               <input type="number" inputmode="decimal" placeholder="-" bind:value={serie.peso_alvo} />
               <div class="rep-range">
-                <input type="number" inputmode="decimal" placeholder="-" bind:value={serie.rep_min} />
+                <input type="number" inputmode="numeric" use:limitarDigitos placeholder="-" bind:value={serie.rep_min} />
                 <span>a</span>
-                <input type="number" inputmode="decimal" placeholder="-" bind:value={serie.rep_max} />
+                <input type="number" inputmode="numeric" use:limitarDigitos placeholder="-" bind:value={serie.rep_max} />
               </div>
             </div>
           {/each}
