@@ -68,8 +68,9 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     }
   };
 
-  const titulo = (txt: string) => {
-    garantir(14);
+  const titulo = (txt: string, minimo = 30) => {
+    // Título + cabeçalho + algumas linhas: evita o título sozinho no fim da folha com a tabela na seguinte.
+    garantir(minimo);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.setTextColor(...COR.texto);
@@ -243,9 +244,9 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---------------- rotinas atuais (o plano de hoje), pelos músculos que cada uma trabalha ----------------
   if (modelo.rotinas.length) {
-    doc.addPage();
-    y = M;
-    titulo("Rotinas atuais (músculos trabalhados)");
+    y += 3;
+    // espaço pra pelo menos a primeira rotina inteira (faixa do nome + músculos), senão a tabela vai pra folha seguinte
+    titulo("Rotinas atuais (músculos trabalhados)", 22 + 5 * (1 + (modelo.rotinas[0]?.musculos.length ?? 1)));
     const comAcum = modelo.rotinas.some((r) => r.musculos.some((m) => m.acum != null));
     const nCols = comAcum ? 5 : 4;
     const corpo: NonNullable<Parameters<typeof autoTable>[1]["body"]> = [];
@@ -294,8 +295,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---- Distribuição Semanal: a grade de dias (seg a dom) com as séries ponderadas planejadas ----
   if (modelo.grade.linhas.length) {
-    doc.addPage();
-    y = M;
+    y += 3;
     titulo("Distribuição semanal planejada (séries totais por dia, total ponderado)");
     const dias = modelo.grade.dias;
     tabela({
@@ -356,9 +356,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---------------- plano atual x executado ----------------
   if (modelo.ajustesPlano.length) {
-    // Começa numa folha separada (é a parte de decisão do plano, fora das tabelas de apoio).
-    doc.addPage();
-    y = M;
+    y += 3;
     titulo("Plano atual contra o executado (onde divergem)");
     tabela({
       head: [["Músculo", "Exec.", "Plano", "Dif.", "Faixa (exec. > plano)", "Progressão", "Leitura"]],
@@ -406,10 +404,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---------------- exercícios ----------------
   const exerciciosComLeitura = modelo.exercicios.filter((x) => x.sessoes >= 4);
-  if (!modelo.ajustesPlano.length) {
-    doc.addPage();
-    y = M;
-  }
+  y += 3;
   titulo("Por exercício (1RM estimado no período, 4 sessões ou mais)");
   tabela({
     head: [["Músculo principal", "Exercício", "Sessões", "1RM início", "1RM fim", "Var. %", "Status", "Última"]],
