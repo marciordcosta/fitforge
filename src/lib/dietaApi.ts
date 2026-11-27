@@ -2220,7 +2220,7 @@ async function getCaloriasConsumidasPorDia(inicio: string, fimExclusivo: string)
 
 /** Resumo de calorias de um período, só pra informação (relatório do Treino): média diária dos dias com
  * lançamento no diário (hoje fica de fora: o dia ainda está incompleto) e a meta média do mesmo período
- * (meta de cada dia da semana, ponderada pelos dias do período). Pagina a consulta: o Supabase corta em
+ * (a meta real de cada dia, somada e dividida pelos dias do período). Pagina a consulta: o Supabase corta em
  * 1000 linhas e um período longo passa disso. */
 export async function getResumoCaloriasPeriodo(
   inicio: string,
@@ -2248,12 +2248,14 @@ export async function getResumoCaloriasPeriodo(
   const comRegistro = dias.filter((d) => (porDia.get(d) ?? 0) > 0);
   const mediaKcal = comRegistro.length ? comRegistro.reduce((a, d) => a + (porDia.get(d) ?? 0), 0) / comRegistro.length : null;
 
+  // Meta de cada dia do período (getMetasDoDia já considera ajustes e histórico), em lotes pequenos.
   let metaMediaKcal: number | null = null;
   try {
-    const metas = await Promise.all([0, 1, 2, 3, 4, 5, 6].map((dow) => getMetasDoDiaSemana(dow)));
-    const contagem = [0, 0, 0, 0, 0, 0, 0];
-    for (const d of dias) contagem[parseISODate(d).getDay()] += 1;
-    const soma = metas.reduce((a, m, dow) => a + m.calorias * contagem[dow], 0);
+    let soma = 0;
+    for (let i = 0; i < dias.length; i += 6) {
+      const metas = await Promise.all(dias.slice(i, i + 6).map((d) => getMetasDoDia(d)));
+      soma += metas.reduce((acc, m) => acc + m.calorias, 0);
+    }
     metaMediaKcal = soma > 0 ? soma / dias.length : null;
   } catch {
     metaMediaKcal = null;
