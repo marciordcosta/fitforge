@@ -4,6 +4,7 @@ import {
   getHistoricoExercicio,
   listMarcadoresExercicio,
   classificarVolumeSemanal,
+  janelaDoMusculo,
   type Musculo,
   type TreinoComExercicios,
   type ParametrosDistribuicao,
@@ -25,7 +26,6 @@ export async function levantarRelatorio(args: {
   treinos: TreinoComExercicios[];
   metaSemanal: Map<string, number>;
   parametros: ParametrosDistribuicao;
-  parametrosParaMusculo: (m: Musculo | null | undefined) => ParametrosDistribuicao;
   historico: Map<string, { data: string; melhor1rm: number }[]>;
   marcadores: Map<string, MarcadorExercicio[]>;
 }): Promise<ModeloRelatorio> {
@@ -151,7 +151,7 @@ export async function levantarRelatorio(args: {
     metaSemanal,
     planejadoSemanal,
     gradeSemanal,
-    classificar: (musculoId, serie) => classificarVolumeSemanal(serie, args.parametrosParaMusculo(musculoPorId.get(musculoId))),
+    classificar: (musculoId, serie) => classificarVolumeSemanal(serie, janelaDoMusculo(musculoPorId.get(musculoId))),
     exercicios,
     fimDoTreino,
     sessoes: { realizadas: sessoes.size, planejadasPorSemana: treinos.length },

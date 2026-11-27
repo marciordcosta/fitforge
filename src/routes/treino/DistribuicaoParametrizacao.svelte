@@ -163,9 +163,6 @@
    * dois) ficava vazia/invertida — a classificação de cor passava a saltar de "manutenção" direto
    * pra "foco" de um jeito que não bate com a legenda mostrada logo abaixo dos campos. */
   function validarFaixas(): string | null {
-    if (seriesManutencaoMin > seriesManutencaoMax) return "O mínimo de Manutenção não pode ser maior que o máximo.";
-    if (seriesFocoMin > seriesFocoMax) return "O mínimo de Foco não pode ser maior que o máximo.";
-    if (seriesFocoMin <= seriesManutencaoMax) return "O mínimo de Foco precisa ser maior que o máximo de Manutenção.";
     // Mesma lógica das faixas de série acima: sem essa trava, dava pra configurar o Corte A maior
     // ou igual ao Corte B e a Fase B (entre os dois) nunca aparecia (tudo até o Corte A vira "a",
     // o resto vira "c" direto).
@@ -239,47 +236,6 @@
   {:else if erro}
     <p class="erro">Erro ao carregar parâmetros: {erro}</p>
   {:else}
-    <div class="param-card">
-      <button type="button" class="param-card-header" onclick={() => alternarCard("Classificação de Volume Semanal")}>
-        <span>Classificação de Volume Semanal</span>
-        <span class="chevron" class:aberto={cardsAbertos.has("Classificação de Volume Semanal")}>{@render iconChevron()}</span>
-      </button>
-      {#if cardsAbertos.has("Classificação de Volume Semanal")}
-        <div class="param-card-body">
-      <p class="param-card-desc">Usada pra colorir o total de séries por músculo na semana (Distribuição, Rotinas).</p>
-      <div class="param-linha">
-        <div class="param-titulos">
-          <span class="param-titulo-campo">Mín</span>
-          <span class="param-titulo-campo">Máx</span>
-        </div>
-        <div class="param-linha-topo">
-          <p class="param-nome">Manutenção <span class="legenda-cor legenda-manutencao">●</span></p>
-          <div class="param-campos">
-            <input class="param-input" type="number" inputmode="numeric" min="0" step="1" aria-label="Manutenção mínimo" bind:value={seriesManutencaoMin} />
-            <input class="param-input" type="number" inputmode="numeric" min="0" step="1" aria-label="Manutenção máximo" bind:value={seriesManutencaoMax} />
-          </div>
-        </div>
-      </div>
-      <div class="param-linha">
-        <div class="param-linha-topo">
-          <p class="param-nome">Foco <span class="legenda-cor legenda-foco">●</span></p>
-          <div class="param-campos">
-            <input class="param-input" type="number" inputmode="numeric" min="0" step="1" aria-label="Foco mínimo" bind:value={seriesFocoMin} />
-            <input class="param-input" type="number" inputmode="numeric" min="0" step="1" aria-label="Foco máximo" bind:value={seriesFocoMax} />
-          </div>
-        </div>
-      </div>
-      <p class="param-legenda">
-        <span class="legenda-cor legenda-abaixo">●</span> abaixo de {seriesManutencaoMin} — insuficiente
-        &nbsp;·&nbsp; <span class="legenda-cor legenda-manutencao">●</span> {seriesManutencaoMin}–{seriesManutencaoMax} — manutenção
-        &nbsp;·&nbsp; <span class="legenda-cor legenda-moderado">●</span> {seriesManutencaoMax + 1}–{seriesFocoMin - 1} — moderado
-        &nbsp;·&nbsp; <span class="legenda-cor legenda-foco">●</span> {seriesFocoMin}–{seriesFocoMax} — foco
-        &nbsp;·&nbsp; <span class="legenda-cor legenda-acima">●</span> acima de {seriesFocoMax} — excessivo
-      </p>
-        </div>
-      {/if}
-    </div>
-
     <div class="param-card">
       <button type="button" class="param-card-header" onclick={() => alternarCard("Fadiga por Posição")}>
         <span>Fadiga por Posição</span>
@@ -591,18 +547,6 @@
     padding: var(--space-3) 0;
     border-top: 1px solid var(--surface-border);
   }
-  .param-titulos {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    margin-bottom: var(--space-1);
-  }
-  .param-titulo-campo {
-    width: 64px;
-    text-align: center;
-    font-size: 11px;
-    color: var(--surface-muted);
-  }
   .param-linha-topo {
     display: flex;
     align-items: center;
@@ -640,33 +584,11 @@
   .legenda-cor {
     font-size: 10px;
   }
-  .legenda-abaixo {
-    color: var(--color-danger);
-  }
-  .legenda-manutencao {
-    color: var(--color-success);
-  }
-  .legenda-acima {
-    color: var(--color-secondary);
-  }
-  .legenda-moderado {
-    color: var(--color-success);
-  }
-  .legenda-foco {
-    color: var(--color-success);
-  }
   .legenda-fase-a {
     color: #60a5fa;
   }
   .legenda-fase-b {
     color: #fbbf24;
-  }
-  .param-legenda {
-    margin: var(--space-2) 0 0;
-    font-size: 12px;
-    color: var(--surface-muted);
-    border-top: 1px solid var(--surface-border);
-    padding-top: var(--space-2);
   }
   .fadiga-opcoes {
     display: flex;

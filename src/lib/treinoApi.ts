@@ -39,6 +39,7 @@ export interface Musculo {
   ordem: number;
   /** Override desse músculo pro mínimo de séries semanais (Manutenção) da classificação de
    * volume — null = usa o mínimo global de Parametrização. Ver classificarVolumeSemanal. */
+  series_maximas: number | null;
   series_minimas: number | null;
 }
 
@@ -231,7 +232,7 @@ export async function deleteAgrupamentoMuscular(id: string): Promise<void> {
 
 // ---------------- Músculos ----------------
 
-const MUSCULO_SELECT = "id, nome, agrupamento_id, ordem, series_minimas, agrupamento:agrupamentos_musculares(id, nome, ordem)";
+const MUSCULO_SELECT = "id, nome, agrupamento_id, ordem, series_minimas, series_maximas, agrupamento:agrupamentos_musculares(id, nome, ordem)";
 
 export async function listMusculos(): Promise<Musculo[]> {
   return comCache("treino:listMusculos", async () => {
@@ -278,10 +279,11 @@ export async function updateMusculo(
   nome: string,
   agrupamentoId: string | null,
   seriesMinimas: number | null = null,
+  seriesMaximas: number | null = null,
 ): Promise<void> {
   const { error } = await supabase
     .from("musculos")
-    .update({ nome: nome.trim(), agrupamento_id: agrupamentoId || null, series_minimas: seriesMinimas })
+    .update({ nome: nome.trim(), agrupamento_id: agrupamentoId || null, series_minimas: seriesMinimas, series_maximas: seriesMaximas })
     .eq("id", id);
   if (error) throw error;
 }
@@ -1912,25 +1914,30 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   ordenacaoHome: "pendente",
 };
 
-export type ClasseVolumeSemanal = "insuficiente" | "manutencao" | "moderado" | "foco" | "excessivo";
-
-/** Classifica um total semanal de séries (SEMPRE ponderado — ver comentário em
- * DistribuicaoMusculos.svelte sobre onde isso é aplicado) pelos landmarks de Parametrização:
- * abaixo da Manutenção = insuficiente; dentro da Manutenção = manutenção; entre o máximo da
- * Manutenção e o mínimo do Foco = "moderado" (faixa automática, sem campo próprio); dentro do
- * Foco = foco; acima do máximo do Foco = excessivo. Insuficiente e excessivo são os dois extremos
- * "fora da faixa saudável", tratados como o mesmo alerta (vermelho) por quem exibe. */
-export function classificarVolumeSemanal(v: number, p: ParametrosDistribuicao): ClasseVolumeSemanal {
-  if (v < p.seriesManutencaoMin) return "insuficiente";
-  if (v <= p.seriesManutencaoMax) return "manutencao";
-  if (v < p.seriesFocoMin) return "moderado";
-  if (v <= p.seriesFocoMax) return "foco";
-  return "excessivo";
+/** Janela de séries semanais (ponderadas) de UM músculo: o que ele precisa pra manter/evoluir. Abaixo do
+ * mínimo = insuficiente (vermelho), dentro = manutenção (verde), acima do máximo = foco (azul). */
+export interface JanelaVolume {
+  min: number;
+  max: number;
 }
 
-/** As três preferências de progressão (fadiga ligada, pausa, janela) moram no banco; o localStorage é
- * só um espelho pra as contas síncronas (tendência dos exercícios, fadiga) lerem sem esperar a rede.
- * O espelho é atualizado a cada leitura do banco e a cada gravação, então vale o que está no banco. */
+/** Janela usada enquanto o músculo não tem a sua própria preenchida (Músculos > Detalhe). */
+export const JANELA_VOLUME_PADRAO: JanelaVolume = { min: 6, max: 14 };
+
+export type ClasseVolumeSemanal = "insuficiente" | "manutencao" | "foco";
+
+/** Janela efetiva do músculo: os campos próprios, e o padrão onde estiverem vazios. */
+export function janelaDoMusculo(m: { series_minimas?: number | null; series_maximas?: number | null } | null | undefined): JanelaVolume {
+  return { min: m?.series_minimas ?? JANELA_VOLUME_PADRAO.min, max: m?.series_maximas ?? JANELA_VOLUME_PADRAO.max };
+}
+
+/** Classifica um total semanal de séries (SEMPRE ponderado) contra a janela do músculo. */
+export function classificarVolumeSemanal(v: number, janela: JanelaVolume): ClasseVolumeSemanal {
+  if (v < janela.min) return "insuficiente";
+  if (v <= janela.max) return "manutencao";
+  return "foco";
+}
+
 export async function getParametrosDistribuicao(): Promise<ParametrosDistribuicao> {
   const p = await getParametrosDistribuicaoBase();
   return {

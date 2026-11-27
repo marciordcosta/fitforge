@@ -19,6 +19,7 @@
   let nome = $state("");
   let agrupamentoId = $state("");
   let seriesMinimas = $state("");
+  let seriesMaximas = $state("");
   let encontrado = $state(true);
   let loading = $state(true);
   let salvando = $state(false);
@@ -41,6 +42,7 @@
       nome = musculo.nome;
       agrupamentoId = musculo.agrupamento_id ?? "";
       seriesMinimas = musculo.series_minimas != null ? String(musculo.series_minimas) : "";
+      seriesMaximas = musculo.series_maximas != null ? String(musculo.series_maximas) : "";
     } else {
       encontrado = false;
     }
@@ -72,7 +74,13 @@
     salvando = true;
     try {
       const seriesMinimasNum = seriesMinimas.trim() ? Number(seriesMinimas) : null;
-      await updateMusculo(musculoId, nome, agrupamentoId || null, seriesMinimasNum);
+      const seriesMaximasNum = seriesMaximas.trim() ? Number(seriesMaximas) : null;
+      if (seriesMinimasNum != null && seriesMaximasNum != null && seriesMinimasNum > seriesMaximasNum) {
+        alert("O mínimo de séries não pode ser maior que o máximo.");
+        salvando = false;
+        return;
+      }
+      await updateMusculo(musculoId, nome, agrupamentoId || null, seriesMinimasNum, seriesMaximasNum);
       mostrarToast("Salvo");
       voltar("/treino/musculos");
     } catch (e) {
@@ -128,10 +136,14 @@
       </button>
     </div>
 
-    <label class="field">
-      <span>Séries mínimas (opcional)</span>
-      <input type="number" inputmode="numeric" min="0" step="1" placeholder="Usa o mínimo geral de Parametrização" bind:value={seriesMinimas} />
-    </label>
+    <div class="field">
+      <span>Janela de séries por semana</span>
+      <div class="janela-campos">
+        <input type="number" inputmode="numeric" min="0" step="1" placeholder="Mín (6)" aria-label="Mínimo de séries por semana" bind:value={seriesMinimas} />
+        <input type="number" inputmode="numeric" min="0" step="1" placeholder="Máx (14)" aria-label="Máximo de séries por semana" bind:value={seriesMaximas} />
+      </div>
+      <p class="muted janela-ajuda">Abaixo do mínimo fica vermelho, dentro da janela verde e acima do máximo azul. Vazio usa 6 a 14.</p>
+    </div>
 
     {#if exerciciosDoMusculo.length}
       <div class="field">
@@ -323,6 +335,18 @@
     font-weight: 600;
     cursor: pointer;
     margin-top: var(--space-2);
+  }
+  .janela-campos {
+    display: flex;
+    gap: var(--space-2);
+  }
+  .janela-campos input {
+    flex: 1;
+    min-width: 0;
+  }
+  .janela-ajuda {
+    margin: var(--space-1) 0 0;
+    font-size: 12px;
   }
   .muted {
     color: var(--surface-muted);

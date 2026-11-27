@@ -38,7 +38,7 @@ function fmtSinal(v: number | null, casas = 1, sufixo = ""): string {
 
 function corClasse(c: string): [number, number, number] {
   if (c === "insuficiente") return COR.vermelho;
-  if (c === "excessivo") return COR.azul;
+  if (c === "foco") return COR.azul;
   return COR.verde;
 }
 

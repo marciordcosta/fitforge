@@ -140,10 +140,8 @@ export interface ModeloRelatorio {
 
 export const NOME_CLASSE: Record<ClasseVolumeSemanal, string> = {
   insuficiente: "Abaixo",
-  manutencao: "Manutenção",
-  moderado: "Moderado",
-  foco: "Foco",
-  excessivo: "Acima",
+  manutencao: "Na janela",
+  foco: "Acima",
 };
 
 export const NOME_PROGRESSAO: Record<StatusProgressao, string> = {
@@ -159,22 +157,18 @@ export function acaoSugerida(classe: ClasseVolumeSemanal, status: StatusProgress
   if (status == null || status === "analise") return { texto: "Dados insuficientes: manter e reavaliar", prioridade: 1 };
   if (classe === "insuficiente") {
     return status === "subindo"
-      ? { texto: "Abaixo da manutenção, mas respondendo: subir um pouco as séries", prioridade: 3 }
-      : { texto: "Aumentar séries (abaixo da manutenção)", prioridade: 5 };
+      ? { texto: "Abaixo da janela, mas respondendo: subir um pouco as séries", prioridade: 3 }
+      : { texto: "Aumentar séries (abaixo da janela)", prioridade: 5 };
   }
   if (classe === "manutencao") {
     if (status === "subindo") return { texto: "Manter", prioridade: 0 };
     if (status === "estavel") return { texto: "Testar mais séries", prioridade: 4 };
-    return { texto: "Regredindo no volume de manutenção: revisar exercícios e recuperação", prioridade: 4 };
+    return { texto: "Regredindo dentro da janela: revisar exercícios e recuperação", prioridade: 4 };
   }
-  if (classe === "excessivo") {
-    if (status === "subindo") return { texto: "Manter, mas monitorar (acima do foco)", prioridade: 1 };
-    return { texto: "Reduzir séries (acima do foco, sem resposta)", prioridade: 5 };
-  }
-  // moderado / foco
-  if (status === "subindo") return { texto: "Manter", prioridade: 0 };
-  if (status === "estavel") return { texto: "Sem resposta nesse volume: variar exercício/ordem ou reduzir", prioridade: 4 };
-  return { texto: "Considerar reduzir séries e checar recuperação", prioridade: 5 };
+  // acima da janela
+  if (status === "subindo") return { texto: "Manter, mas monitorar (acima da janela)", prioridade: 1 };
+  if (status === "estavel") return { texto: "Sem resposta acima da janela: variar exercício/ordem ou reduzir", prioridade: 4 };
+  return { texto: "Acima da janela e regredindo: considerar reduzir séries e checar recuperação", prioridade: 5 };
 }
 
 function r1(v: number): number {

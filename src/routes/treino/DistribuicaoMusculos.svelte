@@ -47,6 +47,7 @@
     getParametrosDistribuicao,
     fatorPerformanceGradual,
     classificarVolumeSemanal,
+    janelaDoMusculo,
     PARAMETROS_DISTRIBUICAO_PADRAO,
     DIAS_SEMANA_ABREV,
     DIAS_SEMANA_COMPLETO,
@@ -912,30 +913,17 @@
     void carregarRealizado();
   }
 
-  /** Classifica o volume semanal por músculo pelos landmarks configuráveis em Parametrização —
-   * usado pra colorir barras/textos simples (Realizado), sem o fundo de "caixa" da grade semanal
-   * (ver estiloCaixaVolume pra isso, inclusive o caso vermelho/texto branco de insuficiente e
-   * excessivo). */
-  /** Parâmetros efetivos pra classificar o volume de UM músculo: se ele tem um mínimo de séries
-   * próprio (MusculoDetalhe > "Séries mínimas"), sobrescreve só o mínimo de Manutenção, mantendo
-   * o resto (Manutenção Máx/Foco Min/Max) no valor geral de Parametrização — primeiro passo de
-   * landmarks por músculo (ex: panturrilha tolera mais volume que deltoide posterior), sem
-   * precisar configurar a faixa toda por músculo ainda. */
-  function parametrosParaMusculo(musculo: Musculo | null | undefined): ParametrosDistribuicao {
-    if (musculo?.series_minimas == null) return parametrosDistribuicao;
-    return { ...parametrosDistribuicao, seriesManutencaoMin: musculo.series_minimas };
-  }
-
+  /** Classifica o volume semanal por músculo pela janela própria dele (Músculos > Detalhe: séries mínimas
+   * e máximas) — cada músculo responde diferente. Usado pra colorir barras/textos simples (Realizado),
+   * sem o fundo de "caixa" da grade semanal (ver estiloCaixaVolume). */
   function corVolume(v: number, musculo?: Musculo | null): string {
     // Arredonda pro mesmo passo de 0.5 que formatValor exibe — sem isso, um valor bruto tipo
     // 9.8 (de somar frações de peso_contribuicao) comparava "9.8 < 10" como verdadeiro mesmo
-    // exibindo "10" na tela, classificando errado (ex: caindo em "moderado" quando devia ser
-    // "foco" pelo número que o usuário está vendo).
-    const classe = classificarVolumeSemanal(arredondarValor(v), parametrosParaMusculo(musculo));
-    // Padrão único: vermelho = abaixo da manutenção, verde = na meta (manutenção, moderado e foco),
-    // azul = acima do foco.
+    // exibindo "10" na tela, classificando errado pelo número que o usuário está vendo.
+    const classe = classificarVolumeSemanal(arredondarValor(v), janelaDoMusculo(musculo));
+    // Padrão único: vermelho = abaixo da janela do músculo, verde = dentro dela, azul = acima.
     if (classe === "insuficiente") return "var(--color-danger)";
-    if (classe === "excessivo") return "var(--color-secondary)";
+    if (classe === "foco") return "var(--color-secondary)";
     return "var(--color-success)";
   }
 
@@ -1111,7 +1099,6 @@
         treinos,
         metaSemanal: metaPorMusculo,
         parametros: parametrosDistribuicao,
-        parametrosParaMusculo,
         historico: historicoPorExercicio,
         marcadores: marcadoresPorExercicio,
       });
@@ -1394,7 +1381,7 @@
    *   nada sobre volume, só sinaliza (a tendência em si já aparece separada). */
   function alertaVolumeTendencia(classe: ClasseVolumeSemanal, tendencia: Tend | null): string | null {
     if (tendencia == null || tendencia === "subindo") return null;
-    if (classe === "insuficiente" || classe === "excessivo") return null;
+    if (classe === "insuficiente") return null;
     if (classe === "manutencao") return tendencia === "estavel" ? "Testar mais séries" : null;
     return tendencia === "estavel" ? "Sem resposta nesse volume" : "Considerar reduzir";
   }
@@ -3405,7 +3392,7 @@
           {#each metasEditor as item (item.musculo.id)}
             {@const metaCampo = item.meta?.tipo ?? null}
             {@const tendMusculo = tendenciaMusculoEditor(item.musculo.id)}
-            {@const classeVolumeItem = classificarVolumeSemanal(arredondarValor(item.atual), parametrosParaMusculo(item.musculo))}
+            {@const classeVolumeItem = classificarVolumeSemanal(arredondarValor(item.atual), janelaDoMusculo(item.musculo))}
             {@const alertaItem = alertaVolumeTendencia(classeVolumeItem, tendMusculo)}
             {@const foraDoFiltroMusculo = musculosImpactadosFiltro != null && !musculosImpactadosFiltro.has(item.musculo.id)}
             <div
