@@ -170,7 +170,7 @@
             seriesData: historicoFiltrado.map((h) => h.numSeries),
             borderColor: m.cor,
             backgroundColor: m.cor,
-            tension: 0.3,
+            cubicInterpolationMode: "monotone",
             pointRadius: 2,
             // Peso não é relevante nessa comparação de forma de curva — some por padrão, mas continua clicável na legenda.
             hidden: m.chave === "peso",
@@ -182,7 +182,7 @@
             seriesData: historicoFiltrado.map((h) => h.numSeries),
             borderColor: "#5eead4",
             backgroundColor: "#5eead4",
-            tension: 0.3,
+            cubicInterpolationMode: "monotone",
             pointRadius: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? 6 : 3)),
             pointBackgroundColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#fbbf24" : corPonto(h, "#5eead4"))),
             pointBorderColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#d97706" : corPonto(h, "#5eead4"))),
