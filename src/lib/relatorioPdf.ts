@@ -192,16 +192,6 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       }
     },
   });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...COR.suave);
-  const nota = doc.splitTextToSize(
-    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo, dividida em três partes iguais (Manutenção, Moderado e Prioridade, em verde); abaixo da janela é Abaixo (vermelho) e acima dela é Foco (azul). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Ação sugerida: dá mais peso aos músculos de foco (volume de 125% da média ou mais). Volume da semana: sempre contra a janela de séries de cada músculo (um posterior de coxa tolera menos que um peitoral). Os avisos de séries num dia só (fracionar, perto do limite ou dia fraco) estão na tabela de Distribuição semanal. Referência para natural: dividir em 2 ou mais dias, subir ~2 séries por semana e reavaliar em 3 a 4 semanas; trocar exercício só depois de 4 ou mais sessões estagnadas.",
-    util,
-  ) as string[];
-  garantir(nota.length * 3.2);
-  doc.text(nota, M, y);
-  y += nota.length * 3.2 + 4;
 
   // ---------------- aprofundamento (a partir da página 2) ----------------
   doc.addPage();
