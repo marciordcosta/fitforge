@@ -156,6 +156,9 @@
     const metricaAtual = metrica;
     const valores = metricaAtual === "todos" ? [] : historicoFiltrado.map((h) => valorPorChave(h, metricaAtual));
     const temPontoAoVivo = pontoAoVivo != null && !modoTodos;
+    // Sessões que contam na leitura de progresso (marcadores, pausa e janela): as de fora ficam apagadas.
+    const validas = new Set(pontosParaTendencia(historicoComAoVivo, marcadores).map((h) => h.data));
+    const corPonto = (h: HistoricoPonto, cheia: string) => (validas.has(h.data) ? cheia : "rgba(94, 234, 212, 0.3)");
 
     const datasets: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[]; seriesData?: (number | null)[] })[] = modoTodos
       ? METRICAS_TODOS.map((m) => {
@@ -181,8 +184,8 @@
             backgroundColor: "#5eead4",
             tension: 0.3,
             pointRadius: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? 6 : 3)),
-            pointBackgroundColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#fbbf24" : "#5eead4")),
-            pointBorderColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#d97706" : "#5eead4")),
+            pointBackgroundColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#fbbf24" : corPonto(h, "#5eead4"))),
+            pointBorderColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#d97706" : corPonto(h, "#5eead4"))),
           },
           // Reta de tendência (a leitura de progresso do app): só nas sessões que contam (marcadores,
           // pausa e janela da progressão aplicados), do primeiro ao último ponto válido.
@@ -191,7 +194,7 @@
             data: retaDeTendencia(
               historicoFiltrado.map((h) => h.data),
               valores,
-              new Set(pontosParaTendencia(historicoComAoVivo, marcadores).map((h) => h.data)),
+              validas,
             ),
             borderColor: "#ffffff",
             backgroundColor: "#ffffff",

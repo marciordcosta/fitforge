@@ -338,6 +338,9 @@
     // adicionada depois, por cima) fica em destaque.
     const opacidadeLinha = mostrarMedia ? 0.25 : 1;
 
+    // Sessões que contam na leitura de progresso (marcadores, pausa e janela): as de fora ficam apagadas.
+    const validas = new Set(pontosParaTendencia(historico, marcadores).map((h) => h.data));
+    const corPontoPrincipal = (d: string) => (!comparando && !validas.has(d) ? comOpacidade(COR_PRINCIPAL, 0.3) : comOpacidade(COR_PRINCIPAL, opacidadeLinha));
     const brutoPrincipal = serie(historicoFiltrado);
     const principalAjustado = ajustar(brutoPrincipal);
     const comparaveisAjustados = comparaveisNaJanela.map((c) => {
@@ -355,8 +358,8 @@
         backgroundColor: comOpacidade(COR_PRINCIPAL, opacidadeLinha),
         tension: 0.3,
         pointRadius: datas.map((d) => (marcadores.some((m) => m.data === d) ? 6 : 3)),
-        pointBackgroundColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#fbbf24" : comOpacidade(COR_PRINCIPAL, opacidadeLinha))),
-        pointBorderColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#d97706" : comOpacidade(COR_PRINCIPAL, opacidadeLinha))),
+        pointBackgroundColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#fbbf24" : corPontoPrincipal(d))),
+        pointBorderColor: datas.map((d) => (marcadores.some((m) => m.data === d) ? "#d97706" : corPontoPrincipal(d))),
         spanGaps: true,
       },
       ...comparaveisAjustados.map(({ c, bruto, ajustado }, i) => {
@@ -381,7 +384,7 @@
       // e janela da progressão aplicados), do primeiro ao último ponto válido.
       datasets.push({
         label: "Tendência",
-        data: retaDeTendencia(datas, brutoPrincipal, new Set(pontosParaTendencia(historico, marcadores).map((h) => h.data))),
+        data: retaDeTendencia(datas, brutoPrincipal, validas),
         borderColor: "#ffffff",
         backgroundColor: "#ffffff",
         borderWidth: 1.5,
