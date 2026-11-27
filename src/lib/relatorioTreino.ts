@@ -198,11 +198,15 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     const m = volumePorMusculoSemana.get(l.musculoId) ?? new Map<string, number>();
     m.set(sem, (m.get(sem) ?? 0) + Number(l.series));
     volumePorMusculoSemana.set(l.musculoId, m);
-    const dm = diasPorMusculoSemana.get(l.musculoId) ?? new Map<string, Set<string>>();
-    const ds = dm.get(sem) ?? new Set<string>();
-    ds.add(l.data);
-    dm.set(sem, ds);
-    diasPorMusculoSemana.set(l.musculoId, dm);
+    // Frequência conta o dia em que o músculo foi tocado por alguma série (séries totais, sem ponderar):
+    // 3 de supino num dia e 3 de tríceps em outro = 2 dias pro tríceps.
+    if (Number(l.series) > 0) {
+      const dm = diasPorMusculoSemana.get(l.musculoId) ?? new Map<string, Set<string>>();
+      const ds = dm.get(sem) ?? new Set<string>();
+      ds.add(l.data);
+      dm.set(sem, ds);
+      diasPorMusculoSemana.set(l.musculoId, dm);
+    }
   }
   const semanasComTreino = semanasComVolume.size;
   // Colunas: do primeiro ao último ffim de semana com treino (semanas parciais vazias nas pontas do
@@ -288,7 +292,8 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
   const grupoPorMusculo = new Map(e.musculos.map((m) => [m.id, m.grupo]));
   const linhasGrade: LinhaGradeRelatorio[] = [];
   for (const [id, porDia] of e.gradeSemanal.porMusculo) {
-    const total = porDia.reduce((a, v) => a + v, 0);
+    // Dias = séries totais; o total da semana é o PONDERADO (a leitura que a faixa de volume usa).
+    const total = planPorMusculo.get(id)?.ponderado ?? 0;
     if (total <= 0) continue;
     linhasGrade.push({
       nome: nomeMusculo.get(id) ?? "",
@@ -335,11 +340,6 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
   for (const l of linhas) {
     if (l.planejado > 0 && l.mediaSemanal < l.planejado * 0.75) {
       alertas.push(`${l.nome}: realizado ${l.mediaSemanal} séries/semana contra ${l.planejado} planejadas.`);
-    }
-  }
-  for (const l of linhas) {
-    if (l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) {
-      alertas.push(`${l.nome}: curva ${l.curva} no realizado e ${l.curvaPlanejada} no planejado (a prioridade na prática desviou do plano).`);
     }
   }
   for (const x of exercicios) {

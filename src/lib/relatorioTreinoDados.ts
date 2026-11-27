@@ -114,7 +114,7 @@ export async function levantarRelatorio(args: {
     };
   });
 
-  // grade da distribuição semanal: um dia por coluna (seg a dom), séries ponderadas por músculo
+  // grade da distribuição semanal: um dia por coluna (seg a dom), séries totais por músculo (o total da semana, ponderado, vem de planejadoSemanal)
   const ORDEM_DIAS = [1, 2, 3, 4, 5, 6, 0];
   const NOMES_DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const porMusculoGrade = new Map<string, number[]>();
@@ -125,8 +125,10 @@ export async function levantarRelatorio(args: {
         const n = te.series.length;
         if (!n) continue;
         for (const m of te.exercicio?.musculos ?? []) {
+          if (!(Number(m.peso_contribuicao) > 0)) continue;
           const linha = porMusculoGrade.get(m.musculo_id) ?? ORDEM_DIAS.map(() => 0);
-          linha[col] += n * Number(m.peso_contribuicao);
+          // Séries TOTAIS no dia: 1 por série pra cada músculo que o exercício toca (sem ponderar).
+          linha[col] += n;
           porMusculoGrade.set(m.musculo_id, linha);
         }
       }

@@ -180,38 +180,31 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
   titulo("Consolidado por músculo (realizado no período)");
   tabela({
-    head: [["Músculo", "Séries/sem.", "Planejado", "% total", "Curva", "Progressão", "Ação sugerida"]],
+    head: [["Músculo", "Séries/sem.", "Faixa", "Freq./sem.", "Progressão", "Ação sugerida"]],
     body: modelo.musculos.map((l) => [
       l.nome,
       fmtNum(l.mediaSemanal),
-      fmtNum(l.planPond),
-      l.curva ? `${l.pctTotal}%` : "-",
-      l.curva ?? "-",
+      NOME_CLASSE[l.classe],
+      `${fmtNum(l.frequenciaSemanal)}x`,
       l.progressao ? `${NOME_PROGRESSAO[l.progressao]}${l.variacaoPct != null ? ` ${fmtSinal(l.variacaoPct, 1, "%")}` : ""}` : "-",
       l.acao,
     ]),
     columnStyles: {
       0: { cellWidth: 42, fontStyle: "bold" },
       1: { halign: "right", cellWidth: 24 },
-      2: { halign: "right", cellWidth: 24 },
-      3: { halign: "right", cellWidth: 20 },
-      4: { halign: "center", cellWidth: 18 },
-      5: { cellWidth: 44 },
+      2: { cellWidth: 26 },
+      3: { halign: "right", cellWidth: 24 },
+      4: { cellWidth: 44 },
     },
     didParseCell: (d) => {
       if (d.section === "head") return;
       const l = modelo.musculos[d.row.index];
       const col = d.column.index;
-      // Realizado bem abaixo do planejado: destaca a única comparação da tabela.
-      if (col === 1 && l.deltaPct != null && l.deltaPct <= -25) {
-        d.cell.styles.textColor = COR.vermelho;
+      if (col === 2) {
+        d.cell.styles.textColor = corClasse(l.classe);
         d.cell.styles.fontStyle = "bold";
       }
-      if (col === 4 && l.curva) {
-        d.cell.styles.fontStyle = "bold";
-        d.cell.styles.textColor = l.curva === "A" ? COR.verde : l.curva === "B" ? COR.ambar : COR.suave;
-      }
-      if (col === 5) {
+      if (col === 4) {
         d.cell.styles.textColor = corProgressao(l.progressao);
         d.cell.styles.fontStyle = "bold";
       }
@@ -221,7 +214,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado; em vermelho quando está 25% ou mais abaixo do Planejado. Curva ABC: volume do músculo contra a média dos músculos treinados; A = 125% da média ou mais (prioridade na prática), B = de 60% a 125%, C = abaixo de 60% (secundário). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Faixa de volume, frequência e demais comparações com o plano estão no Aprofundamento.",
+    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo (vermelho abaixo, verde na janela, azul acima). Freq./sem.: quantos dias por semana o músculo é treinado, contando séries totais (qualquer exercício que o trabalhe, sem ponderar). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise).",
     util,
   ) as string[];
   garantir(nota.length * 3.2);
@@ -243,7 +236,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---- Distribuição Semanal: a grade de dias (seg a dom) com as séries ponderadas planejadas ----
   if (modelo.grade.linhas.length) {
-    titulo("Distribuição semanal planejada (séries ponderadas por dia)");
+    titulo("Distribuição semanal planejada (séries totais por dia, total ponderado)");
     const dias = modelo.grade.dias;
     tabela({
       head: [
@@ -275,60 +268,13 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     doc.setFontSize(7);
     doc.setTextColor(...COR.suave);
     const notaGrade = doc.splitTextToSize(
-      "Séries planejadas por dia da semana, ponderadas pelo peso de contribuição de cada exercício no músculo (a mesma leitura do Realizado). A linha de baixo do cabeçalho mostra a rotina do dia. O Total segue a cor da faixa de volume (vermelho abaixo da manutenção, verde na meta, azul acima do foco).",
+      "Cada dia mostra as séries TOTAIS planejadas (1 por série, para cada músculo que o exercício trabalha). O Total é a soma da semana PONDERADA pelo peso de contribuição de cada exercício (a mesma leitura do Realizado), por isso não é a soma dos dias. A linha de baixo do cabeçalho mostra a rotina do dia. O Total segue a cor da faixa do músculo (vermelho abaixo, verde na janela, azul acima).",
       util,
     ) as string[];
     garantir(notaGrade.length * 3.2);
     doc.text(notaGrade, M, y);
     y += notaGrade.length * 3.2 + 4;
   }
-
-  titulo("Detalhe por músculo: faixa, frequência, plano e fim do treino");
-  tabela({
-    head: [["Músculo", "Grupo", "Faixa", "Freq./sem.", "Realizado vs plano", "Curva real", "Curva plano", "Fim do treino (bloco C)"]],
-    body: modelo.musculos.map((l) => [
-      l.nome,
-      l.grupo ?? "-",
-      NOME_CLASSE[l.classe],
-      fmtNum(l.frequenciaSemanal),
-      l.deltaPct != null ? fmtSinal(l.deltaPct, 0, "%") : "-",
-      l.curva ?? "-",
-      l.curvaPlanejada ?? "-",
-      l.fimDoTreinoPct != null ? `${l.fimDoTreinoPct}%` : "-",
-    ]),
-    columnStyles: {
-      0: { cellWidth: 40, fontStyle: "bold" },
-      1: { cellWidth: 32 },
-      2: { cellWidth: 24 },
-      3: { halign: "right", cellWidth: 22 },
-      4: { halign: "right", cellWidth: 34 },
-      5: { halign: "center", cellWidth: 22 },
-      6: { halign: "center", cellWidth: 22 },
-      7: { halign: "right" },
-    },
-    didParseCell: (d) => {
-      if (d.section !== "body") return;
-      const l = modelo.musculos[d.row.index];
-      if (d.column.index === 2) {
-        d.cell.styles.textColor = corClasse(l.classe);
-        d.cell.styles.fontStyle = "bold";
-      }
-      if (d.column.index === 6 && l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) {
-        d.cell.styles.textColor = COR.vermelho;
-        d.cell.styles.fontStyle = "bold";
-      }
-    },
-  });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...COR.suave);
-  const nota2 = doc.splitTextToSize(
-    "Faixa: classificação do volume realizado (vermelho abaixo da manutenção, verde na meta, azul acima do foco). Freq./sem.: dias por semana em que o músculo foi treinado. Curva plano: a mesma curva ABC sobre o volume planejado (em vermelho quando difere da real: a prioridade na prática desviou do plano). Fim do treino: % do volume planejado do músculo que cai no último bloco da rotina, onde a fadiga desconta mais; um músculo estagnado com esse número alto pode pedir exercício trazido pro começo do treino, não menos séries.",
-    util,
-  ) as string[];
-  garantir(nota2.length * 3.2);
-  doc.text(nota2, M, y);
-  y += nota2.length * 3.2 + 4;
 
   // ---------------- volume semana a semana ----------------
   titulo("Volume semana a semana (séries ponderadas)");
@@ -359,10 +305,11 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   y += 6;
 
   // ---------------- exercícios ----------------
-  titulo("Por exercício (1RM estimado no período)");
+  const exerciciosComLeitura = modelo.exercicios.filter((x) => x.sessoes >= 4);
+  titulo("Por exercício (1RM estimado no período, 4 sessões ou mais)");
   tabela({
     head: [["Músculo principal", "Exercício", "Sessões", "1RM início", "1RM fim", "Var. %", "Status", "Última"]],
-    body: modelo.exercicios.map((x) => [
+    body: exerciciosComLeitura.map((x) => [
       x.musculo,
       x.nome,
       String(x.sessoes),
@@ -383,7 +330,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     },
     didParseCell: (d) => {
       if (d.section !== "body") return;
-      const x = modelo.exercicios[d.row.index];
+      const x = exerciciosComLeitura[d.row.index];
       if (d.column.index === 5 || d.column.index === 6) {
         d.cell.styles.textColor = corProgressao(x.status);
         d.cell.styles.fontStyle = "bold";
@@ -407,26 +354,6 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       y += linhas.length * 4 + 1;
     }
     y += 3;
-  }
-
-  // ---------------- equilíbrio entre grupos ----------------
-  if (modelo.grupos.length) {
-    titulo("Equilíbrio entre grupos musculares");
-    tabela({
-      head: [["Grupo", "Séries/sem", "% do total", "Planejado"]],
-      body: modelo.grupos.map((g) => [g.nome, fmtNum(g.mediaSemanal), `${g.pctTotal}%`, fmtNum(g.planejado)]),
-      columnStyles: { 0: { cellWidth: 70 }, 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
-    });
-  }
-
-  // ---------------- marcadores ----------------
-  if (modelo.marcadores.length) {
-    titulo("Marcadores e observações do período");
-    tabela({
-      head: [["Data", "Exercício", "Tipo", "Observação"]],
-      body: modelo.marcadores.map((m) => [fmtData(m.data), m.exercicio, m.tipo, m.observacao]),
-      columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 50 }, 2: { cellWidth: 24 } },
-    });
   }
 
   // ---------------- limites ----------------
