@@ -125,43 +125,42 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       detalhe: modelo.calorias ? `meta da dieta no período (${modelo.calorias.diasPeriodo} dias)` : "sem dados da dieta",
     },
   ];
-  const wCaixa = (util - 3 * 3) / 4;
+  // ---------------- cards à esquerda (empilhados) e gráfico de peso x meta à direita ----------------
+  const wCaixa = 56;
+  const hCaixa = 15;
+  const gapCaixa = 2.5;
+  const xGraf = M + wCaixa + 6;
+  const wGraf = util - wCaixa - 6;
+  const alturaBloco = caixas.length * hCaixa + (caixas.length - 1) * gapCaixa;
+  garantir(alturaBloco + 12);
+  // título do gráfico (os cards começam na altura do gráfico)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...COR.texto);
+  doc.text("Peso no período contra a meta", xGraf, y + 4);
+  doc.setDrawColor(...COR.linha);
+  doc.line(xGraf, y + 6, xGraf + wGraf, y + 6);
+  const yTopo = y + 9;
   caixas.forEach((c, i) => {
-    const x = M + i * (wCaixa + 3);
-    const yCaixa = y;
+    const yCaixa = yTopo + i * (hCaixa + gapCaixa);
     doc.setDrawColor(...COR.linha);
     doc.setFillColor(...COR.zebra);
-    doc.roundedRect(x, yCaixa, wCaixa, 17, 2, 2, "FD");
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...COR.suave);
-    doc.text(c.rotulo, x + 2.5, yCaixa + 5, { maxWidth: wCaixa - 4 });
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...COR.texto);
-    doc.text(c.valor, x + 2.5, yCaixa + 10.5);
+    doc.roundedRect(M, yCaixa, wCaixa, hCaixa, 2, 2, "FD");
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...COR.suave);
-    doc.text(c.detalhe, x + 2.5, yCaixa + 14.5);
-  });
-  y += 22;
-
-  // ---------------- peso x meta e decisões (um embaixo do outro, em retrato) ----------------
-  const subtitulo = (txt: string, x: number, w: number) => {
+    doc.text(c.rotulo, M + 2.5, yCaixa + 4.3, { maxWidth: wCaixa - 4 });
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(9.5);
     doc.setTextColor(...COR.texto);
-    doc.text(txt, x, y + 4);
-    doc.setDrawColor(...COR.linha);
-    doc.line(x, y + 6, x + w, y + 6);
-  };
-  garantir(50);
-  subtitulo("Peso no período contra a meta", M, util);
-  const yTopo = y + 9;
-  const altGraf = 34;
-  desenharGraficoPeso(doc, modelo, M, yTopo, util, altGraf);
-  y = yTopo + altGraf + 5;
+    doc.text(c.valor, M + 2.5, yCaixa + 9);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(...COR.suave);
+    doc.text(c.detalhe, M + 2.5, yCaixa + 12.6, { maxWidth: wCaixa - 4 });
+  });
+  desenharGraficoPeso(doc, modelo, xGraf, yTopo, wGraf, alturaBloco);
+  y = yTopo + alturaBloco + 5;
 
   // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
   titulo("Consolidado por músculo (realizado no período)");
@@ -245,15 +244,6 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   if (modelo.rotinas.length) {
     doc.addPage();
     y = M;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(...COR.texto);
-    doc.text("Aprofundamento", M, y + 5);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...COR.suave);
-    doc.text("Tabelas complementares ao resumo da primeira página, para análise mais profunda.", M, y + 10);
-    y += 14;
     titulo("Rotinas atuais (músculos trabalhados)");
     const comAcum = modelo.rotinas.some((r) => r.musculos.some((m) => m.acum != null));
     const nCols = comAcum ? 5 : 4;
