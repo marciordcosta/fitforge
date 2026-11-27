@@ -258,6 +258,8 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---------------- rotinas atuais (o plano de hoje), pelos músculos que cada uma trabalha ----------------
   if (modelo.rotinas.length) {
+    doc.addPage();
+    y = M;
     titulo("Rotinas atuais (músculos trabalhados)");
     const comAcum = modelo.rotinas.some((r) => r.musculos.some((m) => m.acum != null));
     const nCols = comAcum ? 4 : 3;
@@ -310,6 +312,8 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---- Distribuição Semanal: a grade de dias (seg a dom) com as séries ponderadas planejadas ----
   if (modelo.grade.linhas.length) {
+    doc.addPage();
+    y = M;
     titulo("Distribuição semanal planejada (séries totais por dia, total ponderado)");
     const dias = modelo.grade.dias;
     tabela({
@@ -420,6 +424,10 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---------------- exercícios ----------------
   const exerciciosComLeitura = modelo.exercicios.filter((x) => x.sessoes >= 4);
+  if (!modelo.ajustesPlano.length) {
+    doc.addPage();
+    y = M;
+  }
   titulo("Por exercício (1RM estimado no período, 4 sessões ou mais)");
   tabela({
     head: [["Músculo principal", "Exercício", "Sessões", "1RM início", "1RM fim", "Var. %", "Status", "Última"]],
