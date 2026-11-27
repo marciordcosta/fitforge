@@ -503,6 +503,8 @@ interface SegmentoMeta {
  * getObservacaoMeta), nunca muda o formato da linha.
  *
  * Nunca ultrapassa o peso-alvo — direção (perda/ganho) definida pelo sinal de percentualMin.
+ * Também nunca anda contra a direção: o alvo da semana não passa do ponto de partida (perda: não
+ * sobe; ganho/bulking: não desce) — a linha fica reta em vez de subir quando a média está acima dela.
  */
 function calcularSegmentosPorDia(pesos: PesoRegistro[], historico: PesoMetaHistorico[]): Map<string, SegmentoMeta | null> {
   const mapa = new Map<string, SegmentoMeta | null>();
@@ -557,7 +559,11 @@ function calcularSegmentosPorDia(pesos: PesoRegistro[], historico: PesoMetaHisto
     const mediaNoLimite = mediaAteData(limite);
     if (config.percentualMin == null || mediaNoLimite == null) continue;
     const inicioValor = continuidade ?? mediaNoLimite;
-    const fimValor = limitarPeloAlvo(mediaNoLimite * (1 + config.percentualMin / 100), config.percentualMin, config.pesoAlvo);
+    const alvoDaSemana = limitarPeloAlvo(mediaNoLimite * (1 + config.percentualMin / 100), config.percentualMin, config.pesoAlvo);
+    // A meta nunca anda contra a direção da meta: na perda ela não sobe e no ganho (bulking) não desce.
+    // Se a média real ficou do lado errado da linha, o alvo calculado dela passaria do ponto de
+    // partida; a linha então fica reta (no nível onde está) até a média alcançar um alvo na direção certa.
+    const fimValor = config.percentualMin < 0 ? Math.min(alvoDaSemana, inicioValor) : Math.max(alvoDaSemana, inicioValor);
     tipoPorLimite.set(limite, "percentual");
     inicioPorLimite.set(limite, inicioValor);
     fimPorLimite.set(limite, fimValor);
