@@ -314,11 +314,12 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     if (total <= 0) continue;
     const janelaMusculo = e.janela(id);
     const minimoDia = Math.min(MINIMO_DIA, Math.floor(janelaMusculo.max / 2));
-    const diasComSerie = porDia.filter((v) => v > 0).length;
-    const avisosDia = porDia.map((v): "max" | "atencao" | null => {
+    // Dia fraco (abaixo do mínimo) só vira aviso quando OUTRO dia do mesmo músculo passa de 8: aí dá pra
+    // redistribuir. Sozinho (ex.: 3 séries num dia e o resto bem distribuído) não é problema.
+    const avisosDia = porDia.map((v, i): "max" | "atencao" | null => {
       if (v > LIMITE_DIA_MAXIMO) return "max";
       if (v > LIMITE_DIA_ATENCAO) return "atencao";
-      if (v > 0 && diasComSerie >= 2 && v < minimoDia) return "atencao";
+      if (v > 0 && v < minimoDia && porDia.some((o, j) => j !== i && o > LIMITE_DIA_ATENCAO)) return "atencao";
       return null;
     });
     const observacoes: string[] = [];
@@ -326,7 +327,7 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
       const dia = e.gradeSemanal.dias[i]?.rotulo ?? "";
       if (avisosDia[i] === "max") observacoes.push(`${dia}: ${v} séries, fracionar em 2 dias (ex.: ${Math.ceil(v / 2)} + ${Math.floor(v / 2)})`);
       else if (v > LIMITE_DIA_ATENCAO) observacoes.push(`${dia}: ${v} séries, perto do limite de ${LIMITE_DIA_MAXIMO}`);
-      else if (avisosDia[i] === "atencao") observacoes.push(`${dia}: ${v} série${v === 1 ? "" : "s"}, abaixo do mínimo de ${minimoDia}`);
+      else if (avisosDia[i] === "atencao") observacoes.push(`${dia}: ${v} série${v === 1 ? "" : "s"}, abaixo do mínimo de ${minimoDia} (outro dia passa de ${LIMITE_DIA_ATENCAO}; dá pra redistribuir)`);
     });
     linhasGrade.push({
       nome: nomeMusculo.get(id) ?? "",
