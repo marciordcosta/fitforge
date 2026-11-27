@@ -120,20 +120,18 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       detalhe: modelo.peso.metaFim != null ? `meta no fim: ${fmtNum(modelo.peso.metaFim)} kg` : "sem meta no período",
     },
     {
-      rotulo: "Calorias planejadas (média/dia)",
+      rotulo: "Calorias planejadas",
       valor: modelo.calorias?.metaMediaKcal != null ? `${Math.round(modelo.calorias.metaMediaKcal).toLocaleString("pt-BR")} kcal` : "-",
-      detalhe: modelo.calorias ? `meta da dieta no período (${modelo.calorias.diasPeriodo} dias)` : "sem dados da dieta",
+      detalhe: modelo.calorias ? `média/dia, meta da dieta (${modelo.calorias.diasPeriodo} dias)` : "sem dados da dieta",
     },
   ];
-  // ---------------- cards à esquerda (empilhados) e gráfico de peso x meta à direita ----------------
-  const wCaixa = 56;
-  const hCaixa = 15;
-  const gapCaixa = 2.5;
-  const xGraf = M + wCaixa + 6;
-  const wGraf = util - wCaixa - 6;
-  const alturaBloco = caixas.length * hCaixa + (caixas.length - 1) * gapCaixa;
+  // ---------------- um card compacto à esquerda e o gráfico de peso x meta à direita ----------------
+  const wCaixa = 54;
+  const hEntrada = 9.5;
+  const xGraf = M + wCaixa + 5;
+  const wGraf = util - wCaixa - 5;
+  const alturaBloco = caixas.length * hEntrada + 3;
   garantir(alturaBloco + 12);
-  // título do gráfico (os cards começam na altura do gráfico)
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...COR.texto);
@@ -141,23 +139,26 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setDrawColor(...COR.linha);
   doc.line(xGraf, y + 6, xGraf + wGraf, y + 6);
   const yTopo = y + 9;
+  doc.setFillColor(...COR.zebra);
+  doc.roundedRect(M, yTopo, wCaixa, alturaBloco, 2, 2, "FD");
   caixas.forEach((c, i) => {
-    const yCaixa = yTopo + i * (hCaixa + gapCaixa);
-    doc.setDrawColor(...COR.linha);
-    doc.setFillColor(...COR.zebra);
-    doc.roundedRect(M, yCaixa, wCaixa, hCaixa, 2, 2, "FD");
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(...COR.suave);
-    doc.text(c.rotulo, M + 2.5, yCaixa + 4.3, { maxWidth: wCaixa - 4 });
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
-    doc.setTextColor(...COR.texto);
-    doc.text(c.valor, M + 2.5, yCaixa + 9);
+    const yEntrada = yTopo + 1.5 + i * hEntrada;
+    if (i > 0) {
+      doc.setDrawColor(...COR.linha);
+      doc.line(M + 2, yEntrada, M + wCaixa - 2, yEntrada);
+    }
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
     doc.setTextColor(...COR.suave);
-    doc.text(c.detalhe, M + 2.5, yCaixa + 12.6, { maxWidth: wCaixa - 4 });
+    doc.text(c.rotulo, M + 2.5, yEntrada + 3.8);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...COR.texto);
+    doc.text(c.valor, M + wCaixa - 2.5, yEntrada + 4, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    doc.setTextColor(...COR.suave);
+    doc.text(c.detalhe, M + 2.5, yEntrada + 7.4, { maxWidth: wCaixa - 4 });
   });
   desenharGraficoPeso(doc, modelo, xGraf, yTopo, wGraf, alturaBloco);
   y = yTopo + alturaBloco + 5;
