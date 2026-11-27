@@ -31,6 +31,8 @@ export interface EntradaRelatorio {
   /** % do volume planejado de cada músculo que cai no bloco C (fim do treino); null se a fadiga está desligada. */
   fimDoTreino: Map<string, number> | null;
   sessoes: { realizadas: number; planejadasPorSemana: number };
+  /** Calorias do período, só informativo (null = sem dados da dieta). */
+  calorias: { mediaKcal: number | null; diasRegistrados: number; diasPeriodo: number; metaMediaKcal: number | null } | null;
   peso: {
     pontos: { data: string; peso: number }[];
     mediaMovel: { data: string; peso: number }[];
@@ -74,6 +76,7 @@ export interface ModeloRelatorio {
   semanas: { chave: string; rotulo: string }[];
   semanasComTreino: number;
   sessoes: { realizadas: number; planejadas: number };
+  calorias: EntradaRelatorio["calorias"];
   peso: {
     inicio: number | null;
     fim: number | null;
@@ -312,6 +315,7 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     semanas,
     semanasComTreino,
     sessoes: { realizadas: e.sessoes.realizadas, planejadas: Math.round(e.sessoes.planejadasPorSemana * semanas.length) },
+    calorias: e.calorias,
     peso: {
       inicio: pInicio != null ? r1(pInicio) : null,
       fim: pFim != null ? r1(pFim) : null,

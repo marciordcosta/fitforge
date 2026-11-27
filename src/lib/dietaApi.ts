@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { DIAS_SEMANA_ABREV, segundaDaSemana } from "./treinoApi";
 import { getPesoMedioAtual, getMeta, getTaxaVariacaoSemanal } from "./pesoApi";
-import { parseISODate, somarDias } from "./dates";
+import { parseISODate, somarDias, toISODate } from "./dates";
 import { marcarDietaDesatualizada } from "./dietaInvalidacao.svelte";
 import { atualizarCache, comCache, compartilharEmAndamento, invalidarChaves, invalidarNamespace } from "./offline/cache.svelte";
 import { getDb } from "./offline/db";
@@ -2216,6 +2216,49 @@ async function getCaloriasConsumidasPorDia(inicio: string, fimExclusivo: string)
   const mapa = new Map<string, number>();
   for (const l of data ?? []) mapa.set(l.data as string, (mapa.get(l.data as string) ?? 0) + (l.calorias as number));
   return mapa;
+}
+
+/** Resumo de calorias de um período, só pra informação (relatório do Treino): média diária dos dias com
+ * lançamento no diário (hoje fica de fora: o dia ainda está incompleto) e a meta média do mesmo período
+ * (meta de cada dia da semana, ponderada pelos dias do período). Pagina a consulta: o Supabase corta em
+ * 1000 linhas e um período longo passa disso. */
+export async function getResumoCaloriasPeriodo(
+  inicio: string,
+  fim: string,
+): Promise<{ mediaKcal: number | null; diasRegistrados: number; diasPeriodo: number; metaMediaKcal: number | null }> {
+  const hoje = toISODate(new Date());
+  const ultimo = fim >= hoje ? somarDias(hoje, -1) : fim;
+  const dias: string[] = [];
+  for (let d = inicio; d <= ultimo; d = somarDias(d, 1)) dias.push(d);
+  if (!dias.length) return { mediaKcal: null, diasRegistrados: 0, diasPeriodo: 0, metaMediaKcal: null };
+
+  const porDia = new Map<string, number>();
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await supabase
+      .from("diario_alimentos")
+      .select("data, calorias")
+      .gte("data", inicio)
+      .lte("data", ultimo)
+      .order("id", { ascending: true })
+      .range(de, de + 999);
+    if (error) throw error;
+    for (const l of data ?? []) porDia.set(l.data as string, (porDia.get(l.data as string) ?? 0) + Number(l.calorias ?? 0));
+    if ((data?.length ?? 0) < 1000) break;
+  }
+  const comRegistro = dias.filter((d) => (porDia.get(d) ?? 0) > 0);
+  const mediaKcal = comRegistro.length ? comRegistro.reduce((a, d) => a + (porDia.get(d) ?? 0), 0) / comRegistro.length : null;
+
+  let metaMediaKcal: number | null = null;
+  try {
+    const metas = await Promise.all([0, 1, 2, 3, 4, 5, 6].map((dow) => getMetasDoDiaSemana(dow)));
+    const contagem = [0, 0, 0, 0, 0, 0, 0];
+    for (const d of dias) contagem[parseISODate(d).getDay()] += 1;
+    const soma = metas.reduce((a, m, dow) => a + m.calorias * contagem[dow], 0);
+    metaMediaKcal = soma > 0 ? soma / dias.length : null;
+  } catch {
+    metaMediaKcal = null;
+  }
+  return { mediaKcal, diasRegistrados: comRegistro.length, diasPeriodo: dias.length, metaMediaKcal };
 }
 
 /** Total já diluído (kcal, convertido dos deltas de carboidrato) por dia, no mesmo intervalo. */

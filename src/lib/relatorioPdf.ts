@@ -117,25 +117,32 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       valor: modelo.peso.kgPorSemana != null ? `${fmtSinal(modelo.peso.kgPorSemana, 2)} kg/sem` : "-",
       detalhe: modelo.peso.metaFim != null ? `meta no fim: ${fmtNum(modelo.peso.metaFim)} kg` : "sem meta no período",
     },
+    {
+      rotulo: "Calorias (média/dia)",
+      valor: modelo.calorias?.mediaKcal != null ? `${Math.round(modelo.calorias.mediaKcal).toLocaleString("pt-BR")} kcal` : "-",
+      detalhe: modelo.calorias
+        ? `${modelo.calorias.metaMediaKcal != null ? `meta ${Math.round(modelo.calorias.metaMediaKcal).toLocaleString("pt-BR")} | ` : ""}${modelo.calorias.diasRegistrados}/${modelo.calorias.diasPeriodo} dias`
+        : "sem dados da dieta",
+    },
   ];
-  const wCaixa = (util - 2 * 4) / 3;
+  const wCaixa = (util - 3 * 3) / 4;
   caixas.forEach((c, i) => {
-    const x = M + i * (wCaixa + 4);
+    const x = M + i * (wCaixa + 3);
     doc.setDrawColor(...COR.linha);
     doc.setFillColor(...COR.zebra);
     doc.roundedRect(x, y, wCaixa, 17, 2, 2, "FD");
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...COR.suave);
-    doc.text(c.rotulo, x + 3, y + 5);
+    doc.text(c.rotulo, x + 2.5, y + 5);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor(...COR.texto);
-    doc.text(c.valor, x + 3, y + 10.5);
+    doc.text(c.valor, x + 2.5, y + 10.5);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...COR.suave);
-    doc.text(c.detalhe, x + 3, y + 14.5);
+    doc.text(c.detalhe, x + 2.5, y + 14.5);
   });
   y += 22;
 

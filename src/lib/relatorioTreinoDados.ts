@@ -11,6 +11,7 @@ import {
 } from "./treinoApi";
 import { getPesosDoPeriodo, listMetaHistorico, calcularMediaMovelSerie, calcularLinhaMetaPorDia } from "./pesoApi";
 import { partesFadigaSemanal } from "./fadiga";
+import { getResumoCaloriasPeriodo } from "./dietaApi";
 import { hojeISO } from "./dates";
 import { montarRelatorio, type ModeloRelatorio } from "./relatorioTreino";
 
@@ -49,11 +50,13 @@ export async function levantarRelatorio(args: {
     }
   }
 
-  const [volume, registros, pesosTodos, metaHistorico, ...historicos] = await Promise.all([
+  const [volume, registros, pesosTodos, metaHistorico, calorias, ...historicos] = await Promise.all([
     getVolumeRealizadoBruto(inicio, fim),
     getRegistrosPorTreinoDesde(inicio),
     getPesosDoPeriodo("1900-01-01", fim > hojeISO() ? fim : hojeISO()),
     listMetaHistorico(),
+    // Informativo: se a dieta falhar, o relatório sai sem as calorias.
+    getResumoCaloriasPeriodo(inicio, fim).catch(() => null),
     ...Array.from(agregados.keys()).map(async (id) => {
       const pontos = args.historico.get(id) ?? (await getHistoricoExercicio(id));
       const marcs = args.marcadores.get(id) ?? (await listMarcadoresExercicio(id));
@@ -99,6 +102,7 @@ export async function levantarRelatorio(args: {
     exercicios,
     fimDoTreino,
     sessoes: { realizadas: sessoes.size, planejadasPorSemana: treinos.length },
+    calorias,
     peso: {
       pontos: ordenados,
       mediaMovel: calcularMediaMovelSerie(ordenados),
