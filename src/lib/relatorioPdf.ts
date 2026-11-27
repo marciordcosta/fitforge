@@ -180,68 +180,42 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   y = yTopo + altGraf + 6;
 
   // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
-  titulo("Resumo por músculo: planejado, realizado, prioridade e progressão");
+  titulo("Consolidado por músculo (realizado no período)");
   tabela({
-    head: [
-      [
-        { content: "", styles: { fillColor: COR.cabecalho } },
-        { content: "Planejado", styles: { halign: "center", fillColor: [51, 65, 85] } },
-        { content: "Realizado", colSpan: 2, styles: { halign: "center", fillColor: [30, 64, 175] } },
-        { content: "Prioridade (curva ABC do realizado)", colSpan: 4, styles: { halign: "center", fillColor: [51, 65, 85] } },
-        { content: "Leitura", colSpan: 5, styles: { halign: "center", fillColor: [30, 64, 175] } },
-      ],
-      ["Músculo", "Pond./sem.", "Pond./sem.", "vs plano", "% total", "Acum. %", "Curva", "Plano", "Faixa", "Freq./sem.", "Progressão", "Var. %", "Ação sugerida"],
-    ],
+    head: [["Músculo", "Séries/sem.", "Planejado", "% total", "Acum. %", "Curva", "Progressão", "Ação sugerida"]],
     body: modelo.musculos.map((l) => [
       l.nome,
-      fmtNum(l.planPond),
       fmtNum(l.mediaSemanal),
-      l.deltaPct != null ? fmtSinal(l.deltaPct, 0, "%") : "-",
+      fmtNum(l.planPond),
       l.curva ? `${l.pctTotal}%` : "-",
       l.curva ? `${l.acumuladoPct}%` : "-",
       l.curva ?? "-",
-      l.curvaPlanejada ?? "-",
-      NOME_CLASSE[l.classe],
-      fmtNum(l.frequenciaSemanal),
-      l.progressao ? NOME_PROGRESSAO[l.progressao] : "-",
-      fmtSinal(l.variacaoPct, 1, "%"),
+      l.progressao ? `${NOME_PROGRESSAO[l.progressao]}${l.variacaoPct != null ? ` ${fmtSinal(l.variacaoPct, 1, "%")}` : ""}` : "-",
       l.acao,
     ]),
     columnStyles: {
-      0: { cellWidth: 32, fontStyle: "bold" },
-      1: { halign: "right", cellWidth: 20 },
-      2: { halign: "right", cellWidth: 20 },
-      3: { halign: "right", cellWidth: 16 },
-      4: { halign: "right", cellWidth: 14 },
-      5: { halign: "right", cellWidth: 15 },
-      6: { halign: "center", cellWidth: 12 },
-      7: { halign: "center", cellWidth: 12 },
-      8: { cellWidth: 21 },
-      9: { halign: "right", cellWidth: 18 },
-      10: { cellWidth: 23 },
-      11: { halign: "right", cellWidth: 15 },
+      0: { cellWidth: 42, fontStyle: "bold" },
+      1: { halign: "right", cellWidth: 24 },
+      2: { halign: "right", cellWidth: 24 },
+      3: { halign: "right", cellWidth: 20 },
+      4: { halign: "right", cellWidth: 20 },
+      5: { halign: "center", cellWidth: 16 },
+      6: { cellWidth: 42 },
     },
     didParseCell: (d) => {
       if (d.section === "head") return;
       const l = modelo.musculos[d.row.index];
       const col = d.column.index;
-      if (col === 3 && l.deltaPct != null) {
-        d.cell.styles.textColor = l.deltaPct <= -25 ? COR.vermelho : l.deltaPct < -10 ? COR.ambar : COR.texto;
+      // Realizado bem abaixo do planejado: destaca a única comparação da tabela.
+      if (col === 1 && l.deltaPct != null && l.deltaPct <= -25) {
+        d.cell.styles.textColor = COR.vermelho;
         d.cell.styles.fontStyle = "bold";
       }
-      if (col === 6 || col === 7) {
-        const v = col === 6 ? l.curva : l.curvaPlanejada;
-        if (v) {
-          d.cell.styles.fontStyle = "bold";
-          d.cell.styles.textColor = v === "A" ? COR.verde : v === "B" ? COR.ambar : COR.suave;
-          if (col === 7 && l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) d.cell.styles.textColor = COR.vermelho;
-        }
-      }
-      if (col === 8) {
-        d.cell.styles.textColor = corClasse(l.classe);
+      if (col === 5 && l.curva) {
         d.cell.styles.fontStyle = "bold";
+        d.cell.styles.textColor = l.curva === "A" ? COR.verde : l.curva === "B" ? COR.ambar : COR.suave;
       }
-      if (col === 10 || col === 11) {
+      if (col === 6) {
         d.cell.styles.textColor = corProgressao(l.progressao);
         d.cell.styles.fontStyle = "bold";
       }
@@ -251,7 +225,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Pond./sem.: séries ponderadas pelo peso de contribuição de cada exercício no músculo, a mesma leitura do Realizado; planejado = soma das rotinas, realizado = média das semanas com treino; vs plano = realizado contra o planejado. Curva ABC: músculos do maior pro menor volume realizado, A = até 70% do volume acumulado, B = até 90%, C = o restante (onde o volume está investido, a prioridade na prática); Plano = a mesma curva sobre o planejado, em vermelho quando difere da real. Faixa: classificação do volume (vermelho abaixo da manutenção, verde na meta, azul acima do foco). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise).",
+    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado; em vermelho quando está 25% ou mais abaixo do Planejado. Curva ABC: músculos do maior pro menor volume realizado; A = até 70% do volume acumulado, B = até 90%, C = o restante (onde o volume está investido, a prioridade na prática). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Faixa de volume, frequência e demais comparações com o plano estão no Aprofundamento.",
     util,
   ) as string[];
   garantir(nota.length * 3.2);
@@ -334,17 +308,47 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     y += notaDist.length * 3.2 + 4;
   }
 
-  titulo("Detalhe por músculo: grupo e fim do treino");
+  titulo("Detalhe por músculo: faixa, frequência, plano e fim do treino");
   tabela({
-    head: [["Músculo", "Grupo", "Fim do treino (bloco C)"]],
-    body: modelo.musculos.map((l) => [l.nome, l.grupo ?? "-", l.fimDoTreinoPct != null ? `${l.fimDoTreinoPct}%` : "-"]),
-    columnStyles: { 0: { cellWidth: 60, fontStyle: "bold" }, 1: { cellWidth: 60 }, 2: { halign: "right" } },
+    head: [["Músculo", "Grupo", "Faixa", "Freq./sem.", "Realizado vs plano", "Curva real", "Curva plano", "Fim do treino (bloco C)"]],
+    body: modelo.musculos.map((l) => [
+      l.nome,
+      l.grupo ?? "-",
+      NOME_CLASSE[l.classe],
+      fmtNum(l.frequenciaSemanal),
+      l.deltaPct != null ? fmtSinal(l.deltaPct, 0, "%") : "-",
+      l.curva ?? "-",
+      l.curvaPlanejada ?? "-",
+      l.fimDoTreinoPct != null ? `${l.fimDoTreinoPct}%` : "-",
+    ]),
+    columnStyles: {
+      0: { cellWidth: 40, fontStyle: "bold" },
+      1: { cellWidth: 32 },
+      2: { cellWidth: 24 },
+      3: { halign: "right", cellWidth: 22 },
+      4: { halign: "right", cellWidth: 34 },
+      5: { halign: "center", cellWidth: 22 },
+      6: { halign: "center", cellWidth: 22 },
+      7: { halign: "right" },
+    },
+    didParseCell: (d) => {
+      if (d.section !== "body") return;
+      const l = modelo.musculos[d.row.index];
+      if (d.column.index === 2) {
+        d.cell.styles.textColor = corClasse(l.classe);
+        d.cell.styles.fontStyle = "bold";
+      }
+      if (d.column.index === 6 && l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) {
+        d.cell.styles.textColor = COR.vermelho;
+        d.cell.styles.fontStyle = "bold";
+      }
+    },
   });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota2 = doc.splitTextToSize(
-    "Fim do treino: % do volume planejado do músculo que cai no último bloco da rotina, onde a fadiga desconta mais. Um músculo estagnado com esse número alto pode pedir exercício trazido pro começo do treino, não menos séries.",
+    "Faixa: classificação do volume realizado (vermelho abaixo da manutenção, verde na meta, azul acima do foco). Freq./sem.: dias por semana em que o músculo foi treinado. Curva plano: a mesma curva ABC sobre o volume planejado (em vermelho quando difere da real: a prioridade na prática desviou do plano). Fim do treino: % do volume planejado do músculo que cai no último bloco da rotina, onde a fadiga desconta mais; um músculo estagnado com esse número alto pode pedir exercício trazido pro começo do treino, não menos séries.",
     util,
   ) as string[];
   garantir(nota2.length * 3.2);
