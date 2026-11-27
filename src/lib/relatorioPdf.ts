@@ -370,6 +370,9 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---------------- plano atual x executado ----------------
   if (modelo.ajustesPlano.length) {
+    // Começa numa folha separada (é a parte de decisão do plano, fora das tabelas de apoio).
+    doc.addPage();
+    y = M;
     titulo("Plano atual contra o executado (onde divergem)");
     tabela({
       head: [["Músculo", "Exec.", "Plano", "Dif.", "Faixa (exec. > plano)", "Progressão", "Leitura"]],
