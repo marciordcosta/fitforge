@@ -6,7 +6,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { lerFimDoDescanso, gravarFimDoDescanso, type FimDoDescanso } from "../../lib/treinoDescansoPrefs";
-  import { lerPausaReiniciarSemanas, gravarPausaReiniciarSemanas, lerFadigaAtiva, gravarFadigaAtiva } from "../../lib/treinoProgressaoPrefs";
+  import { lerPausaReiniciarSemanas, gravarPausaReiniciarSemanas, lerJanelaProgressaoSemanas, gravarJanelaProgressaoSemanas, lerFadigaAtiva, gravarFadigaAtiva } from "../../lib/treinoProgressaoPrefs";
   import {
     getParametrosDistribuicao,
     salvarParametrosDistribuicao,
@@ -38,6 +38,11 @@
   /** Prazo (em semanas) do "reiniciar automático" da tendência de progressão — preferência do aparelho,
    * aplicada na hora. 0 ou vazio = desligado. */
   let pausaReiniciarSemanas = $state<number | null>(lerPausaReiniciarSemanas() || null);
+  /** Janela (em semanas) da conta de progressão: só as sessões dessas últimas semanas entram. Vazio ou 0 = tudo. */
+  let janelaProgressaoSemanas = $state<number | null>(lerJanelaProgressaoSemanas() || null);
+  function aoMudarJanelaProgressao() {
+    gravarJanelaProgressaoSemanas(janelaProgressaoSemanas ?? 0);
+  }
   function aoMudarPausaReiniciar() {
     gravarPausaReiniciarSemanas(pausaReiniciarSemanas ?? 0);
   }
@@ -344,6 +349,42 @@
         <input type="checkbox" bind:checked={destacarExerciciosSemRotina} />
         <span>Destacar na lista Exercícios os que ainda não estão em nenhuma rotina (em vez dos que já estão)</span>
       </label>
+        </div>
+      {/if}
+    </div>
+
+    <div class="param-card">
+      <button type="button" class="param-card-header" onclick={() => alternarCard("Janela da progressão")}>
+        <span>Janela da progressão</span>
+        <span class="chevron" class:aberto={cardsAbertos.has("Janela da progressão")}>{@render iconChevron()}</span>
+      </button>
+      {#if cardsAbertos.has("Janela da progressão")}
+        <div class="param-card-body">
+          <p class="param-card-desc">
+            A leitura de progresso (Progredindo / Estagnado / Regredindo, no exercício e no músculo, e o gráfico do músculo)
+            usa só as sessões das últimas semanas. Marcadores de reiniciar, dias desconsiderados e a pausa automática
+            continuam valendo. Com menos de 4 sessões na janela aparece "Em análise". Vale na hora, só neste aparelho.
+            Vazio ou 0 = usa todo o histórico.
+          </p>
+          <div class="param-linha">
+            <div class="param-linha-topo">
+              <p class="param-nome">Últimas</p>
+              <div class="param-campos">
+                <input
+                  class="param-input"
+                  type="number"
+                  inputmode="numeric"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  aria-label="Semanas da janela da progressão"
+                  bind:value={janelaProgressaoSemanas}
+                  oninput={aoMudarJanelaProgressao}
+                />
+                <span class="param-unidade">semanas</span>
+              </div>
+            </div>
+          </div>
         </div>
       {/if}
     </div>

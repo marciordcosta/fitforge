@@ -67,3 +67,25 @@ export function gravarFadigaAtiva(ativa: boolean): void {
     // sem localStorage: a preferência só não persiste
   }
 }
+
+const CHAVE_JANELA = "fitforge_treino_janela_progressao_semanas";
+
+/** Janela da progressão (Treino > Parametrização): a conta de tendência (exercício, músculo e gráfico
+ * do músculo) só usa as sessões das últimas N semanas. 0 (padrão) = sem janela, usa tudo. Preferência
+ * do aparelho. */
+export function lerJanelaProgressaoSemanas(): number {
+  try {
+    const n = Number(localStorage.getItem(CHAVE_JANELA));
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function gravarJanelaProgressaoSemanas(semanas: number): void {
+  try {
+    localStorage.setItem(CHAVE_JANELA, String(Math.max(0, Math.floor(semanas) || 0)));
+  } catch {
+    // sem localStorage: a preferência só não persiste
+  }
+}

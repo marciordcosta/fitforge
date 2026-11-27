@@ -4,8 +4,8 @@
   import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import { navigate, voltar, router } from "../../lib/router.svelte";
-  import { toISODate, parseISODate } from "../../lib/dates";
-  import { lerPausaReiniciarSemanas, dataCortePorPausa } from "../../lib/treinoProgressaoPrefs";
+  import { toISODate, parseISODate, somarDias } from "../../lib/dates";
+  import { lerPausaReiniciarSemanas, dataCortePorPausa, lerJanelaProgressaoSemanas } from "../../lib/treinoProgressaoPrefs";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -1270,8 +1270,11 @@
       lerPausaReiniciarSemanas(),
       toISODate(new Date()),
     );
-    if (!datasDesconsiderar.size && ultimaDataReiniciar == null && cortePausa == null) return pontos;
-    const corte = [ultimaDataReiniciar, cortePausa].filter((d): d is string => d != null).sort().pop() ?? null;
+    // Janela da progressão (semanas, Parametrização): só vale o que está dentro dela, a partir de hoje.
+    const semanasJanela = lerJanelaProgressaoSemanas();
+    const corteJanela = semanasJanela > 0 ? somarDias(toISODate(new Date()), -7 * semanasJanela) : null;
+    if (!datasDesconsiderar.size && ultimaDataReiniciar == null && cortePausa == null && corteJanela == null) return pontos;
+    const corte = [ultimaDataReiniciar, cortePausa, corteJanela].filter((d): d is string => d != null).sort().pop() ?? null;
     return pontos.filter((p) => !datasDesconsiderar.has(p.data) && (corte == null || p.data >= corte));
   }
 
