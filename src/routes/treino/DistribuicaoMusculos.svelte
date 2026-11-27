@@ -1108,6 +1108,7 @@
       const { gerarRelatorioPdf, entregarPdf } = await import("../../lib/relatorioPdf");
       const blob = await gerarRelatorioPdf(modelo);
       await entregarPdf(blob, `relatorio-treino-${inicio}_${fim}.pdf`);
+      mostrarToast("Relatório pronto");
       mostrarRelatorio = false;
     } catch (err) {
       mostrarToast(`Não consegui gerar o relatório: ${(err as Error).message}`, 4000);
