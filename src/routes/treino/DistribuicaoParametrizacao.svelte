@@ -385,7 +385,7 @@
         <div class="param-card-body">
       <p class="param-card-desc">O que acontece quando o descanso chega em 0:00. Vale na hora, só neste aparelho.</p>
       <div class="fadiga-opcoes">
-        <button type="button" class:ativo={fimDoDescanso === "regressivo"} onclick={() => escolherFimDoDescanso("regressivo")}>Continuar regressivo</button>
+        <button type="button" class:ativo={fimDoDescanso === "regressivo"} onclick={() => escolherFimDoDescanso("regressivo")}>Regressivo</button>
         <button type="button" class:ativo={fimDoDescanso === "zerar"} onclick={() => escolherFimDoDescanso("zerar")}>Zerar ao terminar</button>
       </div>
       <p class="param-card-desc">
