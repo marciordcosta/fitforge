@@ -153,6 +153,7 @@ export async function levantarRelatorio(args: {
     metaSemanal,
     planejadoSemanal,
     gradeSemanal,
+    janela: (musculoId) => janelaDoMusculo(musculoPorId.get(musculoId)),
     classificar: (musculoId, serie) => classificarVolumeSemanal(serie, janelaDoMusculo(musculoPorId.get(musculoId))),
     exercicios,
     fimDoTreino,

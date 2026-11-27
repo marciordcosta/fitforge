@@ -24,6 +24,8 @@ export interface EntradaRelatorio {
    * ponderadas planejadas por músculo naquele dia. */
   gradeSemanal: { dias: { rotulo: string; rotina: string | null }[]; porMusculo: Map<string, number[]> };
   classificar: (musculoId: string, seriesSemana: number) => ClasseVolumeSemanal;
+  /** Janela de séries/semana própria de cada músculo (Músculos > Detalhe): é ela que define abaixo/dentro/acima. */
+  janela: (musculoId: string) => { min: number; max: number };
   exercicios: {
     id: string;
     nome: string;
@@ -327,12 +329,12 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
 
   // ---- decisões: dependem do foco (músculos com mais estímulo vêm primeiro) ----
   /** Limites de séries TOTAIS (sem ponderar) de um músculo num mesmo dia: acima de 8 pede atenção, acima
-   * de 10 passa do que cabe num dia (fracionar); abaixo de 5 o dia rende pouco pro músculo. Abaixo de 6
-   * séries por semana é baixo estímulo (manutenção, no máximo). */
+   * de 10 passa do que cabe num dia (fracionar); abaixo de 5 o dia rende pouco pro músculo. O volume da
+   * SEMANA não tem número fixo: cada músculo usa a janela dele (um posterior de coxa tolera bem menos
+   * que um peitoral). */
   const LIMITE_DIA_ATENCAO = 8;
   const LIMITE_DIA_MAXIMO = 10;
   const MINIMO_DIA = 5;
-  const MINIMO_SEMANA = 6;
   const MIN_SESSOES_TROCA = 4;
 
   const leituraExercicio = e.exercicios.map((x) => {
@@ -374,33 +376,32 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
       itens.push({ p: 2, curto: `um dia com só ${minDia} série${minDia === 1 ? "" : "s"} (menos de ${MINIMO_DIA}): se não é acessório, concentrar em dias de ${MINIMO_DIA} a ${LIMITE_DIA_ATENCAO}.` });
     }
 
-    // por semana
-    const baixoEstimulo = l.mediaSemanal > 0 && l.mediaSemanal < MINIMO_SEMANA;
-    if (baixoEstimulo) {
+    // volume da semana x janela do próprio músculo
+    const janela = e.janela(l.id);
+    const faixaTxt = `${fmt1(janela.min)} a ${fmt1(janela.max)}`;
+    if (l.classe === "insuficiente") {
       if (foco) {
-        itens.push({ p: 5, curto: `só ${fmt1(l.mediaSemanal)} séries/sem. num músculo de foco: subir para 10 a 16, em 2 dias.` });
-      } else {
-        itens.push({ p: 2, curto: `baixo estímulo (${fmt1(l.mediaSemanal)} séries/sem.): natural mantém com ~6; pra crescer, 10 a 12 em 2 dias (+2 por semana, reavaliar em 3 a 4 semanas). Se não é prioridade, pode manter.` });
+        itens.push({ p: 5, curto: `abaixo da janela (${fmt1(l.mediaSemanal)} contra ${faixaTxt}) num músculo de foco: aumentar séries até a janela, em 2 dias.` });
+      } else if (st && st !== "subindo" && st !== "analise") {
+        itens.push({ p: 3, curto: `abaixo da janela (${fmt1(l.mediaSemanal)} contra ${faixaTxt}) e ${st === "estavel" ? "estagnado" : "regredindo"}: aumentar séries até a janela.` });
+      } else if (l.mediaSemanal > 0) {
+        itens.push({ p: 2, curto: `baixo estímulo (${fmt1(l.mediaSemanal)} contra a janela de ${faixaTxt}): se não é prioridade, pode manter; pra crescer, +2 séries por semana até a janela e reavaliar em 3 a 4 semanas.` });
       }
-    }
-
-    // volume x progressão
-    if (st && st !== "analise") {
-      if (l.classe === "insuficiente" && !baixoEstimulo) {
-        if (foco) itens.push({ p: 5, curto: "abaixo da janela num músculo de foco: aumentar séries." });
-        else if (st !== "subindo") itens.push({ p: 3, curto: `abaixo da janela e ${st === "estavel" ? "estagnado" : "regredindo"}: aumentar séries.` });
-      } else if (l.classe === "manutencao") {
+    } else if (st && st !== "analise") {
+      if (l.classe === "manutencao") {
         if (st === "estavel") {
           if (estagnados.length) {
             itens.push({ p: 4 + bump, curto: `estagnado: trocar ou variar o ${estagnados[0].nome} (${estagnados[0].sessoesValidas} sessões sem evoluir), mudando ângulo/pegada e mantendo a base.` });
-          } else if (maxDia <= LIMITE_DIA_ATENCAO) {
-            itens.push({ p: 3 + bump, curto: "estagnado dentro da janela: testar +2 séries por semana (fracionadas) e reavaliar em 3 a 4 semanas." });
+          } else if (maxDia <= LIMITE_DIA_ATENCAO && l.mediaSemanal + 2 <= janela.max) {
+            itens.push({ p: 3 + bump, curto: `estagnado dentro da janela (${faixaTxt}): testar +2 séries por semana (fracionadas) e reavaliar em 3 a 4 semanas.` });
+          } else if (estagnados.length === 0) {
+            itens.push({ p: 2 + bump, curto: `estagnado no topo da janela (${faixaTxt}): em vez de subir séries, variar exercício ou intensidade.` });
           }
         } else if (st === "caindo") {
           itens.push({ p: 4 + bump, curto: `regredindo dentro da janela: checar recuperação (sono, calorias, descanso entre séries); reduzir 2 séries antes de trocar exercício${emQueda.length ? `. O que mais caiu: ${emQueda[0].nome}` : ""}.` });
         }
       } else if (l.classe === "foco" && st !== "subindo") {
-        itens.push({ p: 5, curto: `acima da janela sem resposta: reduzir 2 a 4 séries${maxDia > LIMITE_DIA_ATENCAO ? " e fracionar em mais dias" : ""}; mais volume não está virando resultado.` });
+        itens.push({ p: 5, curto: `acima da janela (${fmt1(l.mediaSemanal)} contra o máximo de ${fmt1(janela.max)}) sem resposta: reduzir 2 a 4 séries${maxDia > LIMITE_DIA_ATENCAO ? " e fracionar em mais dias" : ""}.` });
       }
     }
     itens.sort((a, b) => b.p - a.p);
