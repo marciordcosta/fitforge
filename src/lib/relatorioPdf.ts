@@ -165,6 +165,8 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
 
   // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
   titulo("Consolidado por músculo (realizado no período)");
+  // Músculos que aparecem na tabela de 1RM (Por exercício): ganham um asterisco pequeno ao lado do nome.
+  const musculosNa1rm = new Set(modelo.exercicios.filter((x) => x.sessoes >= 4).map((x) => x.musculo));
   tabela({
     head: [["Músculo", "Séries/sem.", "Faixa", "Progressão", "Ação sugerida"]],
     body: modelo.musculos.map((l) => [
@@ -179,6 +181,17 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       1: { halign: "right", cellWidth: 20 },
       2: { cellWidth: 24 },
       3: { cellWidth: 34 },
+    },
+    didDrawCell: (d) => {
+      if (d.section !== "body" || d.column.index !== 0) return;
+      const l = modelo.musculos[d.row.index];
+      if (!l || !musculosNa1rm.has(l.nome)) return;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      const larguraNome = doc.getTextWidth(l.nome);
+      doc.setFontSize(6);
+      doc.setTextColor(...COR.suave);
+      doc.text("*", d.cell.x + d.cell.padding("left") + larguraNome + 0.4, d.cell.y + d.cell.padding("top") + 1.7);
     },
     didParseCell: (d) => {
       if (d.section === "head") return;
@@ -341,7 +354,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const notaEx = doc.splitTextToSize(
-    "1RM início e fim: primeira e última sessão válida do período, depois do último reinício marcado ou pausa (sessões marcadas como desconsiderar ficam de fora). Var. % e Status vêm da reta de tendência dessas mesmas sessões, não só do início e do fim; sem sessões válidas suficientes ficam em branco ou Em análise.",
+    "* Músculo da tabela Consolidado que tem exercício listado aqui. 1RM início e fim: primeira e última sessão válida do período, depois do último reinício marcado ou pausa (sessões marcadas como desconsiderar ficam de fora). Var. % e Status vêm da reta de tendência dessas mesmas sessões, não só do início e do fim; sem sessões válidas suficientes ficam em branco ou Em análise.",
     util,
   ) as string[];
   garantir(notaEx.length * 3.2);
