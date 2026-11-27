@@ -186,21 +186,19 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
   titulo("Consolidado por músculo (realizado no período)");
   tabela({
-    head: [["Músculo", "Séries/sem.", "Faixa", "Freq./sem.", "Progressão", "Ação sugerida"]],
+    head: [["Músculo", "Séries/sem.", "Faixa", "Progressão", "Ação sugerida"]],
     body: modelo.musculos.map((l) => [
       l.nome,
       fmtNum(l.mediaSemanal),
       NOME_CLASSE[l.classe],
-      `${fmtNum(l.frequenciaSemanal)}x`,
       l.progressao ? `${NOME_PROGRESSAO[l.progressao]}${l.variacaoPct != null ? ` ${fmtSinal(l.variacaoPct, 1, "%")}` : ""}` : "-",
       l.acao,
     ]),
     columnStyles: {
-      0: { cellWidth: 32, fontStyle: "bold" },
+      0: { cellWidth: 34, fontStyle: "bold" },
       1: { halign: "right", cellWidth: 20 },
-      2: { cellWidth: 21 },
-      3: { halign: "right", cellWidth: 17 },
-      4: { cellWidth: 31 },
+      2: { cellWidth: 24 },
+      3: { cellWidth: 34 },
     },
     didParseCell: (d) => {
       if (d.section === "head") return;
@@ -210,7 +208,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
         d.cell.styles.textColor = corClasse(l.classe);
         d.cell.styles.fontStyle = "bold";
       }
-      if (col === 4) {
+      if (col === 3) {
         d.cell.styles.textColor = corProgressao(l.progressao);
         d.cell.styles.fontStyle = "bold";
       }
@@ -220,7 +218,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo, dividida em três partes iguais (Manutenção, Moderado e Prioridade, em verde); abaixo da janela é Abaixo (vermelho) e acima dela é Foco (azul). Freq./sem.: quantos dias por semana o músculo é treinado, contando séries totais (qualquer exercício que o trabalhe, sem ponderar). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Decisões: músculos de foco (volume de 125% da média ou mais) vêm primeiro. Volume da semana: sempre contra a janela de séries de cada músculo (um posterior de coxa tolera menos que um peitoral). Os avisos de séries num dia só (fracionar, perto do limite ou dia fraco) estão na tabela de Distribuição semanal. Referência para natural: dividir em 2 ou mais dias, subir ~2 séries por semana e reavaliar em 3 a 4 semanas; trocar exercício só depois de 4 ou mais sessões estagnadas.",
+    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo, dividida em três partes iguais (Manutenção, Moderado e Prioridade, em verde); abaixo da janela é Abaixo (vermelho) e acima dela é Foco (azul). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Decisões: músculos de foco (volume de 125% da média ou mais) vêm primeiro. Volume da semana: sempre contra a janela de séries de cada músculo (um posterior de coxa tolera menos que um peitoral). Os avisos de séries num dia só (fracionar, perto do limite ou dia fraco) estão na tabela de Distribuição semanal. Referência para natural: dividir em 2 ou mais dias, subir ~2 séries por semana e reavaliar em 3 a 4 semanas; trocar exercício só depois de 4 ou mais sessões estagnadas.",
     util,
   ) as string[];
   garantir(nota.length * 3.2);
