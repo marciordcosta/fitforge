@@ -1931,16 +1931,23 @@ export function janelaDoMusculo(m: { series_minimas?: number | null; series_maxi
   return { min: m?.series_minimas ?? JANELA_VOLUME_PADRAO.min, max: m?.series_maximas ?? JANELA_VOLUME_PADRAO.max };
 }
 
-/** Classifica um total semanal de séries (SEMPRE ponderado) contra a janela do músculo. A janela é dividida
- * em três partes iguais: manutenção (primeiro terço), moderado (segundo) e prioridade (último); abaixo do
- * mínimo é "insuficiente" e acima do máximo é "foco". Ex.: janela 8 a 14 → 8 a 10 manutenção, acima de
- * 10 até 12 moderado, acima de 12 até 14 prioridade, acima de 14 foco. */
+/** Classifica um total semanal de séries (SEMPRE ponderado) contra a janela do músculo. As séries inteiras da
+ * janela (mín a máx, contando as duas pontas) são repartidas entre manutenção, moderado e prioridade; o que
+ * sobra da divisão por 3 vai primeiro pra manutenção e depois pra moderado (prioridade fica com menos). Abaixo
+ * do mínimo é "insuficiente" e acima do máximo é "foco".
+ * Ex.: 8 a 14 (7 séries) → 3/2/2: 8 a 10 manutenção, 11 a 12 moderado, 13 a 14 prioridade.
+ * 4 séries → 2/1/1. 5 séries → 2/2/1. 2 séries → 1/1/0 (sem prioridade). Valores quebrados (10,5) ficam na
+ * mesma parte da série inteira de baixo. */
 export function classificarVolumeSemanal(v: number, janela: JanelaVolume): ClasseVolumeSemanal {
   if (v < janela.min) return "insuficiente";
   if (v > janela.max) return "foco";
-  const terco = (janela.max - janela.min) / 3;
-  if (v <= janela.min + terco) return "manutencao";
-  if (v <= janela.min + 2 * terco) return "moderado";
+  const n = Math.max(1, Math.round(janela.max - janela.min) + 1);
+  const base = Math.floor(n / 3);
+  const resto = n % 3;
+  const manutencao = base + (resto >= 1 ? 1 : 0);
+  const moderado = base + (resto >= 2 ? 1 : 0);
+  if (v < janela.min + manutencao) return "manutencao";
+  if (v < janela.min + manutencao + moderado) return "moderado";
   return "prioridade";
 }
 
