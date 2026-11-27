@@ -168,7 +168,7 @@ export async function levantarRelatorio(args: {
         dia: t.dia_semana != null ? NOMES_DIAS[t.dia_semana] : null,
         totalSeries: t.exercicios.reduce((acc, te) => acc + te.series.length, 0),
         numExercicios: t.exercicios.length,
-        exercicios: exerciciosOrdenados.map((te) => te.exercicio?.nome ?? ""),
+        exercicios: exerciciosOrdenados.map((te) => ({ nome: te.exercicio?.nome ?? "", series: te.series.length })),
         musculos: Array.from(porMusculo.entries())
           .map(([id, v]) => {
             const p = partes.get(id);

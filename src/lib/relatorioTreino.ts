@@ -125,8 +125,8 @@ export interface RotinaRelatorio {
   /** Músculos que a rotina trabalha, do maior pro menor volume ponderado: séries totais (1 por músculo
    * tocado), ponderadas e acumuladas (null com a fadiga desligada, quando seria igual à ponderada). */
   musculos: { nome: string; total: number; pond: number; acum: number | null }[];
-  /** Nomes dos exercícios do dia, na ordem do treino. */
-  exercicios: string[];
+  /** Exercícios do dia, na ordem do treino, com o número de séries de cada um. */
+  exercicios: { nome: string; series: number }[];
 }
 
 export interface LinhaGradeRelatorio {

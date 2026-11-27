@@ -277,7 +277,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
         const m = r.musculos[k];
         const linha: string[] = m ? [m.nome, fmtNum(m.total, m.total % 1 ? 1 : 0), fmtNum(m.pond)] : ["", "", ""];
         if (comAcum) linha.push(m && m.acum != null ? fmtNum(m.acum) : m ? "-" : "");
-        linha.push(r.exercicios[k] ? `${k + 1}. ${r.exercicios[k]}` : "");
+        linha.push(r.exercicios[k] ? `${k + 1}. ${r.exercicios[k].nome} (${r.exercicios[k].series})` : "");
         corpo.push(linha);
       }
     }
@@ -296,7 +296,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     doc.setFontSize(7);
     doc.setTextColor(...COR.suave);
     const notaRot = doc.splitTextToSize(
-      "Séries planejadas por semana nesta rotina, como no card da rotina no app: Total conta 1 série para cada músculo que o exercício trabalha; Pond. pondera pelo peso de contribuição do exercício no músculo; Acum. desconta a posição da série na rotina (só aparece com a fadiga por posição ligada). A lista de exercícios ao lado segue a ordem do treino; cada linha é um exercício, independente do músculo da mesma linha.",
+      "Séries planejadas por semana nesta rotina, como no card da rotina no app: Total conta 1 série para cada músculo que o exercício trabalha; Pond. pondera pelo peso de contribuição do exercício no músculo; Acum. desconta a posição da série na rotina (só aparece com a fadiga por posição ligada). A lista de exercícios ao lado segue a ordem do treino, com o número de séries de cada um entre parênteses; cada linha é um exercício, independente do músculo da mesma linha.",
       util,
     ) as string[];
     garantir(notaRot.length * 3.2);
