@@ -1,13 +1,15 @@
 <script lang="ts">
   import MusculoGraficoProgressao from "./MusculoGraficoProgressao.svelte";
   import { calcularProgressaoMusculo, type ItemProgressao } from "../../lib/progressaoMusculo";
+  import { levantarRelatorio } from "../../lib/relatorioTreinoDados";
   import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import { navigate, voltar, router } from "../../lib/router.svelte";
-  import { toISODate, parseISODate } from "../../lib/dates";
-  import { pontosParaTendencia } from "../../lib/tendenciaExercicio";
+  import { toISODate, parseISODate, somarDias, hojeISO } from "../../lib/dates";
+  import { pontosParaTendencia, variacaoExercicio, classificarTendencia } from "../../lib/tendenciaExercicio";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
+  import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import PieChart, { PALETA } from "../../components/PieChart.svelte";
   import WheelPicker from "../../components/WheelPicker.svelte";
@@ -1061,12 +1063,66 @@
     return { colunas, linhas };
   });
 
+  // ---------------- Relatório de decisão (PDF) ----------------
+  type PeriodoRelatorio = "mes" | "4" | "8" | "12" | "custom";
+  const OPCOES_PERIODO_RELATORIO: { valor: PeriodoRelatorio; label: string }[] = [
+    { valor: "4", label: "Últimas 4 semanas" },
+    { valor: "8", label: "Últimas 8 semanas" },
+    { valor: "12", label: "Últimas 12 semanas" },
+    { valor: "mes", label: "Mês aberto" },
+    { valor: "custom", label: "Personalizado" },
+  ];
+  let mostrarRelatorio = $state(false);
+  let periodoRelatorio = $state<PeriodoRelatorio>("8");
+  let relatorioInicioCustom = $state(toISODate(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  let relatorioFimCustom = $state(hojeISO());
+  let gerandoRelatorio = $state(false);
+
+  function intervaloRelatorio(): { inicio: string; fim: string } {
+    const hoje = hojeISO();
+    if (periodoRelatorio === "mes") return { inicio: toISODate(mesInicio), fim: toISODate(mesFim) };
+    if (periodoRelatorio === "custom") return { inicio: relatorioInicioCustom, fim: relatorioFimCustom };
+    return { inicio: somarDias(hoje, -(7 * Number(periodoRelatorio) - 1)), fim: hoje };
+  }
+
+  async function exportarRelatorio(): Promise<void> {
+    if (gerandoRelatorio) return;
+    const { inicio, fim } = intervaloRelatorio();
+    if (!inicio || !fim || inicio > fim) {
+      mostrarToast("Período inválido");
+      return;
+    }
+    gerandoRelatorio = true;
+    try {
+      const modelo = await levantarRelatorio({
+        inicio,
+        fim,
+        musculos,
+        treinos,
+        metaSemanal: metaPorMusculo,
+        parametros: parametrosDistribuicao,
+        parametrosParaMusculo,
+        historico: historicoPorExercicio,
+        marcadores: marcadoresPorExercicio,
+      });
+      const { gerarRelatorioPdf, entregarPdf } = await import("../../lib/relatorioPdf");
+      const blob = await gerarRelatorioPdf(modelo);
+      await entregarPdf(blob, `relatorio-treino-${inicio}_${fim}.pdf`);
+      mostrarRelatorio = false;
+    } catch (err) {
+      mostrarToast(`Não consegui gerar o relatório: ${(err as Error).message}`, 4000);
+    } finally {
+      gerandoRelatorio = false;
+    }
+  }
+
   function abrirMenuRealizado(): void {
     modalAberto = {
       titulo: "Realizado",
       opcoes: [
         { label: "Mês", icon: iconGrade, onSelect: () => (mostrarGradeRealizado = true) },
         { label: "Gráfico", icon: iconGrafico, onSelect: () => abrirDetalheRotina(mesLabel, listaRealizado) },
+        { label: "Relatório (PDF)", icon: iconRelatorio, onSelect: () => (mostrarRelatorio = true) },
       ],
     };
   }
@@ -1215,40 +1271,6 @@
   /** Status e carregamento lidos do gráfico de progressão do modal por músculo (ver MusculoGraficoProgressao). */
   let statusModalMusculo = $state<Tend | null>(null);
   let carregandoModalMusculo = $state(true);
-
-  /** Mínimo de sessões válidas pra dar resultado (com 2 ou 3 fica "em análise"). */
-  const MIN_SESSOES_TENDENCIA = 4;
-
-  /** Tendência do exercício como uma linha de gráfico: ajusta a reta (mínimos quadrados) pelo 1RM de
-   * TODAS as sessões válidas (já sem as antes de pausa/reinício/dias desconsiderados) e devolve
-   * quanto ela sobe ou desce do primeiro ao último ponto, em % do 1RM médio. Uma sessão fora da
-   * curva pesa pouco; null se há menos de MIN_SESSOES_TENDENCIA sessões. */
-  function variacaoExercicio(pontos: { melhor1rm: number }[]): number | null {
-    const n = pontos.length;
-    if (n < MIN_SESSOES_TENDENCIA) return null;
-    const mediaX = (n - 1) / 2;
-    const mediaY = pontos.reduce((acc, p) => acc + p.melhor1rm, 0) / n;
-    if (mediaY <= 0) return null;
-    let num = 0;
-    let den = 0;
-    pontos.forEach((p, x) => {
-      num += (x - mediaX) * (p.melhor1rm - mediaY);
-      den += (x - mediaX) ** 2;
-    });
-    const inclinacao = num / den;
-    return (inclinacao * (n - 1)) / mediaY;
-  }
-
-  /** Tendência em texto: null com menos de 2 sessões; "analise" com 2 ou 3; senão pela inclinação da reta. */
-  function classificarTendencia(pontos: { melhor1rm: number }[]): Tend | null {
-    if (pontos.length < 2) return null;
-    const v = variacaoExercicio(pontos);
-    if (v == null) return "analise";
-    if (v > 0.02) return "subindo";
-    if (v < -0.02) return "caindo";
-    return "estavel";
-  }
-
 
   /** Tendência de um exercício específico (não agregada por músculo) — mostrada como texto
    * discreto embaixo do nome no editor completo da rotina. */
@@ -2640,6 +2662,14 @@
   {/if}
 </div>
 
+{#snippet iconRelatorio()}
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+    <polyline points="14 3 14 9 20 9" />
+    <line x1="8" y1="13" x2="16" y2="13" />
+    <line x1="8" y1="17" x2="14" y2="17" />
+  </svg>
+{/snippet}
 {#snippet iconGrafico()}
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
@@ -2902,6 +2932,33 @@
       onFechar={() => (editandoMeta = null)}
     />
   </div>
+{/if}
+
+{#if mostrarRelatorio}
+  <Sheet titulo="Relatório de decisão (PDF)" onFechar={() => !gerandoRelatorio && (mostrarRelatorio = false)}>
+    <p class="relatorio-desc">
+      Resumo do período para decidir foco, séries e ajustes: peso contra a meta, volume e progressão por músculo, exercícios,
+      alertas e equilíbrio entre grupos.
+    </p>
+    <div class="relatorio-periodos" role="radiogroup" aria-label="Período do relatório">
+      {#each OPCOES_PERIODO_RELATORIO as opcao (opcao.valor)}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={periodoRelatorio === opcao.valor}
+          class="relatorio-periodo"
+          class:ativo={periodoRelatorio === opcao.valor}
+          onclick={() => (periodoRelatorio = opcao.valor)}
+        >{opcao.label}</button>
+      {/each}
+    </div>
+    <!-- Sempre presente (só desabilitado fora de "Personalizado"): a Sheet não muda de altura. -->
+    <div class="relatorio-datas">
+      <label>De <input type="date" bind:value={relatorioInicioCustom} disabled={periodoRelatorio !== "custom"} max={relatorioFimCustom} /></label>
+      <label>Até <input type="date" bind:value={relatorioFimCustom} disabled={periodoRelatorio !== "custom"} min={relatorioInicioCustom} max={hojeISO()} /></label>
+    </div>
+    <Button onclick={exportarRelatorio} disabled={gerandoRelatorio}>{gerandoRelatorio ? "Gerando…" : "Gerar PDF"}</Button>
+  </Sheet>
 {/if}
 
 {#if mostrarGradeRealizado}
@@ -3899,6 +3956,56 @@
   .link-distribuicao svg {
     width: 20px;
     height: 20px;
+  }
+  .relatorio-desc {
+    margin: 0 0 var(--space-3);
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+  }
+  .relatorio-periodos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .relatorio-periodo {
+    padding: 8px 12px;
+    border: 1px solid var(--surface-border);
+    border-radius: 999px;
+    background: var(--surface-card);
+    color: var(--surface-muted);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+  }
+  .relatorio-periodo.ativo {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-primary-fg);
+    font-weight: 700;
+  }
+  .relatorio-datas {
+    display: flex;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+  .relatorio-datas label {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: var(--font-size-sm);
+    color: var(--surface-muted);
+  }
+  .relatorio-datas input {
+    padding: 8px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    background: var(--surface-card);
+    color: var(--surface-fg);
+    color-scheme: dark;
+  }
+  .relatorio-datas input:disabled {
+    opacity: 0.45;
   }
   .link-ampliar svg {
     width: 16px;

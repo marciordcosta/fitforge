@@ -11,7 +11,11 @@ import { lerPausaReiniciarSemanas, dataCortePorPausa, lerJanelaProgressaoSemanas
  *   se o último treino já passou do prazo, a conta fica em branco até voltar a treinar;
  * - "Janela da progressão" (Parametrização): só as últimas N semanas, a partir de hoje.
  * Vale o corte mais recente. Sem nenhum desses, devolve a lista inteira. */
-export function pontosParaTendencia<T extends { data: string }>(pontos: T[], marcadores: MarcadorExercicio[] | undefined): T[] {
+export function pontosParaTendencia<T extends { data: string }>(
+  pontos: T[],
+  marcadores: MarcadorExercicio[] | undefined,
+  opcoes: { semJanela?: boolean } = {},
+): T[] {
   const datasDesconsiderar = new Set((marcadores ?? []).filter((m) => m.tipo === "desconsiderar").map((m) => m.data));
   const marcadoresReiniciar = (marcadores ?? []).filter((m) => m.tipo === "reiniciar");
   const ultimaDataReiniciar = marcadoresReiniciar.length ? marcadoresReiniciar[marcadoresReiniciar.length - 1].data : null;
@@ -21,7 +25,8 @@ export function pontosParaTendencia<T extends { data: string }>(pontos: T[], mar
     lerPausaReiniciarSemanas(),
     toISODate(new Date()),
   );
-  const semanasJanela = lerJanelaProgressaoSemanas();
+  // `semJanela`: o relatório já recorta o próprio período, então a janela (contada a partir de hoje) não entra.
+  const semanasJanela = opcoes.semJanela ? 0 : lerJanelaProgressaoSemanas();
   const corteJanela = semanasJanela > 0 ? somarDias(toISODate(new Date()), -7 * semanasJanela) : null;
   if (!datasDesconsiderar.size && ultimaDataReiniciar == null && cortePausa == null && corteJanela == null) return pontos;
   const corte = [ultimaDataReiniciar, cortePausa, corteJanela].filter((d): d is string => d != null).sort().pop() ?? null;
@@ -51,4 +56,37 @@ export function retaDeTendencia(
   const incl = pts.reduce((a, p) => a + (p.x - mx) * (p.y - my), 0) / den;
   const porData = new Map(pts.map((p) => [p.data, my + incl * (p.x - mx)]));
   return datasVisiveis.map((d) => porData.get(d) ?? null);
+}
+
+/** Mínimo de sessões válidas pra dar resultado (com 2 ou 3 fica "em análise"). */
+export const MIN_SESSOES_TENDENCIA = 4;
+
+/** Tendência do exercício como uma linha de gráfico: ajusta a reta (mínimos quadrados) pelo 1RM de
+ * TODAS as sessões válidas e devolve quanto ela sobe ou desce do primeiro ao último ponto, em % do 1RM
+ * médio. Uma sessão fora da curva pesa pouco; null se há menos de MIN_SESSOES_TENDENCIA sessões. */
+export function variacaoExercicio(pontos: { melhor1rm: number }[]): number | null {
+  const n = pontos.length;
+  if (n < MIN_SESSOES_TENDENCIA) return null;
+  const mediaX = (n - 1) / 2;
+  const mediaY = pontos.reduce((acc, p) => acc + p.melhor1rm, 0) / n;
+  if (mediaY <= 0) return null;
+  let num = 0;
+  let den = 0;
+  pontos.forEach((p, x) => {
+    num += (x - mediaX) * (p.melhor1rm - mediaY);
+    den += (x - mediaX) ** 2;
+  });
+  return ((num / den) * (n - 1)) / mediaY;
+}
+
+export type TendenciaStatus = "subindo" | "estavel" | "caindo" | "analise";
+
+/** Tendência em texto: null com menos de 2 sessões; "analise" com 2 ou 3; senão pela inclinação da reta (±2%). */
+export function classificarTendencia(pontos: { melhor1rm: number }[]): TendenciaStatus | null {
+  if (pontos.length < 2) return null;
+  const v = variacaoExercicio(pontos);
+  if (v == null) return "analise";
+  if (v > 0.02) return "subindo";
+  if (v < -0.02) return "caindo";
+  return "estavel";
 }

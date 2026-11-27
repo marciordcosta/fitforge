@@ -31,6 +31,8 @@
     "@zxing/library": "^0.23.0",
     "chart.js": "^4.5.1",
     "chartjs-plugin-annotation": "^3.1.0",
-    "idb": "^8.0.3"
+    "idb": "^8.0.3",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9"
   }
 }
