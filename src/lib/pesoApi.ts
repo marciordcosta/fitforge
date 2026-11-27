@@ -600,9 +600,10 @@ export function calcularLinhaMetaPorDia(pesos: PesoRegistro[], historico: PesoMe
     } else if (seg.tipo === "manutencao") {
       mapa.set(data, seg.valor);
     } else {
-      const diasNoLimite = Math.round((parseISODate(data).getTime() - parseISODate(seg.limiteData!).getTime()) / 86400000);
-      const fracao = Math.min(1, Math.max(0, diasNoLimite / 7));
-      mapa.set(data, seg.inicio! + (seg.fim! - seg.inicio!) * fracao);
+      // Linha reta no alvo da semana (média do dia de reset × ritmo mínimo), do primeiro ao último dia
+      // dela; só muda de degrau no reset seguinte. Antes interpolava do fim da semana anterior até o
+      // alvo, o que fazia a "meta do dia" subir quando a média real ficava acima da linha.
+      mapa.set(data, seg.fim!);
     }
   }
   return mapa;
