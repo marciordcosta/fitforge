@@ -101,6 +101,20 @@ export interface LinhaMusculoRelatorio {
   prioridade: number;
 }
 
+/** Músculo em que o plano atual (rotinas de hoje) diverge do que foi executado em média no período. */
+export interface AjusteRotinaRelatorio {
+  nome: string;
+  executado: number;
+  plano: number;
+  /** plano - executado (séries ponderadas por semana). */
+  diferenca: number;
+  classeExecutado: ClasseVolumeSemanal;
+  classePlano: ClasseVolumeSemanal;
+  progressao: StatusProgressao | null;
+  /** O que a diferença significa: vantagem, risco, ou se já resolve uma pendência. */
+  leitura: string;
+}
+
 /** Rotina como está agora (plano atual): exercícios na ordem, com séries, repetições e descanso. */
 export interface RotinaRelatorio {
   nome: string;
@@ -159,6 +173,8 @@ export interface ModeloRelatorio {
   grade: { dias: { rotulo: string; rotina: string | null }[]; linhas: LinhaGradeRelatorio[] };
   /** Rotinas atuais (plano de hoje). */
   rotinas: RotinaRelatorio[];
+  /** Diferenças entre o plano atual e o executado, por músculo (só as que divergem). */
+  ajustesPlano: AjusteRotinaRelatorio[];
   decisoes: string[];
   exercicios: LinhaExercicioRelatorio[];
   alertas: string[];
@@ -462,6 +478,68 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     .slice(0, 6)
     .map(({ l, it }) => `${l.nome}: ${it.curto}`);
 
+  // ---- plano atual x executado: onde as rotinas de hoje divergem da média do período ----
+  /** Diferença mínima (séries ponderadas por semana) pra contar como divergência. */
+  const DIVERGENCIA_MINIMA = 1;
+  const ajustesPlano: AjusteRotinaRelatorio[] = [];
+  for (const l of linhas) {
+    const executado = l.mediaSemanal;
+    const plano = l.planPond;
+    const diferenca = r1(plano - executado);
+    if (Math.abs(diferenca) < DIVERGENCIA_MINIMA) continue;
+    const classePlano = e.classificar(l.id, Math.round(plano * 2) / 2);
+    const janela = e.janela(l.id);
+    const st = l.progressao;
+    const faixaTxt = `${fmt1(janela.min)} a ${fmt1(janela.max)}`;
+    const subiu = diferenca > 0;
+    // O que o músculo estava pedindo (a pendência que as decisões apontariam)
+    const pedeAumentar = l.classe === "insuficiente" || (st === "estavel" && l.classe !== "foco");
+    const pedeReduzir = (l.classe === "foco" && st !== "subindo") || st === "caindo";
+    let leitura: string;
+    if (plano <= 0) {
+      leitura = `Nenhuma rotina atual trabalha o músculo (executado ${fmt1(executado)}/sem.): se tirou de propósito, tudo certo; senão o volume cai a zero.`;
+    } else if (executado <= 0) {
+      leitura = `O plano tem ${fmt1(plano)} séries/sem., mas nada foi executado no período: confira se a rotina está sendo feita.`;
+    } else if (subiu) {
+      if (pedeAumentar) {
+        leitura =
+          classePlano === "insuficiente"
+            ? `Plano sobe, mas continua abaixo da janela (${faixaTxt}): ainda falta aumentar.`
+            : `Resolve a pendência de aumentar séries: executando o plano o músculo sai de ${NOME_CLASSE[l.classe]} para ${NOME_CLASSE[classePlano]}. Basta cumprir e reavaliar em 3 a 4 semanas.`;
+      } else if (pedeReduzir) {
+        leitura = `Atenção: o plano aumenta o volume num músculo que ${st === "caindo" ? "está regredindo" : "está acima da janela sem resposta"}. Mais séries tendem a piorar a recuperação.`;
+      } else if (classePlano === "foco") {
+        leitura = `Progredindo, mas o plano passa do máximo da janela (${fmt1(janela.max)}): mais estímulo, com risco de a recuperação não acompanhar. Monitorar em 3 a 4 semanas.`;
+      } else {
+        leitura = `Progredindo e o plano aumenta: mais estímulo pode acelerar o ganho. Se começar a estagnar ou regredir, voltar ao volume anterior.`;
+      }
+    } else if (pedeReduzir) {
+      leitura =
+        classePlano === "foco"
+          ? `Plano reduz, mas continua acima da janela (máximo ${fmt1(janela.max)}).`
+          : classePlano === "insuficiente"
+            ? `O plano reduz demais: fica abaixo da janela (${faixaTxt}). Uma redução menor (2 a 4 séries) resolve sem perder estímulo.`
+            : `Resolve a pendência de reduzir séries: o plano traz o músculo de ${NOME_CLASSE[l.classe]} para ${NOME_CLASSE[classePlano]}.`;
+    } else if (pedeAumentar) {
+      leitura = `Atenção: o plano reduz o volume num músculo que pede mais (${l.classe === "insuficiente" ? "já está abaixo da janela" : "está estagnado"}). Afasta da correção: considerar manter ou subir.`;
+    } else if (classePlano === "insuficiente") {
+      leitura = `O plano fica abaixo da janela (${faixaTxt}): o músculo está progredindo, mas pode perder o estímulo.`;
+    } else {
+      leitura = `Progredindo e o plano reduz: mais recuperação, com risco de frear o ganho. Só vale se for intencional (por exemplo, foco em outro músculo).`;
+    }
+    ajustesPlano.push({
+      nome: l.nome,
+      executado,
+      plano,
+      diferenca,
+      classeExecutado: l.classe,
+      classePlano,
+      progressao: st,
+      leitura,
+    });
+  }
+  ajustesPlano.sort((a, b) => Math.abs(b.diferenca) - Math.abs(a.diferenca));
+
   // ---- alertas ----
   const alertas: string[] = [];
   for (const l of linhas) {
@@ -539,6 +617,7 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     musculos: linhas,
     grade: { dias: e.gradeSemanal.dias, linhas: linhasGrade },
     rotinas: e.rotinas,
+    ajustesPlano,
     decisoes,
     exercicios,
     alertas,

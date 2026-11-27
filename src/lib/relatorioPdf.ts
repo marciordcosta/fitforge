@@ -343,6 +343,53 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     });
   }
 
+  // ---------------- plano atual x executado ----------------
+  if (modelo.ajustesPlano.length) {
+    titulo("Plano atual contra o executado (onde divergem)");
+    tabela({
+      head: [["Músculo", "Exec.", "Plano", "Dif.", "Faixa (exec. > plano)", "Progressão", "Leitura"]],
+      body: modelo.ajustesPlano.map((a) => [
+        a.nome,
+        fmtNum(a.executado),
+        fmtNum(a.plano),
+        fmtSinal(a.diferenca),
+        `${NOME_CLASSE[a.classeExecutado]} > ${NOME_CLASSE[a.classePlano]}`,
+        a.progressao ? NOME_PROGRESSAO[a.progressao] : "-",
+        a.leitura,
+      ]),
+      columnStyles: {
+        0: { cellWidth: 26, fontStyle: "bold" },
+        1: { halign: "right", cellWidth: 11 },
+        2: { halign: "right", cellWidth: 11 },
+        3: { halign: "right", cellWidth: 11 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 22 },
+      },
+      didParseCell: (d) => {
+        if (d.section !== "body") return;
+        const a = modelo.ajustesPlano[d.row.index];
+        if (d.column.index === 3) {
+          d.cell.styles.fontStyle = "bold";
+          d.cell.styles.textColor = a.diferenca > 0 ? COR.azul : COR.ambar;
+        }
+        if (d.column.index === 5) {
+          d.cell.styles.textColor = corProgressao(a.progressao);
+          d.cell.styles.fontStyle = "bold";
+        }
+      },
+    });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...COR.suave);
+    const notaAj = doc.splitTextToSize(
+      "Séries ponderadas por semana: Exec. é a média do período (a mesma da tabela Consolidado) e Plano é o que as rotinas atuais somam. Dif. positiva = plano acima do executado (aumento recente da rotina ou séries que não foram feitas); negativa = plano abaixo. Só entram músculos com diferença de 1 série ou mais.",
+      util,
+    ) as string[];
+    garantir(notaAj.length * 3.2);
+    doc.text(notaAj, M, y);
+    y += notaAj.length * 3.2 + 4;
+  }
+
   // ---------------- exercícios ----------------
   const exerciciosComLeitura = modelo.exercicios.filter((x) => x.sessoes >= 4);
   titulo("Por exercício (1RM estimado no período, 4 sessões ou mais)");
