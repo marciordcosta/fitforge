@@ -69,6 +69,7 @@
       // ---- "Adicionar peso/variação no gráfico" ----
       if (!mostrarPesoVariacao) {
         const extremos = pontos.length > 1 ? [0, pontos.length - 1] : [0];
+        let ultimoRotuloMeta: string | null = null;
         for (const i of extremos) {
           const ponto = pontos[i];
           const p = pontosGrafico[i];
@@ -79,15 +80,18 @@
           const alvo = metaAlvoPorPonto?.[i];
           if (alvo != null && escalaY) {
             const yLinha = escalaY.getPixelForValue(alvo) - 12;
-            if (Math.abs(yLinha - yPeso) >= 14) {
+            // A meta é a mesma linha: só repete o número quando ele muda.
+            if (Math.abs(yLinha - yPeso) >= 14 && alvo.toFixed(1) !== ultimoRotuloMeta) {
               ctx.fillStyle = COR_TREINO;
               ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
+              ultimoRotuloMeta = alvo.toFixed(1);
             }
           }
         }
       } else {
         // Igual Peso.svelte: linha principal sempre em kg; com a meta visível, cada ponto rotulado
         // ganha também o valor da meta (vermelho) do lado de fora do par ponto/meta.
+        let ultimoRotuloMeta: string | null = null;
         pontos.forEach((ponto, i) => {
           if (pontosComRotulo && !pontosComRotulo[i]) return;
           const p = pontosGrafico[i];
@@ -101,8 +105,10 @@
           const yAlvo = escalaY.getPixelForValue(alvo);
           const yLinha = yAlvo >= ponto.y ? yAlvo + 12 : yAlvo - 12;
           if (Math.abs(yLinha - yPeso) < 14) return;
+          if (formatPeso(alvo) === ultimoRotuloMeta) return;
           ctx.fillStyle = COR_TREINO;
           ctx.fillText(formatPeso(alvo), ponto.x, yLinha);
+          ultimoRotuloMeta = formatPeso(alvo);
         });
       }
 

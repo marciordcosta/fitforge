@@ -557,6 +557,7 @@
         // mantém o valor inicial e final de cada linha (peso/média em branco, meta em vermelho),
         // pra não perder a referência.
         const extremos = pontos.length > 1 ? [0, pontos.length - 1] : [0];
+        let ultimoRotuloMeta: string | null = null;
         for (const i of extremos) {
           const ponto = pontos[i];
           const p = pontosGrafico[i];
@@ -567,9 +568,11 @@
           const alvo = alvos?.[i];
           if (alvo != null && escalaY) {
             const yLinha = escalaY.getPixelForValue(alvo) - 9;
-            if (Math.abs(yLinha - yPeso) >= 12) {
+            // A meta é a mesma linha: só repete o número quando ele muda.
+            if (Math.abs(yLinha - yPeso) >= 12 && alvo.toFixed(1) !== ultimoRotuloMeta) {
               ctx.fillStyle = COR_TREINO;
               ctx.fillText(alvo.toFixed(1), ponto.x, yLinha);
+              ultimoRotuloMeta = alvo.toFixed(1);
             }
           }
         }
@@ -579,6 +582,8 @@
         // daquele dia sobre a própria linha da meta (do lado de fora do par ponto/meta, pra não
         // encostar no número de cima) — a referência em kg pro % exibido.
         const diffs = diffMetaPorPonto;
+        // A meta é a mesma linha: o peso dela só é escrito quando muda (a linha é reta por semana).
+        let ultimoRotuloMeta: string | null = null;
         pontos.forEach((ponto, i) => {
           if (rotulo && !rotulo[i]) return;
           const p = pontosGrafico[i];
@@ -595,8 +600,10 @@
           const yLinha = yAlvo >= ponto.y ? yAlvo + 10 : yAlvo - 9;
           // Colado no número do peso (meta quase igual ao peso) — pula pra não sobrepor.
           if (Math.abs(yLinha - yPeso) < 11) return;
+          if (formatPeso(alvo) === ultimoRotuloMeta) return;
           ctx.fillStyle = COR_TREINO;
           ctx.fillText(formatPeso(alvo), ponto.x, yLinha);
+          ultimoRotuloMeta = formatPeso(alvo);
         });
       }
 
