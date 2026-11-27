@@ -63,6 +63,12 @@ export interface LinhaMusculoRelatorio {
   grupo: string | null;
   mediaSemanal: number;
   planejado: number;
+  /** Distribuição semanal planejada do músculo (todas as rotinas): total bruto, ponderado e acumulado. */
+  planTotal: number;
+  planPond: number;
+  planAcum: number;
+  /** Realizado contra o planejado ponderado, em % (null sem planejado). */
+  deltaPct: number | null;
   /** % do volume total semanal realizado (todos os músculos). */
   pctTotal: number;
   /** % acumulado até este músculo, do maior pro menor volume. */
@@ -223,12 +229,15 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     e.exercicios.map((x) => [x.id, pontosParaTendencia(pontosDoPeriodo(x.pontos), x.marcadores, { semJanela: true })]),
   );
 
+  const planPorMusculo = new Map(e.planejadoSemanal.map((l) => [l.id, l]));
+
   // ---- por músculo ----
   const linhas: LinhaMusculoRelatorio[] = [];
   for (const m of e.musculos) {
     const porSem = volumePorMusculoSemana.get(m.id);
     const total = porSem ? Array.from(porSem.values()).reduce((a, v) => a + v, 0) : 0;
     const planejado = e.metaSemanal.get(m.id) ?? 0;
+    const plan = planPorMusculo.get(m.id);
     if (total <= 0 && planejado <= 0) continue;
     const media = total / divisor;
     const mediaArred = Math.round(media * 2) / 2;
@@ -251,6 +260,10 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
       grupo: m.grupo,
       mediaSemanal: r1(media),
       planejado: r1(planejado),
+      planTotal: r1(plan?.total ?? 0),
+      planPond: r1(plan?.ponderado ?? 0),
+      planAcum: r1(plan?.acumulado ?? 0),
+      deltaPct: (plan?.ponderado ?? 0) > 0 ? Math.round(((media - (plan?.ponderado ?? 0)) / (plan?.ponderado ?? 1)) * 100) : null,
       pctTotal: 0,
       acumuladoPct: 0,
       curva: null,

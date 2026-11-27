@@ -53,7 +53,7 @@ type DocComTabela = jsPDF & { lastAutoTable?: { finalY: number } };
 
 export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> {
   const [{ jsPDF: JsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-  const doc = new JsPDF({ unit: "mm", format: "a4" }) as DocComTabela;
+  const doc = new JsPDF({ unit: "mm", format: "a4", orientation: "landscape" }) as DocComTabela;
   const largura = doc.internal.pageSize.getWidth();
   const altura = doc.internal.pageSize.getHeight();
   const util = largura - 2 * M;
@@ -146,69 +146,107 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   });
   y += 22;
 
-  // ---------------- curva de peso x meta ----------------
-  titulo("Peso no período contra a meta");
+  // ---------------- peso x meta (esquerda) e decisões (direita) ----------------
+  const wGraf = util * 0.56;
+  const xDec = M + wGraf + 8;
+  const wDec = util - wGraf - 8;
+  const subtitulo = (txt: string, x: number, w: number) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...COR.texto);
+    doc.text(txt, x, y + 4);
+    doc.setDrawColor(...COR.linha);
+    doc.line(x, y + 6, x + w, y + 6);
+  };
+  garantir(62);
+  subtitulo("Peso no período contra a meta", M, wGraf);
+  subtitulo("Decisões sugeridas", xDec, wDec);
+  const yTopo = y + 9;
   const altGraf = 42;
-  desenharGraficoPeso(doc, modelo, M, y, util, altGraf);
-  y += altGraf + 4;
-
-  // ---------------- decisões ----------------
-  titulo("Decisões sugeridas");
+  desenharGraficoPeso(doc, modelo, M, yTopo, wGraf, altGraf);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...COR.texto);
+  let yDec = yTopo + 3;
   if (!modelo.decisoes.length) {
-    doc.text("Nenhum ajuste urgente: os músculos com leitura estão mantendo ou progredindo.", M, y + 3);
-    y += 7;
+    doc.text(doc.splitTextToSize("Nenhum ajuste urgente: os músculos com leitura estão mantendo ou progredindo.", wDec) as string[], xDec, yDec);
   } else {
     for (const d of modelo.decisoes) {
-      const linhas = doc.splitTextToSize(`-  ${d}`, util) as string[];
-      garantir(linhas.length * 4.5 + 1);
-      doc.text(linhas, M, y + 3);
-      y += linhas.length * 4.5 + 1;
+      const linhas = doc.splitTextToSize(`-  ${d}`, wDec) as string[];
+      doc.text(linhas, xDec, yDec);
+      yDec += linhas.length * 4.3 + 1.5;
     }
-    y += 2;
   }
+  y = yTopo + altGraf + 6;
 
-  // ---------------- tabela por músculo ----------------
-  titulo("Resumo por músculo: volume, prioridade e progressão");
+  // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
+  titulo("Resumo por músculo: planejado, realizado, prioridade e progressão");
   tabela({
-    head: [["Músculo", "Séries/sem.", "Planej.", "% total", "Acum. %", "Curva", "Faixa", "Progressão", "Var. %", "Ação sugerida"]],
+    head: [
+      [
+        { content: "", styles: { fillColor: COR.cabecalho } },
+        { content: "Planejado na semana", colSpan: 3, styles: { halign: "center", fillColor: [51, 65, 85] } },
+        { content: "Realizado", colSpan: 2, styles: { halign: "center", fillColor: [30, 64, 175] } },
+        { content: "Prioridade (curva ABC do realizado)", colSpan: 4, styles: { halign: "center", fillColor: [51, 65, 85] } },
+        { content: "Leitura", colSpan: 5, styles: { halign: "center", fillColor: [30, 64, 175] } },
+      ],
+      ["Músculo", "Total", "Pond.", "Acum.", "Séries/sem.", "vs plano", "% total", "Acum. %", "Curva", "Plano", "Faixa", "Freq./sem.", "Progressão", "Var. %", "Ação sugerida"],
+    ],
     body: modelo.musculos.map((l) => [
       l.nome,
+      fmtNum(l.planTotal),
+      fmtNum(l.planPond),
+      fmtNum(l.planAcum),
       fmtNum(l.mediaSemanal),
-      fmtNum(l.planejado),
+      l.deltaPct != null ? fmtSinal(l.deltaPct, 0, "%") : "-",
       l.curva ? `${l.pctTotal}%` : "-",
       l.curva ? `${l.acumuladoPct}%` : "-",
       l.curva ?? "-",
+      l.curvaPlanejada ?? "-",
       NOME_CLASSE[l.classe],
+      fmtNum(l.frequenciaSemanal),
       l.progressao ? NOME_PROGRESSAO[l.progressao] : "-",
       fmtSinal(l.variacaoPct, 1, "%"),
       l.acao,
     ]),
     columnStyles: {
-      0: { cellWidth: 24, fontStyle: "bold" },
-      1: { halign: "right", cellWidth: 19 },
-      2: { halign: "right", cellWidth: 13 },
+      0: { cellWidth: 28, fontStyle: "bold" },
+      1: { halign: "right", cellWidth: 12 },
+      2: { halign: "right", cellWidth: 12 },
       3: { halign: "right", cellWidth: 12 },
-      4: { halign: "right", cellWidth: 13 },
-      5: { halign: "center", cellWidth: 11 },
-      6: { cellWidth: 19 },
-      7: { cellWidth: 21 },
-      8: { halign: "right", cellWidth: 12 },
+      4: { halign: "right", cellWidth: 19 },
+      5: { halign: "right", cellWidth: 15 },
+      6: { halign: "right", cellWidth: 13 },
+      7: { halign: "right", cellWidth: 14 },
+      8: { halign: "center", cellWidth: 11 },
+      9: { halign: "center", cellWidth: 11 },
+      10: { cellWidth: 19 },
+      11: { halign: "right", cellWidth: 17 },
+      12: { cellWidth: 21 },
+      13: { halign: "right", cellWidth: 14 },
     },
     didParseCell: (d) => {
-      if (d.section !== "body") return;
-      const l = modelo.musculos[d.row.index];
-      if (d.column.index === 5 && l.curva) {
-        d.cell.styles.fontStyle = "bold";
-        d.cell.styles.textColor = l.curva === "A" ? COR.verde : l.curva === "B" ? COR.ambar : COR.suave;
+      if (d.section === "head") {
+        d.cell.styles.halign = d.row.index === 0 ? "center" : d.cell.styles.halign;
+        return;
       }
-      if (d.column.index === 6) {
+      const l = modelo.musculos[d.row.index];
+      const col = d.column.index;
+      if (col === 5 && l.deltaPct != null) {
+        d.cell.styles.textColor = l.deltaPct <= -25 ? COR.vermelho : l.deltaPct < -10 ? COR.ambar : COR.texto;
+        d.cell.styles.fontStyle = "bold";
+      }
+      if ((col === 8 || col === 9) && (col === 8 ? l.curva : l.curvaPlanejada)) {
+        const v = col === 8 ? l.curva : l.curvaPlanejada;
+        d.cell.styles.fontStyle = "bold";
+        d.cell.styles.textColor = v === "A" ? COR.verde : v === "B" ? COR.ambar : COR.suave;
+        if (col === 9 && l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) d.cell.styles.textColor = COR.vermelho;
+      }
+      if (col === 10) {
         d.cell.styles.textColor = corClasse(l.classe);
         d.cell.styles.fontStyle = "bold";
       }
-      if (d.column.index === 7 || d.column.index === 8) {
+      if (col === 12 || col === 13) {
         d.cell.styles.textColor = corProgressao(l.progressao);
         d.cell.styles.fontStyle = "bold";
       }
@@ -218,7 +256,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Séries/sem.: média ponderada das semanas com treino. Curva ABC: músculos do maior pro menor volume realizado; A = até 70% do volume acumulado, B = até 90%, C = o restante (mostra onde o volume está investido, que é a prioridade na prática). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise).",
+    "Planejado na semana: Total = séries brutas, Pond. = pelo peso de contribuição, Acum. = ponderado descontado pela posição na rotina (igual ao Pond. com a fadiga desligada). Séries/sem.: média ponderada realizada nas semanas com treino; vs plano = realizado contra o planejado ponderado. Curva ABC: músculos do maior pro menor volume realizado, A = até 70% do volume acumulado, B = até 90%, C = o restante (onde o volume está investido, a prioridade na prática); Plano = a mesma curva sobre o planejado, em vermelho quando difere da real. Faixa: classificação do volume (vermelho abaixo da manutenção, verde na meta, azul acima do foco). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise).",
     util,
   ) as string[];
   garantir(nota.length * 3.2);
@@ -232,11 +270,15 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(14);
   doc.setTextColor(...COR.texto);
   doc.text("Aprofundamento", M, y + 5);
-  y += 11;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...COR.suave);
+  doc.text("Tabelas complementares ao resumo da primeira página, para análise mais profunda.", M, y + 10);
+  y += 14;
 
   // ---- distribuição semanal planejada, agrupada como no card "Distribuição Semanal" ----
   if (modelo.distribuicaoSemanal.length) {
-    titulo("Distribuição semanal planejada (todas as rotinas)");
+    titulo("Distribuição semanal planejada por agrupamento muscular");
     type LinhaTab = { nome: string; total: number; ponderado: number; acumulado: number; pct: number; classe?: string; grupo: boolean };
     const porGrupo = new Map<string, typeof modelo.distribuicaoSemanal>();
     const avulsos: typeof modelo.distribuicaoSemanal = [];
@@ -297,37 +339,17 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     y += notaDist.length * 3.2 + 4;
   }
 
-  titulo("Detalhe por músculo: frequência, prioridade e fim do treino");
+  titulo("Detalhe por músculo: grupo e fim do treino");
   tabela({
-    head: [["Músculo", "Freq./sem.", "Curva real", "Curva plano", "Fim do treino (bloco C)"]],
-    body: modelo.musculos.map((l) => [
-      l.nome,
-      fmtNum(l.frequenciaSemanal),
-      l.curva ?? "-",
-      l.curvaPlanejada ?? "-",
-      l.fimDoTreinoPct != null ? `${l.fimDoTreinoPct}%` : "-",
-    ]),
-    columnStyles: {
-      0: { cellWidth: 40, fontStyle: "bold" },
-      1: { halign: "right", cellWidth: 24 },
-      2: { halign: "center", cellWidth: 24 },
-      3: { halign: "center", cellWidth: 24 },
-      4: { halign: "right" },
-    },
-    didParseCell: (d) => {
-      if (d.section !== "body") return;
-      const l = modelo.musculos[d.row.index];
-      if (d.column.index === 3 && l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) {
-        d.cell.styles.textColor = COR.vermelho;
-        d.cell.styles.fontStyle = "bold";
-      }
-    },
+    head: [["Músculo", "Grupo", "Fim do treino (bloco C)"]],
+    body: modelo.musculos.map((l) => [l.nome, l.grupo ?? "-", l.fimDoTreinoPct != null ? `${l.fimDoTreinoPct}%` : "-"]),
+    columnStyles: { 0: { cellWidth: 60, fontStyle: "bold" }, 1: { cellWidth: 60 }, 2: { halign: "right" } },
   });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota2 = doc.splitTextToSize(
-    "Curva plano: a mesma curva ABC sobre o volume planejado (em vermelho quando difere da real: a prioridade na prática desviou do plano). Fim do treino: % do volume planejado do músculo que cai no último bloco da rotina, onde a fadiga desconta mais.",
+    "Fim do treino: % do volume planejado do músculo que cai no último bloco da rotina, onde a fadiga desconta mais. Um músculo estagnado com esse número alto pode pedir exercício trazido pro começo do treino, não menos séries.",
     util,
   ) as string[];
   garantir(nota2.length * 3.2);
