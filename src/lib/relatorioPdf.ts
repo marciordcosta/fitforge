@@ -316,31 +316,52 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     y += notaGrade.length * 3.2 + 4;
   }
 
-  // ---------------- rotinas atuais (o plano de hoje) ----------------
+  // ---------------- rotinas atuais (o plano de hoje), pelos músculos que cada uma trabalha ----------------
   if (modelo.rotinas.length) {
-    titulo("Rotinas atuais");
+    titulo("Rotinas atuais (músculos trabalhados)");
+    const comAcum = modelo.rotinas.some((r) => r.musculos.some((m) => m.acum != null));
+    const nCols = comAcum ? 5 : 4;
     const corpo: NonNullable<Parameters<typeof autoTable>[1]["body"]> = [];
     for (const r of modelo.rotinas) {
       corpo.push([
         {
-          content: `${r.nome}${r.dia ? ` (${r.dia})` : ""}  -  ${r.exercicios.length} exercícios, ${r.totalSeries} séries`,
-          colSpan: 5,
+          content: `${r.nome}${r.dia ? ` (${r.dia})` : ""}  -  ${r.numExercicios} exercícios, ${r.totalSeries} séries`,
+          colSpan: nCols,
           styles: { fontStyle: "bold", fillColor: [229, 231, 235], textColor: COR.texto },
         },
       ]);
-      for (const x of r.exercicios) corpo.push([x.nome, x.musculo || "-", String(x.series), x.reps, x.descanso]);
+      // Músculos à esquerda e, ao lado, a lista dos exercícios do dia em sequência (linha k = exercício k).
+      // Em geral há menos exercícios que músculos; se for o contrário, as linhas extras ficam sem músculo.
+      const linhas = Math.max(r.musculos.length, r.exercicios.length);
+      for (let k = 0; k < linhas; k++) {
+        const m = r.musculos[k];
+        const linha: string[] = m ? [m.nome, fmtNum(m.total, m.total % 1 ? 1 : 0), fmtNum(m.pond)] : ["", "", ""];
+        if (comAcum) linha.push(m && m.acum != null ? fmtNum(m.acum) : m ? "-" : "");
+        linha.push(r.exercicios[k] ? `${k + 1}. ${r.exercicios[k]}` : "");
+        corpo.push(linha);
+      }
     }
     tabela({
-      head: [["Exercício", "Músculo principal", "Séries", "Repetições", "Descanso"]],
+      head: [comAcum ? ["Músculo", "Total", "Pond.", "Acum.", "Exercícios do dia (em sequência)"] : ["Músculo", "Total", "Pond.", "Exercícios do dia (em sequência)"]],
       body: corpo,
       columnStyles: {
-        1: { cellWidth: 38 },
-        2: { halign: "right", cellWidth: 16 },
-        3: { halign: "center", cellWidth: 22 },
-        4: { halign: "center", cellWidth: 20 },
+        0: { cellWidth: 34 },
+        1: { halign: "right", cellWidth: 14 },
+        2: { halign: "right", cellWidth: 14 },
+        ...(comAcum ? { 3: { halign: "right", cellWidth: 14 } } : {}),
       },
       alternateRowStyles: { fillColor: [255, 255, 255] },
     });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...COR.suave);
+    const notaRot = doc.splitTextToSize(
+      "Séries planejadas por semana nesta rotina, como no card da rotina no app: Total conta 1 série para cada músculo que o exercício trabalha; Pond. pondera pelo peso de contribuição do exercício no músculo; Acum. desconta a posição da série na rotina (só aparece com a fadiga por posição ligada). A lista de exercícios ao lado segue a ordem do treino; cada linha é um exercício, independente do músculo da mesma linha.",
+      util,
+    ) as string[];
+    garantir(notaRot.length * 3.2);
+    doc.text(notaRot, M, y);
+    y += notaRot.length * 3.2 + 4;
   }
 
   // ---------------- plano atual x executado ----------------

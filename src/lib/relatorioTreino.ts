@@ -115,13 +115,18 @@ export interface AjusteRotinaRelatorio {
   leitura: string;
 }
 
-/** Rotina como está agora (plano atual): exercícios na ordem, com séries, repetições e descanso. */
+/** Rotina como está agora (plano atual): os músculos que ela trabalha, como no card da rotina. */
 export interface RotinaRelatorio {
   nome: string;
   /** Dia da semana por extenso curto (Seg, Ter...) ou null se a rotina não tem dia fixo. */
   dia: string | null;
   totalSeries: number;
-  exercicios: { nome: string; musculo: string; series: number; reps: string; descanso: string }[];
+  numExercicios: number;
+  /** Músculos que a rotina trabalha, do maior pro menor volume ponderado: séries totais (1 por músculo
+   * tocado), ponderadas e acumuladas (null com a fadiga desligada, quando seria igual à ponderada). */
+  musculos: { nome: string; total: number; pond: number; acum: number | null }[];
+  /** Nomes dos exercícios do dia, na ordem do treino. */
+  exercicios: string[];
 }
 
 export interface LinhaGradeRelatorio {
