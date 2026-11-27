@@ -128,16 +128,18 @@
     return Number.isInteger(v) ? String(v) : v.toFixed(1);
   }
 
-  /** Nos modos "Todos" e comparação, os pontos do gráfico são normalizados (0 a 1, só a forma
-   * da curva) — sem isso o tooltip mostraria "0.42" em vez do valor real (1RM/peso/volume). */
-  function tooltipValorReal(ctx: { dataset: { rawData?: (number | null)[]; label?: string }; dataIndex: number; parsed: { y: number | null } }): string {
+  /** Nos modos "Todos" (0 a 1, só a forma da curva) e comparação (% do início), os pontos do gráfico
+   * não são o valor real — sem isso o tooltip mostraria "0.42" em vez do valor real (1RM/peso/volume). */
+  function tooltipValorReal(ctx: { dataset: { rawData?: (number | null)[]; label?: string; emPercentual?: boolean }; dataIndex: number; parsed: { y: number | null } }): string {
     if (ctx.dataset.label === "Média") {
       const v = ctx.parsed.y;
-      return `Média: ${v == null ? "-" : Math.round(v * 100) + "%"}`;
+      return `Média: ${v == null ? "-" : Math.round(v) + "%"}`;
     }
     const bruto = ctx.dataset.rawData?.[ctx.dataIndex];
     const valor = bruto ?? ctx.parsed.y;
-    return `${ctx.dataset.label}: ${valor == null ? "-" : formatNumero(valor)}`;
+    // Na comparação entre exercícios o eixo é % do início: mostra o valor real e o % ao lado.
+    const pct = ctx.dataset.emPercentual && ctx.parsed.y != null ? ` (${Math.round(ctx.parsed.y)}%)` : "";
+    return `${ctx.dataset.label}: ${valor == null ? "-" : formatNumero(valor)}${pct}`;
   }
 
   /** Linha extra do tooltip, embaixo do valor — quantas séries entraram nesse ponto (não se
@@ -163,6 +165,15 @@
     const max = Math.max(...valores);
     if (max === min) return serie.map((v) => (v == null ? null : 0.5));
     return serie.map((v) => (v == null ? null : (v - min) / (max - min)));
+  }
+
+  /** Comparação entre exercícios: cada linha parte de 100% no primeiro registro dela e mostra quanto
+   * subiu ou caiu em relação a esse ponto (mesmo padrão do gráfico do músculo). Assim dá pra comparar
+   * a evolução de exercícios com cargas e unidades muito diferentes. */
+  function emPercentualDoInicio(serie: (number | null)[]): (number | null)[] {
+    const base = serie.find((v): v is number => v != null && v > 0);
+    if (base == null) return serie.map(() => null);
+    return serie.map((v) => (v == null ? null : (v / base) * 100));
   }
 
   /** Só entram na comparação os registros dentro da mesma janela de datas do exercício principal (já filtrado). */
@@ -333,7 +344,7 @@
       return arr;
     }
 
-    const ajustar = (s: (number | null)[]) => (comparando ? normalizar(s) : s);
+    const ajustar = (s: (number | null)[]) => (comparando ? emPercentualDoInicio(s) : s);
     // Com a Média ativa, as linhas individuais ficam esmaecidas no fundo — só a média (branca,
     // adicionada depois, por cima) fica em destaque.
     const opacidadeLinha = mostrarMedia ? 0.25 : 1;
@@ -348,11 +359,12 @@
       return { c, bruto, ajustado: ajustar(bruto) };
     });
 
-    const datasets: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[]; seriesData?: (number | null)[] })[] = [
+    const datasets: (ChartDataset<"line", (number | null)[]> & { rawData?: (number | null)[]; seriesData?: (number | null)[]; emPercentual?: boolean })[] = [
       {
         label: exercicio.nome,
         data: principalAjustado,
         rawData: brutoPrincipal,
+        emPercentual: comparando,
         seriesData: serieNumSeries(historicoFiltrado),
         borderColor: comOpacidade(COR_PRINCIPAL, opacidadeLinha),
         backgroundColor: comOpacidade(COR_PRINCIPAL, opacidadeLinha),
@@ -368,6 +380,7 @@
           label: c.exercicio.nome,
           data: ajustado,
           rawData: bruto,
+          emPercentual: true,
           seriesData: serieNumSeries(c.historico),
           borderColor: comOpacidade(cor, opacidadeLinha),
           backgroundColor: comOpacidade(cor, opacidadeLinha),
@@ -432,8 +445,6 @@
           },
           y: comparando
             ? {
-                min: 0,
-                max: 1,
                 ticks: { display: false },
                 grid: { color: "rgba(255, 255, 255, 0.08)" },
                 border: { display: false },
