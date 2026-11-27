@@ -345,6 +345,17 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     },
   });
 
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...COR.suave);
+  const notaEx = doc.splitTextToSize(
+    "1RM início e fim: primeira e última sessão válida do período, depois do último reinício marcado ou pausa (sessões marcadas como desconsiderar ficam de fora). Var. % e Status vêm da reta de tendência dessas mesmas sessões, não só do início e do fim; sem sessões válidas suficientes ficam em branco ou Em análise.",
+    util,
+  ) as string[];
+  garantir(notaEx.length * 3.2);
+  doc.text(notaEx, M, y);
+  y += notaEx.length * 3.2 + 4;
+
   // ---------------- limites ----------------
   garantir(16);
   doc.setFont("helvetica", "italic");

@@ -351,8 +351,10 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
         musculo: x.musculoPrincipalId ? (nomeMusculo.get(x.musculoPrincipalId) ?? "") : "",
         sessoes: doPeriodo.length,
         sessoesValidas: validos.length,
-        rmInicio: doPeriodo.length ? r1(doPeriodo[0].melhor1rm) : null,
-        rmFim: doPeriodo.length ? r1(doPeriodo[doPeriodo.length - 1].melhor1rm) : null,
+        // Início/fim das sessões VÁLIDAS (depois do último reinício marcado ou pausa; "desconsiderar" fora): é a
+        // mesma base do Var. % e do status, então os números batem com a tendência.
+        rmInicio: validos.length ? r1(validos[0].melhor1rm) : null,
+        rmFim: validos.length ? r1(validos[validos.length - 1].melhor1rm) : null,
         variacaoPct: v != null ? Math.round(v * 1000) / 10 : null,
         status: classificarTendencia(validos),
         ultima: doPeriodo.length ? doPeriodo[doPeriodo.length - 1].data : null,
