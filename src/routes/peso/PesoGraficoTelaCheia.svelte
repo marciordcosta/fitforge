@@ -103,7 +103,9 @@
           const alvo = metaAlvoPorPonto?.[i];
           if (alvo == null || !escalaY) return;
           const yAlvo = escalaY.getPixelForValue(alvo);
-          const yLinha = yAlvo >= ponto.y ? yAlvo + 12 : yAlvo - 12;
+          let yLinha = yAlvo >= ponto.y ? yAlvo + 12 : yAlvo - 12;
+          // Meta rente ao fundo do gráfico: o rótulo embaixo cairia em cima das datas do eixo — vai pra cima da linha.
+          if (yLinha > c.chartArea.bottom - 5) yLinha = yAlvo - 12;
           if (Math.abs(yLinha - yPeso) < 14) return;
           if (formatPeso(alvo) === ultimoRotuloMeta) return;
           ctx.fillStyle = COR_TREINO;

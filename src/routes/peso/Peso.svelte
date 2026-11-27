@@ -597,7 +597,9 @@
           if (alvo == null || !escalaY) return;
           const yAlvo = escalaY.getPixelForValue(alvo);
           // Meta abaixo do ponto: rótulo logo abaixo da linha da meta; acima: logo acima dela.
-          const yLinha = yAlvo >= ponto.y ? yAlvo + 10 : yAlvo - 9;
+          let yLinha = yAlvo >= ponto.y ? yAlvo + 10 : yAlvo - 9;
+          // Meta rente ao fundo do gráfico: o rótulo embaixo cairia em cima das datas do eixo — vai pra cima da linha.
+          if (yLinha > c.chartArea.bottom - 4) yLinha = yAlvo - 9;
           // Colado no número do peso (meta quase igual ao peso) — pula pra não sobrepor.
           if (Math.abs(yLinha - yPeso) < 11) return;
           if (formatPeso(alvo) === ultimoRotuloMeta) return;
