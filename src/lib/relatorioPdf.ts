@@ -175,7 +175,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       yDec += linhas.length * 4.3 + 1.5;
     }
   }
-  y = yTopo + altGraf + 6;
+  y = Math.max(yTopo + altGraf, yDec) + 6;
 
   // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
   titulo("Consolidado por músculo (realizado no período)");
@@ -214,7 +214,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo (vermelho abaixo, verde na janela, azul acima). Freq./sem.: quantos dias por semana o músculo é treinado, contando séries totais (qualquer exercício que o trabalhe, sem ponderar). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise).",
+    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo (vermelho abaixo, verde na janela, azul acima). Freq./sem.: quantos dias por semana o músculo é treinado, contando séries totais (qualquer exercício que o trabalhe, sem ponderar). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Decisões: músculos de foco (volume de 125% da média ou mais) vêm primeiro. Limites por dia, em séries totais: até 8 ok, 8 a 10 atenção, acima de 10 fracionar; abaixo de 5 o dia rende pouco; menos de 6 séries/sem. é baixo estímulo. Referência para natural: 10 a 20 séries/sem. por músculo de foco e 6 a 12 nos demais, em 2 ou mais dias, subindo ~2 séries por semana e reavaliando em 3 a 4 semanas; trocar exercício só depois de 4 ou mais sessões estagnadas.",
     util,
   ) as string[];
   garantir(nota.length * 3.2);

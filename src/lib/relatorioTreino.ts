@@ -305,13 +305,6 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
   }
   linhasGrade.sort((a, b) => b.total - a.total);
 
-  // ---- decisões (as mais urgentes) ----
-  const decisoes = [...linhas]
-    .filter((l) => l.prioridade >= 3)
-    .sort((a, b) => b.prioridade - a.prioridade || b.mediaSemanal - a.mediaSemanal)
-    .slice(0, 5)
-    .map((l) => `${l.nome}: ${l.acao}`);
-
   // ---- exercícios ----
   const exercicios: LinhaExercicioRelatorio[] = e.exercicios
     .map((x) => {
@@ -331,6 +324,105 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
       };
     })
     .sort((a, b) => a.musculo.localeCompare(b.musculo) || a.nome.localeCompare(b.nome));
+
+  // ---- decisões: dependem do foco (músculos com mais estímulo vêm primeiro) ----
+  /** Limites de séries TOTAIS (sem ponderar) de um músculo num mesmo dia: acima de 8 pede atenção, acima
+   * de 10 passa do que cabe num dia (fracionar); abaixo de 5 o dia rende pouco pro músculo. Abaixo de 6
+   * séries por semana é baixo estímulo (manutenção, no máximo). */
+  const LIMITE_DIA_ATENCAO = 8;
+  const LIMITE_DIA_MAXIMO = 10;
+  const MINIMO_DIA = 5;
+  const MINIMO_SEMANA = 6;
+  const MIN_SESSOES_TROCA = 4;
+
+  const leituraExercicio = e.exercicios.map((x) => {
+    const validos = validosPorExercicio.get(x.id) ?? [];
+    return {
+      nome: x.nome,
+      contribuicoes: x.contribuicoes,
+      status: classificarTendencia(validos),
+      sessoesValidas: validos.length,
+      variacao: variacaoExercicio(validos),
+    };
+  });
+  const fmt1 = (v: number) => String(r1(v)).replace(".", ",");
+
+  interface ItemDecisao {
+    curto: string;
+    p: number;
+  }
+  const decisoesPorMusculo = new Map<string, ItemDecisao[]>();
+  for (const l of linhas) {
+    const itens: ItemDecisao[] = [];
+    const foco = l.curva === "A";
+    const bump = foco ? 1 : 0;
+    const dias = (e.gradeSemanal.porMusculo.get(l.id) ?? []).filter((v) => v > 0);
+    const maxDia = dias.length ? Math.max(...dias) : 0;
+    const minDia = dias.length ? Math.min(...dias) : 0;
+    const doMusculo = leituraExercicio.filter((x) => x.contribuicoes.some((cn) => cn.musculoId === l.id && cn.peso > 0));
+    const estagnados = doMusculo.filter((x) => x.status === "estavel" && x.sessoesValidas >= MIN_SESSOES_TROCA).sort((a, b) => b.sessoesValidas - a.sessoesValidas);
+    const emQueda = doMusculo.filter((x) => x.status === "caindo" && x.variacao != null).sort((a, b) => (a.variacao ?? 0) - (b.variacao ?? 0));
+    const st = l.progressao;
+
+    // por dia (séries totais, plano atual)
+    if (maxDia > LIMITE_DIA_MAXIMO) {
+      itens.push({ p: 6, curto: `${maxDia} séries num único dia (limite de ${LIMITE_DIA_MAXIMO}): fracionar em 2 dias (ex.: ${Math.ceil(maxDia / 2)} + ${Math.floor(maxDia / 2)}).` });
+    } else if (maxDia > LIMITE_DIA_ATENCAO) {
+      itens.push({ p: 3, curto: `${maxDia} séries num dia, perto do limite de ${LIMITE_DIA_MAXIMO}: ao subir o volume, abrir mais um dia em vez de empilhar.` });
+    }
+    if (dias.length >= 2 && minDia < MINIMO_DIA) {
+      itens.push({ p: 2, curto: `um dia com só ${minDia} série${minDia === 1 ? "" : "s"} (menos de ${MINIMO_DIA}): se não é acessório, concentrar em dias de ${MINIMO_DIA} a ${LIMITE_DIA_ATENCAO}.` });
+    }
+
+    // por semana
+    const baixoEstimulo = l.mediaSemanal > 0 && l.mediaSemanal < MINIMO_SEMANA;
+    if (baixoEstimulo) {
+      if (foco) {
+        itens.push({ p: 5, curto: `só ${fmt1(l.mediaSemanal)} séries/sem. num músculo de foco: subir para 10 a 16, em 2 dias.` });
+      } else {
+        itens.push({ p: 2, curto: `baixo estímulo (${fmt1(l.mediaSemanal)} séries/sem.): natural mantém com ~6; pra crescer, 10 a 12 em 2 dias (+2 por semana, reavaliar em 3 a 4 semanas). Se não é prioridade, pode manter.` });
+      }
+    }
+
+    // volume x progressão
+    if (st && st !== "analise") {
+      if (l.classe === "insuficiente" && !baixoEstimulo) {
+        if (foco) itens.push({ p: 5, curto: "abaixo da janela num músculo de foco: aumentar séries." });
+        else if (st !== "subindo") itens.push({ p: 3, curto: `abaixo da janela e ${st === "estavel" ? "estagnado" : "regredindo"}: aumentar séries.` });
+      } else if (l.classe === "manutencao") {
+        if (st === "estavel") {
+          if (estagnados.length) {
+            itens.push({ p: 4 + bump, curto: `estagnado: trocar ou variar o ${estagnados[0].nome} (${estagnados[0].sessoesValidas} sessões sem evoluir), mudando ângulo/pegada e mantendo a base.` });
+          } else if (maxDia <= LIMITE_DIA_ATENCAO) {
+            itens.push({ p: 3 + bump, curto: "estagnado dentro da janela: testar +2 séries por semana (fracionadas) e reavaliar em 3 a 4 semanas." });
+          }
+        } else if (st === "caindo") {
+          itens.push({ p: 4 + bump, curto: `regredindo dentro da janela: checar recuperação (sono, calorias, descanso entre séries); reduzir 2 séries antes de trocar exercício${emQueda.length ? `. O que mais caiu: ${emQueda[0].nome}` : ""}.` });
+        }
+      } else if (l.classe === "foco" && st !== "subindo") {
+        itens.push({ p: 5, curto: `acima da janela sem resposta: reduzir 2 a 4 séries${maxDia > LIMITE_DIA_ATENCAO ? " e fracionar em mais dias" : ""}; mais volume não está virando resultado.` });
+      }
+    }
+    itens.sort((a, b) => b.p - a.p);
+    decisoesPorMusculo.set(l.id, itens);
+    const topo = itens[0];
+    if (topo) {
+      l.acao = topo.curto.charAt(0).toUpperCase() + topo.curto.slice(1);
+      l.prioridade = topo.p;
+    } else if (!st || st === "analise") {
+      l.acao = "Dados insuficientes: manter e reavaliar";
+      l.prioridade = 1;
+    } else {
+      l.acao = "Manter";
+      l.prioridade = 0;
+    }
+  }
+  const decisoes = linhas
+    .flatMap((l) => (decisoesPorMusculo.get(l.id) ?? []).slice(0, 2).map((it) => ({ l, it })))
+    .filter(({ it }) => it.p >= 2)
+    .sort((a, b) => b.it.p - a.it.p || Number(b.l.curva === "A") - Number(a.l.curva === "A") || b.l.mediaSemanal - a.l.mediaSemanal)
+    .slice(0, 6)
+    .map(({ l, it }) => `${l.nome}: ${it.curto}`);
 
   // ---- alertas ----
   const alertas: string[] = [];
