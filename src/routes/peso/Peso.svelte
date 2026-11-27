@@ -688,6 +688,8 @@
                   pointRadius: 0,
                   spanGaps: true,
                   tension: 0,
+                  // Meta semanal em degraus: reta no valor da semana, salto só no dia do reset.
+                  stepped: "after" as const,
                   // Sempre desenhada por cima da linha de peso (ver comentário acima) — o tracejado
                   // vermelho fica visível por cima da linha sólida, mesmo nos pontos sincronizados.
                   order: 0,
