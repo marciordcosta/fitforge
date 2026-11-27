@@ -125,17 +125,17 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       detalhe: modelo.calorias ? `meta da dieta no período (${modelo.calorias.diasPeriodo} dias)` : "sem dados da dieta",
     },
   ];
-  const wCaixa = (util - 3) / 2;
+  const wCaixa = (util - 3 * 3) / 4;
   caixas.forEach((c, i) => {
-    const x = M + (i % 2) * (wCaixa + 3);
-    const yCaixa = y + Math.floor(i / 2) * 20;
+    const x = M + i * (wCaixa + 3);
+    const yCaixa = y;
     doc.setDrawColor(...COR.linha);
     doc.setFillColor(...COR.zebra);
     doc.roundedRect(x, yCaixa, wCaixa, 17, 2, 2, "FD");
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...COR.suave);
-    doc.text(c.rotulo, x + 2.5, yCaixa + 5);
+    doc.text(c.rotulo, x + 2.5, yCaixa + 5, { maxWidth: wCaixa - 4 });
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(...COR.texto);
@@ -145,7 +145,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     doc.setTextColor(...COR.suave);
     doc.text(c.detalhe, x + 2.5, yCaixa + 14.5);
   });
-  y += 42;
+  y += 22;
 
   // ---------------- peso x meta e decisões (um embaixo do outro, em retrato) ----------------
   const subtitulo = (txt: string, x: number, w: number) => {
@@ -156,10 +156,10 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     doc.setDrawColor(...COR.linha);
     doc.line(x, y + 6, x + w, y + 6);
   };
-  garantir(62);
+  garantir(50);
   subtitulo("Peso no período contra a meta", M, util);
   const yTopo = y + 9;
-  const altGraf = 48;
+  const altGraf = 34;
   desenharGraficoPeso(doc, modelo, M, yTopo, util, altGraf);
   y = yTopo + altGraf + 5;
 
@@ -168,6 +168,8 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   // Músculos que aparecem na tabela de 1RM (Por exercício): ganham um asterisco pequeno ao lado do nome.
   const musculosNa1rm = new Set(modelo.exercicios.filter((x) => x.sessoes >= 4).map((x) => x.musculo));
   tabela({
+    styles: { fontSize: 6.8, cellPadding: 1, textColor: COR.texto, lineColor: COR.linha, lineWidth: 0.1 },
+    headStyles: { fillColor: COR.cabecalho, textColor: 255, fontStyle: "bold", fontSize: 6.8 },
     head: [["Músculo", "Séries/sem.", "Faixa", "Progressão", "Ação sugerida"]],
     body: modelo.musculos.map((l) => [
       l.nome,
@@ -187,9 +189,9 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       const l = modelo.musculos[d.row.index];
       if (!l || !musculosNa1rm.has(l.nome)) return;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
+      doc.setFontSize(6.8);
       const larguraNome = doc.getTextWidth(l.nome);
-      doc.setFontSize(6);
+      doc.setFontSize(5.5);
       doc.setTextColor(...COR.suave);
       doc.text("*", d.cell.x + d.cell.padding("left") + larguraNome + 0.4, d.cell.y + d.cell.padding("top") + 1.7);
     },
@@ -208,31 +210,14 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     },
   });
 
-  // ---------------- aprofundamento (a partir da página 2) ----------------
-  doc.addPage();
-  y = M;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(...COR.texto);
-  doc.text("Aprofundamento", M, y + 5);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...COR.suave);
-  doc.text("Tabelas complementares ao resumo da primeira página, para análise mais profunda.", M, y + 10);
-  y += 14;
-
   // ---------------- volume semana a semana ----------------
   titulo("Volume semana a semana (séries ponderadas)");
   tabela({
     head: [["Músculo", ...modelo.semanas.map((s) => s.rotulo), "Média"]],
     body: modelo.musculos.map((l) => [l.nome, ...l.porSemana.map((v) => fmtNum(v)), fmtNum(l.mediaSemanal)]),
-    // Períodos longos (muitas semanas) em retrato: fonte e margem menores pra caberem as colunas.
-    ...(modelo.semanas.length > 10
-      ? {
-          styles: { fontSize: 6, cellPadding: 0.7, textColor: COR.texto, lineColor: COR.linha, lineWidth: 0.1 },
-          headStyles: { fillColor: COR.cabecalho, textColor: 255, fontStyle: "bold" as const, fontSize: 6 },
-        }
-      : {}),
+    // Compacta (fonte e margem menores): divide a primeira folha com o Consolidado.
+    styles: { fontSize: modelo.semanas.length > 10 ? 6 : 6.5, cellPadding: 0.7, textColor: COR.texto, lineColor: COR.linha, lineWidth: 0.1 },
+    headStyles: { fillColor: COR.cabecalho, textColor: 255, fontStyle: "bold" as const, fontSize: modelo.semanas.length > 10 ? 6 : 6.5 },
     columnStyles: { 0: { cellWidth: 26, fontStyle: "bold" } },
     didParseCell: (d) => {
       if (d.section !== "body") return;
@@ -260,6 +245,15 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   if (modelo.rotinas.length) {
     doc.addPage();
     y = M;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(...COR.texto);
+    doc.text("Aprofundamento", M, y + 5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...COR.suave);
+    doc.text("Tabelas complementares ao resumo da primeira página, para análise mais profunda.", M, y + 10);
+    y += 14;
     titulo("Rotinas atuais (músculos trabalhados)");
     const comAcum = modelo.rotinas.some((r) => r.musculos.some((m) => m.acum != null));
     const nCols = comAcum ? 5 : 4;
