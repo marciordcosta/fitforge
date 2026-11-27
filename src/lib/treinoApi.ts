@@ -1,4 +1,11 @@
-import { lerFadigaAtiva } from "./treinoProgressaoPrefs";
+import {
+  lerFadigaAtiva,
+  gravarFadigaAtiva,
+  lerPausaReiniciarSemanas,
+  gravarPausaReiniciarSemanas,
+  lerJanelaProgressaoSemanas,
+  gravarJanelaProgressaoSemanas,
+} from "./treinoProgressaoPrefs";
 import { supabase } from "./supabase";
 import { auth } from "./auth.svelte";
 import { hojeISO, parseISODate, toISODate } from "./dates";
@@ -1843,8 +1850,12 @@ export interface ParametrosDistribuicao {
   seriesFocoMin: number;
   seriesFocoMax: number;
   fadigaModo: FadigaModo;
-  /** Desconto de fadiga por posição ligado (padrão). Desligado: todas as séries contam como bloco A. Preferência do aparelho (localStorage). */
+  /** Desconto de fadiga por posição ligado (padrão). Desligado: todas as séries contam como bloco A. */
   fadigaAtiva: boolean;
+  /** Reiniciar a progressão depois de uma pausa de N semanas (0 = desligado). */
+  pausaReiniciarSemanas: number;
+  /** Janela da progressão: só as últimas N semanas entram na conta (0 = tudo). */
+  janelaProgressaoSemanas: number;
   /** % da sessão (não nº de séries) até onde a posição na rotina (modo Fases) conta como
    * bloco de maior prioridade/retorno (faixa A) — depois disso até fadigaFasesCorteB é o
    * bloco intermediário (faixa B), e além dele o bloco final (faixa C). Não modela fadiga
@@ -1885,6 +1896,8 @@ export const PARAMETROS_DISTRIBUICAO_PADRAO: ParametrosDistribuicao = {
   seriesFocoMax: 20,
   fadigaModo: "fases",
   fadigaAtiva: true,
+  pausaReiniciarSemanas: 0,
+  janelaProgressaoSemanas: 0,
   fadigaFasesCorteA: 20,
   fadigaFasesCorteB: 50,
   fadigaGradualC: 0.12,
@@ -1915,9 +1928,17 @@ export function classificarVolumeSemanal(v: number, p: ParametrosDistribuicao): 
   return "excessivo";
 }
 
+/** As três preferências de progressão (fadiga ligada, pausa, janela) moram no banco; o localStorage é
+ * só um espelho pra as contas síncronas (tendência dos exercícios, fadiga) lerem sem esperar a rede.
+ * O espelho é atualizado a cada leitura do banco e a cada gravação, então vale o que está no banco. */
 export async function getParametrosDistribuicao(): Promise<ParametrosDistribuicao> {
   const p = await getParametrosDistribuicaoBase();
-  return { ...p, fadigaAtiva: lerFadigaAtiva() };
+  return {
+    ...p,
+    fadigaAtiva: lerFadigaAtiva(),
+    pausaReiniciarSemanas: lerPausaReiniciarSemanas(),
+    janelaProgressaoSemanas: lerJanelaProgressaoSemanas(),
+  };
 }
 
 async function getParametrosDistribuicaoBase(): Promise<ParametrosDistribuicao> {
@@ -1925,18 +1946,37 @@ async function getParametrosDistribuicaoBase(): Promise<ParametrosDistribuicao> 
     const { data, error } = await supabase
       .from("treino_parametros")
       .select(
-        "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, campo_grade, grafico_campo, home_modo_grupos, destacar_exercicios_sem_rotina, ordenacao_home",
+        "series_manutencao_min, series_manutencao_max, series_foco_min, series_foco_max, fadiga_modo, fadiga_ativa, pausa_reiniciar_semanas, janela_progressao_semanas, fadiga_fases_corte_a, fadiga_fases_corte_b, fadiga_gradual_c, fadiga_gradual_d, mostrar_series_totais, mostrar_series_ponderadas, mostrar_series_acumuladas, campo_grade, grafico_campo, home_modo_grupos, destacar_exercicios_sem_rotina, ordenacao_home",
       )
       .maybeSingle();
     if (error) throw error;
     if (!data) return PARAMETROS_DISTRIBUICAO_PADRAO;
+    // Coluna nula = nunca gravada no banco: vale o que o aparelho já tinha (uma vez, sobe pro banco).
+    // Preenchida = vale o banco, e o espelho local passa a seguir ele (vale em todos os aparelhos).
+    const pendentes: Record<string, unknown> = {};
+    if (data.fadiga_ativa == null) {
+      if (!lerFadigaAtiva()) pendentes.fadiga_ativa = false;
+    } else gravarFadigaAtiva(data.fadiga_ativa);
+    if (data.pausa_reiniciar_semanas == null) {
+      const local = lerPausaReiniciarSemanas();
+      if (local > 0) pendentes.pausa_reiniciar_semanas = local;
+    } else gravarPausaReiniciarSemanas(data.pausa_reiniciar_semanas);
+    if (data.janela_progressao_semanas == null) {
+      const local = lerJanelaProgressaoSemanas();
+      if (local > 0) pendentes.janela_progressao_semanas = local;
+    } else gravarJanelaProgressaoSemanas(data.janela_progressao_semanas);
+    if (Object.keys(pendentes).length) {
+      void supabase.from("treino_parametros").update(pendentes).eq("user_id", uid());
+    }
     return {
       seriesManutencaoMin: data.series_manutencao_min,
       seriesManutencaoMax: data.series_manutencao_max,
       seriesFocoMin: data.series_foco_min,
       seriesFocoMax: data.series_foco_max,
       fadigaModo: "fases",
-      fadigaAtiva: true,
+      fadigaAtiva: data.fadiga_ativa ?? lerFadigaAtiva(),
+      pausaReiniciarSemanas: data.pausa_reiniciar_semanas ?? lerPausaReiniciarSemanas(),
+      janelaProgressaoSemanas: data.janela_progressao_semanas ?? lerJanelaProgressaoSemanas(),
       fadigaFasesCorteA: data.fadiga_fases_corte_a,
       fadigaFasesCorteB: data.fadiga_fases_corte_b,
       fadigaGradualC: data.fadiga_gradual_c,
@@ -1961,6 +2001,9 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     series_foco_min: p.seriesFocoMin,
     series_foco_max: p.seriesFocoMax,
     fadiga_modo: "fases",
+    fadiga_ativa: p.fadigaAtiva,
+    pausa_reiniciar_semanas: Math.max(0, Math.floor(p.pausaReiniciarSemanas) || 0),
+    janela_progressao_semanas: Math.max(0, Math.floor(p.janelaProgressaoSemanas) || 0),
     fadiga_fases_corte_a: p.fadigaFasesCorteA,
     fadiga_fases_corte_b: p.fadigaFasesCorteB,
     fadiga_gradual_c: p.fadigaGradualC,
@@ -1976,6 +2019,9 @@ export async function salvarParametrosDistribuicao(p: ParametrosDistribuicao): P
     updated_at: new Date().toISOString(),
   });
   if (error) throw error;
+  gravarFadigaAtiva(p.fadigaAtiva);
+  gravarPausaReiniciarSemanas(p.pausaReiniciarSemanas);
+  gravarJanelaProgressaoSemanas(p.janelaProgressaoSemanas);
   // Só essa chave muda de verdade aqui -- invalidarNamespace("treino") apagaria também
   // listTreinos/listMusculos/listMetasMusculo etc. (intactos), forçando a Distribuição a
   // rebuscar tudo da rede ao voltar da Parametrização (reflow/"tela em movimento" visível

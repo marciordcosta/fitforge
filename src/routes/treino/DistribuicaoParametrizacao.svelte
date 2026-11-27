@@ -6,7 +6,7 @@
   import Button from "../../components/Button.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
   import { lerFimDoDescanso, gravarFimDoDescanso, type FimDoDescanso } from "../../lib/treinoDescansoPrefs";
-  import { lerPausaReiniciarSemanas, gravarPausaReiniciarSemanas, lerJanelaProgressaoSemanas, gravarJanelaProgressaoSemanas, lerFadigaAtiva, gravarFadigaAtiva } from "../../lib/treinoProgressaoPrefs";
+  import { lerPausaReiniciarSemanas, lerJanelaProgressaoSemanas, lerFadigaAtiva } from "../../lib/treinoProgressaoPrefs";
   import {
     getParametrosDistribuicao,
     salvarParametrosDistribuicao,
@@ -35,17 +35,11 @@
     cardsAbertos = novo;
   }
 
-  /** Prazo (em semanas) do "reiniciar automático" da tendência de progressão — preferência do aparelho,
-   * aplicada na hora. 0 ou vazio = desligado. */
+  /** Prazo (em semanas) do "reiniciar automático" da tendência de progressão — salvo no banco junto com
+   * os demais parâmetros. 0 ou vazio = desligado. */
   let pausaReiniciarSemanas = $state<number | null>(lerPausaReiniciarSemanas() || null);
   /** Janela (em semanas) da conta de progressão: só as sessões dessas últimas semanas entram. Vazio ou 0 = tudo. */
   let janelaProgressaoSemanas = $state<number | null>(lerJanelaProgressaoSemanas() || null);
-  function aoMudarJanelaProgressao() {
-    gravarJanelaProgressaoSemanas(janelaProgressaoSemanas ?? 0);
-  }
-  function aoMudarPausaReiniciar() {
-    gravarPausaReiniciarSemanas(pausaReiniciarSemanas ?? 0);
-  }
 
   let carregando = $state(true);
   let erro = $state<string | null>(null);
@@ -128,6 +122,9 @@
       seriesManutencaoMax = p.seriesManutencaoMax;
       seriesFocoMin = p.seriesFocoMin;
       seriesFocoMax = p.seriesFocoMax;
+      fadigaAtiva = p.fadigaAtiva;
+      pausaReiniciarSemanas = p.pausaReiniciarSemanas || null;
+      janelaProgressaoSemanas = p.janelaProgressaoSemanas || null;
       fadigaFasesCorteA = p.fadigaFasesCorteA;
       fadigaFasesCorteB = p.fadigaFasesCorteB;
       mostrarSeriesTotais = p.mostrarSeriesTotais;
@@ -191,6 +188,8 @@
         seriesFocoMax,
         fadigaModo: PARAMETROS_DISTRIBUICAO_PADRAO.fadigaModo,
         fadigaAtiva,
+        pausaReiniciarSemanas: pausaReiniciarSemanas ?? 0,
+        janelaProgressaoSemanas: janelaProgressaoSemanas ?? 0,
         fadigaFasesCorteA,
         fadigaFasesCorteB,
         fadigaGradualC: PARAMETROS_DISTRIBUICAO_PADRAO.fadigaGradualC,
@@ -205,7 +204,6 @@
         homeModoGrupos: PARAMETROS_DISTRIBUICAO_PADRAO.homeModoGrupos,
         ordenacaoHome: PARAMETROS_DISTRIBUICAO_PADRAO.ordenacaoHome,
       };
-      gravarFadigaAtiva(fadigaAtiva);
       await salvarParametrosDistribuicao(p);
       mostrarToast("Salvo");
       voltar("/treino");
@@ -379,7 +377,6 @@
                   placeholder="0"
                   aria-label="Semanas da janela da progressão"
                   bind:value={janelaProgressaoSemanas}
-                  oninput={aoMudarJanelaProgressao}
                 />
                 <span class="param-unidade">semanas</span>
               </div>
@@ -415,7 +412,6 @@
                   placeholder="0"
                   aria-label="Semanas de pausa para reiniciar a progressão"
                   bind:value={pausaReiniciarSemanas}
-                  oninput={aoMudarPausaReiniciar}
                 />
                 <span class="param-unidade">semanas</span>
               </div>

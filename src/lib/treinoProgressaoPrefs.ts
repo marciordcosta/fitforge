@@ -1,5 +1,6 @@
-/** Preferência da conta de tendência de progressão/regressão dos exercícios (Treino >
- * Parametrização) — guardada só no aparelho (localStorage), como as demais preferências de exibição.
+/** Preferências da conta de tendência de progressão/regressão dos exercícios (Treino >
+ * Parametrização). A fonte é o banco (treino_parametros); aqui fica só o ESPELHO em localStorage, pra as
+ * contas síncronas lerem sem esperar a rede — treinoApi o atualiza a cada leitura/gravação do banco.
  *
  * `pausaReiniciarSemanas` > 0 liga o "reiniciar" automático: depois de uma pausa de N semanas ou mais
  * (entre duas sessões do mesmo exercício, ou do último treino dele até hoje), a conta ignora o que
