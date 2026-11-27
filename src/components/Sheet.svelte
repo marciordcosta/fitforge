@@ -7,8 +7,11 @@
     acaoTituloEsquerda,
     acaoTituloDireita,
     aoClicarTitulo,
+    abrirCompleto = false,
     children,
   }: {
+    /** Abre já na altura do conteúdo (até 92% da tela) em vez de limitar a 60% e exigir rolagem/arraste. */
+    abrirCompleto?: boolean;
     titulo?: string;
     onFechar: () => void;
     acaoTituloEsquerda?: Snippet;
@@ -53,6 +56,7 @@
 <div class="sheet-overlay" role="presentation" onclick={onFechar}>
   <div
     class="sheet"
+    class:completo={abrirCompleto}
     bind:this={sheetEl}
     role="presentation"
     onclick={(e) => e.stopPropagation()}
@@ -101,6 +105,10 @@
     background: var(--surface-card);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     box-shadow: var(--shadow-float);
+  }
+  .sheet.completo {
+    max-height: 92vh;
+    max-height: 92dvh;
   }
   .sheet-handle-wrap {
     flex-shrink: 0;

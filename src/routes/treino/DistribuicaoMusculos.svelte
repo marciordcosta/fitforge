@@ -3062,6 +3062,7 @@
       if (musculoUrlContexto) window.history.back();
     }}
     acaoTituloDireita={linkDistribuicao}
+    abrirCompleto
   >
     {#if carregandoModalMusculo && itensGraficoMusculo.length}
       <p class="tendencia-musculo muted">Verificando progressão…</p>
