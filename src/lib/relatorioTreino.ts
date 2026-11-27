@@ -20,6 +20,9 @@ export interface EntradaRelatorio {
   /** Distribuição semanal planejada (todas as rotinas somadas), nas três leituras da tela de Distribuição:
    * total (bruto), ponderado e acumulado (ponderado descontado pela posição na rotina). */
   planejadoSemanal: { id: string; total: number; ponderado: number; acumulado: number }[];
+  /** Grade da Distribuição Semanal: uma coluna por dia (seg a dom) com a rotina do dia e as séries
+   * ponderadas planejadas por músculo naquele dia. */
+  gradeSemanal: { dias: { rotulo: string; rotina: string | null }[]; porMusculo: Map<string, number[]> };
   classificar: (musculoId: string, seriesSemana: number) => ClasseVolumeSemanal;
   exercicios: {
     id: string;
@@ -87,14 +90,11 @@ export interface LinhaMusculoRelatorio {
   prioridade: number;
 }
 
-export interface LinhaDistribuicaoRelatorio {
+export interface LinhaGradeRelatorio {
   nome: string;
   grupo: string | null;
+  porDia: number[];
   total: number;
-  ponderado: number;
-  acumulado: number;
-  /** % do total ponderado planejado. */
-  pct: number;
   classe: ClasseVolumeSemanal;
 }
 
@@ -130,8 +130,8 @@ export interface ModeloRelatorio {
     meta: { data: string; valor: number }[];
   };
   musculos: LinhaMusculoRelatorio[];
-  /** Distribuição semanal planejada (a mesma do card "Distribuição Semanal" da aba Planejado). */
-  distribuicaoSemanal: LinhaDistribuicaoRelatorio[];
+  /** Distribuição Semanal (grade da aba Planejado): séries ponderadas planejadas por dia e músculo. */
+  grade: { dias: { rotulo: string; rotina: string | null }[]; linhas: LinhaGradeRelatorio[] };
   decisoes: string[];
   exercicios: LinhaExercicioRelatorio[];
   alertas: string[];
@@ -300,21 +300,21 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     }
   }
 
-  // ---- distribuição semanal planejada ----
+  // ---- grade da distribuição semanal (planejado, por dia) ----
   const grupoPorMusculo = new Map(e.musculos.map((m) => [m.id, m.grupo]));
-  const totalPond = e.planejadoSemanal.reduce((a, l) => a + l.ponderado, 0);
-  const distribuicaoSemanal: LinhaDistribuicaoRelatorio[] = e.planejadoSemanal
-    .filter((l) => l.ponderado > 0)
-    .map((l) => ({
-      nome: nomeMusculo.get(l.id) ?? "",
-      grupo: grupoPorMusculo.get(l.id) ?? null,
-      total: r1(l.total),
-      ponderado: r1(l.ponderado),
-      acumulado: r1(l.acumulado),
-      pct: totalPond > 0 ? Math.round((l.ponderado / totalPond) * 100) : 0,
-      classe: e.classificar(l.id, Math.round(l.ponderado * 2) / 2),
-    }))
-    .sort((a, b) => b.ponderado - a.ponderado);
+  const linhasGrade: LinhaGradeRelatorio[] = [];
+  for (const [id, porDia] of e.gradeSemanal.porMusculo) {
+    const total = porDia.reduce((a, v) => a + v, 0);
+    if (total <= 0) continue;
+    linhasGrade.push({
+      nome: nomeMusculo.get(id) ?? "",
+      grupo: grupoPorMusculo.get(id) ?? null,
+      porDia: porDia.map(r1),
+      total: r1(total),
+      classe: e.classificar(id, Math.round(total * 2) / 2),
+    });
+  }
+  linhasGrade.sort((a, b) => b.total - a.total);
 
   // ---- decisões (as mais urgentes) ----
   const decisoes = [...linhas]
@@ -423,7 +423,7 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
       meta: metaPts,
     },
     musculos: linhas,
-    distribuicaoSemanal,
+    grade: { dias: e.gradeSemanal.dias, linhas: linhasGrade },
     decisoes,
     exercicios,
     alertas,

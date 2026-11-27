@@ -114,6 +114,32 @@ export async function levantarRelatorio(args: {
     };
   });
 
+  // grade da distribuição semanal: um dia por coluna (seg a dom), séries ponderadas por músculo
+  const ORDEM_DIAS = [1, 2, 3, 4, 5, 6, 0];
+  const NOMES_DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const porMusculoGrade = new Map<string, number[]>();
+  ORDEM_DIAS.forEach((dia, col) => {
+    const doDia = treinos.filter((t) => t.dia_semana === dia);
+    for (const t of doDia) {
+      for (const te of t.exercicios) {
+        const n = te.series.length;
+        if (!n) continue;
+        for (const m of te.exercicio?.musculos ?? []) {
+          const linha = porMusculoGrade.get(m.musculo_id) ?? ORDEM_DIAS.map(() => 0);
+          linha[col] += n * Number(m.peso_contribuicao);
+          porMusculoGrade.set(m.musculo_id, linha);
+        }
+      }
+    }
+  });
+  const gradeSemanal = {
+    dias: ORDEM_DIAS.map((dia) => ({
+      rotulo: NOMES_DIAS[dia],
+      rotina: treinos.filter((t) => t.dia_semana === dia).map((t) => t.nome_treino).join(" + ") || null,
+    })),
+    porMusculo: porMusculoGrade,
+  };
+
   const ordenados = [...pesosTodos].sort((a, b) => a.data.localeCompare(b.data));
 
   return montarRelatorio({
@@ -124,6 +150,7 @@ export async function levantarRelatorio(args: {
     volume: volume.map((l) => ({ data: l.data, musculoId: l.musculo_id, series: Number(l.series_equivalentes) })),
     metaSemanal,
     planejadoSemanal,
+    gradeSemanal,
     classificar: (musculoId, serie) => classificarVolumeSemanal(serie, args.parametrosParaMusculo(musculoPorId.get(musculoId))),
     exercicios,
     fimDoTreino,

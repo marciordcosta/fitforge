@@ -245,67 +245,46 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.text("Tabelas complementares ao resumo da primeira página, para análise mais profunda.", M, y + 10);
   y += 14;
 
-  // ---- distribuição semanal planejada, agrupada como no card "Distribuição Semanal" ----
-  if (modelo.distribuicaoSemanal.length) {
-    titulo("Distribuição semanal planejada por agrupamento muscular");
-    type LinhaTab = { nome: string; total: number; ponderado: number; acumulado: number; pct: number; classe?: string; grupo: boolean };
-    const porGrupo = new Map<string, typeof modelo.distribuicaoSemanal>();
-    const avulsos: typeof modelo.distribuicaoSemanal = [];
-    for (const l of modelo.distribuicaoSemanal) {
-      if (l.grupo) porGrupo.set(l.grupo, [...(porGrupo.get(l.grupo) ?? []), l]);
-      else avulsos.push(l);
-    }
-    const blocos: { ordem: number; linhas: LinhaTab[] }[] = [];
-    for (const [nome, itens] of porGrupo) {
-      const soma = (k: "total" | "ponderado" | "acumulado" | "pct") => itens.reduce((a, i) => a + i[k], 0);
-      blocos.push({
-        ordem: soma("ponderado"),
-        linhas: [
-          { nome, total: soma("total"), ponderado: soma("ponderado"), acumulado: soma("acumulado"), pct: soma("pct"), grupo: true },
-          ...itens.map((i) => ({ ...i, nome: `    ${i.nome}`, grupo: false })),
-        ],
-      });
-    }
-    for (const l of avulsos) blocos.push({ ordem: l.ponderado, linhas: [{ ...l, grupo: false }] });
-    const linhasTab = blocos.sort((a, b) => b.ordem - a.ordem).flatMap((b) => b.linhas);
-    const totalGeral = modelo.distribuicaoSemanal.reduce(
-      (a, l) => ({ total: a.total + l.total, ponderado: a.ponderado + l.ponderado, acumulado: a.acumulado + l.acumulado }),
-      { total: 0, ponderado: 0, acumulado: 0 },
-    );
+  // ---- Distribuição Semanal: a grade de dias (seg a dom) com as séries ponderadas planejadas ----
+  if (modelo.grade.linhas.length) {
+    titulo("Distribuição semanal planejada (séries ponderadas por dia)");
+    const dias = modelo.grade.dias;
     tabela({
-      head: [["Músculo", "Total", "Pond.", "Acum.", "% do pond."]],
-      body: [
-        ...linhasTab.map((l) => [l.nome, fmtNum(l.total), fmtNum(l.ponderado), fmtNum(l.acumulado), `${l.pct}%`]),
-        ["Total geral", fmtNum(totalGeral.total), fmtNum(totalGeral.ponderado), fmtNum(totalGeral.acumulado), "100%"],
+      head: [
+        ["Músculo", ...dias.map((d) => d.rotulo), "Total"],
+        ["", ...dias.map((d) => d.rotina ?? "descanso"), ""],
       ],
-      columnStyles: {
-        0: { cellWidth: 60 },
-        1: { halign: "right" },
-        2: { halign: "right" },
-        3: { halign: "right" },
-        4: { halign: "right" },
-      },
+      body: modelo.grade.linhas.map((l) => [l.nome, ...l.porDia.map((v) => (v > 0 ? fmtNum(v) : "-")), fmtNum(l.total)]),
+      columnStyles: { 0: { cellWidth: 42, fontStyle: "bold" } },
       didParseCell: (d) => {
-        if (d.section !== "body") return;
-        const ultima = d.row.index === linhasTab.length;
-        const l = linhasTab[d.row.index];
-        if (ultima || l?.grupo) {
-          d.cell.styles.fontStyle = "bold";
-          d.cell.styles.fillColor = [232, 236, 241];
+        const col = d.column.index;
+        if (d.section === "head") {
+          if (d.row.index === 1) {
+            d.cell.styles.fillColor = [51, 65, 85];
+            d.cell.styles.fontStyle = "normal";
+            d.cell.styles.fontSize = 6.5;
+          }
+          if (col >= 1) d.cell.styles.halign = "center";
+          return;
         }
-        if (l && !l.grupo && d.column.index === 2 && l.classe) d.cell.styles.textColor = corClasse(l.classe);
+        if (col >= 1) d.cell.styles.halign = "center";
+        const l = modelo.grade.linhas[d.row.index];
+        if (col === dias.length + 1) {
+          d.cell.styles.fontStyle = "bold";
+          d.cell.styles.textColor = corClasse(l.classe);
+        }
       },
     });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...COR.suave);
-    const notaDist = doc.splitTextToSize(
-      "Total: séries brutas (1 por músculo tocado). Pond.: séries pelo peso de contribuição de cada exercício no músculo (a cor segue a faixa de volume). Acum.: ponderado descontado pela posição na rotina (igual ao Pond. se a fadiga está desligada). Linhas em negrito são os agrupamentos musculares.",
+    const notaGrade = doc.splitTextToSize(
+      "Séries planejadas por dia da semana, ponderadas pelo peso de contribuição de cada exercício no músculo (a mesma leitura do Realizado). A linha de baixo do cabeçalho mostra a rotina do dia. O Total segue a cor da faixa de volume (vermelho abaixo da manutenção, verde na meta, azul acima do foco).",
       util,
     ) as string[];
-    garantir(notaDist.length * 3.2);
-    doc.text(notaDist, M, y);
-    y += notaDist.length * 3.2 + 4;
+    garantir(notaGrade.length * 3.2);
+    doc.text(notaGrade, M, y);
+    y += notaGrade.length * 3.2 + 4;
   }
 
   titulo("Detalhe por músculo: faixa, frequência, plano e fim do treino");
