@@ -13,7 +13,7 @@
     getMetaRefeicaoPorNome,
     getAlimento,
     listRefeicoesModelo,
-    listMetasDiaModelo,
+    getReceitaPadraoIdEfetiva,
     getMetasDoDia,
     getPreferenciasRefeicoesHome,
     getReceita,
@@ -62,11 +62,10 @@
     loading = true;
     erro = null;
     try {
-      const [refeicaoRes, itensRes, modelos, metasDia, prefs] = await Promise.all([
+      const [refeicaoRes, itensRes, modelos, prefs] = await Promise.all([
         getRefeicaoDia(refeicaoId),
         getItensDaRefeicao(refeicaoId),
         listRefeicoesModelo(),
-        listMetasDiaModelo(),
         getPreferenciasRefeicoesHome(),
       ]);
       refeicao = refeicaoRes;
@@ -78,9 +77,7 @@
       // espera a mais, em sequência, antes da tela aparecer).
       let receitaIdEfetiva: string | null = null;
       if (refeicao && modeloRefeicao) {
-        const diaSemana = parseISODate(refeicao.data).getDay();
-        const override = metasDia.find((md) => md.modeloId === modeloRefeicao!.id && md.diaSemana === diaSemana);
-        receitaIdEfetiva = override?.metaReceitaId ?? modeloRefeicao.metaReceitaId ?? null;
+        receitaIdEfetiva = await getReceitaPadraoIdEfetiva(modeloRefeicao.id, parseISODate(refeicao.data).getDay());
       }
       const [metasRes, receitaPadrao] = await Promise.all([
         refeicao

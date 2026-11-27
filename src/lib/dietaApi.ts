@@ -1170,16 +1170,24 @@ async function garantirRefeicoesPadraoDoDiaImpl(data: string): Promise<RefeicaoD
   return getRefeicoesDoDia(data);
 }
 
+/** Id da lista de alimentos padrão dessa refeição pro dia da semana. Na Ondulatória, o override do
+ * dia (grupo de dias) prevalece sobre a lista global; na Fixa o Gerenciar só enxerga/edita a lista
+ * global, então overrides que sobraram de quando o modo era Ondulatória precisam ser ignorados —
+ * senão o Diário lançava a lista antiga em vez da que aparece em Gerenciar. */
+export async function getReceitaPadraoIdEfetiva(modeloId: string, diaSemana: number): Promise<string | null> {
+  const [modelos, metasDia, modo] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo(), getModoCalorias()]);
+  const modelo = modelos.find((m) => m.id === modeloId);
+  const override = modo === "ondulatoria" ? metasDia.find((m) => m.modeloId === modeloId && m.diaSemana === diaSemana) : undefined;
+  return override?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
+}
+
 /** Lança de uma vez só, no diário do dia informado, os itens da lista de alimentos "padrão"
  * dessa refeição (efetiva pro dia da semana — override do dia se houver, senão a global). Ação
  * manual (botão "Refeição Padrão" no Diário): ao contrário do que fazia antes automaticamente,
  * lança mesmo que a refeição já tenha itens hoje — quem decide é o usuário. Retorna `false` sem
  * fazer nada se essa refeição não tiver uma lista de alimentos padrão configurada. */
 export async function lancarReceitaPadrao(modeloId: string, diaSemana: number, refeicaoId: string, data: string): Promise<boolean> {
-  const [modelos, metasDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo()]);
-  const modelo = modelos.find((m) => m.id === modeloId);
-  const override = metasDia.find((m) => m.modeloId === modeloId && m.diaSemana === diaSemana);
-  const receitaId = override?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
+  const receitaId = await getReceitaPadraoIdEfetiva(modeloId, diaSemana);
   if (!receitaId) return false;
   const receita = await getReceita(receitaId);
   if (!receita?.itens.length) return false;
@@ -1197,10 +1205,7 @@ export async function salvarComoReceitaPadrao(
   diaSemana: number,
   itens: { alimentoId: string; quantidade: number }[],
 ): Promise<void> {
-  const [modelos, metasDia] = await Promise.all([listRefeicoesModelo(), listMetasDiaModelo()]);
-  const modelo = modelos.find((m) => m.id === modeloId);
-  const override = metasDia.find((m) => m.modeloId === modeloId && m.diaSemana === diaSemana);
-  const receitaIdEfetiva = override?.metaReceitaId ?? modelo?.metaReceitaId ?? null;
+  const receitaIdEfetiva = await getReceitaPadraoIdEfetiva(modeloId, diaSemana);
   const receitaId = receitaIdEfetiva ?? (await garantirReceitaPrivadaRefeicao(modeloId, nomeModelo, null));
   const receitaAtual = await getReceita(receitaId);
   if (receitaAtual?.itens.length) {
