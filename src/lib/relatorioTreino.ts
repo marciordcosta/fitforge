@@ -37,8 +37,8 @@ export interface EntradaRelatorio {
   /** % do volume planejado de cada músculo que cai no bloco C (fim do treino); null se a fadiga está desligada. */
   fimDoTreino: Map<string, number> | null;
   sessoes: { realizadas: number; planejadasPorSemana: number };
-  /** Calorias do período, só informativo (null = sem dados da dieta). */
-  calorias: { mediaKcal: number | null; diasRegistrados: number; diasPeriodo: number; metaMediaKcal: number | null } | null;
+  /** Meta média de calorias do período, só informativo (null = sem dados da dieta). */
+  calorias: { diasPeriodo: number; metaMediaKcal: number | null } | null;
   peso: {
     pontos: { data: string; peso: number }[];
     mediaMovel: { data: string; peso: number }[];

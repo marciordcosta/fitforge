@@ -118,11 +118,9 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       detalhe: modelo.peso.metaFim != null ? `meta no fim: ${fmtNum(modelo.peso.metaFim)} kg` : "sem meta no período",
     },
     {
-      rotulo: "Calorias (média/dia)",
-      valor: modelo.calorias?.mediaKcal != null ? `${Math.round(modelo.calorias.mediaKcal).toLocaleString("pt-BR")} kcal` : "-",
-      detalhe: modelo.calorias
-        ? `${modelo.calorias.metaMediaKcal != null ? `meta ${Math.round(modelo.calorias.metaMediaKcal).toLocaleString("pt-BR")} | ` : ""}${modelo.calorias.diasRegistrados}/${modelo.calorias.diasPeriodo} dias`
-        : "sem dados da dieta",
+      rotulo: "Calorias planejadas (média/dia)",
+      valor: modelo.calorias?.metaMediaKcal != null ? `${Math.round(modelo.calorias.metaMediaKcal).toLocaleString("pt-BR")} kcal` : "-",
+      detalhe: modelo.calorias ? `meta da dieta no período (${modelo.calorias.diasPeriodo} dias)` : "sem dados da dieta",
     },
   ];
   const wCaixa = (util - 3 * 3) / 4;
