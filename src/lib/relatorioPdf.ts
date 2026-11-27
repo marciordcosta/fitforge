@@ -185,18 +185,16 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     head: [
       [
         { content: "", styles: { fillColor: COR.cabecalho } },
-        { content: "Planejado na semana", colSpan: 3, styles: { halign: "center", fillColor: [51, 65, 85] } },
+        { content: "Planejado", styles: { halign: "center", fillColor: [51, 65, 85] } },
         { content: "Realizado", colSpan: 2, styles: { halign: "center", fillColor: [30, 64, 175] } },
         { content: "Prioridade (curva ABC do realizado)", colSpan: 4, styles: { halign: "center", fillColor: [51, 65, 85] } },
         { content: "Leitura", colSpan: 5, styles: { halign: "center", fillColor: [30, 64, 175] } },
       ],
-      ["Músculo", "Total", "Pond.", "Acum.", "Séries/sem.", "vs plano", "% total", "Acum. %", "Curva", "Plano", "Faixa", "Freq./sem.", "Progressão", "Var. %", "Ação sugerida"],
+      ["Músculo", "Pond./sem.", "Pond./sem.", "vs plano", "% total", "Acum. %", "Curva", "Plano", "Faixa", "Freq./sem.", "Progressão", "Var. %", "Ação sugerida"],
     ],
     body: modelo.musculos.map((l) => [
       l.nome,
-      fmtNum(l.planTotal),
       fmtNum(l.planPond),
-      fmtNum(l.planAcum),
       fmtNum(l.mediaSemanal),
       l.deltaPct != null ? fmtSinal(l.deltaPct, 0, "%") : "-",
       l.curva ? `${l.pctTotal}%` : "-",
@@ -210,43 +208,40 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       l.acao,
     ]),
     columnStyles: {
-      0: { cellWidth: 28, fontStyle: "bold" },
-      1: { halign: "right", cellWidth: 12 },
-      2: { halign: "right", cellWidth: 12 },
-      3: { halign: "right", cellWidth: 12 },
-      4: { halign: "right", cellWidth: 19 },
+      0: { cellWidth: 32, fontStyle: "bold" },
+      1: { halign: "right", cellWidth: 20 },
+      2: { halign: "right", cellWidth: 20 },
+      3: { halign: "right", cellWidth: 16 },
+      4: { halign: "right", cellWidth: 14 },
       5: { halign: "right", cellWidth: 15 },
-      6: { halign: "right", cellWidth: 13 },
-      7: { halign: "right", cellWidth: 14 },
-      8: { halign: "center", cellWidth: 11 },
-      9: { halign: "center", cellWidth: 11 },
-      10: { cellWidth: 19 },
-      11: { halign: "right", cellWidth: 17 },
-      12: { cellWidth: 21 },
-      13: { halign: "right", cellWidth: 14 },
+      6: { halign: "center", cellWidth: 12 },
+      7: { halign: "center", cellWidth: 12 },
+      8: { cellWidth: 21 },
+      9: { halign: "right", cellWidth: 18 },
+      10: { cellWidth: 23 },
+      11: { halign: "right", cellWidth: 15 },
     },
     didParseCell: (d) => {
-      if (d.section === "head") {
-        d.cell.styles.halign = d.row.index === 0 ? "center" : d.cell.styles.halign;
-        return;
-      }
+      if (d.section === "head") return;
       const l = modelo.musculos[d.row.index];
       const col = d.column.index;
-      if (col === 5 && l.deltaPct != null) {
+      if (col === 3 && l.deltaPct != null) {
         d.cell.styles.textColor = l.deltaPct <= -25 ? COR.vermelho : l.deltaPct < -10 ? COR.ambar : COR.texto;
         d.cell.styles.fontStyle = "bold";
       }
-      if ((col === 8 || col === 9) && (col === 8 ? l.curva : l.curvaPlanejada)) {
-        const v = col === 8 ? l.curva : l.curvaPlanejada;
-        d.cell.styles.fontStyle = "bold";
-        d.cell.styles.textColor = v === "A" ? COR.verde : v === "B" ? COR.ambar : COR.suave;
-        if (col === 9 && l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) d.cell.styles.textColor = COR.vermelho;
+      if (col === 6 || col === 7) {
+        const v = col === 6 ? l.curva : l.curvaPlanejada;
+        if (v) {
+          d.cell.styles.fontStyle = "bold";
+          d.cell.styles.textColor = v === "A" ? COR.verde : v === "B" ? COR.ambar : COR.suave;
+          if (col === 7 && l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) d.cell.styles.textColor = COR.vermelho;
+        }
       }
-      if (col === 10) {
+      if (col === 8) {
         d.cell.styles.textColor = corClasse(l.classe);
         d.cell.styles.fontStyle = "bold";
       }
-      if (col === 12 || col === 13) {
+      if (col === 10 || col === 11) {
         d.cell.styles.textColor = corProgressao(l.progressao);
         d.cell.styles.fontStyle = "bold";
       }
@@ -256,7 +251,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Planejado na semana: Total = séries brutas, Pond. = pelo peso de contribuição, Acum. = ponderado descontado pela posição na rotina (igual ao Pond. com a fadiga desligada). Séries/sem.: média ponderada realizada nas semanas com treino; vs plano = realizado contra o planejado ponderado. Curva ABC: músculos do maior pro menor volume realizado, A = até 70% do volume acumulado, B = até 90%, C = o restante (onde o volume está investido, a prioridade na prática); Plano = a mesma curva sobre o planejado, em vermelho quando difere da real. Faixa: classificação do volume (vermelho abaixo da manutenção, verde na meta, azul acima do foco). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise).",
+    "Pond./sem.: séries ponderadas pelo peso de contribuição de cada exercício no músculo, a mesma leitura do Realizado; planejado = soma das rotinas, realizado = média das semanas com treino; vs plano = realizado contra o planejado. Curva ABC: músculos do maior pro menor volume realizado, A = até 70% do volume acumulado, B = até 90%, C = o restante (onde o volume está investido, a prioridade na prática); Plano = a mesma curva sobre o planejado, em vermelho quando difere da real. Faixa: classificação do volume (vermelho abaixo da manutenção, verde na meta, azul acima do foco). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise).",
     util,
   ) as string[];
   garantir(nota.length * 3.2);
