@@ -329,8 +329,9 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
 
   // ---- decisões: dependem do foco (músculos com mais estímulo vêm primeiro) ----
   /** Limites de séries TOTAIS (sem ponderar) de um músculo num mesmo dia: acima de 8 pede atenção, acima
-   * de 10 passa do que cabe num dia (fracionar); abaixo de 5 o dia rende pouco pro músculo. O volume da
-   * SEMANA não tem número fixo: cada músculo usa a janela dele (um posterior de coxa tolera bem menos
+   * de 10 passa do que cabe num dia (fracionar); abaixo de 5 o dia rende pouco pro músculo, mas só pra
+   * quem suporta isso: o mínimo do dia é o MENOR entre 5 e a metade do máximo semanal da janela do
+   * músculo, arredondada pra baixo (máximo 9 → mínimo 4; máximo 6 → 3). O volume da SEMANA não tem número fixo: cada músculo usa a janela dele (um posterior de coxa tolera bem menos
    * que um peitoral). */
   const LIMITE_DIA_ATENCAO = 8;
   const LIMITE_DIA_MAXIMO = 10;
@@ -365,6 +366,9 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     const estagnados = doMusculo.filter((x) => x.status === "estavel" && x.sessoesValidas >= MIN_SESSOES_TROCA).sort((a, b) => b.sessoesValidas - a.sessoesValidas);
     const emQueda = doMusculo.filter((x) => x.status === "caindo" && x.variacao != null).sort((a, b) => (a.variacao ?? 0) - (b.variacao ?? 0));
     const st = l.progressao;
+    const janela = e.janela(l.id);
+    const faixaTxt = `${fmt1(janela.min)} a ${fmt1(janela.max)}`;
+    const minimoDia = Math.min(MINIMO_DIA, Math.floor(janela.max / 2));
 
     // por dia (séries totais, plano atual)
     if (maxDia > LIMITE_DIA_MAXIMO) {
@@ -372,13 +376,11 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     } else if (maxDia > LIMITE_DIA_ATENCAO) {
       itens.push({ p: 3, curto: `${maxDia} séries num dia, perto do limite de ${LIMITE_DIA_MAXIMO}: ao subir o volume, abrir mais um dia em vez de empilhar.` });
     }
-    if (dias.length >= 2 && minDia < MINIMO_DIA) {
-      itens.push({ p: 2, curto: `um dia com só ${minDia} série${minDia === 1 ? "" : "s"} (menos de ${MINIMO_DIA}): se não é acessório, concentrar em dias de ${MINIMO_DIA} a ${LIMITE_DIA_ATENCAO}.` });
+    if (dias.length >= 2 && minDia < minimoDia) {
+      itens.push({ p: 2, curto: `um dia com só ${minDia} série${minDia === 1 ? "" : "s"} (mínimo de ${fmt1(minimoDia)} pra esse músculo): se não é acessório, concentrar em menos dias.` });
     }
 
     // volume da semana x janela do próprio músculo
-    const janela = e.janela(l.id);
-    const faixaTxt = `${fmt1(janela.min)} a ${fmt1(janela.max)}`;
     if (l.classe === "insuficiente") {
       if (foco) {
         itens.push({ p: 5, curto: `abaixo da janela (${fmt1(l.mediaSemanal)} contra ${faixaTxt}) num músculo de foco: aumentar séries até a janela, em 2 dias.` });
