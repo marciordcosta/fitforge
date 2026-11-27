@@ -17,6 +17,9 @@ export interface EntradaRelatorio {
   volume: { data: string; musculoId: string; series: number }[];
   /** Planejado semanal (ponderado) por músculo. */
   metaSemanal: Map<string, number>;
+  /** Distribuição semanal planejada (todas as rotinas somadas), nas três leituras da tela de Distribuição:
+   * total (bruto), ponderado e acumulado (ponderado descontado pela posição na rotina). */
+  planejadoSemanal: { id: string; total: number; ponderado: number; acumulado: number }[];
   classificar: (musculoId: string, seriesSemana: number) => ClasseVolumeSemanal;
   exercicios: {
     id: string;
@@ -78,6 +81,17 @@ export interface LinhaMusculoRelatorio {
   prioridade: number;
 }
 
+export interface LinhaDistribuicaoRelatorio {
+  nome: string;
+  grupo: string | null;
+  total: number;
+  ponderado: number;
+  acumulado: number;
+  /** % do total ponderado planejado. */
+  pct: number;
+  classe: ClasseVolumeSemanal;
+}
+
 export interface LinhaExercicioRelatorio {
   nome: string;
   musculo: string;
@@ -110,6 +124,8 @@ export interface ModeloRelatorio {
     meta: { data: string; valor: number }[];
   };
   musculos: LinhaMusculoRelatorio[];
+  /** Distribuição semanal planejada (a mesma do card "Distribuição Semanal" da aba Planejado). */
+  distribuicaoSemanal: LinhaDistribuicaoRelatorio[];
   decisoes: string[];
   exercicios: LinhaExercicioRelatorio[];
   alertas: string[];
@@ -271,6 +287,22 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     }
   }
 
+  // ---- distribuição semanal planejada ----
+  const grupoPorMusculo = new Map(e.musculos.map((m) => [m.id, m.grupo]));
+  const totalPond = e.planejadoSemanal.reduce((a, l) => a + l.ponderado, 0);
+  const distribuicaoSemanal: LinhaDistribuicaoRelatorio[] = e.planejadoSemanal
+    .filter((l) => l.ponderado > 0)
+    .map((l) => ({
+      nome: nomeMusculo.get(l.id) ?? "",
+      grupo: grupoPorMusculo.get(l.id) ?? null,
+      total: r1(l.total),
+      ponderado: r1(l.ponderado),
+      acumulado: r1(l.acumulado),
+      pct: totalPond > 0 ? Math.round((l.ponderado / totalPond) * 100) : 0,
+      classe: e.classificar(l.id, Math.round(l.ponderado * 2) / 2),
+    }))
+    .sort((a, b) => b.ponderado - a.ponderado);
+
   // ---- decisões (as mais urgentes) ----
   const decisoes = [...linhas]
     .filter((l) => l.prioridade >= 3)
@@ -378,6 +410,7 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
       meta: metaPts,
     },
     musculos: linhas,
+    distribuicaoSemanal,
     decisoes,
     exercicios,
     alertas,

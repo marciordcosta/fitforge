@@ -89,6 +89,31 @@ export async function levantarRelatorio(args: {
     }
   }
 
+  // distribuição semanal planejada: total (1 por série e músculo tocado), ponderado (peso de contribuição)
+  // e acumulado (ponderado descontado pela posição na rotina; sem desconto se a fadiga está desligada)
+  const totalPorMusculo = new Map<string, number>();
+  const pondPorMusculo = new Map<string, number>();
+  for (const t of treinos) {
+    for (const te of t.exercicios) {
+      const n = te.series.length;
+      if (!n) continue;
+      for (const m of te.exercicio?.musculos ?? []) {
+        totalPorMusculo.set(m.musculo_id, (totalPorMusculo.get(m.musculo_id) ?? 0) + n);
+        pondPorMusculo.set(m.musculo_id, (pondPorMusculo.get(m.musculo_id) ?? 0) + n * Number(m.peso_contribuicao));
+      }
+    }
+  }
+  const partesSemana = partesFadigaSemanal(treinos, parametros);
+  const planejadoSemanal = musculos.map((m) => {
+    const p = partesSemana.get(m.id);
+    return {
+      id: m.id,
+      total: totalPorMusculo.get(m.id) ?? 0,
+      ponderado: pondPorMusculo.get(m.id) ?? 0,
+      acumulado: p ? p.a + p.b * 0.7 + p.c * 0.4 : 0,
+    };
+  });
+
   const ordenados = [...pesosTodos].sort((a, b) => a.data.localeCompare(b.data));
 
   return montarRelatorio({
@@ -98,6 +123,7 @@ export async function levantarRelatorio(args: {
     musculos: musculos.map((m) => ({ id: m.id, nome: m.nome, grupo: m.agrupamento?.nome ?? null })),
     volume: volume.map((l) => ({ data: l.data, musculoId: l.musculo_id, series: Number(l.series_equivalentes) })),
     metaSemanal,
+    planejadoSemanal,
     classificar: (musculoId, serie) => classificarVolumeSemanal(serie, args.parametrosParaMusculo(musculoPorId.get(musculoId))),
     exercicios,
     fimDoTreino,

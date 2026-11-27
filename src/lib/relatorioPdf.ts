@@ -234,6 +234,69 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.text("Aprofundamento", M, y + 5);
   y += 11;
 
+  // ---- distribuição semanal planejada, agrupada como no card "Distribuição Semanal" ----
+  if (modelo.distribuicaoSemanal.length) {
+    titulo("Distribuição semanal planejada (todas as rotinas)");
+    type LinhaTab = { nome: string; total: number; ponderado: number; acumulado: number; pct: number; classe?: string; grupo: boolean };
+    const porGrupo = new Map<string, typeof modelo.distribuicaoSemanal>();
+    const avulsos: typeof modelo.distribuicaoSemanal = [];
+    for (const l of modelo.distribuicaoSemanal) {
+      if (l.grupo) porGrupo.set(l.grupo, [...(porGrupo.get(l.grupo) ?? []), l]);
+      else avulsos.push(l);
+    }
+    const blocos: { ordem: number; linhas: LinhaTab[] }[] = [];
+    for (const [nome, itens] of porGrupo) {
+      const soma = (k: "total" | "ponderado" | "acumulado" | "pct") => itens.reduce((a, i) => a + i[k], 0);
+      blocos.push({
+        ordem: soma("ponderado"),
+        linhas: [
+          { nome, total: soma("total"), ponderado: soma("ponderado"), acumulado: soma("acumulado"), pct: soma("pct"), grupo: true },
+          ...itens.map((i) => ({ ...i, nome: `    ${i.nome}`, grupo: false })),
+        ],
+      });
+    }
+    for (const l of avulsos) blocos.push({ ordem: l.ponderado, linhas: [{ ...l, grupo: false }] });
+    const linhasTab = blocos.sort((a, b) => b.ordem - a.ordem).flatMap((b) => b.linhas);
+    const totalGeral = modelo.distribuicaoSemanal.reduce(
+      (a, l) => ({ total: a.total + l.total, ponderado: a.ponderado + l.ponderado, acumulado: a.acumulado + l.acumulado }),
+      { total: 0, ponderado: 0, acumulado: 0 },
+    );
+    tabela({
+      head: [["Músculo", "Total", "Pond.", "Acum.", "% do pond."]],
+      body: [
+        ...linhasTab.map((l) => [l.nome, fmtNum(l.total), fmtNum(l.ponderado), fmtNum(l.acumulado), `${l.pct}%`]),
+        ["Total geral", fmtNum(totalGeral.total), fmtNum(totalGeral.ponderado), fmtNum(totalGeral.acumulado), "100%"],
+      ],
+      columnStyles: {
+        0: { cellWidth: 60 },
+        1: { halign: "right" },
+        2: { halign: "right" },
+        3: { halign: "right" },
+        4: { halign: "right" },
+      },
+      didParseCell: (d) => {
+        if (d.section !== "body") return;
+        const ultima = d.row.index === linhasTab.length;
+        const l = linhasTab[d.row.index];
+        if (ultima || l?.grupo) {
+          d.cell.styles.fontStyle = "bold";
+          d.cell.styles.fillColor = [232, 236, 241];
+        }
+        if (l && !l.grupo && d.column.index === 2 && l.classe) d.cell.styles.textColor = corClasse(l.classe);
+      },
+    });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...COR.suave);
+    const notaDist = doc.splitTextToSize(
+      "Total: séries brutas (1 por músculo tocado). Pond.: séries pelo peso de contribuição de cada exercício no músculo (a cor segue a faixa de volume). Acum.: ponderado descontado pela posição na rotina (igual ao Pond. se a fadiga está desligada). Linhas em negrito são os agrupamentos musculares.",
+      util,
+    ) as string[];
+    garantir(notaDist.length * 3.2);
+    doc.text(notaDist, M, y);
+    y += notaDist.length * 3.2 + 4;
+  }
+
   titulo("Detalhe por músculo: frequência, prioridade e fim do treino");
   tabela({
     head: [["Músculo", "Freq./sem.", "Curva real", "Curva plano", "Fim do treino (bloco C)"]],
