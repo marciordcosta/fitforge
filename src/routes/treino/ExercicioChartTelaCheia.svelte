@@ -226,6 +226,12 @@
     });
   }
 
+  /** Reta de tendência (mínimos quadrados) da linha de Média, tracejada por cima dela. */
+  function tendenciaDaMedia(media: (number | null)[], rotulos: string[]): (number | null)[] {
+    const validas = new Set(rotulos.filter((_, i) => media[i] != null));
+    return retaDeTendencia(rotulos.map((r, i) => ({ data: r, valor: media[i] })), validas, rotulos);
+  }
+
   /** Recalcula a linha de Média a partir de quais linhas estão visíveis no momento — esconder um
    * exercício na legenda tira ele da média junto, já que ele some do gráfico. */
   function recalcularMedia(c: Chart): void {
@@ -233,11 +239,14 @@
     if (idxMedia === -1) return;
     const seriesVisiveis = c.data.datasets
       .map((d, i) => ({ dados: d.data as (number | null)[], visivel: c.isDatasetVisible(i) }))
-      .filter((_, i) => i !== idxMedia)
+      .filter((_, i) => i !== idxMedia && c.data.datasets[i].label !== "Tendência da média")
       .filter((s) => s.visivel)
       .map((s) => s.dados);
     const tamanho = (c.data.labels ?? []).length;
-    (c.data.datasets[idxMedia].data as (number | null)[]) = calcularMedia(seriesVisiveis, tamanho);
+    const media = calcularMedia(seriesVisiveis, tamanho);
+    (c.data.datasets[idxMedia].data as (number | null)[]) = media;
+    const idxTendencia = c.data.datasets.findIndex((d) => d.label === "Tendência da média");
+    if (idxTendencia !== -1) (c.data.datasets[idxTendencia].data as (number | null)[]) = tendenciaDaMedia(media, (c.data.labels ?? []) as string[]);
   }
 
   /** Clicar num exercício na legenda esconde a linha dele (padrão do Chart.js) e, com a Média
@@ -246,7 +255,8 @@
     const index = legendItem.datasetIndex;
     if (index == null) return;
     const ci = legend.chart;
-    if (ci.data.datasets[index]?.label === "Média") return;
+    const rotulo = ci.data.datasets[index]?.label;
+    if (rotulo === "Média" || rotulo === "Tendência da média") return;
     if (ci.isDatasetVisible(index)) {
       ci.hide(index);
     } else {
@@ -420,6 +430,16 @@
         pointRadius: 0,
         spanGaps: true,
       });
+      datasets.push({
+        label: "Tendência da média",
+        data: tendenciaDaMedia(media, datas.map(formatData)),
+        borderColor: "#ffffff",
+        backgroundColor: "#ffffff",
+        borderWidth: 1.5,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        spanGaps: true,
+      });
     }
 
     chart = new Chart(canvas, {
@@ -433,7 +453,7 @@
           legend: {
             display: comparando,
             position: "bottom",
-            labels: { color: "#9aa0ab", boxWidth: 12, font: { size: 11 } },
+            labels: { color: "#9aa0ab", boxWidth: 12, font: { size: 11 }, filter: (item) => item.text !== "Tendência da média" },
             onClick: mostrarMedia ? aoClicarLegenda : Chart.defaults.plugins.legend.onClick,
           },
           tooltip: { callbacks: { label: tooltipValorReal, afterLabel: tooltipSeries, footer: tooltipMarcador } },
