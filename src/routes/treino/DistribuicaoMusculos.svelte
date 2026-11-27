@@ -1,5 +1,6 @@
 <script lang="ts">
   import MusculoGraficoProgressao from "./MusculoGraficoProgressao.svelte";
+  import { calcularProgressaoMusculo, type ItemProgressao } from "../../lib/progressaoMusculo";
   import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import { navigate, voltar, router } from "../../lib/router.svelte";
@@ -1211,9 +1212,9 @@
     status: Tend;
   }
 
-  let tendenciaMusculo = $state<TendenciaMusculo | null>(null);
-  let carregandoTendencia = $state(false);
-  let musculoIdTendenciaCarregada = $state<string | null>(null);
+  /** Status e carregamento lidos do gráfico de progressão do modal por músculo (ver MusculoGraficoProgressao). */
+  let statusModalMusculo = $state<Tend | null>(null);
+  let carregandoModalMusculo = $state(true);
 
   /** Mínimo de sessões válidas pra dar resultado (com 2 ou 3 fica "em análise"). */
   const MIN_SESSOES_TENDENCIA = 4;
@@ -1327,31 +1328,21 @@
    * tendenciaMusculoRotina (1 rotina, no card da tela principal) e tendenciaMusculoSemanal (todas
    * as rotinas, no card "Distribuição Semanal"). */
   function tendenciaMusculoPonderada(treinosList: TreinoComExercicios[], musculoId: string): Tend | null {
-    let somaPonderada = 0;
-    let somaPesos = 0;
-    let temAnalise = false;
+    const itens: ItemProgressao[] = [];
     for (const treino of treinosList) {
       const pesos = pesosFadigaPorExercicio(treino);
       for (const te of treino.exercicios) {
         if (!te.exercicio?.musculos.some((m) => m.musculo_id === musculoId)) continue;
         const pontos = historicoPorExercicio.get(te.exercicio_id);
         if (!pontos) continue;
-        const validos = pontosParaTendencia(pontos, marcadoresPorExercicio.get(te.exercicio_id));
-        const v = variacaoExercicio(validos);
-        if (v == null) {
-          if (validos.length >= 2) temAnalise = true;
-          continue;
-        }
-        const peso = pesos.get(te.id) ?? 1;
-        somaPonderada += v * peso;
-        somaPesos += peso;
+        itens.push({
+          nome: te.exercicio.nome,
+          peso: pesos.get(te.id) ?? 1,
+          pontos: pontosParaTendencia(pontos, marcadoresPorExercicio.get(te.exercicio_id)),
+        });
       }
     }
-    if (somaPesos === 0) return temAnalise ? "analise" : null;
-    const media = somaPonderada / somaPesos;
-    if (media > 0.02) return "subindo";
-    if (media < -0.02) return "caindo";
-    return "estavel";
+    return calcularProgressaoMusculo(itens).status;
   }
 
   /** Tendência de um músculo dentro da rotina aberta no editor — texto discreto embaixo do nome. */
@@ -1407,58 +1398,6 @@
     return variacaoExercicio(pontosParaTendencia(pontos, marcadoresPorExercicio.get(exercicioId)));
   }
 
-  /** Tendência do músculo = média da variação de 1RM de cada exercício que o trabalha (nessa
-   * rotina). Caindo sugere reduzir séries, estável sugere tentar aumentar (pra sair do platô),
-   * subindo sugere manter (já está funcionando). */
-  /** Token de sequenciamento: abrir um músculo, fechar e abrir outro rápido antes do primeiro
-   * fetch terminar podia deixar a tendência do músculo ERRADO sobrescrever a do que está aberto
-   * agora, se a resposta mais lenta chegasse depois da mais rápida. */
-  let tokenTendencia = 0;
-
-  async function carregarTendenciaMusculo(itens: ItemMusculoRotina[]): Promise<void> {
-    const meuToken = ++tokenTendencia;
-    carregandoTendencia = true;
-    tendenciaMusculo = null;
-    try {
-      const variacoes: number[] = [];
-      let temAnalise = false;
-      for (const item of itens) {
-        // Reaproveita o histórico/marcadores já pré-carregados (carregarHistoricoTodos) — só
-        // busca de novo se esse exercício não estava no cache (ex: acabou de ser adicionado à
-        // rotina).
-        const pontos = historicoPorExercicio.get(item.exercicioId) ?? (await getHistoricoExercicio(item.exercicioId));
-        const marcadores = marcadoresPorExercicio.get(item.exercicioId) ?? (await listMarcadoresExercicio(item.exercicioId));
-        const validos = pontosParaTendencia(pontos, marcadores);
-        const v = variacaoExercicio(validos);
-        if (v != null) variacoes.push(v);
-        else if (validos.length >= 2) temAnalise = true;
-      }
-      if (meuToken !== tokenTendencia) return;
-      if (!variacoes.length) {
-        if (temAnalise) tendenciaMusculo = { status: "analise" };
-        return;
-      }
-      const media = variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
-      if (media > 0.02) tendenciaMusculo = { status: "subindo" };
-      else if (media < -0.02) tendenciaMusculo = { status: "caindo" };
-      else tendenciaMusculo = { status: "estavel" };
-    } finally {
-      if (meuToken === tokenTendencia) carregandoTendencia = false;
-    }
-  }
-
-  /** Carrega a tendência só quando o músculo aberto muda (não a cada ajuste de série). */
-  $effect(() => {
-    const musculo = modalMusculoRotina?.musculo;
-    const itens = modalMusculoRotina?.itens;
-    if (!musculo || !itens) {
-      musculoIdTendenciaCarregada = null;
-      return;
-    }
-    if (musculoIdTendenciaCarregada === musculo.id) return;
-    musculoIdTendenciaCarregada = musculo.id;
-    void carregarTendenciaMusculo(itens);
-  });
 
   const TEXTO_TENDENCIA = {
     subindo: "Progredindo",
@@ -3092,10 +3031,10 @@
     }}
     acaoTituloDireita={linkDistribuicao}
   >
-    {#if carregandoTendencia}
+    {#if carregandoModalMusculo && itensGraficoMusculo.length}
       <p class="tendencia-musculo muted">Verificando progressão…</p>
-    {:else if tendenciaMusculo}
-      <p class="tendencia-musculo tendencia-{tendenciaMusculo.status}">{TEXTO_TENDENCIA[tendenciaMusculo.status]}</p>
+    {:else if statusModalMusculo}
+      <p class="tendencia-musculo tendencia-{statusModalMusculo}">{TEXTO_TENDENCIA[statusModalMusculo]}</p>
     {:else}
       <p class="tendencia-musculo tendencia-sem-info">Sem info</p>
     {/if}
@@ -3103,7 +3042,7 @@
       <p class="status-ajuste status-ajuste-{statusAjusteMusculo.tipo}">{statusAjusteMusculo.texto}</p>
     {/if}
     {#if itensGraficoMusculo.length}
-      <MusculoGraficoProgressao itens={itensGraficoMusculo} obterPontos={pontosGraficoMusculo} bind:cheia={graficoMusculoCheio} bind:podeAmpliar={graficoMusculoPodeAmpliar} />
+      <MusculoGraficoProgressao itens={itensGraficoMusculo} obterPontos={pontosGraficoMusculo} bind:cheia={graficoMusculoCheio} bind:podeAmpliar={graficoMusculoPodeAmpliar} bind:status={statusModalMusculo} bind:carregando={carregandoModalMusculo} />
     {/if}
     {#if !modalMusculoRotina.itens.length}
       <p class="muted">Nenhum exercício encontrado.</p>
