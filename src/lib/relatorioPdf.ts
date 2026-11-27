@@ -163,103 +163,97 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   desenharGraficoPeso(doc, modelo, M, yTopo, util, altGraf);
   y = yTopo + altGraf + 5;
 
-  // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
+  // ---------------- TABELA PRINCIPAL: volume semana a semana + leitura, por músculo ----------------
   titulo("Consolidado por músculo (realizado no período)");
   // Músculos que aparecem na tabela de 1RM (Por exercício): ganham um asterisco pequeno ao lado do nome.
   const musculosNa1rm = new Set(modelo.exercicios.filter((x) => x.sessoes >= 4).map((x) => x.musculo));
+  // Colunas das semanas (séries ponderadas) vêm antes da média; em retrato cabem as 8 últimas.
+  const MAX_SEMANAS_TABELA = 8;
+  const semanasTab = modelo.semanas.slice(-MAX_SEMANAS_TABELA);
+  const nS = semanasTab.length;
+  const colMedia = nS + 1;
+  const colFaixa = nS + 2;
+  const colProg = nS + 3;
+  const FONTE = 6.8;
   tabela({
-    head: [["Músculo", "Séries/sem.", "Faixa", "Progressão", "Ação sugerida"]],
+    styles: { fontSize: FONTE, cellPadding: 1, textColor: COR.texto, lineColor: COR.linha, lineWidth: 0.1 },
+    headStyles: { fillColor: COR.cabecalho, textColor: 255, fontStyle: "bold", fontSize: FONTE },
+    head: [["Músculo", ...semanasTab.map((x) => x.rotulo), "Média", "Faixa", "Progressão", "Ação sugerida"]],
     body: modelo.musculos.map((l) => [
       l.nome,
+      ...l.porSemana.slice(-nS).map((v) => fmtNum(v)),
       fmtNum(l.mediaSemanal),
       NOME_CLASSE[l.classe],
       l.progressao ? `${NOME_PROGRESSAO[l.progressao]}${l.variacaoPct != null ? ` ${fmtSinal(l.variacaoPct, 1, "%")}` : ""}` : "-",
       l.acao,
     ]),
     columnStyles: {
-      0: { cellWidth: 34, fontStyle: "bold" },
-      1: { halign: "right", cellWidth: 20 },
-      2: { cellWidth: 24 },
-      3: { cellWidth: 34 },
+      0: { cellWidth: 27, fontStyle: "bold" },
+      ...Object.fromEntries(semanasTab.map((_, i) => [i + 1, { halign: "right" as const, cellWidth: 9 }])),
+      [colMedia]: { halign: "right", cellWidth: 11, fontStyle: "bold" },
+      [colFaixa]: { cellWidth: 17 },
+      [colProg]: { cellWidth: 23 },
     },
     didDrawCell: (d) => {
       if (d.section !== "body" || d.column.index !== 0) return;
       const l = modelo.musculos[d.row.index];
       if (!l || !musculosNa1rm.has(l.nome)) return;
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
+      doc.setFontSize(FONTE);
       const larguraNome = doc.getTextWidth(l.nome);
-      doc.setFontSize(6);
+      doc.setFontSize(5.5);
       doc.setTextColor(...COR.suave);
-      doc.text("*", d.cell.x + d.cell.padding("left") + larguraNome + 0.4, d.cell.y + d.cell.padding("top") + 1.7);
+      doc.text("*", d.cell.x + d.cell.padding("left") + larguraNome + 0.4, d.cell.y + d.cell.padding("top") + 1.6);
     },
     didParseCell: (d) => {
-      if (d.section === "head") return;
+      if (d.section === "head") {
+        if (d.column.index >= 1 && d.column.index <= colMedia) d.cell.styles.halign = "right";
+        return;
+      }
       const l = modelo.musculos[d.row.index];
       const col = d.column.index;
-      if (col === 2) {
+      if (col >= 1 && col <= nS) {
+        // semana contra o plano atual do músculo: verde 90% ou mais, amarelo 60% a 90%, vermelho abaixo
+        const v = l.porSemana[modelo.semanas.length - nS + col - 1];
+        if (l.planejado > 0 && v != null) {
+          const r = v / l.planejado;
+          d.cell.styles.fillColor = r >= 0.9 ? [220, 245, 227] : r >= 0.6 ? [254, 243, 199] : [254, 226, 226];
+        }
+      }
+      if (col === colFaixa) {
         d.cell.styles.textColor = corClasse(l.classe);
         d.cell.styles.fontStyle = "bold";
       }
-      if (col === 3) {
+      if (col === colProg) {
         d.cell.styles.textColor = corProgressao(l.progressao);
         d.cell.styles.fontStyle = "bold";
       }
     },
   });
-
-  // ---------------- aprofundamento (a partir da página 2) ----------------
-  doc.addPage();
-  y = M;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(...COR.texto);
-  doc.text("Aprofundamento", M, y + 5);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...COR.suave);
-  doc.text("Tabelas complementares ao resumo da primeira página, para análise mais profunda.", M, y + 10);
-  y += 14;
-
-  // ---------------- volume semana a semana ----------------
-  titulo("Volume semana a semana (séries ponderadas)");
-  tabela({
-    head: [["Músculo", ...modelo.semanas.map((s) => s.rotulo), "Média"]],
-    body: modelo.musculos.map((l) => [l.nome, ...l.porSemana.map((v) => fmtNum(v)), fmtNum(l.mediaSemanal)]),
-    // Períodos longos (muitas semanas) em retrato: fonte e margem menores pra caberem as colunas.
-    ...(modelo.semanas.length > 10
-      ? {
-          styles: { fontSize: 6, cellPadding: 0.7, textColor: COR.texto, lineColor: COR.linha, lineWidth: 0.1 },
-          headStyles: { fillColor: COR.cabecalho, textColor: 255, fontStyle: "bold" as const, fontSize: 6 },
-        }
-      : {}),
-    columnStyles: { 0: { cellWidth: 26, fontStyle: "bold" } },
-    didParseCell: (d) => {
-      if (d.section !== "body") return;
-      if (d.column.index >= 1 && d.column.index <= modelo.semanas.length) {
-        const l = modelo.musculos[d.row.index];
-        const v = l.porSemana[d.column.index - 1];
-        d.cell.styles.halign = "right";
-        if (l.planejado > 0) {
-          const r = v / l.planejado;
-          d.cell.styles.fillColor = r >= 0.9 ? [220, 245, 227] : r >= 0.6 ? [254, 243, 199] : [254, 226, 226];
-        }
-      } else if (d.column.index > modelo.semanas.length) {
-        d.cell.styles.halign = "right";
-      }
-    },
-  });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setTextColor(...COR.suave);
   garantir(5);
-  doc.text("Cores: verde = 90% ou mais do plano atual do músculo; amarelo = 60% a 90%; vermelho = abaixo de 60%.", M, y);
-  y += 6;
+  doc.text(
+    `Semanas em séries ponderadas${modelo.semanas.length > nS ? ` (últimas ${nS})` : ""}; cor da semana: verde = 90% ou mais do plano atual do músculo, amarelo = 60% a 90%, vermelho = abaixo de 60%.`,
+    M,
+    y,
+  );
+  y += 5;
 
   // ---------------- rotinas atuais (o plano de hoje), pelos músculos que cada uma trabalha ----------------
   if (modelo.rotinas.length) {
     doc.addPage();
     y = M;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(...COR.texto);
+    doc.text("Aprofundamento", M, y + 5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...COR.suave);
+    doc.text("Tabelas complementares ao resumo da primeira página, para análise mais profunda.", M, y + 10);
+    y += 14;
     titulo("Rotinas atuais (músculos trabalhados)");
     const comAcum = modelo.rotinas.some((r) => r.musculos.some((m) => m.acum != null));
     const nCols = comAcum ? 5 : 4;
