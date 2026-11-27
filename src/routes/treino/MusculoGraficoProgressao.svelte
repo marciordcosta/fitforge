@@ -114,8 +114,8 @@
         borderColor: "#ffffff",
         backgroundColor: "#ffffff",
         tension: 0.3,
-        borderWidth: 3,
-        pointRadius: 3,
+        borderWidth: 2,
+        pointRadius: 2,
         spanGaps: true,
       });
       if (prog.reta.some((v) => v != null)) {
@@ -124,7 +124,7 @@
           data: prog.reta,
           borderColor: "#ffffff",
           backgroundColor: "#ffffff",
-          borderWidth: 2,
+          borderWidth: 1.5,
           borderDash: [6, 4],
           pointRadius: 0,
           spanGaps: true,
