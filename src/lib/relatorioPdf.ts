@@ -1,10 +1,6 @@
 import type { jsPDF } from "jspdf";
 import { NOME_CLASSE, NOME_PROGRESSAO, type ModeloRelatorio } from "./relatorioTreino";
 import { parseISODate } from "./dates";
-import { Capacitor } from "@capacitor/core";
-import { Browser } from "@capacitor/browser";
-import { supabase } from "./supabase";
-import { auth } from "./auth.svelte";
 
 /** Desenha o relatório de decisão do Treino em PDF (A4 retrato). jsPDF/autotable entram por import
  * dinâmico: só baixam quando o usuário pede o relatório. Fonte padrão (Helvetica) cobre os acentos;
@@ -175,38 +171,44 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   }
 
   // ---------------- tabela por músculo ----------------
-  titulo("Por músculo: volume, progressão e ação");
+  titulo("Resumo por músculo: volume, prioridade e progressão");
   tabela({
-    head: [["Músculo", "Séries/sem.", "Planej.", "Faixa", "Freq./sem.", "Progressão", "Var. %", "Fim treino", "Ação sugerida"]],
+    head: [["Músculo", "Séries/sem.", "Planej.", "% total", "Acum. %", "Curva", "Faixa", "Progressão", "Var. %", "Ação sugerida"]],
     body: modelo.musculos.map((l) => [
       l.nome,
       fmtNum(l.mediaSemanal),
       fmtNum(l.planejado),
+      l.curva ? `${l.pctTotal}%` : "-",
+      l.curva ? `${l.acumuladoPct}%` : "-",
+      l.curva ?? "-",
       NOME_CLASSE[l.classe],
-      fmtNum(l.frequenciaSemanal),
       l.progressao ? NOME_PROGRESSAO[l.progressao] : "-",
       fmtSinal(l.variacaoPct, 1, "%"),
-      l.fimDoTreinoPct != null ? `${l.fimDoTreinoPct}%` : "-",
       l.acao,
     ]),
     columnStyles: {
-      0: { cellWidth: 26, fontStyle: "bold" },
-      1: { halign: "right", cellWidth: 18 },
+      0: { cellWidth: 24, fontStyle: "bold" },
+      1: { halign: "right", cellWidth: 19 },
       2: { halign: "right", cellWidth: 13 },
-      3: { cellWidth: 19 },
-      4: { halign: "right", cellWidth: 17 },
-      5: { cellWidth: 19 },
-      6: { halign: "right", cellWidth: 13 },
-      7: { halign: "right", cellWidth: 14 },
+      3: { halign: "right", cellWidth: 12 },
+      4: { halign: "right", cellWidth: 13 },
+      5: { halign: "center", cellWidth: 11 },
+      6: { cellWidth: 19 },
+      7: { cellWidth: 21 },
+      8: { halign: "right", cellWidth: 12 },
     },
     didParseCell: (d) => {
       if (d.section !== "body") return;
       const l = modelo.musculos[d.row.index];
-      if (d.column.index === 3) {
+      if (d.column.index === 5 && l.curva) {
+        d.cell.styles.fontStyle = "bold";
+        d.cell.styles.textColor = l.curva === "A" ? COR.verde : l.curva === "B" ? COR.ambar : COR.suave;
+      }
+      if (d.column.index === 6) {
         d.cell.styles.textColor = corClasse(l.classe);
         d.cell.styles.fontStyle = "bold";
       }
-      if (d.column.index === 5 || d.column.index === 6) {
+      if (d.column.index === 7 || d.column.index === 8) {
         d.cell.styles.textColor = corProgressao(l.progressao);
         d.cell.styles.fontStyle = "bold";
       }
@@ -216,12 +218,58 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Séries/sem: média ponderada das semanas com treino. Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Fim treino: % do volume planejado que cai no último bloco da rotina, onde a fadiga desconta mais.",
+    "Séries/sem.: média ponderada das semanas com treino. Curva ABC: músculos do maior pro menor volume realizado; A = até 70% do volume acumulado, B = até 90%, C = o restante (mostra onde o volume está investido, que é a prioridade na prática). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise).",
     util,
   ) as string[];
   garantir(nota.length * 3.2);
   doc.text(nota, M, y);
   y += nota.length * 3.2 + 4;
+
+  // ---------------- aprofundamento (a partir da página 2) ----------------
+  doc.addPage();
+  y = M;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...COR.texto);
+  doc.text("Aprofundamento", M, y + 5);
+  y += 11;
+
+  titulo("Detalhe por músculo: frequência, prioridade e fim do treino");
+  tabela({
+    head: [["Músculo", "Freq./sem.", "Curva real", "Curva plano", "Fim do treino (bloco C)"]],
+    body: modelo.musculos.map((l) => [
+      l.nome,
+      fmtNum(l.frequenciaSemanal),
+      l.curva ?? "-",
+      l.curvaPlanejada ?? "-",
+      l.fimDoTreinoPct != null ? `${l.fimDoTreinoPct}%` : "-",
+    ]),
+    columnStyles: {
+      0: { cellWidth: 40, fontStyle: "bold" },
+      1: { halign: "right", cellWidth: 24 },
+      2: { halign: "center", cellWidth: 24 },
+      3: { halign: "center", cellWidth: 24 },
+      4: { halign: "right" },
+    },
+    didParseCell: (d) => {
+      if (d.section !== "body") return;
+      const l = modelo.musculos[d.row.index];
+      if (d.column.index === 3 && l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) {
+        d.cell.styles.textColor = COR.vermelho;
+        d.cell.styles.fontStyle = "bold";
+      }
+    },
+  });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...COR.suave);
+  const nota2 = doc.splitTextToSize(
+    "Curva plano: a mesma curva ABC sobre o volume planejado (em vermelho quando difere da real: a prioridade na prática desviou do plano). Fim do treino: % do volume planejado do músculo que cai no último bloco da rotina, onde a fadiga desconta mais.",
+    util,
+  ) as string[];
+  garantir(nota2.length * 3.2);
+  doc.text(nota2, M, y);
+  y += nota2.length * 3.2 + 4;
 
   // ---------------- volume semana a semana ----------------
   titulo("Volume semana a semana (séries ponderadas)");
@@ -424,46 +472,4 @@ function desenharGraficoPeso(doc: jsPDF, m: ModeloRelatorio, x: number, y: numbe
   doc.setLineDashPattern([], 0);
   doc.text("Meta", lx + 48, ly);
   doc.setLineWidth(0.2);
-}
-
-/** Entrega o PDF no aparelho.
- * - App Android (Capacitor, WebView): o WebView não baixa arquivo de blob nem tem o menu de
- *   compartilhar, então o PDF sobe pro armazenamento do usuário (mesmo bucket das fotos, pasta
- *   `relatorios/`, sempre o mesmo arquivo sobrescrito) e abre por um link assinado de 5 minutos no
- *   navegador do sistema (Chrome Custom Tab), que baixa/abre o PDF.
- * - Navegador/PWA: compartilhar (se houver) ou baixar direto. */
-export async function entregarPdf(blob: Blob, nome: string): Promise<"aberto" | "compartilhado" | "baixado"> {
-  if (Capacitor.isNativePlatform()) {
-    const userId = auth.user?.id;
-    if (!userId) throw new Error("Usuário não autenticado.");
-    const path = `${userId}/relatorios/relatorio-treino.pdf`;
-    const { error: erroUpload } = await supabase.storage.from("fotos").upload(path, blob, { upsert: true, contentType: "application/pdf" });
-    if (erroUpload) throw new Error(`Não consegui enviar o PDF: ${erroUpload.message}`);
-    const { data, error } = await supabase.storage.from("fotos").createSignedUrl(path, 300, { download: nome });
-    if (error || !data) throw new Error(`Não consegui abrir o PDF: ${error?.message ?? "link indisponível"}`);
-    await Browser.open({ url: data.signedUrl });
-    return "aberto";
-  }
-
-  const arquivo = new File([blob], nome, { type: "application/pdf" });
-  try {
-    if (navigator.canShare?.({ files: [arquivo] })) {
-      await navigator.share({ files: [arquivo], title: nome });
-      return "compartilhado";
-    }
-  } catch (err) {
-    if ((err as DOMException)?.name === "AbortError") return "compartilhado";
-  }
-  const url = URL.createObjectURL(blob);
-  try {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nome;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    return "baixado";
-  } finally {
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  }
 }

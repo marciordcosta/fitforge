@@ -40,12 +40,34 @@ export interface EntradaRelatorio {
   };
 }
 
+export type CurvaABC = "A" | "B" | "C";
+
+/** Cortes da curva ABC sobre o % acumulado do volume (músculos do maior pro menor volume): a classe
+ * vem de onde o acumulado ESTAVA antes de somar o músculo — assim quem cruza o limite fica na classe
+ * em que o cruzamento acontece. A até 70%, B até 90%, C o resto. */
+export const CORTE_CURVA_A = 70;
+export const CORTE_CURVA_B = 90;
+
+export function curvaPorAcumuladoAnterior(acumuladoAnterior: number): CurvaABC {
+  if (acumuladoAnterior < CORTE_CURVA_A) return "A";
+  if (acumuladoAnterior < CORTE_CURVA_B) return "B";
+  return "C";
+}
+
 export interface LinhaMusculoRelatorio {
   id: string;
   nome: string;
   grupo: string | null;
   mediaSemanal: number;
   planejado: number;
+  /** % do volume total semanal realizado (todos os músculos). */
+  pctTotal: number;
+  /** % acumulado até este músculo, do maior pro menor volume. */
+  acumuladoPct: number;
+  /** Curva ABC do volume realizado (null sem volume). */
+  curva: CurvaABC | null;
+  /** Curva ABC do volume planejado (prioridade pretendida). */
+  curvaPlanejada: CurvaABC | null;
   classe: ClasseVolumeSemanal;
   frequenciaSemanal: number;
   porSemana: number[];
@@ -213,6 +235,10 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
       grupo: m.grupo,
       mediaSemanal: r1(media),
       planejado: r1(planejado),
+      pctTotal: 0,
+      acumuladoPct: 0,
+      curva: null,
+      curvaPlanejada: null,
       classe,
       frequenciaSemanal: r1(freq),
       porSemana: chavesColunas.map((k) => r1(porSem?.get(k) ?? 0)),
@@ -224,6 +250,26 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     });
   }
   linhas.sort((a, b) => b.mediaSemanal - a.mediaSemanal);
+
+  // ---- curva ABC (volume realizado) e a mesma conta sobre o planejado ----
+  const totalReal = linhas.reduce((a, l) => a + l.mediaSemanal, 0);
+  let acumReal = 0;
+  for (const l of linhas) {
+    if (totalReal > 0 && l.mediaSemanal > 0) {
+      l.curva = curvaPorAcumuladoAnterior(acumReal);
+      l.pctTotal = Math.round((l.mediaSemanal / totalReal) * 100);
+      acumReal += (l.mediaSemanal / totalReal) * 100;
+      l.acumuladoPct = Math.round(acumReal);
+    }
+  }
+  const totalPlan = linhas.reduce((a, l) => a + l.planejado, 0);
+  let acumPlan = 0;
+  for (const l of [...linhas].sort((a, b) => b.planejado - a.planejado)) {
+    if (totalPlan > 0 && l.planejado > 0) {
+      l.curvaPlanejada = curvaPorAcumuladoAnterior(acumPlan);
+      acumPlan += (l.planejado / totalPlan) * 100;
+    }
+  }
 
   // ---- decisões (as mais urgentes) ----
   const decisoes = [...linhas]
@@ -260,6 +306,11 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
   for (const l of linhas) {
     if (l.planejado > 0 && l.mediaSemanal < l.planejado * 0.75) {
       alertas.push(`${l.nome}: realizado ${l.mediaSemanal} séries/semana contra ${l.planejado} planejadas.`);
+    }
+  }
+  for (const l of linhas) {
+    if (l.curva && l.curvaPlanejada && l.curva !== l.curvaPlanejada) {
+      alertas.push(`${l.nome}: curva ${l.curva} no realizado e ${l.curvaPlanejada} no planejado (a prioridade na prática desviou do plano).`);
     }
   }
   for (const x of exercicios) {

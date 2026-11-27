@@ -1105,7 +1105,7 @@
         historico: historicoPorExercicio,
         marcadores: marcadoresPorExercicio,
       });
-      const { gerarRelatorioPdf, entregarPdf } = await import("../../lib/relatorioPdf");
+      const [{ gerarRelatorioPdf }, { entregarPdf }] = await Promise.all([import("../../lib/relatorioPdf"), import("../../lib/relatorioEntrega")]);
       const blob = await gerarRelatorioPdf(modelo);
       await entregarPdf(blob, `relatorio-treino-${inicio}_${fim}.pdf`);
       mostrarToast("Relatório pronto");
