@@ -412,10 +412,14 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
         if (st === "estavel") {
           if (estagnados.length) {
             itens.push({ p: 4 + bump, curto: `estagnado: trocar ou variar o ${estagnados[0].nome} (${estagnados[0].sessoesValidas} sessões sem evoluir), mudando ângulo/pegada e mantendo a base.` });
-          } else if (maxDia <= LIMITE_DIA_ATENCAO && l.mediaSemanal + 2 <= janela.max) {
+          } else if (l.mediaSemanal + 2 > janela.max) {
+            // sem espaço na janela pra subir séries: o caminho é mexer no estímulo
+            itens.push({ p: 2 + bump, curto: `estagnado perto do topo da janela (${fmt1(l.mediaSemanal)} de ${faixaTxt}): em vez de subir séries, variar exercício ou intensidade.` });
+          } else if (maxDia > LIMITE_DIA_ATENCAO) {
+            // há espaço na janela, mas um dia já está cheio: as séries novas vão pra outro dia
+            itens.push({ p: 3 + bump, curto: `estagnado dentro da janela (${faixaTxt}): há espaço pra +2 séries por semana, mas um dia já tem ${maxDia}; colocar as séries novas em outro dia e reavaliar em 3 a 4 semanas.` });
+          } else {
             itens.push({ p: 3 + bump, curto: `estagnado dentro da janela (${faixaTxt}): testar +2 séries por semana (fracionadas) e reavaliar em 3 a 4 semanas.` });
-          } else if (estagnados.length === 0) {
-            itens.push({ p: 2 + bump, curto: `estagnado no topo da janela (${faixaTxt}): em vez de subir séries, variar exercício ou intensidade.` });
           }
         } else if (st === "caindo") {
           itens.push({ p: 4 + bump, curto: `regredindo dentro da janela: checar recuperação (sono, calorias, descanso entre séries); reduzir 2 séries antes de trocar exercício${emQueda.length ? `. O que mais caiu: ${emQueda[0].nome}` : ""}.` });
