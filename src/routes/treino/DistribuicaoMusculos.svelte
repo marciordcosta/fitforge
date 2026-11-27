@@ -94,6 +94,10 @@
    * marcador (ver pontosParaTendencia e TipoMarcadorExercicio em treinoApi.ts). */
   let marcadoresPorExercicio = $state<Map<string, MarcadorExercicio[]>>(new Map());
 
+  /** Todos os históricos já chegaram (a busca vem em lotes). Até lá os status de progressão ficam em
+   * "carregando": com o histórico pela metade o resultado de cada músculo mudava a cada lote. */
+  let historicoPronto = $state(false);
+
   /** Busca em lotes pequenos (não tudo de uma vez via Promise.all) — muitas rotinas/exercícios
    * juntos saturavam o limite de conexões simultâneas do navegador, deixando outras requisições
    * (tipo salvar um ajuste de série) na fila atrás dessa busca em massa. */
@@ -104,19 +108,23 @@
     }
     const lista = Array.from(ids);
     const TAMANHO_LOTE = 4;
-    for (let i = 0; i < lista.length; i += TAMANHO_LOTE) {
-      const lote = lista.slice(i, i + TAMANHO_LOTE);
-      const resultados = await Promise.all(
-        lote.map(async (id) => [id, await getHistoricoExercicio(id), await listMarcadoresExercicio(id)] as const),
-      );
-      const mapa = new Map(historicoPorExercicio);
-      const mapaMarcadores = new Map(marcadoresPorExercicio);
-      for (const [id, pontos, marcadores] of resultados) {
-        mapa.set(id, pontos);
-        mapaMarcadores.set(id, marcadores);
+    try {
+      for (let i = 0; i < lista.length; i += TAMANHO_LOTE) {
+        const lote = lista.slice(i, i + TAMANHO_LOTE);
+        const resultados = await Promise.all(
+          lote.map(async (id) => [id, await getHistoricoExercicio(id), await listMarcadoresExercicio(id)] as const),
+        );
+        const mapa = new Map(historicoPorExercicio);
+        const mapaMarcadores = new Map(marcadoresPorExercicio);
+        for (const [id, pontos, marcadores] of resultados) {
+          mapa.set(id, pontos);
+          mapaMarcadores.set(id, marcadores);
+        }
+        historicoPorExercicio = mapa;
+        marcadoresPorExercicio = mapaMarcadores;
       }
-      historicoPorExercicio = mapa;
-      marcadoresPorExercicio = mapaMarcadores;
+    } finally {
+      historicoPronto = true;
     }
   }
 
@@ -2431,7 +2439,9 @@
 {#snippet nomeComTendencia(nome: string, tendencia: Tend | null, aoClicar: () => void)}
   <button class="nome-btn nome-btn-tendencia" onclick={aoClicar}>
     <span class="nome-btn-texto">{nome}</span>
-    {#if textoTendencia(tendencia)}
+    {#if !historicoPronto}
+      <span class="editor-tendencia-texto tendencia-carregando skeleton" aria-label="Carregando progressão"></span>
+    {:else if textoTendencia(tendencia)}
       <span
         class="editor-tendencia-texto"
         class:valor-subindo={tendencia === "subindo"}
@@ -3359,7 +3369,9 @@
                 {/if}
                 <span class="editor-exercicio-nome-col">
                   <span class="editor-exercicio-nome" class:editor-nome-destacado={destacado}>{te.exercicio?.nome ?? ""}</span>
-                  {#if textoTendencia(tendEx)}
+                  {#if !historicoPronto}
+                    <span class="editor-tendencia-texto tendencia-carregando skeleton" aria-label="Carregando progressão"></span>
+                  {:else if textoTendencia(tendEx)}
                     <span
                       class="editor-tendencia-texto"
                       class:valor-subindo={tendEx === "subindo"}
@@ -3424,7 +3436,9 @@
                       >{item.impactoPct > 0 ? "+" : ""}{Math.round(item.impactoPct)}%</span>
                     {/if}
                   </span>
-                  {#if textoTendencia(tendMusculo)}
+                  {#if !historicoPronto}
+                    <span class="editor-tendencia-texto tendencia-carregando skeleton" aria-label="Carregando progressão"></span>
+                  {:else if textoTendencia(tendMusculo)}
                     <span
                       class="editor-tendencia-texto"
                       class:valor-subindo={tendMusculo === "subindo"}
@@ -3434,7 +3448,7 @@
                   {:else}
                     <span class="editor-tendencia-texto valor-sem-info">Sem info</span>
                   {/if}
-                  {#if alertaItem}
+                  {#if historicoPronto && alertaItem}
                     <span class="editor-alerta-texto">⚠ {alertaItem}</span>
                   {/if}
                 </span>
@@ -4643,6 +4657,13 @@
   }
   .editor-tendencia-texto.valor-sem-info {
     color: var(--surface-muted);
+  }
+  /* Mesmo espaço do texto de status (9px de altura): nada se mexe quando o resultado chega. */
+  .editor-tendencia-texto.tendencia-carregando {
+    display: inline-block;
+    width: 56px;
+    height: 9px;
+    border-radius: 3px;
   }
   /* Sinal combinado (volume + tendência) — cor de atenção própria, distinta de qualquer outra
      usada aqui (não é erro/vermelho, nem progresso/verde: é "vale olhar"). */
