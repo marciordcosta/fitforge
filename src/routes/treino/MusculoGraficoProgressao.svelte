@@ -151,7 +151,7 @@
             y: {
               grid: { color: "rgba(255, 255, 255, 0.08)" },
               border: { display: false },
-              ticks: { color: "#9aa0ab", maxTicksLimit: 5, font: { size: 10 }, callback: (v) => `${v}%` },
+              ticks: { display: false, maxTicksLimit: 5 },
             },
           },
         },
