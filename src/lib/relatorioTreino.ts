@@ -142,8 +142,10 @@ export interface ModeloRelatorio {
 
 export const NOME_CLASSE: Record<ClasseVolumeSemanal, string> = {
   insuficiente: "Abaixo",
-  manutencao: "Na janela",
-  foco: "Acima",
+  manutencao: "Manutenção",
+  moderado: "Moderado",
+  prioridade: "Prioridade",
+  foco: "Foco",
 };
 
 export const NOME_PROGRESSAO: Record<StatusProgressao, string> = {
@@ -162,7 +164,7 @@ export function acaoSugerida(classe: ClasseVolumeSemanal, status: StatusProgress
       ? { texto: "Abaixo da janela, mas respondendo: subir um pouco as séries", prioridade: 3 }
       : { texto: "Aumentar séries (abaixo da janela)", prioridade: 5 };
   }
-  if (classe === "manutencao") {
+  if (classe === "manutencao" || classe === "moderado" || classe === "prioridade") {
     if (status === "subindo") return { texto: "Manter", prioridade: 0 };
     if (status === "estavel") return { texto: "Testar mais séries", prioridade: 4 };
     return { texto: "Regredindo dentro da janela: revisar exercícios e recuperação", prioridade: 4 };
@@ -390,7 +392,7 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
         itens.push({ p: 2, curto: `baixo estímulo (${fmt1(l.mediaSemanal)} contra a janela de ${faixaTxt}): se não é prioridade, pode manter; pra crescer, +2 séries por semana até a janela e reavaliar em 3 a 4 semanas.` });
       }
     } else if (st && st !== "analise") {
-      if (l.classe === "manutencao") {
+      if (l.classe === "manutencao" || l.classe === "moderado" || l.classe === "prioridade") {
         if (st === "estavel") {
           if (estagnados.length) {
             itens.push({ p: 4 + bump, curto: `estagnado: trocar ou variar o ${estagnados[0].nome} (${estagnados[0].sessoesValidas} sessões sem evoluir), mudando ângulo/pegada e mantendo a base.` });

@@ -1391,7 +1391,7 @@
   function alertaVolumeTendencia(classe: ClasseVolumeSemanal, tendencia: Tend | null): string | null {
     if (tendencia == null || tendencia === "subindo") return null;
     if (classe === "insuficiente") return null;
-    if (classe === "manutencao") return tendencia === "estavel" ? "Testar mais séries" : null;
+    if (classe === "manutencao" || classe === "moderado") return tendencia === "estavel" ? "Testar mais séries" : null;
     return tendencia === "estavel" ? "Sem resposta nesse volume" : "Considerar reduzir";
   }
 

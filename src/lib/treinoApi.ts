@@ -1924,18 +1924,24 @@ export interface JanelaVolume {
 /** Janela usada enquanto o músculo não tem a sua própria preenchida (Músculos > Detalhe). */
 export const JANELA_VOLUME_PADRAO: JanelaVolume = { min: 6, max: 14 };
 
-export type ClasseVolumeSemanal = "insuficiente" | "manutencao" | "foco";
+export type ClasseVolumeSemanal = "insuficiente" | "manutencao" | "moderado" | "prioridade" | "foco";
 
 /** Janela efetiva do músculo: os campos próprios, e o padrão onde estiverem vazios. */
 export function janelaDoMusculo(m: { series_minimas?: number | null; series_maximas?: number | null } | null | undefined): JanelaVolume {
   return { min: m?.series_minimas ?? JANELA_VOLUME_PADRAO.min, max: m?.series_maximas ?? JANELA_VOLUME_PADRAO.max };
 }
 
-/** Classifica um total semanal de séries (SEMPRE ponderado) contra a janela do músculo. */
+/** Classifica um total semanal de séries (SEMPRE ponderado) contra a janela do músculo. A janela é dividida
+ * em três partes iguais: manutenção (primeiro terço), moderado (segundo) e prioridade (último); abaixo do
+ * mínimo é "insuficiente" e acima do máximo é "foco". Ex.: janela 8 a 14 → 8 a 10 manutenção, acima de
+ * 10 até 12 moderado, acima de 12 até 14 prioridade, acima de 14 foco. */
 export function classificarVolumeSemanal(v: number, janela: JanelaVolume): ClasseVolumeSemanal {
   if (v < janela.min) return "insuficiente";
-  if (v <= janela.max) return "manutencao";
-  return "foco";
+  if (v > janela.max) return "foco";
+  const terco = (janela.max - janela.min) / 3;
+  if (v <= janela.min + terco) return "manutencao";
+  if (v <= janela.min + 2 * terco) return "moderado";
+  return "prioridade";
 }
 
 export async function getParametrosDistribuicao(): Promise<ParametrosDistribuicao> {
