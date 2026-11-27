@@ -192,9 +192,9 @@
           {
             label: "Tendência",
             data: retaDeTendencia(
-              historicoFiltrado.map((h) => h.data),
-              valores,
+              historicoComAoVivo.map((h) => ({ data: h.data, valor: valorPorChave(h, metricaAtual as "peso" | "1rm" | "volume") })),
               validas,
+              historicoFiltrado.map((h) => h.data),
             ),
             borderColor: "#ffffff",
             backgroundColor: "#ffffff",

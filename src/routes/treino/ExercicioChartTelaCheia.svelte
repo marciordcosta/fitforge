@@ -384,7 +384,7 @@
       // e janela da progressão aplicados), do primeiro ao último ponto válido.
       datasets.push({
         label: "Tendência",
-        data: retaDeTendencia(datas, brutoPrincipal, validas),
+        data: retaDeTendencia(historico.map((h) => ({ data: h.data, valor: valorMetrica(h) })), validas, datas),
         borderColor: "#ffffff",
         backgroundColor: "#ffffff",
         borderWidth: 1.5,

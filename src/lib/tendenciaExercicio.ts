@@ -28,24 +28,27 @@ export function pontosParaTendencia<T extends { data: string }>(pontos: T[], mar
   return pontos.filter((p) => !datasDesconsiderar.has(p.data) && (corte == null || p.data >= corte));
 }
 
-/** Reta de tendência (mínimos quadrados) pelos pontos de um gráfico de linha. `valores[i]` é o valor
- * plotado na data `datas[i]`; só entram na reta as datas em `validas` (as que contam na leitura de
- * progresso). Devolve o valor da reta em cada ponto, `null` fora do trecho válido (a reta vai da
- * primeira à última data válida) — ou tudo `null` com menos de 2 pontos válidos. */
-export function retaDeTendencia(datas: string[], valores: (number | null)[], validas: Set<string>): (number | null)[] {
-  const vazio = datas.map(() => null);
-  const pts: { x: number; y: number }[] = [];
-  datas.forEach((d, x) => {
-    const v = valores[x];
-    if (v != null && validas.has(d)) pts.push({ x, y: v });
-  });
+/** Reta de tendência (mínimos quadrados) do gráfico de um exercício. Ajusta sobre TODAS as sessões
+ * que contam (`validas`, do histórico inteiro — a mesma base do status Progredindo/Estagnado/Regredindo,
+ * com x = ordem da sessão), não só as que o filtro de registros do gráfico mostra: assim a reta e o
+ * status concordam em qualquer filtro de visualização. Devolve o valor da reta nas datas VISÍVEIS que
+ * contam (`null` nas demais; a linha liga os pontos), ou tudo `null` com menos de 2 sessões válidas. */
+export function retaDeTendencia(
+  todas: { data: string; valor: number | null }[],
+  validas: Set<string>,
+  datasVisiveis: string[],
+): (number | null)[] {
+  const vazio = datasVisiveis.map(() => null);
+  const pts: { data: string; x: number; y: number }[] = [];
+  for (const t of todas) {
+    if (t.valor != null && validas.has(t.data)) pts.push({ data: t.data, x: pts.length, y: t.valor });
+  }
   if (pts.length < 2) return vazio;
   const mx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
   const my = pts.reduce((a, p) => a + p.y, 0) / pts.length;
   const den = pts.reduce((a, p) => a + (p.x - mx) ** 2, 0);
   if (den === 0) return vazio;
   const incl = pts.reduce((a, p) => a + (p.x - mx) * (p.y - my), 0) / den;
-  const ini = pts[0].x;
-  const fim = pts[pts.length - 1].x;
-  return datas.map((_, x) => (x >= ini && x <= fim ? my + incl * (x - mx) : null));
+  const porData = new Map(pts.map((p) => [p.data, my + incl * (p.x - mx)]));
+  return datasVisiveis.map((d) => porData.get(d) ?? null);
 }
