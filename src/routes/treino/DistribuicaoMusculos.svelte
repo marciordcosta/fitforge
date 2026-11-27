@@ -2766,6 +2766,20 @@
 {/snippet}
 
 {#snippet linkDistribuicao()}
+  {#if graficoMusculoPodeAmpliar}
+    <button
+      class="link-distribuicao link-ampliar"
+      onclick={() => (graficoMusculoCheio = true)}
+      aria-label="Abrir gráfico em tela cheia"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="15 3 21 3 21 9" />
+        <polyline points="9 21 3 21 3 15" />
+        <line x1="21" y1="3" x2="14" y2="10" />
+        <line x1="3" y1="21" x2="10" y2="14" />
+      </svg>
+    </button>
+  {/if}
   {#if modalMusculoRotina?.multiRotina}
     <button
       class="link-distribuicao"
@@ -3045,25 +3059,15 @@
       modalMusculoRotina = null;
       if (musculoUrlContexto) window.history.back();
     }}
-    acaoTituloDireita={modalMusculoRotina.multiRotina ? linkDistribuicao : undefined}
+    acaoTituloDireita={linkDistribuicao}
   >
-    <div class="linha-tendencia-musculo">
-      {#if carregandoTendencia}
-        <p class="tendencia-musculo muted">Verificando progressão…</p>
-      {:else if tendenciaMusculo}
-        <p class="tendencia-musculo tendencia-{tendenciaMusculo.status}">{TEXTO_TENDENCIA[tendenciaMusculo.status]}</p>
-      {:else}
-        <p class="tendencia-musculo tendencia-sem-info">Sem info</p>
-      {/if}
-      <button type="button" class="ampliar-grafico-musculo" disabled={!graficoMusculoPodeAmpliar} onclick={() => (graficoMusculoCheio = true)} aria-label="Abrir gráfico em tela cheia">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="15 3 21 3 21 9" />
-          <polyline points="9 21 3 21 3 15" />
-          <line x1="21" y1="3" x2="14" y2="10" />
-          <line x1="3" y1="21" x2="10" y2="14" />
-        </svg>
-      </button>
-    </div>
+    {#if carregandoTendencia}
+      <p class="tendencia-musculo muted">Verificando progressão…</p>
+    {:else if tendenciaMusculo}
+      <p class="tendencia-musculo tendencia-{tendenciaMusculo.status}">{TEXTO_TENDENCIA[tendenciaMusculo.status]}</p>
+    {:else}
+      <p class="tendencia-musculo tendencia-sem-info">Sem info</p>
+    {/if}
     {#if statusAjusteMusculo}
       <p class="status-ajuste status-ajuste-{statusAjusteMusculo.tipo}">{statusAjusteMusculo.texto}</p>
     {/if}
@@ -3951,6 +3955,10 @@
     width: 20px;
     height: 20px;
   }
+  .link-ampliar svg {
+    width: 16px;
+    height: 16px;
+  }
   .link-distribuicao.ativo {
     color: var(--color-primary-fg);
     background: var(--color-primary);
@@ -4148,35 +4156,6 @@
     aspect-ratio: 1;
     overflow: hidden;
     margin: var(--space-2) auto 0;
-  }
-  .linha-tendencia-musculo {
-    display: flex;
-    align-items: stretch;
-    gap: var(--space-2);
-    margin-bottom: var(--space-3);
-  }
-  .linha-tendencia-musculo .tendencia-musculo {
-    margin: 0;
-    flex: 1;
-    min-width: 0;
-  }
-  .ampliar-grafico-musculo {
-    flex: none;
-    width: 36px;
-    padding: 8px;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--radius-md);
-    background: var(--surface-card);
-    color: var(--surface-fg);
-    cursor: pointer;
-  }
-  .ampliar-grafico-musculo:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .ampliar-grafico-musculo svg {
-    width: 100%;
-    height: 100%;
   }
   .tendencia-musculo {
     margin: 0 0 var(--space-3);

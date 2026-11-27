@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { Chart, type ChartDataset } from "chart.js/auto";
   import { chaveSemana, parseISODate } from "../../lib/dates";
   import { PALETA } from "../../components/PieChart.svelte";
@@ -29,6 +30,8 @@
   type Serie = { nome: string; peso: number; porSemana: Map<string, number> };
 
   let carregando = $state(true);
+  /** Gráfico já desenhado no tamanho final: até lá o quadro de "carregando" fica por cima. */
+  let pronto = $state(false);
   let series = $state<Serie[]>([]);
   let token = 0;
 
@@ -48,12 +51,19 @@
     );
     if (meu !== token) return;
     series = resultado;
+    pronto = false;
     carregando = false;
   }
 
+  /** Só recarrega quando o CONTEÚDO muda (o modal pode recriar o array sem mudar nada): senão o
+   * gráfico voltava ao "carregando" e piscava. */
+  const chaveItens = $derived(itens.map((i) => `${i.exercicioId}:${i.peso}`).join("|"));
+  let chaveCarregada = "";
   $effect(() => {
-    const lista = itens;
-    void carregar(lista);
+    const chave = chaveItens;
+    if (chave === chaveCarregada) return;
+    chaveCarregada = chave;
+    void carregar(untrack(() => itens));
   });
 
   const semanas = $derived.by(() => {
@@ -137,6 +147,7 @@
         type: "line",
         data: { labels: semanas.map(formatData), datasets },
         options: {
+          animation: false,
           responsive: true,
           maintainAspectRatio: false,
           layout: { padding: { top: 8 } },
@@ -161,6 +172,8 @@
       });
     }
     desenhar();
+    // Um quadro depois do primeiro desenho (já com o tamanho final): revela o gráfico.
+    requestAnimationFrame(() => requestAnimationFrame(() => (pronto = true)));
     return {
       update() {
         desenhar();
@@ -189,7 +202,8 @@
   {:else if !temDados}
     <div class="vazio"><p>Poucos registros para montar o gráfico (precisa de pelo menos 2 semanas de treino).</p></div>
   {:else}
-    <canvas use:grafico={versao}></canvas>
+    <canvas use:grafico={versao} class="canvas-inline" class:oculto={!pronto}></canvas>
+    {#if !pronto}<div class="skeleton cheio sobre" role="status" aria-label="Carregando gráfico"></div>{/if}
   {/if}
 </div>
 
@@ -222,6 +236,15 @@
     width: 100%;
     height: 100%;
     border-radius: var(--radius-lg);
+  }
+  .canvas-inline.oculto {
+    visibility: hidden;
+  }
+  .sobre {
+    position: absolute;
+    inset: var(--space-2);
+    width: auto;
+    height: auto;
   }
   .vazio {
     height: 100%;
