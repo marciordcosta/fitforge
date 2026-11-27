@@ -2192,10 +2192,11 @@
    * à grade, mas configurável em Parametrização pra sempre usar total ou sempre ponderado. */
   function abrirGraficoSemanal(): void {
     // Só existe o anel da semana, sempre na leitura ponderada (os anéis por rotina foram removidos).
-    const { itens, total } = itensParaGrafico(linhasSemanal, "ponderado");
+    const { itens } = itensParaGrafico(linhasSemanal, "ponderado");
     // Anel geral: mesma regra da coluna Total da grade semanal — classifica por volume sempre
     // pelo ponderado.
-    abrirDetalheRotina("Distribuição Semanal", itens, formatValor(total), "séries", coresAbcAcumulado(itens), "ponderado");
+    // Centro (sem fatia selecionada): total de séries dos exercícios da semana, não a soma ponderada das fatias.
+    abrirDetalheRotina("Distribuição Semanal", itens, totaisSemanais.series, "séries", coresAbcAcumulado(itens), "ponderado");
     modalDetalheOrigem = { tipo: "semanal" };
   }
 
@@ -2281,11 +2282,12 @@
   $effect(() => {
     const origem = modalDetalheOrigem;
     if (!origem) return;
-    const { itens, total } = itensParaGrafico(linhasSemanal, "ponderado");
+    const { itens } = itensParaGrafico(linhasSemanal, "ponderado");
     const cores = coresAbcAcumulado(itens);
+    const centro = totaisSemanais.series;
     untrack(() => {
       if (!modalDetalheRotina) return;
-      modalDetalheRotina = { ...modalDetalheRotina, itens, centroValor: formatValor(total), cores };
+      modalDetalheRotina = { ...modalDetalheRotina, itens, centroValor: centro, cores };
     });
   });
 </script>
