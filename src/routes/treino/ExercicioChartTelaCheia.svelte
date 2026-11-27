@@ -4,6 +4,7 @@
   import { Chart, type ChartDataset } from "chart.js/auto";
   import { getHistoricoExercicio, listExercicios, type HistoricoPonto, type Exercicio, type MarcadorExercicio } from "../../lib/treinoApi";
   import { chaveSemana, parseISODate } from "../../lib/dates";
+  import { pontosParaTendencia, retaDeTendencia } from "../../lib/tendenciaExercicio";
   import ActionSheet from "../../components/ActionSheet.svelte";
   import { PALETA } from "../../components/PieChart.svelte";
 
@@ -374,6 +375,21 @@
         };
       }),
     ];
+
+    if (!comparando) {
+      // Reta de tendência (a leitura de progresso do app): só nas sessões que contam (marcadores, pausa
+      // e janela da progressão aplicados), do primeiro ao último ponto válido.
+      datasets.push({
+        label: "Tendência",
+        data: retaDeTendencia(datas, brutoPrincipal, new Set(pontosParaTendencia(historico, marcadores).map((h) => h.data))),
+        borderColor: "#ffffff",
+        backgroundColor: "#ffffff",
+        borderWidth: 1.5,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        spanGaps: true,
+      });
+    }
 
     if (mostrarMedia) {
       const todasSeries = [principalAjustado, ...comparaveisAjustados.map((x) => x.ajustado)];

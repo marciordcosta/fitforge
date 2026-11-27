@@ -4,8 +4,8 @@
   import CarregandoBloco from "../../components/CarregandoBloco.svelte";
   import { untrack } from "svelte";
   import { navigate, voltar, router } from "../../lib/router.svelte";
-  import { toISODate, parseISODate, somarDias } from "../../lib/dates";
-  import { lerPausaReiniciarSemanas, dataCortePorPausa, lerJanelaProgressaoSemanas } from "../../lib/treinoProgressaoPrefs";
+  import { toISODate, parseISODate } from "../../lib/dates";
+  import { pontosParaTendencia } from "../../lib/tendenciaExercicio";
   import ActionSheet, { type AcaoSheet } from "../../components/ActionSheet.svelte";
   import Sheet from "../../components/Sheet.svelte";
   import ConfirmDialog from "../../components/ConfirmDialog.svelte";
@@ -1249,34 +1249,6 @@
     return "estavel";
   }
 
-  /** Aplica os marcadores (observação pontual no gráfico) à conta de tendência de progressão,
-   * conforme o tipo de cada um — ver TipoMarcadorExercicio em treinoApi.ts:
-   * - "desconsiderar": esse dia some só da conta (continua no histórico/gráfico normalmente).
-   * - "reiniciar": corta tudo ANTES do marcador mais recente desse tipo (ex: troca de
-   *   equipamento) — sem isso, uma mudança de peso causada por ela entraria na conta como se
-   *   fosse evolução real.
-   * - "apenas_marcar": sem efeito nenhum aqui, só visual.
-   * Além dos marcadores, a preferência "Reiniciar progressão após pausa" (Treino > Parametrização)
-   * age como um "reiniciar" no primeiro treino depois de uma pausa longa — e, se o último treino do
-   * exercício já passou do prazo, a conta inteira fica em branco até voltar a treiná-lo.
-   * Sem marcador nem pausa, devolve a lista inteira. */
-  function pontosParaTendencia<T extends { data: string }>(pontos: T[], marcadores: MarcadorExercicio[] | undefined): T[] {
-    const datasDesconsiderar = new Set((marcadores ?? []).filter((m) => m.tipo === "desconsiderar").map((m) => m.data));
-    const marcadoresReiniciar = (marcadores ?? []).filter((m) => m.tipo === "reiniciar");
-    const ultimaDataReiniciar = marcadoresReiniciar.length ? marcadoresReiniciar[marcadoresReiniciar.length - 1].data : null;
-    // A pausa é medida entre sessões de verdade (lista completa, antes de "desconsiderar" tirar dias).
-    const cortePausa = dataCortePorPausa(
-      pontos.map((p) => p.data),
-      lerPausaReiniciarSemanas(),
-      toISODate(new Date()),
-    );
-    // Janela da progressão (semanas, Parametrização): só vale o que está dentro dela, a partir de hoje.
-    const semanasJanela = lerJanelaProgressaoSemanas();
-    const corteJanela = semanasJanela > 0 ? somarDias(toISODate(new Date()), -7 * semanasJanela) : null;
-    if (!datasDesconsiderar.size && ultimaDataReiniciar == null && cortePausa == null && corteJanela == null) return pontos;
-    const corte = [ultimaDataReiniciar, cortePausa, corteJanela].filter((d): d is string => d != null).sort().pop() ?? null;
-    return pontos.filter((p) => !datasDesconsiderar.has(p.data) && (corte == null || p.data >= corte));
-  }
 
   /** Tendência de um exercício específico (não agregada por músculo) — mostrada como texto
    * discreto embaixo do nome no editor completo da rotina. */

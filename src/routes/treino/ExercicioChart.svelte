@@ -3,6 +3,7 @@
   import { getHistoricoExercicio, calcular1RM, type HistoricoPonto, type Exercicio, type MarcadorExercicio } from "../../lib/treinoApi";
   import { treinoLogSessao } from "../../lib/treinoLogSessao.svelte";
   import { hojeISO } from "../../lib/dates";
+  import { pontosParaTendencia, retaDeTendencia } from "../../lib/tendenciaExercicio";
   import ExercicioChartTelaCheia from "./ExercicioChartTelaCheia.svelte";
   import ActionSheet from "../../components/ActionSheet.svelte";
 
@@ -182,6 +183,22 @@
             pointRadius: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? 6 : 3)),
             pointBackgroundColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#fbbf24" : "#5eead4")),
             pointBorderColor: historicoFiltrado.map((h) => (marcadores.some((m) => m.data === h.data) ? "#d97706" : "#5eead4")),
+          },
+          // Reta de tendência (a leitura de progresso do app): só nas sessões que contam (marcadores,
+          // pausa e janela da progressão aplicados), do primeiro ao último ponto válido.
+          {
+            label: "Tendência",
+            data: retaDeTendencia(
+              historicoFiltrado.map((h) => h.data),
+              valores,
+              new Set(pontosParaTendencia(historicoComAoVivo, marcadores).map((h) => h.data)),
+            ),
+            borderColor: "#ffffff",
+            backgroundColor: "#ffffff",
+            borderWidth: 1.5,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            spanGaps: true,
           },
         ];
 
