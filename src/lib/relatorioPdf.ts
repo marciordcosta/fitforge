@@ -161,28 +161,6 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   desenharGraficoPeso(doc, modelo, M, yTopo, util, altGraf);
   y = yTopo + altGraf + 5;
 
-  garantir(30);
-  subtitulo("Decisões sugeridas", M, util);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...COR.texto);
-  let yDec = y + 11;
-  if (!modelo.decisoes.length) {
-    doc.text(doc.splitTextToSize("Nenhum ajuste urgente: os músculos com leitura estão mantendo ou progredindo.", util) as string[], M, yDec);
-    yDec += 5;
-  } else {
-    for (const d of modelo.decisoes) {
-      const linhas = doc.splitTextToSize(`-  ${d}`, util) as string[];
-      if (yDec + linhas.length * 4.3 > altura - M - 6) {
-        doc.addPage();
-        yDec = M + 4;
-      }
-      doc.text(linhas, M, yDec);
-      yDec += linhas.length * 4.3 + 1.5;
-    }
-  }
-  y = yDec + 3;
-
   // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
   titulo("Consolidado por músculo (realizado no período)");
   tabela({
@@ -218,7 +196,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo, dividida em três partes iguais (Manutenção, Moderado e Prioridade, em verde); abaixo da janela é Abaixo (vermelho) e acima dela é Foco (azul). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Decisões: músculos de foco (volume de 125% da média ou mais) vêm primeiro. Volume da semana: sempre contra a janela de séries de cada músculo (um posterior de coxa tolera menos que um peitoral). Os avisos de séries num dia só (fracionar, perto do limite ou dia fraco) estão na tabela de Distribuição semanal. Referência para natural: dividir em 2 ou mais dias, subir ~2 séries por semana e reavaliar em 3 a 4 semanas; trocar exercício só depois de 4 ou mais sessões estagnadas.",
+    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo, dividida em três partes iguais (Manutenção, Moderado e Prioridade, em verde); abaixo da janela é Abaixo (vermelho) e acima dela é Foco (azul). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Ação sugerida: dá mais peso aos músculos de foco (volume de 125% da média ou mais). Volume da semana: sempre contra a janela de séries de cada músculo (um posterior de coxa tolera menos que um peitoral). Os avisos de séries num dia só (fracionar, perto do limite ou dia fraco) estão na tabela de Distribuição semanal. Referência para natural: dividir em 2 ou mais dias, subir ~2 séries por semana e reavaliar em 3 a 4 semanas; trocar exercício só depois de 4 ou mais sessões estagnadas.",
     util,
   ) as string[];
   garantir(nota.length * 3.2);
@@ -366,24 +344,6 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       }
     },
   });
-
-  // ---------------- alertas ----------------
-  titulo("Alertas");
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...COR.texto);
-  if (!modelo.alertas.length) {
-    doc.text("Nenhum alerta no período.", M, y + 3);
-    y += 7;
-  } else {
-    for (const a of modelo.alertas) {
-      const linhas = doc.splitTextToSize(`-  ${a}`, util) as string[];
-      garantir(linhas.length * 4 + 1);
-      doc.text(linhas, M, y + 3);
-      y += linhas.length * 4 + 1;
-    }
-    y += 3;
-  }
 
   // ---------------- limites ----------------
   garantir(16);
