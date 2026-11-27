@@ -2135,35 +2135,11 @@
     editorSujo = true;
   }
 
-  /** Abre o gráfico direto (sem passar por menu) quando se entra em
-   * /treino/distribuicao/rotina/:id/grafico — usado pela opção "Distribuição" no menu de
-   * Visualizar Rotina, e pelo rodapé do card da rotina. "Voltar" do navegador fecha o gráfico
-   * e sai dessa rota. */
-  const graficoUrlTreino = $derived.by(() => {
-    const m = router.path.match(/^\/treino\/distribuicao\/rotina\/([^/]+)\/grafico$/);
-    if (!m) return null;
-    return treinos.find((t) => t.id === m[1]) ?? null;
-  });
-
   /** Só abre uma vez por entrada na URL — sem isso, cada atualização de `treinos` (ex: depois de
    * ajustar uma série) recriava `graficoUrlTreino`/`musculoUrlContexto`/`editorUrlTreino` e o
    * efeito reabria o modal do zero de novo, brigando com a atualização direta que já tinha
    * acabado de acontecer. */
   let urlAbertaChave = $state<string | null>(null);
-
-  $effect(() => {
-    if (!graficoUrlTreino) {
-      if (urlAbertaChave?.startsWith("grafico:")) urlAbertaChave = null;
-      // Voltar físico/gesto muda a URL por baixo do Sheet — sem isso ele ficava visualmente
-      // aberto, mostrando dados de uma rota que já não é mais a atual.
-      if (modalGraficoTreino) modalGraficoTreino = null;
-      return;
-    }
-    const chave = `grafico:${graficoUrlTreino.id}`;
-    if (urlAbertaChave === chave) return;
-    urlAbertaChave = chave;
-    abrirGraficoTreino(graficoUrlTreino);
-  });
 
   /** Mesmo padrão do gráfico: reabre o modal de exercícios por músculo ao voltar do detalhe do
    * exercício (ou de qualquer navegação), já que abrirExerciciosDaRotina navega pra essa rota. */
@@ -2215,7 +2191,8 @@
    * Segue campoGrafico — por padrão a mesma coluna (Total/Pond./Acum.) selecionada no card, igual
    * à grade, mas configurável em Parametrização pra sempre usar total ou sempre ponderado. */
   function abrirGraficoSemanal(): void {
-    const { itens, total } = itensParaGrafico(linhasSemanal, campoGrafico);
+    // Só existe o anel da semana, sempre na leitura ponderada (os anéis por rotina foram removidos).
+    const { itens, total } = itensParaGrafico(linhasSemanal, "ponderado");
     // Anel geral: mesma regra da coluna Total da grade semanal — classifica por volume sempre
     // pelo ponderado.
     abrirDetalheRotina("Distribuição Semanal", itens, formatValor(total), "séries", coresAbcAcumulado(itens), "ponderado");
@@ -2254,16 +2231,7 @@
 
   /** De onde os dados do anel aberto vieram — pra recalcular quando o botão de alternar coluna
    * (mesma ideia da grade semanal) é tocado dentro do próprio modal. */
-  let modalDetalheOrigem = $state<{ tipo: "semanal" } | { tipo: "treino"; treino: TreinoComExercicios } | null>(null);
-
-  /** Botão de alternar coluna dentro do anel — cicla ordemSemanal (mesma variável global da
-   * grade) e reabre o anel com os dados recalculados pra coluna nova. */
-  function alternarColunaDetalhe(): void {
-    alternarColunaDestacada();
-    if (!modalDetalheOrigem) return;
-    if (modalDetalheOrigem.tipo === "semanal") abrirGraficoSemanal();
-    else abrirGraficoTreinoDominancia(modalDetalheOrigem.treino, campoGrafico);
-  }
+  let modalDetalheOrigem = $state<{ tipo: "semanal" } | null>(null);
 
   /** Alterna entre o anel por músculo individual com cores de classificação de volume semanal
    * (Parametrização — padrão) e por dominância (ABC). Reseta pro padrão sempre que um anel novo
@@ -2305,51 +2273,6 @@
     return itens.map((i) => corVolume((campo === "bruto" ? i.bruto : i.ponderado) ?? i.valor, i.musculo));
   }
 
-  /** Gráfico de uma rotina específica: mesmos dados do card da rotina (distribuicaoPorTreino
-   * — série equivalente, agrupamento por agrupamento_id, faixas A/B/C por posição), só que
-   * em anel em vez de barras. Sem isso os dois ficavam mostrando números diferentes pro
-   * mesmo músculo (um bruto sem agrupar, outro ponderado agrupado). */
-  let modalGraficoTreino = $state<{
-    treinoId: string;
-    titulo: string;
-    totalSeries: number;
-    porSerie: LinhaRotina[];
-  } | null>(null);
-
-  function abrirGraficoTreino(treino: TreinoComExercicios): void {
-    const lista = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
-    const totalSeries = treino.exercicios.reduce((acc, ex) => acc + ex.series.length, 0);
-    modalGraficoTreino = { treinoId: treino.id, titulo: treino.nome_treino, totalSeries, porSerie: lista };
-  }
-
-  /** Mantém o anel por rotina (posição/fadiga) sincronizado ao vivo com treinosEfetivos — mesmo
-   * motivo do efeito de modalDetalheRotina: sem isso, editar séries com o anel aberto por cima
-   * deixava o número no centro (e as fatias) desatualizados até fechar e abrir de novo. */
-  $effect(() => {
-    if (!modalGraficoTreino) return;
-    const treinoId = modalGraficoTreino.treinoId;
-    const dados = distribuicaoPorTreino.find((d) => d.treino.id === treinoId);
-    if (!dados) return;
-    const totalSeries = treinosEfetivos.find((t) => t.id === treinoId)?.exercicios.reduce((acc, ex) => acc + ex.series.length, 0) ?? 0;
-    untrack(() => {
-      if (!modalGraficoTreino) return;
-      modalGraficoTreino = { ...modalGraficoTreino, totalSeries, porSerie: dados.lista };
-    });
-  });
-
-  /** Anel por dominância (mesma conta da Distribuição Semanal, coresAbcAcumulado), só que
-   * dessa rotina isolada — mesma lista já usada pelo card (distribuicaoPorTreino), reprojetada
-   * pra coluna (Total/Pond./Acum.) selecionada nele, igual à grade. Diferente do anel por
-   * posição/fadiga (abrirGraficoTreino), que é o que a barra já abre. */
-  function abrirGraficoTreinoDominancia(treino: TreinoComExercicios, campo: CampoOrdenacaoSeries): void {
-    const lista = distribuicaoPorTreino.find((d) => d.treino.id === treino.id)?.lista ?? [];
-    const { itens, total } = itensParaGrafico(lista, campo);
-    // Anel por rotina: mesma regra das colunas de rotina/dia da grade semanal — classifica por
-    // volume sempre pelo total bruto.
-    abrirDetalheRotina(treino.nome_treino, itens, formatValor(total), "séries", coresAbcAcumulado(itens), "bruto");
-    modalDetalheOrigem = { tipo: "treino", treino };
-  }
-
   /** `modalDetalheRotina` é um snapshot tirado no momento em que o anel abre — sem isso, editar
    * uma série (add/remover exercício, ajustar séries) enquanto o anel está aberto por cima deixava
    * o número mostrado no centro (ao tocar numa fatia) desatualizado até fechar e abrir de novo.
@@ -2357,10 +2280,8 @@
    * ABC/Volume do usuário a cada mudança nos dados. */
   $effect(() => {
     const origem = modalDetalheOrigem;
-    const campo = campoGrafico;
     if (!origem) return;
-    const dadosOrigem = origem.tipo === "semanal" ? linhasSemanal : (distribuicaoPorTreino.find((d) => d.treino.id === origem.treino.id)?.lista ?? []);
-    const { itens, total } = itensParaGrafico(dadosOrigem, campo);
+    const { itens, total } = itensParaGrafico(linhasSemanal, "ponderado");
     const cores = coresAbcAcumulado(itens);
     untrack(() => {
       if (!modalDetalheRotina) return;
@@ -2526,9 +2447,6 @@
                 (acc, ex) => acc + ex.series.length,
                 0,
               )} séries · {registrosPorTreino.get(treino.id) ?? 0} {(registrosPorTreino.get(treino.id) ?? 0) === 1 ? "registro" : "registros"}
-            </button>
-            <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(treino, campoGrafico)} aria-label="Ver anel por dominância">
-              {@render iconGrafico()}
             </button>
           </div>
         {/snippet}
@@ -3013,12 +2931,11 @@
        precisa ficar por cima dele, não só do resto da página. -->
   <div class="acima-editor">
     <Sheet
-      titulo={LABEL_TITULO_GRADE[campoGrafico]}
+      titulo={LABEL_TITULO_GRADE[modalDetalheOrigem ? "ponderado" : campoGrafico]}
       onFechar={() => {
         modalDetalheRotina = null;
         modalDetalheOrigem = null;
       }}
-      aoClicarTitulo={colunasAtivas.length > 1 && parametrosDistribuicao.graficoCampo === "destacada" ? alternarColunaDetalhe : undefined}
       acaoTituloDireita={modalDetalheRotina.itens.length ? alternarModoDetalhe : undefined}
     >
       <div class="pizza-wrap">
@@ -3040,28 +2957,6 @@
       </div>
     </Sheet>
   </div>
-{/if}
-
-{#if modalGraficoTreino}
-  <Sheet
-    titulo={modalGraficoTreino.titulo}
-    onFechar={() => {
-      modalGraficoTreino = null;
-      if (graficoUrlTreino) window.history.back();
-    }}
-  >
-    <div class="pizza-wrap">
-      <PieChart
-        dados={modalGraficoTreino.porSerie.map((i) => ({
-          nome: i.nome,
-          valor: i.valor,
-          partes: partesParaSegmentos(i.partes),
-        }))}
-        centroValor={modalGraficoTreino.totalSeries}
-        centroLabel="séries"
-      />
-    </div>
-  </Sheet>
 {/if}
 
 {#if modalMusculoRotina && !mostrarGradeSemanal}
@@ -3476,9 +3371,6 @@
             aria-label="Ver distribuição na semana"
           >
             {@render iconGrade()}
-          </button>
-          <button class="rotina-grafico-btn" onclick={() => abrirGraficoTreinoDominancia(modalEditorRotina!, campoGrafico)} aria-label="Ver anel por dominância">
-            {@render iconGrafico()}
           </button>
         </div>
       </div>
