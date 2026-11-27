@@ -143,6 +143,27 @@
         pointRadius: 3,
         spanGaps: true,
       });
+      // Reta de tendência da linha ponderada (mínimos quadrados): o que o olho enxerga como "está subindo".
+      const pts = dados.ponderada.map((v, x) => ({ x, v })).filter((p): p is { x: number; v: number } => p.v != null);
+      if (pts.length >= 3) {
+        const mx = pts.reduce((acc, p) => acc + p.x, 0) / pts.length;
+        const my = pts.reduce((acc, p) => acc + p.v, 0) / pts.length;
+        const den = pts.reduce((acc, p) => acc + (p.x - mx) ** 2, 0);
+        if (den > 0) {
+          const incl = pts.reduce((acc, p) => acc + (p.x - mx) * (p.v - my), 0) / den;
+          const clamp = (v: number) => Math.max(0, Math.min(1, v));
+          datasets.push({
+            label: "Tendência",
+            data: dados.ponderada.map((_, x) => clamp(my + incl * (x - mx))),
+            borderColor: "#ffffff",
+            backgroundColor: "#ffffff",
+            borderWidth: 2,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            spanGaps: true,
+          });
+        }
+      }
       chart = new Chart(canvas, {
         type: "line",
         data: { labels: semanas.map(formatData), datasets },
@@ -157,6 +178,7 @@
               callbacks: {
                 label: (ctx) => {
                   const ds = ctx.dataset as DS;
+                  if (ds.label === "Tendência") return "Tendência";
                   if (ds.label === "Ponderada") return `Ponderada: ${ctx.parsed.y == null ? "-" : Math.round(ctx.parsed.y * 100) + "%"}`;
                   const bruto = ds.rawData?.[ctx.dataIndex];
                   return `${ds.label}: ${bruto == null ? "-" : Math.round(bruto * 10) / 10 + " (1RM)"}`;
@@ -215,7 +237,7 @@
     </div>
     <div class="tela-cheia-grafico"><canvas use:grafico={versao}></canvas></div>
     <div class="legenda">
-      <span class="item destaque"><i style="background:#fff"></i>Ponderada</span>
+      <span class="item destaque"><i style="background:#fff"></i>Ponderada (tracejada = tendência)</span>
       {#each series as s, i (s.nome + i)}
         <span class="item"><i style={`background:${PALETA[i % PALETA.length]}`}></i>{s.nome}</span>
       {/each}

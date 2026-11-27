@@ -566,10 +566,17 @@ export function getHistoricoExercicio(exercicioId: string, antesDe?: string): Pr
 }
 
 async function getHistoricoExercicioImpl(exercicioId: string, antesDe?: string): Promise<HistoricoPonto[]> {
-  let query = supabase.from("treino_registros").select("data, peso, repeticoes").eq("exercicio_id", exercicioId).not("peso", "is", null);
-  if (antesDe) query = query.lt("data", antesDe);
-  const { data, error } = await query.order("data", { ascending: true });
-  if (error) throw error;
+  // Pagina de 1000 em 1000: o Supabase corta cada consulta em 1000 linhas, e sem isso as sessões MAIS
+  // RECENTES (a ordem é crescente) sumiam do histórico de quem tem muito registro no exercício.
+  const data: { data: string; peso: number | null; repeticoes: number | null }[] = [];
+  for (let de = 0; ; de += 1000) {
+    let query = supabase.from("treino_registros").select("data, peso, repeticoes").eq("exercicio_id", exercicioId).not("peso", "is", null);
+    if (antesDe) query = query.lt("data", antesDe);
+    const { data: pagina, error } = await query.order("data", { ascending: true }).order("id", { ascending: true }).range(de, de + 999);
+    if (error) throw error;
+    data.push(...(pagina ?? []));
+    if ((pagina?.length ?? 0) < 1000) break;
+  }
 
   const porData = new Map<string, { peso: number; repeticoes: number }[]>();
   for (const r of data ?? []) {
@@ -1765,9 +1772,20 @@ export interface RegistroPorTreino {
  * sessões (dias distintos) cada rotina teve DEPOIS do último reset manual da contagem
  * (treinos.registros_zerados_em), sem precisar buscar o histórico inteiro de cada uma. */
 export async function getRegistrosPorTreinoDesde(dataMinima: string): Promise<RegistroPorTreino[]> {
-  const { data, error } = await supabase.from("treino_registros").select("treino_id, data").gte("data", dataMinima);
-  if (error) throw error;
-  return data ?? [];
+  // Paginado (limite de 1000 linhas por consulta do Supabase): contava a menos em quem tem muito registro.
+  const todos: RegistroPorTreino[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await supabase
+      .from("treino_registros")
+      .select("treino_id, data")
+      .gte("data", dataMinima)
+      .order("id", { ascending: true })
+      .range(de, de + 999);
+    if (error) throw error;
+    todos.push(...(data ?? []));
+    if ((data?.length ?? 0) < 1000) break;
+  }
+  return todos;
 }
 
 /** Zera manualmente a contagem de "registros" no rodapé do card de uma rotina (ou de todas, se

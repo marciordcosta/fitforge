@@ -1204,26 +1204,48 @@
 
   // ---------------- Tendência de progressão do músculo (1RM médio das últimas sessões) ----------------
 
+  /** "analise" = 2 ou 3 sessões válidas: já conta, mas ainda sem resultado (o resultado vem a partir da 4ª). */
+  type Tend = "subindo" | "estavel" | "caindo" | "analise";
+
   interface TendenciaMusculo {
-    status: "subindo" | "estavel" | "caindo";
+    status: Tend;
   }
 
   let tendenciaMusculo = $state<TendenciaMusculo | null>(null);
   let carregandoTendencia = $state(false);
   let musculoIdTendenciaCarregada = $state<string | null>(null);
 
-  /** Variação % do 1RM médio das últimas 4 sessões vs as 4 anteriores a essas — null se não há
-   * histórico suficiente pra comparar. */
+  /** Mínimo de sessões válidas pra dar resultado (com 2 ou 3 fica "em análise"). */
+  const MIN_SESSOES_TENDENCIA = 4;
+
+  /** Tendência do exercício como uma linha de gráfico: ajusta a reta (mínimos quadrados) pelo 1RM de
+   * TODAS as sessões válidas (já sem as antes de pausa/reinício/dias desconsiderados) e devolve
+   * quanto ela sobe ou desce do primeiro ao último ponto, em % do 1RM médio. Uma sessão fora da
+   * curva pesa pouco; null se há menos de MIN_SESSOES_TENDENCIA sessões. */
   function variacaoExercicio(pontos: { melhor1rm: number }[]): number | null {
-    const N = 4;
-    if (pontos.length < N + 2) return null;
-    const recentes = pontos.slice(-N);
-    const anteriores = pontos.slice(-2 * N, -N);
-    if (anteriores.length < 2) return null;
-    const mediaRecente = recentes.reduce((acc, p) => acc + p.melhor1rm, 0) / recentes.length;
-    const mediaAnterior = anteriores.reduce((acc, p) => acc + p.melhor1rm, 0) / anteriores.length;
-    if (mediaAnterior <= 0) return null;
-    return (mediaRecente - mediaAnterior) / mediaAnterior;
+    const n = pontos.length;
+    if (n < MIN_SESSOES_TENDENCIA) return null;
+    const mediaX = (n - 1) / 2;
+    const mediaY = pontos.reduce((acc, p) => acc + p.melhor1rm, 0) / n;
+    if (mediaY <= 0) return null;
+    let num = 0;
+    let den = 0;
+    pontos.forEach((p, x) => {
+      num += (x - mediaX) * (p.melhor1rm - mediaY);
+      den += (x - mediaX) ** 2;
+    });
+    const inclinacao = num / den;
+    return (inclinacao * (n - 1)) / mediaY;
+  }
+
+  /** Tendência em texto: null com menos de 2 sessões; "analise" com 2 ou 3; senão pela inclinação da reta. */
+  function classificarTendencia(pontos: { melhor1rm: number }[]): Tend | null {
+    if (pontos.length < 2) return null;
+    const v = variacaoExercicio(pontos);
+    if (v == null) return "analise";
+    if (v > 0.02) return "subindo";
+    if (v < -0.02) return "caindo";
+    return "estavel";
   }
 
   /** Aplica os marcadores (observação pontual no gráfico) à conta de tendência de progressão,
@@ -1254,14 +1276,10 @@
 
   /** Tendência de um exercício específico (não agregada por músculo) — mostrada como texto
    * discreto embaixo do nome no editor completo da rotina. */
-  function tendenciaExercicio(exercicioId: string): "subindo" | "estavel" | "caindo" | null {
+  function tendenciaExercicio(exercicioId: string): Tend | null {
     const pontos = historicoPorExercicio.get(exercicioId);
     if (!pontos) return null;
-    const v = variacaoExercicio(pontosParaTendencia(pontos, marcadoresPorExercicio.get(exercicioId)));
-    if (v == null) return null;
-    if (v > 0.02) return "subindo";
-    if (v < -0.02) return "caindo";
-    return "estavel";
+    return classificarTendencia(pontosParaTendencia(pontos, marcadoresPorExercicio.get(exercicioId)));
   }
 
   /** Peso de fadiga (0 a 1) de cada exercício da rotina, pela posição das séries dele —
@@ -1308,23 +1326,28 @@
    * peso. Base compartilhada por tendenciaMusculoEditor (1 rotina, a aberta no editor),
    * tendenciaMusculoRotina (1 rotina, no card da tela principal) e tendenciaMusculoSemanal (todas
    * as rotinas, no card "Distribuição Semanal"). */
-  function tendenciaMusculoPonderada(treinosList: TreinoComExercicios[], musculoId: string): "subindo" | "estavel" | "caindo" | null {
+  function tendenciaMusculoPonderada(treinosList: TreinoComExercicios[], musculoId: string): Tend | null {
     let somaPonderada = 0;
     let somaPesos = 0;
+    let temAnalise = false;
     for (const treino of treinosList) {
       const pesos = pesosFadigaPorExercicio(treino);
       for (const te of treino.exercicios) {
         if (!te.exercicio?.musculos.some((m) => m.musculo_id === musculoId)) continue;
         const pontos = historicoPorExercicio.get(te.exercicio_id);
         if (!pontos) continue;
-        const v = variacaoExercicio(pontosParaTendencia(pontos, marcadoresPorExercicio.get(te.exercicio_id)));
-        if (v == null) continue;
+        const validos = pontosParaTendencia(pontos, marcadoresPorExercicio.get(te.exercicio_id));
+        const v = variacaoExercicio(validos);
+        if (v == null) {
+          if (validos.length >= 2) temAnalise = true;
+          continue;
+        }
         const peso = pesos.get(te.id) ?? 1;
         somaPonderada += v * peso;
         somaPesos += peso;
       }
     }
-    if (somaPesos === 0) return null;
+    if (somaPesos === 0) return temAnalise ? "analise" : null;
     const media = somaPonderada / somaPesos;
     if (media > 0.02) return "subindo";
     if (media < -0.02) return "caindo";
@@ -1332,26 +1355,27 @@
   }
 
   /** Tendência de um músculo dentro da rotina aberta no editor — texto discreto embaixo do nome. */
-  function tendenciaMusculoEditor(musculoId: string): "subindo" | "estavel" | "caindo" | null {
+  function tendenciaMusculoEditor(musculoId: string): Tend | null {
     if (!modalEditorRotina) return null;
     return tendenciaMusculoPonderada([modalEditorRotina], musculoId);
   }
 
   /** Tendência de um músculo dentro de UMA rotina específica — card da rotina na tela principal
    * da Distribuição. */
-  function tendenciaMusculoRotina(treino: TreinoComExercicios, musculoId: string): "subindo" | "estavel" | "caindo" | null {
+  function tendenciaMusculoRotina(treino: TreinoComExercicios, musculoId: string): Tend | null {
     return tendenciaMusculoPonderada([treino], musculoId);
   }
 
   /** Tendência de um músculo somando TODAS as rotinas da semana — card "Distribuição Semanal". */
-  function tendenciaMusculoSemanal(musculoId: string): "subindo" | "estavel" | "caindo" | null {
+  function tendenciaMusculoSemanal(musculoId: string): Tend | null {
     return tendenciaMusculoPonderada(treinos, musculoId);
   }
 
-  function textoTendencia(t: "subindo" | "estavel" | "caindo" | null): string | null {
+  function textoTendencia(t: Tend | null): string | null {
     if (t === "subindo") return "Progredindo";
     if (t === "estavel") return "Estagnado";
     if (t === "caindo") return "Regredindo";
+    if (t === "analise") return "Em análise";
     return null;
   }
 
@@ -1368,7 +1392,7 @@
    *   reage ao resultado real, não só ao total de séries.
    * - Manutenção + regredindo: regressão não costuma ser problema de pouco volume — não sugere
    *   nada sobre volume, só sinaliza (a tendência em si já aparece separada). */
-  function alertaVolumeTendencia(classe: ClasseVolumeSemanal, tendencia: "subindo" | "estavel" | "caindo" | null): string | null {
+  function alertaVolumeTendencia(classe: ClasseVolumeSemanal, tendencia: Tend | null): string | null {
     if (tendencia == null || tendencia === "subindo") return null;
     if (classe === "insuficiente" || classe === "excessivo") return null;
     if (classe === "manutencao") return tendencia === "estavel" ? "Testar mais séries" : null;
@@ -1397,17 +1421,23 @@
     tendenciaMusculo = null;
     try {
       const variacoes: number[] = [];
+      let temAnalise = false;
       for (const item of itens) {
         // Reaproveita o histórico/marcadores já pré-carregados (carregarHistoricoTodos) — só
         // busca de novo se esse exercício não estava no cache (ex: acabou de ser adicionado à
         // rotina).
         const pontos = historicoPorExercicio.get(item.exercicioId) ?? (await getHistoricoExercicio(item.exercicioId));
         const marcadores = marcadoresPorExercicio.get(item.exercicioId) ?? (await listMarcadoresExercicio(item.exercicioId));
-        const v = variacaoExercicio(pontosParaTendencia(pontos, marcadores));
+        const validos = pontosParaTendencia(pontos, marcadores);
+        const v = variacaoExercicio(validos);
         if (v != null) variacoes.push(v);
+        else if (validos.length >= 2) temAnalise = true;
       }
       if (meuToken !== tokenTendencia) return;
-      if (!variacoes.length) return;
+      if (!variacoes.length) {
+        if (temAnalise) tendenciaMusculo = { status: "analise" };
+        return;
+      }
       const media = variacoes.reduce((acc, v) => acc + v, 0) / variacoes.length;
       if (media > 0.02) tendenciaMusculo = { status: "subindo" };
       else if (media < -0.02) tendenciaMusculo = { status: "caindo" };
@@ -1434,6 +1464,7 @@
     subindo: "Progredindo",
     estavel: "Estagnado",
     caindo: "Regredindo",
+    analise: "Em análise",
   };
 
   /** Exercícios dessa rotina específica que trabalham o músculo, com o número de séries editável
@@ -2461,7 +2492,7 @@
   </div>
 {/snippet}
 
-{#snippet nomeComTendencia(nome: string, tendencia: "subindo" | "estavel" | "caindo" | null, aoClicar: () => void)}
+{#snippet nomeComTendencia(nome: string, tendencia: Tend | null, aoClicar: () => void)}
   <button class="nome-btn nome-btn-tendencia" onclick={aoClicar}>
     <span class="nome-btn-texto">{nome}</span>
     {#if textoTendencia(tendencia)}
@@ -4173,6 +4204,7 @@
   .tendencia-caindo {
     color: var(--color-negative);
   }
+  .tendencia-analise,
   .tendencia-sem-info {
     color: var(--surface-muted);
   }
