@@ -63,6 +63,14 @@ export function curvaPorRazaoDaMedia(razao: number): CurvaABC {
   return "C";
 }
 
+/** Limites de séries TOTAIS (sem ponderar) de um músculo num mesmo dia: acima de 8 pede atenção, acima de 10
+ * passa do que cabe num dia (fracionar). O mínimo do dia é o MENOR entre 5 e a metade do máximo semanal da
+ * janela do músculo, arredondada pra baixo (máximo 9 → 4; máximo 6 → 3): um dia abaixo disso rende pouco. O
+ * volume da SEMANA não tem número fixo: cada músculo usa a janela dele. */
+const LIMITE_DIA_ATENCAO = 8;
+const LIMITE_DIA_MAXIMO = 10;
+const MINIMO_DIA = 5;
+
 export interface LinhaMusculoRelatorio {
   id: string;
   nome: string;
@@ -95,6 +103,11 @@ export interface LinhaGradeRelatorio {
   nome: string;
   grupo: string | null;
   porDia: number[];
+  /** Aviso por dia (mesma ordem de porDia): "max" = acima de 10 séries (fracionar), "atencao" = de 8 a 10 ou
+   * abaixo do mínimo do músculo, null = ok. */
+  avisosDia: ("max" | "atencao" | null)[];
+  /** Sugestões por dia, já em texto (vazio = nenhuma). */
+  observacao: string;
   total: number;
   classe: ClasseVolumeSemanal;
 }
@@ -299,9 +312,27 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     // Dias = séries totais; o total da semana é o PONDERADO (a leitura que a faixa de volume usa).
     const total = planPorMusculo.get(id)?.ponderado ?? 0;
     if (total <= 0) continue;
+    const janelaMusculo = e.janela(id);
+    const minimoDia = Math.min(MINIMO_DIA, Math.floor(janelaMusculo.max / 2));
+    const diasComSerie = porDia.filter((v) => v > 0).length;
+    const avisosDia = porDia.map((v): "max" | "atencao" | null => {
+      if (v > LIMITE_DIA_MAXIMO) return "max";
+      if (v > LIMITE_DIA_ATENCAO) return "atencao";
+      if (v > 0 && diasComSerie >= 2 && v < minimoDia) return "atencao";
+      return null;
+    });
+    const observacoes: string[] = [];
+    porDia.forEach((v, i) => {
+      const dia = e.gradeSemanal.dias[i]?.rotulo ?? "";
+      if (avisosDia[i] === "max") observacoes.push(`${dia}: ${v} séries, fracionar em 2 dias (ex.: ${Math.ceil(v / 2)} + ${Math.floor(v / 2)})`);
+      else if (v > LIMITE_DIA_ATENCAO) observacoes.push(`${dia}: ${v} séries, perto do limite de ${LIMITE_DIA_MAXIMO}`);
+      else if (avisosDia[i] === "atencao") observacoes.push(`${dia}: ${v} série${v === 1 ? "" : "s"}, abaixo do mínimo de ${minimoDia}`);
+    });
     linhasGrade.push({
       nome: nomeMusculo.get(id) ?? "",
       grupo: grupoPorMusculo.get(id) ?? null,
+      avisosDia,
+      observacao: observacoes.join("; "),
       porDia: porDia.map(r1),
       total: r1(total),
       classe: e.classificar(id, Math.round(total * 2) / 2),
@@ -330,14 +361,6 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     .sort((a, b) => a.musculo.localeCompare(b.musculo) || a.nome.localeCompare(b.nome));
 
   // ---- decisões: dependem do foco (músculos com mais estímulo vêm primeiro) ----
-  /** Limites de séries TOTAIS (sem ponderar) de um músculo num mesmo dia: acima de 8 pede atenção, acima
-   * de 10 passa do que cabe num dia (fracionar); abaixo de 5 o dia rende pouco pro músculo, mas só pra
-   * quem suporta isso: o mínimo do dia é o MENOR entre 5 e a metade do máximo semanal da janela do
-   * músculo, arredondada pra baixo (máximo 9 → mínimo 4; máximo 6 → 3). O volume da SEMANA não tem número fixo: cada músculo usa a janela dele (um posterior de coxa tolera bem menos
-   * que um peitoral). */
-  const LIMITE_DIA_ATENCAO = 8;
-  const LIMITE_DIA_MAXIMO = 10;
-  const MINIMO_DIA = 5;
   const MIN_SESSOES_TROCA = 4;
 
   const leituraExercicio = e.exercicios.map((x) => {
@@ -363,24 +386,14 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     const bump = foco ? 1 : 0;
     const dias = (e.gradeSemanal.porMusculo.get(l.id) ?? []).filter((v) => v > 0);
     const maxDia = dias.length ? Math.max(...dias) : 0;
-    const minDia = dias.length ? Math.min(...dias) : 0;
     const doMusculo = leituraExercicio.filter((x) => x.contribuicoes.some((cn) => cn.musculoId === l.id && cn.peso > 0));
     const estagnados = doMusculo.filter((x) => x.status === "estavel" && x.sessoesValidas >= MIN_SESSOES_TROCA).sort((a, b) => b.sessoesValidas - a.sessoesValidas);
     const emQueda = doMusculo.filter((x) => x.status === "caindo" && x.variacao != null).sort((a, b) => (a.variacao ?? 0) - (b.variacao ?? 0));
     const st = l.progressao;
     const janela = e.janela(l.id);
     const faixaTxt = `${fmt1(janela.min)} a ${fmt1(janela.max)}`;
-    const minimoDia = Math.min(MINIMO_DIA, Math.floor(janela.max / 2));
 
-    // por dia (séries totais, plano atual)
-    if (maxDia > LIMITE_DIA_MAXIMO) {
-      itens.push({ p: 6, curto: `${maxDia} séries num único dia (limite de ${LIMITE_DIA_MAXIMO}): fracionar em 2 dias (ex.: ${Math.ceil(maxDia / 2)} + ${Math.floor(maxDia / 2)}).` });
-    } else if (maxDia > LIMITE_DIA_ATENCAO) {
-      itens.push({ p: 3, curto: `${maxDia} séries num dia, perto do limite de ${LIMITE_DIA_MAXIMO}: ao subir o volume, abrir mais um dia em vez de empilhar.` });
-    }
-    if (dias.length >= 2 && minDia < minimoDia) {
-      itens.push({ p: 2, curto: `um dia com só ${minDia} série${minDia === 1 ? "" : "s"} (mínimo de ${fmt1(minimoDia)} pra esse músculo): se não é acessório, concentrar em menos dias.` });
-    }
+    // (os avisos por dia — séries num dia só — ficam na tabela de Distribuição semanal)
 
     // volume da semana x janela do próprio músculo
     if (l.classe === "insuficiente") {

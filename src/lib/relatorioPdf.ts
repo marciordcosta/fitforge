@@ -53,7 +53,7 @@ type DocComTabela = jsPDF & { lastAutoTable?: { finalY: number } };
 
 export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> {
   const [{ jsPDF: JsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-  const doc = new JsPDF({ unit: "mm", format: "a4", orientation: "landscape" }) as DocComTabela;
+  const doc = new JsPDF({ unit: "mm", format: "a4", orientation: "portrait" }) as DocComTabela;
   const largura = doc.internal.pageSize.getWidth();
   const altura = doc.internal.pageSize.getHeight();
   const util = largura - 2 * M;
@@ -123,31 +123,29 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       detalhe: modelo.calorias ? `meta da dieta no período (${modelo.calorias.diasPeriodo} dias)` : "sem dados da dieta",
     },
   ];
-  const wCaixa = (util - 3 * 3) / 4;
+  const wCaixa = (util - 3) / 2;
   caixas.forEach((c, i) => {
-    const x = M + i * (wCaixa + 3);
+    const x = M + (i % 2) * (wCaixa + 3);
+    const yCaixa = y + Math.floor(i / 2) * 20;
     doc.setDrawColor(...COR.linha);
     doc.setFillColor(...COR.zebra);
-    doc.roundedRect(x, y, wCaixa, 17, 2, 2, "FD");
+    doc.roundedRect(x, yCaixa, wCaixa, 17, 2, 2, "FD");
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...COR.suave);
-    doc.text(c.rotulo, x + 2.5, y + 5);
+    doc.text(c.rotulo, x + 2.5, yCaixa + 5);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(...COR.texto);
-    doc.text(c.valor, x + 2.5, y + 10.5);
+    doc.text(c.valor, x + 2.5, yCaixa + 10.5);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...COR.suave);
-    doc.text(c.detalhe, x + 2.5, y + 14.5);
+    doc.text(c.detalhe, x + 2.5, yCaixa + 14.5);
   });
-  y += 22;
+  y += 42;
 
-  // ---------------- peso x meta (esquerda) e decisões (direita) ----------------
-  const wGraf = util * 0.56;
-  const xDec = M + wGraf + 8;
-  const wDec = util - wGraf - 8;
+  // ---------------- peso x meta e decisões (um embaixo do outro, em retrato) ----------------
   const subtitulo = (txt: string, x: number, w: number) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
@@ -157,25 +155,33 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     doc.line(x, y + 6, x + w, y + 6);
   };
   garantir(62);
-  subtitulo("Peso no período contra a meta", M, wGraf);
-  subtitulo("Decisões sugeridas", xDec, wDec);
+  subtitulo("Peso no período contra a meta", M, util);
   const yTopo = y + 9;
-  const altGraf = 42;
-  desenharGraficoPeso(doc, modelo, M, yTopo, wGraf, altGraf);
+  const altGraf = 48;
+  desenharGraficoPeso(doc, modelo, M, yTopo, util, altGraf);
+  y = yTopo + altGraf + 5;
+
+  garantir(30);
+  subtitulo("Decisões sugeridas", M, util);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...COR.texto);
-  let yDec = yTopo + 3;
+  let yDec = y + 11;
   if (!modelo.decisoes.length) {
-    doc.text(doc.splitTextToSize("Nenhum ajuste urgente: os músculos com leitura estão mantendo ou progredindo.", wDec) as string[], xDec, yDec);
+    doc.text(doc.splitTextToSize("Nenhum ajuste urgente: os músculos com leitura estão mantendo ou progredindo.", util) as string[], M, yDec);
+    yDec += 5;
   } else {
     for (const d of modelo.decisoes) {
-      const linhas = doc.splitTextToSize(`-  ${d}`, wDec) as string[];
-      doc.text(linhas, xDec, yDec);
+      const linhas = doc.splitTextToSize(`-  ${d}`, util) as string[];
+      if (yDec + linhas.length * 4.3 > altura - M - 6) {
+        doc.addPage();
+        yDec = M + 4;
+      }
+      doc.text(linhas, M, yDec);
       yDec += linhas.length * 4.3 + 1.5;
     }
   }
-  y = Math.max(yTopo + altGraf, yDec) + 6;
+  y = yDec + 3;
 
   // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
   titulo("Consolidado por músculo (realizado no período)");
@@ -190,11 +196,11 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       l.acao,
     ]),
     columnStyles: {
-      0: { cellWidth: 42, fontStyle: "bold" },
-      1: { halign: "right", cellWidth: 24 },
-      2: { cellWidth: 26 },
-      3: { halign: "right", cellWidth: 24 },
-      4: { cellWidth: 44 },
+      0: { cellWidth: 32, fontStyle: "bold" },
+      1: { halign: "right", cellWidth: 20 },
+      2: { cellWidth: 21 },
+      3: { halign: "right", cellWidth: 17 },
+      4: { cellWidth: 31 },
     },
     didParseCell: (d) => {
       if (d.section === "head") return;
@@ -214,7 +220,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo, dividida em três partes iguais (Manutenção, Moderado e Prioridade, em verde); abaixo da janela é Abaixo (vermelho) e acima dela é Foco (azul). Freq./sem.: quantos dias por semana o músculo é treinado, contando séries totais (qualquer exercício que o trabalhe, sem ponderar). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Decisões: músculos de foco (volume de 125% da média ou mais) vêm primeiro. Volume da semana: sempre contra a janela de séries de cada músculo (um posterior de coxa tolera menos que um peitoral). Limites por dia, em séries totais: até 8 ok, 8 a 10 atenção, acima de 10 fracionar; abaixo de 5 o dia rende pouco (ou da metade do máximo semanal do músculo, arredondada pra baixo, se for menor que 5). Referência para natural: dividir em 2 ou mais dias, subir ~2 séries por semana e reavaliar em 3 a 4 semanas; trocar exercício só depois de 4 ou mais sessões estagnadas.",
+    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado. Faixa: o volume contra a janela de séries do músculo, dividida em três partes iguais (Manutenção, Moderado e Prioridade, em verde); abaixo da janela é Abaixo (vermelho) e acima dela é Foco (azul). Freq./sem.: quantos dias por semana o músculo é treinado, contando séries totais (qualquer exercício que o trabalhe, sem ponderar). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Decisões: músculos de foco (volume de 125% da média ou mais) vêm primeiro. Volume da semana: sempre contra a janela de séries de cada músculo (um posterior de coxa tolera menos que um peitoral). Os avisos de séries num dia só (fracionar, perto do limite ou dia fraco) estão na tabela de Distribuição semanal. Referência para natural: dividir em 2 ou mais dias, subir ~2 séries por semana e reavaliar em 3 a 4 semanas; trocar exercício só depois de 4 ou mais sessões estagnadas.",
     util,
   ) as string[];
   garantir(nota.length * 3.2);
@@ -240,27 +246,45 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     const dias = modelo.grade.dias;
     tabela({
       head: [
-        ["Músculo", ...dias.map((d) => d.rotulo), "Total"],
-        ["", ...dias.map((d) => d.rotina ?? "descanso"), ""],
+        ["Músculo", ...dias.map((d) => d.rotulo), "Total", "Observação"],
+        ["", ...dias.map((d) => d.rotina ?? "descanso"), "", ""],
       ],
-      body: modelo.grade.linhas.map((l) => [l.nome, ...l.porDia.map((v) => (v > 0 ? fmtNum(v) : "-")), fmtNum(l.total)]),
-      columnStyles: { 0: { cellWidth: 42, fontStyle: "bold" } },
+      body: modelo.grade.linhas.map((l) => [l.nome, ...l.porDia.map((v) => (v > 0 ? fmtNum(v) : "-")), fmtNum(l.total), l.observacao || "-"]),
+      columnStyles: {
+        0: { cellWidth: 26, fontStyle: "bold" },
+        ...Object.fromEntries(dias.map((_, i) => [i + 1, { cellWidth: 12.5 }])),
+        [dias.length + 1]: { cellWidth: 13 },
+      },
       didParseCell: (d) => {
         const col = d.column.index;
         if (d.section === "head") {
           if (d.row.index === 1) {
             d.cell.styles.fillColor = [51, 65, 85];
             d.cell.styles.fontStyle = "normal";
-            d.cell.styles.fontSize = 6.5;
+            d.cell.styles.fontSize = 5.8;
           }
-          if (col >= 1) d.cell.styles.halign = "center";
+          if (col >= 1 && col <= dias.length + 1) d.cell.styles.halign = "center";
           return;
         }
-        if (col >= 1) d.cell.styles.halign = "center";
+        if (col >= 1 && col <= dias.length + 1) d.cell.styles.halign = "center";
         const l = modelo.grade.linhas[d.row.index];
         if (col === dias.length + 1) {
           d.cell.styles.fontStyle = "bold";
           d.cell.styles.textColor = corClasse(l.classe);
+        }
+        if (col >= 1 && col <= dias.length) {
+          const aviso = l.avisosDia[col - 1];
+          if (aviso === "max") {
+            d.cell.styles.textColor = COR.vermelho;
+            d.cell.styles.fontStyle = "bold";
+          } else if (aviso === "atencao") {
+            d.cell.styles.textColor = COR.ambar;
+            d.cell.styles.fontStyle = "bold";
+          }
+        }
+        if (col === dias.length + 2) {
+          d.cell.styles.fontSize = 6.5;
+          d.cell.styles.textColor = l.avisosDia.includes("max") ? COR.vermelho : COR.suave;
         }
       },
     });
@@ -268,7 +292,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     doc.setFontSize(7);
     doc.setTextColor(...COR.suave);
     const notaGrade = doc.splitTextToSize(
-      "Cada dia mostra as séries TOTAIS planejadas (1 por série, para cada músculo que o exercício trabalha). O Total é a soma da semana PONDERADA pelo peso de contribuição de cada exercício (a mesma leitura do Realizado), por isso não é a soma dos dias. A linha de baixo do cabeçalho mostra a rotina do dia. O Total segue a cor da faixa do músculo (vermelho abaixo, verde na janela, azul acima).",
+      "Cada dia mostra as séries TOTAIS planejadas (1 por série, para cada músculo que o exercício trabalha). O Total é a soma da semana PONDERADA pelo peso de contribuição de cada exercício (a mesma leitura do Realizado), por isso não é a soma dos dias. A linha de baixo do cabeçalho mostra a rotina do dia. O Total segue a cor da faixa do músculo (vermelho abaixo, verde dentro da janela, azul acima). Dias em vermelho passam de 10 séries (fracionar); em âmbar ficam de 8 a 10 (perto do limite) ou abaixo do mínimo do músculo (o menor entre 5 e a metade do máximo semanal dele, só avaliado quando o músculo é treinado em 2 ou mais dias).",
       util,
     ) as string[];
     garantir(notaGrade.length * 3.2);
@@ -281,7 +305,14 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   tabela({
     head: [["Músculo", ...modelo.semanas.map((s) => s.rotulo), "Média", "Planej."]],
     body: modelo.musculos.map((l) => [l.nome, ...l.porSemana.map((v) => fmtNum(v)), fmtNum(l.mediaSemanal), fmtNum(l.planejado)]),
-    columnStyles: { 0: { cellWidth: 28, fontStyle: "bold" } },
+    // Períodos longos (muitas semanas) em retrato: fonte e margem menores pra caberem as colunas.
+    ...(modelo.semanas.length > 10
+      ? {
+          styles: { fontSize: 6, cellPadding: 0.7, textColor: COR.texto, lineColor: COR.linha, lineWidth: 0.1 },
+          headStyles: { fillColor: COR.cabecalho, textColor: 255, fontStyle: "bold" as const, fontSize: 6 },
+        }
+      : {}),
+    columnStyles: { 0: { cellWidth: 26, fontStyle: "bold" } },
     didParseCell: (d) => {
       if (d.section !== "body") return;
       if (d.column.index >= 1 && d.column.index <= modelo.semanas.length) {
