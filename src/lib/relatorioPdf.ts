@@ -224,8 +224,8 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   // ---------------- volume semana a semana ----------------
   titulo("Volume semana a semana (séries ponderadas)");
   tabela({
-    head: [["Músculo", ...modelo.semanas.map((s) => s.rotulo), "Média", "Planej."]],
-    body: modelo.musculos.map((l) => [l.nome, ...l.porSemana.map((v) => fmtNum(v)), fmtNum(l.mediaSemanal), fmtNum(l.planejado)]),
+    head: [["Músculo", ...modelo.semanas.map((s) => s.rotulo), "Média"]],
+    body: modelo.musculos.map((l) => [l.nome, ...l.porSemana.map((v) => fmtNum(v)), fmtNum(l.mediaSemanal)]),
     // Períodos longos (muitas semanas) em retrato: fonte e margem menores pra caberem as colunas.
     ...(modelo.semanas.length > 10
       ? {
@@ -253,7 +253,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   garantir(5);
-  doc.text("Cores: verde = 90% ou mais do planejado; amarelo = 60% a 90%; vermelho = abaixo de 60%.", M, y);
+  doc.text("Cores: verde = 90% ou mais do plano atual do músculo; amarelo = 60% a 90%; vermelho = abaixo de 60%.", M, y);
   y += 6;
 
   // ---------------- rotinas atuais (o plano de hoje), pelos músculos que cada uma trabalha ----------------
