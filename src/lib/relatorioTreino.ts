@@ -23,6 +23,8 @@ export interface EntradaRelatorio {
   /** Grade da Distribuição Semanal: uma coluna por dia (seg a dom) com a rotina do dia e as séries
    * ponderadas planejadas por músculo naquele dia. */
   gradeSemanal: { dias: { rotulo: string; rotina: string | null }[]; porMusculo: Map<string, number[]> };
+  /** Rotinas atuais (plano de hoje), já ordenadas por dia da semana. */
+  rotinas: RotinaRelatorio[];
   classificar: (musculoId: string, seriesSemana: number) => ClasseVolumeSemanal;
   /** Janela de séries/semana própria de cada músculo (Músculos > Detalhe): é ela que define abaixo/dentro/acima. */
   janela: (musculoId: string) => { min: number; max: number };
@@ -99,6 +101,15 @@ export interface LinhaMusculoRelatorio {
   prioridade: number;
 }
 
+/** Rotina como está agora (plano atual): exercícios na ordem, com séries, repetições e descanso. */
+export interface RotinaRelatorio {
+  nome: string;
+  /** Dia da semana por extenso curto (Seg, Ter...) ou null se a rotina não tem dia fixo. */
+  dia: string | null;
+  totalSeries: number;
+  exercicios: { nome: string; musculo: string; series: number; reps: string; descanso: string }[];
+}
+
 export interface LinhaGradeRelatorio {
   nome: string;
   grupo: string | null;
@@ -146,6 +157,8 @@ export interface ModeloRelatorio {
   musculos: LinhaMusculoRelatorio[];
   /** Distribuição Semanal (grade da aba Planejado): séries ponderadas planejadas por dia e músculo. */
   grade: { dias: { rotulo: string; rotina: string | null }[]; linhas: LinhaGradeRelatorio[] };
+  /** Rotinas atuais (plano de hoje). */
+  rotinas: RotinaRelatorio[];
   decisoes: string[];
   exercicios: LinhaExercicioRelatorio[];
   alertas: string[];
@@ -525,6 +538,7 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
     },
     musculos: linhas,
     grade: { dias: e.gradeSemanal.dias, linhas: linhasGrade },
+    rotinas: e.rotinas,
     decisoes,
     exercicios,
     alertas,

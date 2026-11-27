@@ -142,6 +142,42 @@ export async function levantarRelatorio(args: {
     porMusculo: porMusculoGrade,
   };
 
+  // rotinas atuais, na ordem da semana (seg a dom, sem dia por último), com os exercícios na ordem da rotina
+  const posicaoDia = (d: number | null) => (d == null ? 99 : ORDEM_DIAS.indexOf(d));
+  const fmtReps = (series: { rep_min: number | null; rep_max: number | null }[]): string => {
+    const mins = series.map((x) => x.rep_min).filter((v): v is number => v != null);
+    const maxs = series.map((x) => x.rep_max).filter((v): v is number => v != null);
+    if (!mins.length && !maxs.length) return "-";
+    const lo = mins.length ? Math.min(...mins) : Math.min(...maxs);
+    const hi = maxs.length ? Math.max(...maxs) : Math.max(...mins);
+    return lo === hi ? String(lo) : `${lo}-${hi}`;
+  };
+  const fmtDescanso = (seg: number | null): string => {
+    if (seg == null) return "-";
+    const m = Math.floor(seg / 60);
+    const r = seg % 60;
+    return m ? `${m}:${String(r).padStart(2, "0")}` : `${seg}s`;
+  };
+  const rotinas = [...treinos]
+    .sort((a, b) => posicaoDia(a.dia_semana) - posicaoDia(b.dia_semana) || a.ordem - b.ordem)
+    .map((t) => ({
+      nome: t.nome_treino,
+      dia: t.dia_semana != null ? NOMES_DIAS[t.dia_semana] : null,
+      totalSeries: t.exercicios.reduce((acc, te) => acc + te.series.length, 0),
+      exercicios: [...t.exercicios]
+        .sort((a, b) => a.ordem - b.ordem)
+        .map((te) => {
+          const principal = [...(te.exercicio?.musculos ?? [])].sort((a, b) => Number(b.peso_contribuicao) - Number(a.peso_contribuicao))[0];
+          return {
+            nome: te.exercicio?.nome ?? "",
+            musculo: principal ? (musculoPorId.get(principal.musculo_id)?.nome ?? "") : "",
+            series: te.series.length,
+            reps: fmtReps(te.series),
+            descanso: fmtDescanso(te.descanso_seg),
+          };
+        }),
+    }));
+
   const ordenados = [...pesosTodos].sort((a, b) => a.data.localeCompare(b.data));
 
   return montarRelatorio({
@@ -153,6 +189,7 @@ export async function levantarRelatorio(args: {
     metaSemanal,
     planejadoSemanal,
     gradeSemanal,
+    rotinas,
     janela: (musculoId) => janelaDoMusculo(musculoPorId.get(musculoId)),
     classificar: (musculoId, serie) => classificarVolumeSemanal(serie, janelaDoMusculo(musculoPorId.get(musculoId))),
     exercicios,

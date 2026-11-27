@@ -316,6 +316,33 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     y += notaGrade.length * 3.2 + 4;
   }
 
+  // ---------------- rotinas atuais (o plano de hoje) ----------------
+  if (modelo.rotinas.length) {
+    titulo("Rotinas atuais");
+    const corpo: NonNullable<Parameters<typeof autoTable>[1]["body"]> = [];
+    for (const r of modelo.rotinas) {
+      corpo.push([
+        {
+          content: `${r.nome}${r.dia ? ` (${r.dia})` : ""}  -  ${r.exercicios.length} exercícios, ${r.totalSeries} séries`,
+          colSpan: 5,
+          styles: { fontStyle: "bold", fillColor: [229, 231, 235], textColor: COR.texto },
+        },
+      ]);
+      for (const x of r.exercicios) corpo.push([x.nome, x.musculo || "-", String(x.series), x.reps, x.descanso]);
+    }
+    tabela({
+      head: [["Exercício", "Músculo principal", "Séries", "Repetições", "Descanso"]],
+      body: corpo,
+      columnStyles: {
+        1: { cellWidth: 38 },
+        2: { halign: "right", cellWidth: 16 },
+        3: { halign: "center", cellWidth: 22 },
+        4: { halign: "center", cellWidth: 20 },
+      },
+      alternateRowStyles: { fillColor: [255, 255, 255] },
+    });
+  }
+
   // ---------------- exercícios ----------------
   const exerciciosComLeitura = modelo.exercicios.filter((x) => x.sessoes >= 4);
   titulo("Por exercício (1RM estimado no período, 4 sessões ou mais)");
