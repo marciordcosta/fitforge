@@ -1085,6 +1085,13 @@
     return { inicio: somarDias(hoje, -(7 * Number(periodoRelatorio) - 1)), fim: hoje };
   }
 
+  function abrirAbaParaPdf(): Window | null {
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return null;
+    const aba = window.open("", "_blank");
+    if (aba) aba.document.title = "Gerando relatório...";
+    return aba;
+  }
+
   async function exportarRelatorio(): Promise<void> {
     if (gerandoRelatorio) return;
     const { inicio, fim } = intervaloRelatorio();
@@ -1093,6 +1100,9 @@
       return;
     }
     gerandoRelatorio = true;
+    // No computador o PDF abre numa aba nova; ela precisa ser aberta já no clique (depois da geração o
+    // navegador bloquearia o pop-up) e recebe o PDF quando ficar pronto.
+    const abaPdf = abrirAbaParaPdf();
     try {
       const modelo = await levantarRelatorio({
         inicio,
@@ -1107,10 +1117,11 @@
       });
       const [{ gerarRelatorioPdf }, { entregarPdf }] = await Promise.all([import("../../lib/relatorioPdf"), import("../../lib/relatorioEntrega")]);
       const blob = await gerarRelatorioPdf(modelo);
-      await entregarPdf(blob, `relatorio-treino-${inicio}_${fim}.pdf`);
+      await entregarPdf(blob, `relatorio-treino-${inicio}_${fim}.pdf`, abaPdf);
       mostrarToast("Relatório pronto");
       mostrarRelatorio = false;
     } catch (err) {
+      abaPdf?.close();
       mostrarToast(`Não consegui gerar o relatório: ${(err as Error).message}`, 4000);
     } finally {
       gerandoRelatorio = false;
