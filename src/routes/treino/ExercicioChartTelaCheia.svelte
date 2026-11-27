@@ -545,7 +545,8 @@
   .topo-esquerda {
     position: absolute;
     top: var(--space-3);
-    left: var(--space-3);
+    /* À direita, ao lado do botão de fechar (32px + respiro). */
+    right: calc(var(--space-3) + 32px + var(--space-2));
     display: flex;
     gap: var(--space-2);
     z-index: 1;
