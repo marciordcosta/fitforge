@@ -182,13 +182,12 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   // ---------------- TABELA PRINCIPAL: tudo que decide, por músculo ----------------
   titulo("Consolidado por músculo (realizado no período)");
   tabela({
-    head: [["Músculo", "Séries/sem.", "Planejado", "% total", "Acum. %", "Curva", "Progressão", "Ação sugerida"]],
+    head: [["Músculo", "Séries/sem.", "Planejado", "% total", "Curva", "Progressão", "Ação sugerida"]],
     body: modelo.musculos.map((l) => [
       l.nome,
       fmtNum(l.mediaSemanal),
       fmtNum(l.planPond),
       l.curva ? `${l.pctTotal}%` : "-",
-      l.curva ? `${l.acumuladoPct}%` : "-",
       l.curva ?? "-",
       l.progressao ? `${NOME_PROGRESSAO[l.progressao]}${l.variacaoPct != null ? ` ${fmtSinal(l.variacaoPct, 1, "%")}` : ""}` : "-",
       l.acao,
@@ -198,9 +197,8 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
       1: { halign: "right", cellWidth: 24 },
       2: { halign: "right", cellWidth: 24 },
       3: { halign: "right", cellWidth: 20 },
-      4: { halign: "right", cellWidth: 20 },
-      5: { halign: "center", cellWidth: 16 },
-      6: { cellWidth: 42 },
+      4: { halign: "center", cellWidth: 18 },
+      5: { cellWidth: 44 },
     },
     didParseCell: (d) => {
       if (d.section === "head") return;
@@ -211,11 +209,11 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
         d.cell.styles.textColor = COR.vermelho;
         d.cell.styles.fontStyle = "bold";
       }
-      if (col === 5 && l.curva) {
+      if (col === 4 && l.curva) {
         d.cell.styles.fontStyle = "bold";
         d.cell.styles.textColor = l.curva === "A" ? COR.verde : l.curva === "B" ? COR.ambar : COR.suave;
       }
-      if (col === 6) {
+      if (col === 5) {
         d.cell.styles.textColor = corProgressao(l.progressao);
         d.cell.styles.fontStyle = "bold";
       }
@@ -225,7 +223,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.setFontSize(7);
   doc.setTextColor(...COR.suave);
   const nota = doc.splitTextToSize(
-    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado; em vermelho quando está 25% ou mais abaixo do Planejado. Curva ABC: músculos do maior pro menor volume realizado; A = até 70% do volume acumulado, B = até 90%, C = o restante (onde o volume está investido, a prioridade na prática). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Faixa de volume, frequência e demais comparações com o plano estão no Aprofundamento.",
+    "Séries/sem.: séries ponderadas realizadas (média das semanas com treino), a mesma leitura do Realizado; em vermelho quando está 25% ou mais abaixo do Planejado. Curva ABC: volume do músculo contra a média dos músculos treinados; A = 125% da média ou mais (prioridade na prática), B = de 60% a 125%, C = abaixo de 60% (secundário). Progressão: reta do 1RM semanal dos exercícios do músculo, ponderados pelo trabalho no músculo (limite de 2%; com menos de 4 semanas fica Em análise). Faixa de volume, frequência e demais comparações com o plano estão no Aprofundamento.",
     util,
   ) as string[];
   garantir(nota.length * 3.2);

@@ -48,15 +48,16 @@ export interface EntradaRelatorio {
 
 export type CurvaABC = "A" | "B" | "C";
 
-/** Cortes da curva ABC sobre o % acumulado do volume (músculos do maior pro menor volume): a classe
- * vem de onde o acumulado ESTAVA antes de somar o músculo — assim quem cruza o limite fica na classe
- * em que o cruzamento acontece. A até 70%, B até 90%, C o resto. */
-export const CORTE_CURVA_A = 70;
-export const CORTE_CURVA_B = 90;
+/** Curva ABC relativa à média: o volume de cada músculo contra a média dos músculos treinados (volume
+ * total ÷ nº de músculos com volume). A = 125% da média ou mais (prioridade), B = de 60% a 125%,
+ * C = abaixo de 60% (secundário). Funciona mesmo quando o volume é parecido entre vários músculos,
+ * onde uma regra de Pareto (acumulado) deixaria quase todos em A. */
+export const CORTE_CURVA_A = 1.25;
+export const CORTE_CURVA_B = 0.6;
 
-export function curvaPorAcumuladoAnterior(acumuladoAnterior: number): CurvaABC {
-  if (acumuladoAnterior < CORTE_CURVA_A) return "A";
-  if (acumuladoAnterior < CORTE_CURVA_B) return "B";
+export function curvaPorRazaoDaMedia(razao: number): CurvaABC {
+  if (razao >= CORTE_CURVA_A) return "A";
+  if (razao >= CORTE_CURVA_B) return "B";
   return "C";
 }
 
@@ -74,8 +75,6 @@ export interface LinhaMusculoRelatorio {
   deltaPct: number | null;
   /** % do volume total semanal realizado (todos os músculos). */
   pctTotal: number;
-  /** % acumulado até este músculo, do maior pro menor volume. */
-  acumuladoPct: number;
   /** Curva ABC do volume realizado (null sem volume). */
   curva: CurvaABC | null;
   /** Curva ABC do volume planejado (prioridade pretendida). */
@@ -265,7 +264,6 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
       planAcum: r1(plan?.acumulado ?? 0),
       deltaPct: (plan?.ponderado ?? 0) > 0 ? Math.round(((media - (plan?.ponderado ?? 0)) / (plan?.ponderado ?? 1)) * 100) : null,
       pctTotal: 0,
-      acumuladoPct: 0,
       curva: null,
       curvaPlanejada: null,
       classe,
@@ -280,25 +278,17 @@ export function montarRelatorio(e: EntradaRelatorio): ModeloRelatorio {
   }
   linhas.sort((a, b) => b.mediaSemanal - a.mediaSemanal);
 
-  // ---- curva ABC (volume realizado) e a mesma conta sobre o planejado ----
-  const totalReal = linhas.reduce((a, l) => a + l.mediaSemanal, 0);
-  let acumReal = 0;
-  for (const l of linhas) {
-    if (totalReal > 0 && l.mediaSemanal > 0) {
-      l.curva = curvaPorAcumuladoAnterior(acumReal);
-      l.pctTotal = Math.round((l.mediaSemanal / totalReal) * 100);
-      acumReal += (l.mediaSemanal / totalReal) * 100;
-      l.acumuladoPct = Math.round(acumReal);
-    }
+  // ---- curva ABC relativa à média (volume realizado) e a mesma conta sobre o planejado ----
+  const musculosComVolume = linhas.filter((l) => l.mediaSemanal > 0);
+  const totalReal = musculosComVolume.reduce((a, l) => a + l.mediaSemanal, 0);
+  const mediaReal = musculosComVolume.length ? totalReal / musculosComVolume.length : 0;
+  for (const l of musculosComVolume) {
+    l.curva = curvaPorRazaoDaMedia(l.mediaSemanal / mediaReal);
+    l.pctTotal = Math.round((l.mediaSemanal / totalReal) * 100);
   }
-  const totalPlan = linhas.reduce((a, l) => a + l.planejado, 0);
-  let acumPlan = 0;
-  for (const l of [...linhas].sort((a, b) => b.planejado - a.planejado)) {
-    if (totalPlan > 0 && l.planejado > 0) {
-      l.curvaPlanejada = curvaPorAcumuladoAnterior(acumPlan);
-      acumPlan += (l.planejado / totalPlan) * 100;
-    }
-  }
+  const comPlano = linhas.filter((l) => l.planejado > 0);
+  const mediaPlano = comPlano.length ? comPlano.reduce((a, l) => a + l.planejado, 0) / comPlano.length : 0;
+  for (const l of comPlano) l.curvaPlanejada = curvaPorRazaoDaMedia(l.planejado / mediaPlano);
 
   // ---- grade da distribuição semanal (planejado, por dia) ----
   const grupoPorMusculo = new Map(e.musculos.map((m) => [m.id, m.grupo]));
