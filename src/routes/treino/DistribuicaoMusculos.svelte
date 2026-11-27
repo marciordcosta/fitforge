@@ -930,10 +930,13 @@
     // 9.8 (de somar frações de peso_contribuicao) comparava "9.8 < 10" como verdadeiro mesmo
     // exibindo "10" na tela, classificando errado pelo número que o usuário está vendo.
     const classe = classificarVolumeSemanal(arredondarValor(v), janelaDoMusculo(musculo));
-    // Padrão único: vermelho = abaixo da janela do músculo, verde = dentro dela, azul = acima.
+    // Uma cor por estágio da janela do músculo: abaixo = vermelho, manutenção = cinza, moderado = amarelo,
+    // prioridade = verde, acima (foco) = azul.
     if (classe === "insuficiente") return "var(--color-danger)";
-    if (classe === "foco") return "var(--color-secondary)";
-    return "var(--color-success)";
+    if (classe === "manutencao") return "var(--color-neutral)";
+    if (classe === "moderado") return "#fbbf24";
+    if (classe === "prioridade") return "var(--color-success)";
+    return "var(--color-secondary)";
   }
 
   /** Estilo completo (texto + fundo) pra um valor de série numa "caixa" (grade semanal, Realizado

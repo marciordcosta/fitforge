@@ -40,6 +40,7 @@ function corClasse(c: string): [number, number, number] {
   if (c === "insuficiente") return COR.vermelho;
   if (c === "foco") return COR.azul;
   if (c === "manutencao") return COR.suave;
+  if (c === "moderado") return COR.ambar;
   return COR.verde;
 }
 
@@ -294,7 +295,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     doc.setFontSize(7);
     doc.setTextColor(...COR.suave);
     const notaGrade = doc.splitTextToSize(
-      "Cada dia mostra as séries TOTAIS planejadas (1 por série, para cada músculo que o exercício trabalha). O Total é a soma da semana PONDERADA pelo peso de contribuição de cada exercício (a mesma leitura do Realizado), por isso não é a soma dos dias. A linha de baixo do cabeçalho mostra a rotina do dia. O Total segue a cor da faixa do músculo (vermelho abaixo, cinza em manutenção, verde em moderado e prioridade, azul em foco). Dias em vermelho passam de 10 séries (fracionar); em âmbar ficam de 8 a 10 (perto do limite) ou abaixo do mínimo do músculo (o menor entre 5 e a metade do máximo semanal dele), este só quando outro dia do mesmo músculo passa de 8 e dá pra redistribuir.",
+      "Cada dia mostra as séries TOTAIS planejadas (1 por série, para cada músculo que o exercício trabalha). O Total é a soma da semana PONDERADA pelo peso de contribuição de cada exercício (a mesma leitura do Realizado), por isso não é a soma dos dias. A linha de baixo do cabeçalho mostra a rotina do dia. O Total segue a cor da faixa do músculo (vermelho abaixo, cinza em manutenção, amarelo em moderado, verde em prioridade, azul em foco). Dias em vermelho passam de 10 séries (fracionar); em âmbar ficam de 8 a 10 (perto do limite) ou abaixo do mínimo do músculo (o menor entre 5 e a metade do máximo semanal dele), este só quando outro dia do mesmo músculo passa de 8 e dá pra redistribuir.",
       util,
     ) as string[];
     garantir(notaGrade.length * 3.2);
