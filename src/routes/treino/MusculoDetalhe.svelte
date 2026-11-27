@@ -73,8 +73,10 @@
     }
     salvando = true;
     try {
-      const seriesMinimasNum = seriesMinimas.trim() ? Number(seriesMinimas) : null;
-      const seriesMaximasNum = seriesMaximas.trim() ? Number(seriesMaximas) : null;
+      // O input numérico devolve número (ou vazio/null), não texto: String() antes de olhar se está vazio.
+      const paraNumero = (v: unknown): number | null => (String(v ?? "").trim() === "" ? null : Number(v));
+      const seriesMinimasNum = paraNumero(seriesMinimas);
+      const seriesMaximasNum = paraNumero(seriesMaximas);
       if (seriesMinimasNum != null && seriesMaximasNum != null && seriesMinimasNum > seriesMaximasNum) {
         alert("O mínimo de séries não pode ser maior que o máximo.");
         salvando = false;
