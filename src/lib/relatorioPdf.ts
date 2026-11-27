@@ -260,7 +260,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   if (modelo.rotinas.length) {
     titulo("Rotinas atuais (músculos trabalhados)");
     const comAcum = modelo.rotinas.some((r) => r.musculos.some((m) => m.acum != null));
-    const nCols = comAcum ? 5 : 4;
+    const nCols = comAcum ? 4 : 3;
     const corpo: NonNullable<Parameters<typeof autoTable>[1]["body"]> = [];
     for (const r of modelo.rotinas) {
       corpo.push([
@@ -270,25 +270,29 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
           styles: { fontStyle: "bold", fillColor: [229, 231, 235], textColor: COR.texto },
         },
       ]);
-      // Músculos à esquerda e, ao lado, a lista dos exercícios do dia em sequência (linha k = exercício k).
-      // Em geral há menos exercícios que músculos; se for o contrário, as linhas extras ficam sem músculo.
-      const linhas = Math.max(r.musculos.length, r.exercicios.length);
-      for (let k = 0; k < linhas; k++) {
-        const m = r.musculos[k];
-        const linha: string[] = m ? [m.nome, fmtNum(m.total, m.total % 1 ? 1 : 0), fmtNum(m.pond)] : ["", "", ""];
-        if (comAcum) linha.push(m && m.acum != null ? fmtNum(m.acum) : m ? "-" : "");
-        linha.push(r.exercicios[k] ? `${k + 1}. ${r.exercicios[k].nome} (${r.exercicios[k].series})` : "");
+      // Exercícios do dia em sequência, numa linha só (quebra se for longa): "1º Flexora (3), 2º Agachamento (3)"
+      if (r.exercicios.length) {
+        corpo.push([
+          {
+            content: r.exercicios.map((x, k) => `${k + 1}º ${x.nome} (${x.series})`).join(", "),
+            colSpan: nCols,
+            styles: { fontStyle: "italic", fontSize: 7, textColor: COR.suave, fillColor: [255, 255, 255] },
+          },
+        ]);
+      }
+      for (const m of r.musculos) {
+        const linha = [m.nome, fmtNum(m.total, m.total % 1 ? 1 : 0), fmtNum(m.pond)];
+        if (comAcum) linha.push(m.acum != null ? fmtNum(m.acum) : "-");
         corpo.push(linha);
       }
     }
     tabela({
-      head: [comAcum ? ["Músculo", "Total", "Pond.", "Acum.", "Exercícios do dia (em sequência)"] : ["Músculo", "Total", "Pond.", "Exercícios do dia (em sequência)"]],
+      head: [comAcum ? ["Músculo", "Total", "Pond.", "Acum."] : ["Músculo", "Total", "Pond."]],
       body: corpo,
       columnStyles: {
-        0: { cellWidth: 34 },
-        1: { halign: "right", cellWidth: 14 },
-        2: { halign: "right", cellWidth: 14 },
-        ...(comAcum ? { 3: { halign: "right", cellWidth: 14 } } : {}),
+        1: { halign: "right", cellWidth: 24 },
+        2: { halign: "right", cellWidth: 24 },
+        ...(comAcum ? { 3: { halign: "right", cellWidth: 24 } } : {}),
       },
       alternateRowStyles: { fillColor: [255, 255, 255] },
     });
@@ -296,7 +300,7 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     doc.setFontSize(7);
     doc.setTextColor(...COR.suave);
     const notaRot = doc.splitTextToSize(
-      "Séries planejadas por semana nesta rotina, como no card da rotina no app: Total conta 1 série para cada músculo que o exercício trabalha; Pond. pondera pelo peso de contribuição do exercício no músculo; Acum. desconta a posição da série na rotina (só aparece com a fadiga por posição ligada). A lista de exercícios ao lado segue a ordem do treino, com o número de séries de cada um entre parênteses; cada linha é um exercício, independente do músculo da mesma linha.",
+      "Séries planejadas por semana nesta rotina, como no card da rotina no app: Total conta 1 série para cada músculo que o exercício trabalha; Pond. pondera pelo peso de contribuição do exercício no músculo; Acum. desconta a posição da série na rotina (só aparece com a fadiga por posição ligada). Abaixo do nome da rotina, os exercícios do dia na ordem do treino, com o número de séries entre parênteses.",
       util,
     ) as string[];
     garantir(notaRot.length * 3.2);
