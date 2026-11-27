@@ -238,6 +238,41 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
   doc.text("Tabelas complementares ao resumo da primeira página, para análise mais profunda.", M, y + 10);
   y += 14;
 
+  // ---------------- volume semana a semana ----------------
+  titulo("Volume semana a semana (séries ponderadas)");
+  tabela({
+    head: [["Músculo", ...modelo.semanas.map((s) => s.rotulo), "Média", "Planej."]],
+    body: modelo.musculos.map((l) => [l.nome, ...l.porSemana.map((v) => fmtNum(v)), fmtNum(l.mediaSemanal), fmtNum(l.planejado)]),
+    // Períodos longos (muitas semanas) em retrato: fonte e margem menores pra caberem as colunas.
+    ...(modelo.semanas.length > 10
+      ? {
+          styles: { fontSize: 6, cellPadding: 0.7, textColor: COR.texto, lineColor: COR.linha, lineWidth: 0.1 },
+          headStyles: { fillColor: COR.cabecalho, textColor: 255, fontStyle: "bold" as const, fontSize: 6 },
+        }
+      : {}),
+    columnStyles: { 0: { cellWidth: 26, fontStyle: "bold" } },
+    didParseCell: (d) => {
+      if (d.section !== "body") return;
+      if (d.column.index >= 1 && d.column.index <= modelo.semanas.length) {
+        const l = modelo.musculos[d.row.index];
+        const v = l.porSemana[d.column.index - 1];
+        d.cell.styles.halign = "right";
+        if (l.planejado > 0) {
+          const r = v / l.planejado;
+          d.cell.styles.fillColor = r >= 0.9 ? [220, 245, 227] : r >= 0.6 ? [254, 243, 199] : [254, 226, 226];
+        }
+      } else if (d.column.index > modelo.semanas.length) {
+        d.cell.styles.halign = "right";
+      }
+    },
+  });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...COR.suave);
+  garantir(5);
+  doc.text("Cores: verde = 90% ou mais do planejado; amarelo = 60% a 90%; vermelho = abaixo de 60%.", M, y);
+  y += 6;
+
   // ---- Distribuição Semanal: a grade de dias (seg a dom) com as séries ponderadas planejadas ----
   if (modelo.grade.linhas.length) {
     titulo("Distribuição semanal planejada (séries totais por dia, total ponderado)");
@@ -297,41 +332,6 @@ export async function gerarRelatorioPdf(modelo: ModeloRelatorio): Promise<Blob> 
     doc.text(notaGrade, M, y);
     y += notaGrade.length * 3.2 + 4;
   }
-
-  // ---------------- volume semana a semana ----------------
-  titulo("Volume semana a semana (séries ponderadas)");
-  tabela({
-    head: [["Músculo", ...modelo.semanas.map((s) => s.rotulo), "Média", "Planej."]],
-    body: modelo.musculos.map((l) => [l.nome, ...l.porSemana.map((v) => fmtNum(v)), fmtNum(l.mediaSemanal), fmtNum(l.planejado)]),
-    // Períodos longos (muitas semanas) em retrato: fonte e margem menores pra caberem as colunas.
-    ...(modelo.semanas.length > 10
-      ? {
-          styles: { fontSize: 6, cellPadding: 0.7, textColor: COR.texto, lineColor: COR.linha, lineWidth: 0.1 },
-          headStyles: { fillColor: COR.cabecalho, textColor: 255, fontStyle: "bold" as const, fontSize: 6 },
-        }
-      : {}),
-    columnStyles: { 0: { cellWidth: 26, fontStyle: "bold" } },
-    didParseCell: (d) => {
-      if (d.section !== "body") return;
-      if (d.column.index >= 1 && d.column.index <= modelo.semanas.length) {
-        const l = modelo.musculos[d.row.index];
-        const v = l.porSemana[d.column.index - 1];
-        d.cell.styles.halign = "right";
-        if (l.planejado > 0) {
-          const r = v / l.planejado;
-          d.cell.styles.fillColor = r >= 0.9 ? [220, 245, 227] : r >= 0.6 ? [254, 243, 199] : [254, 226, 226];
-        }
-      } else if (d.column.index > modelo.semanas.length) {
-        d.cell.styles.halign = "right";
-      }
-    },
-  });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...COR.suave);
-  garantir(5);
-  doc.text("Cores: verde = 90% ou mais do planejado; amarelo = 60% a 90%; vermelho = abaixo de 60%.", M, y);
-  y += 6;
 
   // ---------------- exercícios ----------------
   const exerciciosComLeitura = modelo.exercicios.filter((x) => x.sessoes >= 4);
