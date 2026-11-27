@@ -395,7 +395,8 @@
     const ativas: CampoOrdenacaoSeries[] = [];
     if (parametrosDistribuicao.mostrarSeriesTotais) ativas.push("total");
     if (parametrosDistribuicao.mostrarSeriesPonderadas) ativas.push("ponderado");
-    if (parametrosDistribuicao.mostrarSeriesAcumuladas) ativas.push("acumulado");
+    // Sem desconto de fadiga, Acumuladas seria igual a Ponderadas: a coluna não aparece.
+    if (parametrosDistribuicao.mostrarSeriesAcumuladas && parametrosDistribuicao.fadigaAtiva) ativas.push("acumulado");
     return ativas.length ? ativas : ["ponderado"];
   });
 

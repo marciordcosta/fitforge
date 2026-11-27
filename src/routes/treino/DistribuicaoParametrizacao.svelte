@@ -73,7 +73,7 @@
   /** Impede desmarcar a última coluna ativa — sempre precisa sobrar pelo menos uma. */
   function alternarColuna(campo: "totais" | "ponderadas" | "acumuladas", e: Event): void {
     const input = e.currentTarget as HTMLInputElement;
-    const ativas = [mostrarSeriesTotais, mostrarSeriesPonderadas, mostrarSeriesAcumuladas].filter(Boolean).length;
+    const ativas = [mostrarSeriesTotais, mostrarSeriesPonderadas, fadigaAtiva && mostrarSeriesAcumuladas].filter(Boolean).length;
     const atual = campo === "totais" ? mostrarSeriesTotais : campo === "ponderadas" ? mostrarSeriesPonderadas : mostrarSeriesAcumuladas;
     if (atual && ativas <= 1) {
       input.checked = true;
@@ -248,28 +248,25 @@
         <span>Descontar a fadiga por posição da série</span>
       </label>
       <p class="param-card-desc">
-        Desligado, todas as séries contam inteiro: as barras ficam de uma cor só e Acumuladas fica igual a Ponderadas.
+        Desligado, todas as séries contam inteiro: as barras ficam de uma cor só e a coluna Acumuladas some (seria igual à Ponderada).
       </p>
 
       {#if fadigaAtiva}
         <div class="param-linha">
           <div class="param-linha-topo">
-            <p class="param-nome">Bloco A até <span class="legenda-cor legenda-fase-a">●</span></p>
+            <p class="param-nome">Bloco B (intermediário) <span class="legenda-cor legenda-fase-b">●</span></p>
             <div class="param-campos">
-              <input class="param-input" type="number" inputmode="numeric" min="1" max="99" step="5" aria-label="Corte A" bind:value={fadigaFasesCorteA} />
+              <span class="param-unidade">de</span>
+              <input class="param-input" type="number" inputmode="numeric" min="1" max="99" step="5" aria-label="Bloco B começa em (%)" bind:value={fadigaFasesCorteA} />
+              <span class="param-unidade">a</span>
+              <input class="param-input" type="number" inputmode="numeric" min="1" max="99" step="5" aria-label="Bloco B termina em (%)" bind:value={fadigaFasesCorteB} />
               <span class="param-unidade">%</span>
             </div>
           </div>
         </div>
-        <div class="param-linha">
-          <div class="param-linha-topo">
-            <p class="param-nome">Bloco B até <span class="legenda-cor legenda-fase-b">●</span></p>
-            <div class="param-campos">
-              <input class="param-input" type="number" inputmode="numeric" min="1" max="99" step="5" aria-label="Corte B" bind:value={fadigaFasesCorteB} />
-              <span class="param-unidade">%</span>
-            </div>
-          </div>
-        </div>
+        <p class="param-card-desc">
+          Percentual da rotina em que as séries caem no bloco B. Antes disso é o bloco A (<span class="legenda-cor legenda-fase-a">●</span> início, maior retorno); depois, o bloco C (fim, maior desconto).
+        </p>
       {/if}
 
         </div>
@@ -293,10 +290,12 @@
         <input type="checkbox" checked={mostrarSeriesPonderadas} onchange={(e) => alternarColuna("ponderadas", e)} />
         <span>Séries Ponderadas</span>
       </label>
-      <label class="checkbox-linha">
-        <input type="checkbox" checked={mostrarSeriesAcumuladas} onchange={(e) => alternarColuna("acumuladas", e)} />
-        <span>Séries Acumuladas</span>
-      </label>
+      {#if fadigaAtiva}
+        <label class="checkbox-linha">
+          <input type="checkbox" checked={mostrarSeriesAcumuladas} onchange={(e) => alternarColuna("acumuladas", e)} />
+          <span>Séries Acumuladas</span>
+        </label>
+      {/if}
 
       <p class="param-subtitulo">Lista de Exercícios</p>
       <label class="checkbox-linha">
